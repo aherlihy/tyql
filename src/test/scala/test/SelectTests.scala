@@ -1,5 +1,7 @@
 package test
 import tyql.*
+import language.experimental.namedTuples
+import NamedTuple.{NamedTuple, AnyNamedTuple}
 
 case class CityT(zipCode: Int, name: String, population: Int)
 case class CityT2(zipCode: Int, name: String, population: Int)
@@ -48,7 +50,20 @@ class SelectWithNestTest extends SQLStringTest[CityT, CityT] {
   def sqlString: String = "SELECT city.* FROM cities AS city JOIN cities AS alt ON city.name=alt.name AND city.zipcode != alt.zipcode"  
 }
 
-// class SelectWithProjectTest extends SQLStringTest[CityT, CityT] {
+class SelectNested extends SQLStringTest[CityT, CityT] {
+  def testDescription: String = "select with 1 join, 2 tables, 1 row type"
+  def query() =
+    for
+      city <- testTable.table
+      alt <- testTable.table
+      if city.name == alt.name && city.zipCode != alt.zipCode
+    yield
+      city
+  def sqlString: String =  "SELECT city.* FROM cities AS city JOIN cities AS alt ON city.name=alt.name AND city.zipcode != alt.zipcode"
+}  
+
+//      
+// class SelectWithProjectTest extends SQLStringTest[CityT, (name: String, zipCode: Int)] {   
 //   def testDescription: String = "select with project"
 //   def query() =
 //     testTable.table.map: city =>

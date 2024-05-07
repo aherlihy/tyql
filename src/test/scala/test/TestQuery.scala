@@ -1,4 +1,4 @@
-package test // test package so that it can be imported by bench. TODO: better way to structure?
+package test // test package so that it can be imported by bench.
 import tyql.*
 
 class TestTable[Row] {
@@ -13,9 +13,10 @@ trait TestQuery[Row, Return](using val testTable: TestTable[Row]) {
   def sqlString: String
 }
 
+
 abstract class SQLStringTest[Row, Return](using TestTable[Row]) extends munit.FunSuite with TestQuery[Row, Return] {
   test(testDescription) {
-    assert(query().toSQLString == sqlString)
+    assertEquals(query().toSQLString, sqlString)
   }
   // TODO: test other features
 }
