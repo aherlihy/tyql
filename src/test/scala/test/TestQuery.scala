@@ -1,22 +1,21 @@
 package test // test package so that it can be imported by bench.
 import tyql.*
 
-class TestTable[Row] {
-  def table: Table[Row] = Table[Row]("tableName")
+class TestDatabase[Rows <: Tuple] { // this could be a named tuple?
+  def tables: Tuple.Map[Rows, Table] = ???
   def init(): Unit = ???
 }
-// class CitiesTable extends TestTable[CityT] in case custom init method required
 
-trait TestQuery[Row, Return](using val testTable: TestTable[Row]) {
+trait TestQuery[Rows <: Tuple, Return](using val testDB: TestDatabase[Rows]) {
   def testDescription: String
   def query(): Query[Return]
   def sqlString: String
 }
 
-
-abstract class SQLStringTest[Row, Return](using TestTable[Row]) extends munit.FunSuite with TestQuery[Row, Return] {
+trait TestSQLString[Rows <: Tuple, Return] extends munit.FunSuite with TestQuery[Rows, Return] {
   test(testDescription) {
     assertEquals(query().toSQLString, sqlString)
   }
-  // TODO: test other features
 }
+
+abstract class SQLStringTest[Rows <: Tuple, Return](using TestDatabase[Rows]) extends TestSQLString[Rows, Return] with TestQuery[Rows, Return]
