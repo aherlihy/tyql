@@ -4,11 +4,6 @@ import language.experimental.namedTuples
 import scala.language.implicitConversions
 import NamedTuple.{NamedTuple, AnyNamedTuple}
 
-// Some sample types
-case class City(zipCode: Int, name: String, population: Int)
-case class City2(zipCode: Int, name: String, population: Int)
-type Address = (city: City, street: String, number: Int)
-type Person = (name: String, age: Int, addr: Address)
 
 // case class QueryTest[Row, Result](name: String, // TODO: constrain Result based on Rows? Constrain types to DB types?
 //                           queryFn: Table[Row] => Query[Result],
