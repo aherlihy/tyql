@@ -4,13 +4,16 @@ import language.experimental.namedTuples
 import NamedTuple.*
 
 case class CityT(zipCode: Int, name: String, population: Int)
-case class CityT2(zipCode: Int, name: String, population: Int)
 type AddressT = (city: CityT, street: String, number: Int)
-type PersonT = (name: String, age: Int, addr: AddressT)
 
-given TestDatabase[Tuple1[CityT]] with
+given cityDB: TestDatabase[Tuple1[CityT]] with
   override def tables = Tuple(
     Table[CityT]("cities")
+  )
+
+given addressDB: TestDatabase[Tuple1[AddressT]] with
+  override def tables = Tuple(
+    Table[AddressT]("addresses")
   )
 
 given TestDatabase[(CityT, AddressT, CityT)] with
@@ -71,11 +74,11 @@ class SelectNested extends SQLStringTest[(CityT, AddressT, CityT), CityT] {
   def sqlString: String =  "SELECT city.* FROM cities AS city JOIN cities AS alt ON city.name=alt.name AND city.zipcode != alt.zipcode"
 }
 
-     
-// class SelectWithProjectTest extends SQLStringTest[Tuple1[CityT], (name: String, zipCode: Int)] {   
-//   def testDescription: String = "select with project"
-//   def query() =
-//     testDB.tables.head.map: city =>
-//       (name = city.name, zipCode = city.zipCode)
-//   def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"  
-// }
+class SelectWithProjectTest extends SQLStringTest[Tuple1[CityT], (name: String, zipCode: Int)] {
+  def testDescription: String = "select with project"
+  def query() =
+    val q = testDB.tables.head.map: city =>
+      (name = city.name, zipCode = city.zipCode)
+    q
+  def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
+}
