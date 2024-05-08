@@ -1,33 +1,39 @@
-// package test
-// import tyql.*
-// import language.experimental.namedTuples
-// import NamedTuple.*
+package test
+import tyql.*
+import language.experimental.namedTuples
+import NamedTuple.*
+import scala.language.implicitConversions
 
-// import java.time.LocalDate
 
-// class JoinTest extends SQLStringTest[(Buyer, ShippingInfo), String] {
-//   def query() =
-//     for {
-//       b <- Buyer.select
-//       si <- ShippingInfo.Join(_.buyerId `=` b.id)
-//     } yield (b.name, si.shippingDate)
+import java.time.LocalDate
 
-//   def sqlString = """
-//         SELECT buyer0.name AS res_0, shipping_info1.shipping_date AS res_1
-//         FROM buyer buyer0
-//         JOIN shipping_info shipping_info1 ON (shipping_info1.buyer_id = buyer0.id)
-//       """
-// }
+class JoinTest extends SQLStringTest[(Buyer, ShippingInfo), (name: String, shippingDate: LocalDate)] {
+  def testDescription = "two-table simple join"
+  def query() =
+    val q =
+      for
+        b <- testDB.tables._1
+        si <- testDB.tables._2
+        if si.buyerId == b.id
+      yield (name = b.name, shippingDate = si.shippingDate)
+    q
+
+  def sqlString = """
+        SELECT buyer0.name AS res_0, shipping_info1.shipping_date AS res_1
+        FROM buyer buyer0
+        JOIN shipping_info shipping_info1 ON (shipping_info1.buyer_id = buyer0.id)
+      """
+}
 // class Join2Test extends SQLStringTest[(Product, Buyer, ShippingInfo, Purchase), String] {
 //   def query() =
-//     for {
+//     for
 //       b <- Buyer.select
 //       if b.name === "Li Haoyi"
 //       si <- ShippingInfo.join(_.id `=` b.id)
 //       pu <- Purchase.join(_.shippingInfoId `=` si.id)
-//       pr <- Product.join(_.id `=` pu.productId)
-//       if pr.price > 1.0
-//     } yield (b.name, pr.name, pr.price)
+//       pr <- Product.join(_.id `=` pu.productId)ends SQLStringTest[(Product, Buyer, ShippingInfo, Purchase), String] {
+
+//     yield (b.name, pr.name, pr.price)
 //   def sqlString = """
 //         SELECT buyer0.name AS res_0, product3.name AS res_1, product3.price AS res_2
 //         FROM buyer buyer0

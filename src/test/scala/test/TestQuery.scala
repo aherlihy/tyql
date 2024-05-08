@@ -15,7 +15,7 @@ trait TestQuery[Rows <: Tuple, Return](using val testDB: TestDatabase[Rows]) {
 trait TestSQLString[Rows <: Tuple, Return] extends munit.FunSuite with TestQuery[Rows, Return] {
   test(testDescription) {
     val q = query()
-    println(q)
+    println(s"query tree for $testDescription: $q")
     assertEquals(q.toSQLString, sqlString)
   }
 }
