@@ -34,7 +34,7 @@ class SimpleSelectTest extends SQLStringTest[CityDB, Int] {
 class SelectWithFilterTest extends SQLStringTest[CityDB, String] {
   def testDescription: String = "select with filter"
   def query() =
-    testDB.tables.head.withFilter: city =>
+    testDB.tables.cities.withFilter: city =>
       city.population > 10_000
     .map: city =>
       city.name
@@ -45,7 +45,7 @@ class SelectWithGtTest extends SQLStringTest[CityDB, String] {
   def testDescription: String = "select with gt constraint"
   def query() =
     for
-      city <- testDB.tables.head if city.population > 10_000
+      city <- testDB.tables.cities if city.population > 10_000
     yield city.name
   def sqlString: String = "SELECT name from cities where city.population > 10000"
 }
@@ -54,8 +54,8 @@ class SelectWithSelfNestTest extends SQLStringTest[CityDB, CityT] {
   def testDescription: String = "select with nested loop, 1 table"
   def query() =
     for
-      city <- testDB.tables.head
-      alt <- testDB.tables.head
+      city <- testDB.tables.cities
+      alt <- testDB.tables.cities
       if city.name == alt.name && city.zipCode != alt.zipCode
     yield
       city
@@ -77,7 +77,7 @@ class SelectNested extends SQLStringTest[AllLocDBs, CityT] {
 class SelectWithProjectTestImplicit extends SQLStringTest[CityDB, (name: String, zipCode: Int)] {
   def testDescription: String = "select with project"
   def query() =
-    val q = testDB.tables.head.map: city =>
+    val q = testDB.tables.cities.map: city =>
       (name = city.name, zipCode = city.zipCode)
     q // TODO: report bug? need to assign temp var, otherwise implicit conversion won't work
   def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
@@ -86,7 +86,7 @@ class SelectWithProjectTestImplicit extends SQLStringTest[CityDB, (name: String,
 class SelectWithProjectTestToRow extends SQLStringTest[CityDB, (name: String, zipCode: Int)] {
   def testDescription: String = "select with project"
   def query() =
-    testDB.tables.head.map: city =>
+    testDB.tables.cities.map: city =>
       (name = city.name, zipCode = city.zipCode).toRow
   def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
 }

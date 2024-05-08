@@ -24,30 +24,37 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
         JOIN shipping_info shipping_info1 ON (shipping_info1.buyer_id = buyer0.id)
       """
 }
-// class Join2Test extends SQLStringTest[(Product, Buyer, ShippingInfo, Purchase), String] {
-//   def query() =
-//     for
-//       b <- Buyer.select
-//       if b.name === "Li Haoyi"
-//       si <- ShippingInfo.join(_.id `=` b.id)
-//       pu <- Purchase.join(_.shippingInfoId `=` si.id)
-//       pr <- Product.join(_.id `=` pu.productId)ends SQLStringTest[(Product, Buyer, ShippingInfo, Purchase), String] {
+class Join2Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+  def testDescription = "Compare with string"
+  def query() =
+    val q =
+      for
+        b <- testDB.tables.buyers
+        // if b.name == "Li Haoyi"
+        si <- testDB.tables.shipInfos
+        // if si.id == b.id
+        pu <- testDB.tables.purchases
+        // if pu.shippingInfoId == si.id
+        pr <- testDB.tables.products
+        // if pr.id == pu.productId
+        if /*b.name == "Li Haoyi" && */ si.buyerId == b.id && pu.shippingInfoId == si.id// && pr.id == pu.productId
+      yield (buyerName = b.name, productName = pr.name, price = pr.price)
+    q
 
-//     yield (b.name, pr.name, pr.price)
-//   def sqlString = """
-//         SELECT buyer0.name AS res_0, product3.name AS res_1, product3.price AS res_2
-//         FROM buyer buyer0
-//         JOIN shipping_info shipping_info1 ON (shipping_info1.id = buyer0.id)
-//         JOIN purchase purchase2 ON (purchase2.shipping_info_id = shipping_info1.id)
-//         JOIN product product3 ON (product3.id = purchase2.product_id)
-//         WHERE (buyer0.name = ?) AND (product3.price > ?)
-//       """
-// }
+  def sqlString = """
+        SELECT buyer0.name AS res_0, product3.name AS res_1, product3.price AS res_2
+        FROM buyer buyer0
+        JOIN shipping_info shipping_info1 ON (shipping_info1.id = buyer0.id)
+        JOIN purchase purchase2 ON (purchase2.shipping_info_id = shipping_info1.id)
+        JOIN product product3 ON (product3.id = purchase2.product_id)
+        WHERE (buyer0.name = ?) AND (product3.price > ?)
+      """
+}
 
 // class LeftJoinTest extends SQLStringTest[(Buyer, ShippingInfo), String] {
 //   def query() =
 //     for {
-//       b <- Buyer.select
+//       b <- testDB.tables.buyers
 //       si <- ShippingInfo.leftJoin(_.buyerId `=` b.id)
 //     } yield (b.name, si.map(_.shippingDate))
 //   def sqlString = """
@@ -58,7 +65,7 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
 // }
 // class FlatMapTest extends SQLStringTest[(Buyer, ShippingInfo), String] {
 //   def query() =
-//     Buyer.select
+//     testDB.tables.buyers
 //       .flatMap(b => ShippingInfo.crossJoin().map((b, _)))
 //       .filter { case (b, s) => b.id `=` s.buyerId && b.name `=` "James Bond" }
 //       .map(_._2.shippingDate)
@@ -73,7 +80,7 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
 // class FlatMapForTest extends SQLStringTest[(Buyer, ShippingInfo), String] {
 //   def query() =
 //     for {
-//       b <- Buyer.select
+//       b <- testDB.tables.buyers
 //       s <- ShippingInfo.crossJoin()
 //       if b.id `=` s.buyerId && b.name `=` "James Bond"
 //     } yield s.shippingDate
@@ -88,7 +95,7 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
 // class FlatMapForFilterTest extends SQLStringTest[(Buyer, ShippingInfo), String] {
 //   def query() =
 //     for {
-//       b <- Buyer.select.filter(_.name `=` "James Bond")
+//       b <- testDB.tables.buyers.filter(_.name `=` "James Bond")
 //       s <- ShippingInfo.crossJoin().filter(b.id `=` _.buyerId)
 //     } yield s.shippingDate
 //   def sqlString = """
@@ -102,7 +109,7 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
 // class FlatMapForJoinTest extends SQLStringTest[(Product, Buyer, ShippingInfo, Purchase), String] {
 //   def query() =
 //     for {
-//       (b, si) <- Buyer.select.join(ShippingInfo)(_.id `=` _.buyerId)
+//       (b, si) <- testDB.tables.buyers.join(ShippingInfo)(_.id `=` _.buyerId)
 //       (pu, pr) <- Purchase.select.join(Product)(_.productId `=` _.id).crossJoin()
 //       if si.id `=` pu.shippingInfoId
 //     } yield (b.name, pr.name)
@@ -121,7 +128,7 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
 // class FlatMapForGroupByTest extends SQLStringTest[(Buyer, ShippingInfo), String] {
 //   def query() =
 //     for {
-//       (name, dateOfBirth) <- Buyer.select.groupBy(_.name)(_.minBy(_.dateOfBirth))
+//       (name, dateOfBirth) <- testDB.tables.buyers.groupBy(_.name)(_.minBy(_.dateOfBirth))
 //       shippingInfo <- ShippingInfo.crossJoin()
 //     } yield (name, dateOfBirth, shippingInfo.id, shippingInfo.shippingDate)
 
@@ -141,7 +148,7 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
 // class FlatMapForGroupBy2Test extends SQLStringTest[(Buyer, ShippingInfo), String] {
 //   def query() =
 //     for {
-//       (name, dateOfBirth) <- Buyer.select.groupBy(_.name)(_.minBy(_.dateOfBirth))
+//       (name, dateOfBirth) <- testDB.tables.buyers.groupBy(_.name)(_.minBy(_.dateOfBirth))
 //       (shippingInfoId, shippingDate) <- ShippingInfo.select
 //         .groupBy(_.id)(_.minBy(_.shippingDate))
 //         .crossJoin()
@@ -169,7 +176,7 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
 // class FlatMapForCompoundTest extends SQLStringTest[(Buyer, ShippingInfo), String] {
 //   def query() =
 //     for {
-//       b <- Buyer.select.sortBy(_.id).asc.take(1)
+//       b <- testDB.tables.buyers.sortBy(_.id).asc.take(1)
 //       si <- ShippingInfo.select.sortBy(_.id).asc.take(1).crossJoin()
 //     } yield (b.name, si.shippingDate)
 //   def sqlString = """

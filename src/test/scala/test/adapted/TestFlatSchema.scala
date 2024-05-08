@@ -25,8 +25,8 @@ type AllCommerceDBs = (products: Product, buyers: Buyer, shipInfos: ShippingInfo
 // Test databases
 given commerceDBs: TestDatabase[AllCommerceDBs] with
   override def tables = (
-    Table[Product]("product"),
-    Table[Buyer]("buyers"),
-    Table[ShippingInfo]("shippingInfo"),
-    Table[Purchase]("purchase")
+    products = Table[Product]("product"),
+    buyers = Table[Buyer]("buyers"),
+    shipInfos = Table[ShippingInfo]("shippingInfo"),
+    purchases = Table[Purchase]("purchase")
   )
