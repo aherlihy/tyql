@@ -20,17 +20,13 @@ case class Purchase(
     total: Double
 )
 
+type AllCommerceDBs = (products: Product, buyers: Buyer, shipInfos: ShippingInfo, purchases: Purchase)
+
 // Test databases
-given commerceDBs: TestDatabase[(Product, Buyer, ShippingInfo, Purchase)] with
+given commerceDBs: TestDatabase[AllCommerceDBs] with
   override def tables = (
     Table[Product]("product"),
     Table[Buyer]("buyers"),
     Table[ShippingInfo]("shippingInfo"),
     Table[Purchase]("purchase")
-  )
-
-given buyerShipDB: TestDatabase[(Buyer, ShippingInfo)] with
-  override def tables = (
-    Table[Buyer]("buyers"),
-    Table[ShippingInfo]("shippingInfo")
   )

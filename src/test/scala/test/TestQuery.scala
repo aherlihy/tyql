@@ -1,18 +1,20 @@
 package test // test package so that it can be imported by bench.
 import tyql.*
+import language.experimental.namedTuples
+import NamedTuple.*
 
-class TestDatabase[Rows <: Tuple] { // this could be a named tuple?
-  def tables: Tuple.Map[Rows, Table] = ???
+class TestDatabase[Rows <: AnyNamedTuple] {
+  def tables: NamedTuple.Map[Rows, Table] = ???
   def init(): Unit = ???
 }
 
-trait TestQuery[Rows <: Tuple, Return](using val testDB: TestDatabase[Rows]) {
+trait TestQuery[Rows <: AnyNamedTuple, Return](using val testDB: TestDatabase[Rows]) {
   def testDescription: String
   def query(): Query[Return]
   def sqlString: String
 }
 
-trait TestSQLString[Rows <: Tuple, Return] extends munit.FunSuite with TestQuery[Rows, Return] {
+trait TestSQLString[Rows <: AnyNamedTuple, Return] extends munit.FunSuite with TestQuery[Rows, Return] {
   test(testDescription) {
     val q = query()
     println(s"query tree for $testDescription: $q")
@@ -20,4 +22,4 @@ trait TestSQLString[Rows <: Tuple, Return] extends munit.FunSuite with TestQuery
   }
 }
 
-abstract class SQLStringTest[Rows <: Tuple, Return](using TestDatabase[Rows]) extends TestSQLString[Rows, Return] with TestQuery[Rows, Return]
+abstract class SQLStringTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) extends TestSQLString[Rows, Return] with TestQuery[Rows, Return]

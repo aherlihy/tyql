@@ -7,13 +7,13 @@ import scala.language.implicitConversions
 
 import java.time.LocalDate
 
-class JoinTest extends SQLStringTest[(Buyer, ShippingInfo), (name: String, shippingDate: LocalDate)] {
+class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
   def testDescription = "two-table simple join"
   def query() =
     val q =
       for
-        b <- testDB.tables._1
-        si <- testDB.tables._2
+        b <- testDB.tables.buyers
+        si <- testDB.tables.shipInfos
         if si.buyerId == b.id
       yield (name = b.name, shippingDate = si.shippingDate)
     q
