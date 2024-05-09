@@ -82,6 +82,39 @@ class Repro2_Pass2(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase,
 [error]    |      Required: tyql.Expr[(newName : String)]
 */
 
+// REPRO3: implicit conversion doesn't happen for nested expression
+class Repro3_Pass1(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase, (name: String)] {
+  def query() =
+    for
+      t1 <- testDB.tables.t1
+      if t1.name == "constant"
+    yield (name = t1.name).toRow
+}
+class Repro3_Pass2(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase, (name: String)] {
+  def query() =
+    for
+      t1 <- testDB.tables.t1
+      if t1.name == Expr.StringLit("constant") && t1.id == Expr.IntLit(5)
+    yield (name = t1.name).toRow
+}
+// Uncomment:
+// class Repro3_Fail(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase, (name: String)] {
+//   def query() =
+//     for
+//       t1 <- testDB.tables.t1
+//       if t1.name == "constant" && t1.id == 5
+//     yield (name = t1.name).toRow
+// }
+/* Fails with:
+[error] -- [E172] Type Error: /Users/anna/lamp/tyql/src/main/scala/tyql/main.scala:112:9
+[error] 112 |      if t1.name == "constant" && t1.id == 5
+[error]     |         ^^^^^^^^^^^^^^^^^^^^^
+[error]     |Values of types tyql.Expr[String] and String cannot be compared with == or !=
+[error] -- [E172] Type Error: /Users/anna/lamp/tyql/src/main/scala/tyql/main.scala:112:34
+[error] 112 |      if t1.name == "constant" && t1.id == 5
+[error]     |                                  ^^^^^^^^^^
+[error]     |Values of types tyql.Expr[Int] and Int cannot be compared with == or !=
+*/
 
 @main def main() =
   println("test")

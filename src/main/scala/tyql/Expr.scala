@@ -44,14 +44,11 @@ object Expr:
   // Todo: Make it strongly typed like the other cases
   case class Select[A]($x: Expr[A], $name: String) extends Expr
 
-  case class Single[S <: String, A]($x: Expr[A])
-  extends Expr[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]
+  case class Single[S <: String, A]($x: Expr[A]) extends Expr[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]
 
-  case class Concat[A <: AnyNamedTuple, B <: AnyNamedTuple]($x: Expr[A], $y: Expr[B])
-  extends Expr[NamedTuple.Concat[A, B]]
+  case class Concat[A <: AnyNamedTuple, B <: AnyNamedTuple]($x: Expr[A], $y: Expr[B]) extends Expr[NamedTuple.Concat[A, B]]
 
-  case class Project[A <: AnyNamedTuple](a: A)
-  extends Expr[NamedTuple.Map[A, StripExpr]]
+  case class Project[A <: AnyNamedTuple]($a: A) extends Expr[NamedTuple.Map[A, StripExpr]]
 
   type StripExpr[E] = E match
     case Expr[b] => b
@@ -65,7 +62,7 @@ object Expr:
   private var refCount = 0
 
   case class Ref[A]($name: String = "") extends Expr[A]:
-    val id = refCount
+    private val id = refCount
     refCount += 1
     override def toString = s"ref$id(${$name})"
 
@@ -80,7 +77,7 @@ object Expr:
   /** The internal representation of a function `A => B`
    *  Query languages are ususally first-order, so Fun is not an Expr
    */
-  case class Fun[A, B](param: Ref[A], f: B)
+  case class Fun[A, B]($param: Ref[A], $f: B)
 
   type Pred[A] = Fun[A, Expr[Boolean]]
 
