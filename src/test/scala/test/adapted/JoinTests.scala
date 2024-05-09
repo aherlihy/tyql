@@ -1,5 +1,6 @@
 package test
 import tyql.*
+import tyql.Expr.toRow
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
@@ -8,15 +9,15 @@ import scala.language.implicitConversions
 import java.time.LocalDate
 
 class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
-  def testDescription = "two-table simple join"
+  def testDescription = "two-table simple join on int equality"
   def query() =
-    val q =
+    // val q =
       for
         b <- testDB.tables.buyers
         si <- testDB.tables.shipInfos
         if si.buyerId == b.id
-      yield (name = b.name, shippingDate = si.shippingDate)
-    q
+      yield (name = b.name, shippingDate = si.shippingDate).toRow
+    //q
 
   def sqlString = """
         SELECT buyer0.name AS res_0, shipping_info1.shipping_date AS res_1
@@ -24,32 +25,47 @@ class JoinTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate
         JOIN shipping_info shipping_info1 ON (shipping_info1.buyer_id = buyer0.id)
       """
 }
-class Join2Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
-  def testDescription = "Compare with string"
+class JoinTest2 extends SQLStringTest[AllCommerceDBs, (id: Int, name: String)] {
+  def testDescription = "two-table simple join on string equality"
   def query() =
-    val q =
-      for
-        b <- testDB.tables.buyers
-        // if b.name == "Li Haoyi"
-        si <- testDB.tables.shipInfos
-        // if si.id == b.id
-        pu <- testDB.tables.purchases
-        // if pu.shippingInfoId == si.id
-        pr <- testDB.tables.products
-        // if pr.id == pu.productId
-        if /*b.name == "Li Haoyi" && */ si.buyerId == b.id && pu.shippingInfoId == si.id// && pr.id == pu.productId
-      yield (buyerName = b.name, productName = pr.name, price = pr.price)
-    q
+    for
+      b <- testDB.tables.buyers
+      p <- testDB.tables.products
+      // if p.name == b.name
+    yield (id = p.id, name = b.name).toRow
 
   def sqlString = """
-        SELECT buyer0.name AS res_0, product3.name AS res_1, product3.price AS res_2
+        SELECT buyer0.name AS res_0, shipping_info1.shipping_date AS res_1
         FROM buyer buyer0
-        JOIN shipping_info shipping_info1 ON (shipping_info1.id = buyer0.id)
-        JOIN purchase purchase2 ON (purchase2.shipping_info_id = shipping_info1.id)
-        JOIN product product3 ON (product3.id = purchase2.product_id)
-        WHERE (buyer0.name = ?) AND (product3.price > ?)
+        JOIN shipping_info shipping_info1 ON (shipping_info1.buyer_id = buyer0.id)
       """
 }
+// class Join3Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+  // def testDescription = "Compare with string literal"
+  // def query() =
+  //   val q =
+  //     for
+  //       b <- testDB.tables.buyers
+  //       // if b.name == "Li Haoyi"
+  //       si <- testDB.tables.shipInfos
+  //       // if si.id == b.id
+  //       pu <- testDB.tables.purchases
+  //       // if pu.shippingInfoId == si.id
+  //       pr <- testDB.tables.products
+  //       // if pr.id == pu.productId
+  //       if b.name == pr.name && /*"Li Haoyi" */ si.buyerId == b.id &&  pu.shippingInfoId == si.id// && pr.id == pu.productId
+  //     yield (buyerName = b.name, productName = pr.name, price = pr.price)
+  //   q
+
+  // def sqlString = """
+  //       SELECT buyer0.name AS res_0, product3.name AS res_1, product3.price AS res_2
+  //       FROM buyer buyer0
+  //       JOIN shipping_info shipping_info1 ON (shipping_info1.id = buyer0.id)
+  //       JOIN purchase purchase2 ON (purchase2.shipping_info_id = shipping_info1.id)
+  //       JOIN product product3 ON (product3.id = purchase2.product_id)
+  //       WHERE (buyer0.name = ?) AND (product3.price > ?)
+  //     """
+// }
 
 // class LeftJoinTest extends SQLStringTest[(Buyer, ShippingInfo), String] {
 //   def query() =

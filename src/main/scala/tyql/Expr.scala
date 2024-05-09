@@ -25,7 +25,7 @@ object Expr:
   /** Sample extension methods for individual types */
   extension (x: Expr[Int])
     def > (y: Expr[Int]): Expr[Boolean] = Gt(x, y)
-    def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y))
+    def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y)) // TODO: shouldn't the implicit conversion handle this?
   extension (x: Expr[Boolean])
     def &&(y: Expr[Boolean]): Expr[Boolean] = And(x, y)
     def || (y: Expr[Boolean]): Expr[Boolean] = Or(x, y)
@@ -50,11 +50,12 @@ object Expr:
   case class Concat[A <: AnyNamedTuple, B <: AnyNamedTuple]($x: Expr[A], $y: Expr[B])
   extends Expr[NamedTuple.Concat[A, B]]
 
-  case class Join[A <: AnyNamedTuple](a: A)
+  case class Project[A <: AnyNamedTuple](a: A)
   extends Expr[NamedTuple.Map[A, StripExpr]]
 
   type StripExpr[E] = E match
     case Expr[b] => b
+    // case _ => E // TODO: verify this won't backfire
 
   // Also weakly typed in the arguents since these two classes model universal equality */
   case class Eq($x: Expr[?], $y: Expr[?]) extends Expr[Boolean]
@@ -70,9 +71,11 @@ object Expr:
 
   /** Literals are type-specific, tailored to the types that the DB supports */
   case class IntLit($value: Int) extends Expr[Int]
-
   /** Scala values can be lifted into literals by conversions */
   given Conversion[Int, IntLit] = IntLit(_)
+
+  case class StringLit($value: String) extends Expr[String]
+  given Conversion[String, StringLit] = StringLit(_)
 
   /** The internal representation of a function `A => B`
    *  Query languages are ususally first-order, so Fun is not an Expr
@@ -86,9 +89,9 @@ object Expr:
    *  to
    *      Expr[(name_1: T_1, ..., name_n: T_n)]
    */
-  extension [A <: AnyNamedTuple](x: A) def toRow: Join[A] = Join(x)
+  extension [A <: AnyNamedTuple](x: A) def toRow: Project[A] = Project(x)
 
   /** Same as _.toRow, as an implicit conversion */
-  given [A <: AnyNamedTuple]: Conversion[A, Expr.Join[A]] = Expr.Join(_)
+  given [A <: AnyNamedTuple]: Conversion[A, Expr.Project[A]] = Expr.Project(_)
 
 end Expr
