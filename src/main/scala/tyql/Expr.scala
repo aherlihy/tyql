@@ -20,6 +20,9 @@ trait Expr[Result] extends Selectable:
   def == (other: Expr[?]): Expr[Boolean] = Expr.Eq(this, other)
   def != (other: Expr[?]): Expr[Boolean] = Expr.Ne(this, other)
 
+  def == (other: String): Expr[Boolean] = Expr.Eq(this, Expr.StringLit(other))
+  def == (other: Int): Expr[Boolean] = Expr.Eq(this, Expr.IntLit(other))
+
 object Expr:
 
   /** Sample extension methods for individual types */
@@ -27,7 +30,7 @@ object Expr:
     def > (y: Expr[Int]): Expr[Boolean] = Gt(x, y)
     def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y)) // TODO: shouldn't the implicit conversion handle this?
   extension (x: Expr[Boolean])
-    def &&(y: Expr[Boolean]): Expr[Boolean] = And(x, y)
+    def && (y: Expr[Boolean]): Expr[Boolean] = And(x, y)
     def || (y: Expr[Boolean]): Expr[Boolean] = Or(x, y)
 
   // Note: All field names of constructors in the query language are prefixed with `$`

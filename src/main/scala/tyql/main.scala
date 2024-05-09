@@ -98,13 +98,13 @@ class Repro3_Pass2(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase,
     yield (name = t1.name).toRow
 }
 // Uncomment:
-// class Repro3_Fail(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase, (name: String)] {
-//   def query() =
-//     for
-//       t1 <- testDB.tables.t1
-//       if t1.name == "constant" && t1.id == 5
-//     yield (name = t1.name).toRow
-// }
+class Repro3_Fail(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase, (name: String)] {
+  def query() =
+    for
+      t1 <- testDB.tables.t1
+      if t1.name == "constant" && t1.id == 5
+    yield (name = t1.name).toRow
+}
 /* Fails with:
 [error] -- [E172] Type Error: /Users/anna/lamp/tyql/src/main/scala/tyql/main.scala:112:9
 [error] 112 |      if t1.name == "constant" && t1.id == 5
@@ -114,6 +114,9 @@ class Repro3_Pass2(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase,
 [error] 112 |      if t1.name == "constant" && t1.id == 5
 [error]     |                                  ^^^^^^^^^^
 [error]     |Values of types tyql.Expr[Int] and Int cannot be compared with == or !=
+
+>>> Workaround: add explicit `==` that takes in literal types in trait Expr
+Maybe the compiler looks for == that returns a type which has a member called &&, and when it looks like at Expr[Boolean] it doesn't find the member && because it's an extension method?
 */
 
 @main def main() =
