@@ -1,4 +1,4 @@
-package test // test package so that it can be imported by bench.
+package test // test package so that it can be imported by bench. Use subpackages so that SBT test reporting is easier to read.
 import tyql.*
 import language.experimental.namedTuples
 import NamedTuple.*
