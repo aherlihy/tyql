@@ -84,6 +84,7 @@ object Expr:
 
   type Pred[A] = Fun[A, Expr[Boolean]]
 
+
   /** Explicit conversion from
    *      (name_1: Expr[T_1], ..., name_n: Expr[T_n])
    *  to
