@@ -27,6 +27,7 @@ trait Expr[Result] extends Selectable:
 
   def sum: Expr[Result] = Expr.Sum(this) // TODO: require summable type?
   def avg: Expr[Result] = Expr.Avg(this)
+  // def single: Expr[Result] = Expr.Single(this)
 
 object Expr:
 

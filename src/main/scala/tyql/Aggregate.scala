@@ -11,9 +11,9 @@ package tyql
  * Expr.scala with `AggregationExpr` which does not differentiate aggregations from any other op.
  **/
 
-trait Aggregation[A] extends DatabaseAST[A]
-object Aggregation:
-  import Expr.Fun
-  case class Sum[A, B]($q: Query[A], $p: Fun[A, Expr[B]]) extends Aggregation[B]
-  case class Avg[A, B]($q: Query[A], $p: Fun[A, Expr[B]]) extends Aggregation[B]
+// trait Aggregation[A] extends DatabaseAST[A]
+// object Aggregation:
+//   import Expr.Fun
+//   case class Sum[A, B]($q: Query[A], $p: Fun[A, Expr[B]]) extends Aggregation[B]
+//   case class Avg[A, B]($q: Query[A], $p: Fun[A, Expr[B]]) extends Aggregation[B]
 

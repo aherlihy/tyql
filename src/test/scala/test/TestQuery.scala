@@ -10,7 +10,7 @@ class TestDatabase[Rows <: AnyNamedTuple] {
 
 trait TestQuery[Rows <: AnyNamedTuple, Return](using val testDB: TestDatabase[Rows]) {
   def testDescription: String
-  def query(): DatabaseAST[Return]
+  def query(): Query[Return] // DatabaseAST if distinguishing between aggregates and queries
   def sqlString: String
 }
 

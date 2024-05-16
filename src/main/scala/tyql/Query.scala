@@ -3,20 +3,20 @@ package tyql
 import language.experimental.namedTuples
 import NamedTuple.{NamedTuple, AnyNamedTuple}
 
-trait DatabaseAST[ReturnValue]:
-  def toSQLString: String =
-    "query"
+// trait DatabaseAST[ReturnValue]:
+//   def toSQLString: String =
+//     "query"
 
 
 /** The type of database queries. So far, we have queries
  *  that represent whole DB tables and queries that reify
  *  for-expressions as data.
  */
-trait Query[A] extends DatabaseAST[A]
+trait Query[A] //extends DatabaseAST[A]
 
 object Query:
   import Expr.{Pred, Fun, Ref}
-  import Aggregation.{Sum, Avg}
+  // import Aggregation.{Sum, Avg}
 
   case class Filter[A]($q: Query[A], $p: Pred[A]) extends Query[A]
   case class Map[A, B]($q: Query[A], $f: Fun[A, Expr[B]]) extends Query[B]
@@ -34,9 +34,14 @@ object Query:
   // Extension methods to support for-expression syntax for queries
   extension [R](x: Query[R])
 
+    def toSQLString: String =
+      "query"
+
     def withFilter(p: Ref[R] => Expr[Boolean]): Query[R] =
       val ref = Ref[R]()
       Filter(x, Fun(ref, p(ref)))
+
+    def filter(p: Ref[R] => Expr[Boolean]): Query[R] = withFilter(p)
 
     // for the cases where you are projecting one field
     def map[B](f: Ref[R] => Expr[B]): Query[B] =
@@ -60,13 +65,13 @@ object Query:
 
     def distinct: Query[R] = Distinct(x)
 
-    def sum[B](f: Ref[R] => Expr[B]): Aggregation[B] =
-      val ref = Ref[R]()
-      Sum(x, Fun(ref, f(ref)))
+    // def sum[B](f: Ref[R] => Expr[B]): Aggregation[B] =
+    //   val ref = Ref[R]()
+    //   Sum(x, Fun(ref, f(ref)))
 
-    def avg[B](f: Ref[R] => Expr[B]): Aggregation[B] =
-      val ref = Ref[R]()
-      Avg(x, Fun(ref, f(ref)))
+    // def avg[B](f: Ref[R] => Expr[B]): Aggregation[B] =
+    //   val ref = Ref[R]()
+    //   Avg(x, Fun(ref, f(ref)))
 
     def union(that: Query[R]): Query[R] =
       Union(x, that, true)
@@ -76,6 +81,9 @@ object Query:
 
     def intersect(that: Query[R]): Query[R] =
       Intersect(x, that)
+
+    // def single(): R =
+    //   Expr.Single(x)
 
 end Query
 

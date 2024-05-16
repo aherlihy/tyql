@@ -1,0 +1,35 @@
+package test.query.select2tests
+import test.SQLStringTest
+import test.query.{commerceDBs, AllCommerceDBs}
+
+import tyql.*
+import tyql.Expr.toRow
+import language.experimental.namedTuples
+import NamedTuple.*
+import scala.language.implicitConversions
+
+// class GroupByTest extends SQLStringTest[AllCommerceDBs, Int] {
+//   def testDescription: String = "GroupBy"
+//   def query() =
+//     testDB.tables.products
+//       .filter(p => p.price == 0)
+//       .single
+//   def sqlString: String = """
+//     SELECT * FROM products
+//     WHERE price == 0 AND id > 0
+//     LIMIT 1
+//     """
+// }
+
+// class GroupByHavingTest extends SQLStringTest[AllCommerceDBs, Int] {
+//   def testDescription: String = "GroupByHaving"
+//   def query() =
+//     testDB.tables.products
+//       .filter(p => p.price == 0)
+//       .single
+//   def sqlString: String = """
+//     SELECT * FROM products
+//     WHERE price == 0 AND id > 0
+//     LIMIT 1
+//     """
+// }

@@ -1,5 +1,6 @@
 package test.query.select
 import test.{SQLStringTest, TestDatabase}
+import test.query.{commerceDBs,  AllCommerceDBs, Product}
 
 import tyql.*
 import language.experimental.namedTuples
@@ -91,3 +92,97 @@ class SelectWithProjectTestToRow extends SQLStringTest[CityDB, (name: String, zi
       (name = city.name, zipCode = city.zipCode).toRow
   def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
 }
+
+class SelectTableTest extends SQLStringTest[AllCommerceDBs, Product] {
+  def testDescription: String = "Select: table"
+  def query() =
+    testDB.tables.products
+  def sqlString: String = """
+        SELECT * FROM products
+    """
+}
+
+class SelectMultipleFilterTest extends SQLStringTest[AllCommerceDBs, Product] {
+  def testDescription: String = "Select: multiple filter"
+  def query() =
+    testDB.tables.products
+      .filter(p => p.price == 0)
+      .filter(p => p.id > 0)
+  def sqlString: String = """
+          SELECT * FROM products
+          WHERE price == 0 AND id > 0
+    """
+}
+
+// class SelectSingleTest extends SQLStringTest[AllCommerceDBs, Product] {
+//   def testDescription: String = "Select: single"
+//   def query() =
+//     testDB.tables.products
+//       .filter(p => p.price == 0)
+//       .single
+//   def sqlString: String = """
+//     SELECT * FROM products
+//     WHERE price == 0 AND id > 0
+//     LIMIT 1
+//     """
+// }
+
+// class ContainsTest extends SQLStringTest[AllCommerceDBs, Int] {
+//   def testDescription: String = "Contains"
+//   def query() =
+//     testDB.tables.products
+//       .filter(p => testDB.tables.purchases.contains(p.id))
+//   def sqlString: String = """
+// SELECT *
+// FROM Products
+// WHERE id IN (
+//     SELECT id
+//     FROM Purchases
+// )
+// """
+// }
+
+// class NonEmptyTest extends SQLStringTest[AllCommerceDBs, Int] {
+//   def testDescription: String = "NonEmpty"
+//   def query() =
+//     testDB.tables.products
+//       .filter(p => testDB.tables.purchases.filter(purch => purch.id == p.id).nonEmpty)
+//   def sqlString: String = """SELECT *
+//     FROM Products p
+//     WHERE EXISTS (
+//       SELECT 1
+//       FROM purchases
+//       WHERE purchases.id = p.id
+//     )"""
+// }
+
+// class IsEmptyTest extends SQLStringTest[AllCommerceDBs, Int] {
+//   def testDescription: String = "Empty"
+//   def query() =
+//     testDB.tables.products
+//       .filter(p => testDB.tables.purchases.filter(purch => purch.id == p.id).isEmpty)
+//   def sqlString: String = """SELECT *
+//   FROM Products p
+//   WHERE NOT EXISTS (
+//     SELECT 1
+//     FROM purchases
+//     WHERE purchases.id = p.id
+//   )"""
+// }
+
+// // class CaseTest extends SQLStringTest[AllCommerceDBs, Int] {
+// //   def testDescription: String = "CaseTest"
+// //   def query() =
+// //     testDB.tables.products
+// //       .map: prod => (name: prod.name, price: prod.price, op: (prod.price > 1000) ? "Expensive" "Cheap")
+// //   def sqlString: String = """
+// // SELECT
+// //   Name,
+// //   Price,
+// //   CASE
+// //     WHEN Price > 1000 THEN 'Expensive'
+// //     ELSE 'Cheap'
+// //   END
+// // FROM Products;
+// //   """
+// // }

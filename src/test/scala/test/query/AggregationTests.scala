@@ -8,6 +8,7 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 
+/*
 class SelectModifiersSumSelectTest extends SQLStringTest[AllCommerceDBs, Double] {
   def testDescription: String = "SelectModifiers: sum"
   def query() =
@@ -42,6 +43,7 @@ class SelectModifiersSum4SelectTest extends SQLStringTest[AllCommerceDBs, Double
           WHERE product.price > 0)
   """
 }
+*/
 
 class SelectModifiersMultiAggregateTest extends SQLStringTest[AllCommerceDBs, (sum: Double, avg: Double)] {
   def testDescription: String = "SelectModifiers: aggregate"
