@@ -1,7 +1,9 @@
 package tyql
 
+import scala.annotation.targetName
 import language.experimental.namedTuples
 import NamedTuple.{NamedTuple, AnyNamedTuple}
+
 
 /** The type of expressions in the query language */
 trait Expr[Result] extends Selectable:
@@ -23,12 +25,23 @@ trait Expr[Result] extends Selectable:
   def == (other: String): Expr[Boolean] = Expr.Eq(this, Expr.StringLit(other))
   def == (other: Int): Expr[Boolean] = Expr.Eq(this, Expr.IntLit(other))
 
+  def sum: Expr[Result] = Expr.Sum(this) // TODO: require summable type?
+  def avg: Expr[Result] = Expr.Avg(this)
+
 object Expr:
 
   /** Sample extension methods for individual types */
   extension (x: Expr[Int])
     def > (y: Expr[Int]): Expr[Boolean] = Gt(x, y)
-    def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y)) // TODO: shouldn't the implicit conversion handle this?
+    def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y))
+
+  // TODO: write for numerical
+  extension (x: Expr[Double])
+    @targetName("gtDoubleExpr")
+    def > (y: Expr[Double]): Expr[Boolean] = GtDouble(x, y)
+    @targetName("gtDoubleLit")
+    def > (y: Double): Expr[Boolean] = GtDouble(x, DoubleLit(y))
+
   extension (x: Expr[Boolean])
     def && (y: Expr[Boolean]): Expr[Boolean] = And(x, y)
     def || (y: Expr[Boolean]): Expr[Boolean] = Or(x, y)
@@ -39,6 +52,8 @@ object Expr:
 
   // Some sample constructors for Exprs
   case class Gt($x: Expr[Int], $y: Expr[Int]) extends Expr[Boolean]
+  case class GtDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
+
   case class Plus(x: Expr[Int], y: Expr[Int]) extends Expr[Int]
   case class And($x: Expr[Boolean], $y: Expr[Boolean]) extends Expr[Boolean]
   case class Or($x: Expr[Boolean], $y: Expr[Boolean]) extends Expr[Boolean]
@@ -53,9 +68,12 @@ object Expr:
 
   case class Project[A <: AnyNamedTuple]($a: A) extends Expr[NamedTuple.Map[A, StripExpr]]
 
+  trait AggregationExpr
+  case class Sum[A]($a: Expr[A]) extends Expr[A] with AggregationExpr
+  case class Avg[A]($a: Expr[A]) extends Expr[A] with AggregationExpr
+
   type StripExpr[E] = E match
     case Expr[b] => b
-    // case _ => E // TODO: verify this won't backfire
 
   // Also weakly typed in the arguents since these two classes model universal equality */
   case class Eq($x: Expr[?], $y: Expr[?]) extends Expr[Boolean]
@@ -76,6 +94,9 @@ object Expr:
 
   case class StringLit($value: String) extends Expr[String]
   given Conversion[String, StringLit] = StringLit(_)
+
+  case class DoubleLit($value: Double) extends Expr[Double]
+  given Conversion[Double, DoubleLit] = DoubleLit(_)
 
   /** The internal representation of a function `A => B`
    *  Query languages are ususally first-order, so Fun is not an Expr

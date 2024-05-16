@@ -10,7 +10,7 @@ class TestDatabase[Rows <: AnyNamedTuple] {
 
 trait TestQuery[Rows <: AnyNamedTuple, Return](using val testDB: TestDatabase[Rows]) {
   def testDescription: String
-  def query(): Query[Return]
+  def query(): DatabaseAST[Return]
   def sqlString: String
 }
 
