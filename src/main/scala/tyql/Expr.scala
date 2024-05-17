@@ -25,14 +25,14 @@ trait Expr[Result] extends Selectable:
   def == (other: String): Expr[Boolean] = Expr.Eq(this, Expr.StringLit(other))
   def == (other: Int): Expr[Boolean] = Expr.Eq(this, Expr.IntLit(other))
 
-  def sum: Expr[Result] = Expr.Sum(this) // TODO: require summable type?
-  def avg: Expr[Result] = Expr.Avg(this)
   // def single: Expr[Result] = Expr.Single(this)
 
 object Expr:
 
   /** Sample extension methods for individual types */
   extension (x: Expr[Int])
+    def sum: Expr[Int] = Expr.Sum(x) // TODO: require summable type?
+    def avg: Expr[Int] = Expr.Avg(x)
     def > (y: Expr[Int]): Expr[Boolean] = Gt(x, y)
     def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y))
 
@@ -42,6 +42,10 @@ object Expr:
     def > (y: Expr[Double]): Expr[Boolean] = GtDouble(x, y)
     @targetName("gtDoubleLit")
     def > (y: Double): Expr[Boolean] = GtDouble(x, DoubleLit(y))
+    @targetName("sumDouble")
+    def sum: Expr[Double] = Expr.Sum(x) // TODO: require summable type?
+    @targetName("avgDouble")
+    def avg: Expr[Double] = Expr.Avg(x)
 
   extension (x: Expr[Boolean])
     def && (y: Expr[Boolean]): Expr[Boolean] = And(x, y)
@@ -69,9 +73,9 @@ object Expr:
 
   case class Project[A <: AnyNamedTuple]($a: A) extends Expr[NamedTuple.Map[A, StripExpr]]
 
-  trait AggregationExpr
-  case class Sum[A]($a: Expr[A]) extends Expr[A] with AggregationExpr
-  case class Avg[A]($a: Expr[A]) extends Expr[A] with AggregationExpr
+  trait AggregationExpr[B]
+  case class Sum[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
+  case class Avg[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
 
   type StripExpr[E] = E match
     case Expr[b] => b

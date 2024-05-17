@@ -15,8 +15,7 @@ import NamedTuple.{NamedTuple, AnyNamedTuple}
 trait Query[A] //extends DatabaseAST[A]
 
 object Query:
-  import Expr.{Pred, Fun, Ref}
-  // import Aggregation.{Sum, Avg}
+  import Expr.{Pred, Fun, Ref, Single}
 
   case class Filter[A]($q: Query[A], $p: Pred[A]) extends Query[A]
   case class Map[A, B]($q: Query[A], $f: Fun[A, Expr[B]]) extends Query[B]
@@ -65,13 +64,13 @@ object Query:
 
     def distinct: Query[R] = Distinct(x)
 
-    // def sum[B](f: Ref[R] => Expr[B]): Aggregation[B] =
-    //   val ref = Ref[R]()
-    //   Sum(x, Fun(ref, f(ref)))
+    def sum[B](f: Ref[R] => Expr[B]): Aggregation[R, B, B] =
+      val ref = Ref[R]()
+      Aggregation(x, Fun(ref, Expr.Sum(f(ref))))
 
-    // def avg[B](f: Ref[R] => Expr[B]): Aggregation[B] =
-    //   val ref = Ref[R]()
-    //   Avg(x, Fun(ref, f(ref)))
+    def avg[B](f: Ref[R] => Expr[B]): Aggregation[R, B, B] =
+      val ref = Ref[R]()
+      Aggregation(x, Fun(ref, Expr.Avg(f(ref))))
 
     def union(that: Query[R]): Query[R] =
       Union(x, that, true)
