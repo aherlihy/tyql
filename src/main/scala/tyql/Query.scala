@@ -30,6 +30,11 @@ object Query:
   case class Union[A]($this: Query[A], $other: Query[A], $dedup: Boolean) extends Query[A]
   case class Intersect[A]($this: Query[A], $other: Query[A]) extends Query[A]
 
+  case class Contains[A]($this: Query[A], $other: Expr[A]) extends Expr[Boolean]
+  case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean]
+  case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean]
+
+
   // Extension methods to support for-expression syntax for queries
   extension [R](x: Query[R])
 
@@ -80,6 +85,16 @@ object Query:
 
     def intersect(that: Query[R]): Query[R] =
       Intersect(x, that)
+
+    // Does not work for subsets, need to match types exactly
+    def contains(that: Expr[R]): Expr[Boolean] =
+      Contains(x, that)
+
+    def nonEmpty(): Expr[Boolean] =
+      NonEmpty(x)
+
+    def isEmpty(): Expr[Boolean] =
+      IsEmpty(x)
 
     // def single(): R =
     //   Expr.Single(x)
