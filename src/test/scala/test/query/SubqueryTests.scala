@@ -133,42 +133,6 @@ class sortLimitSortLimitSubqueryTest extends SQLStringTest[AllCommerceDBs, Strin
         LIMIT ?
       """
 }
-
-/*class sortGroupBySubqueryTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
-  def testDescription = "Subquery: sortGroupBy"
-  def query() =
-        Purchase.select.sort(_.count).take(5).groupBy(_.productId)(_.sumBy(_.total))
-  def sqlString = """
-        SELECT subquery0.product_id AS res_0, SUM(subquery0.total) AS res_1
-        FROM (SELECT
-            purchase0.product_id AS product_id,
-            purchase0.count AS count,
-            purchase0.total AS total
-          FROM purchase purchase0
-          ORDER BY count
-          LIMIT ?) subquery0
-        GROUP BY subquery0.product_id
-      """
-}
-class groupByJoinSubqueryTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
-  def testDescription = "Subquery: groupByJoin"
-  def query() =
-        Purchase.select.groupBy(_.productId)(_.sumBy(_.total)).join(Product)(_._1 `=` _.id).map {
-          case (productId, total, product) => (product.name, total)
-        }
-  def sqlString = """
-        SELECT
-          product1.name AS res_0,
-          subquery0.res_1 AS res_1
-        FROM (SELECT
-            purchase0.product_id AS res_0,
-            SUM(purchase0.total) AS res_1
-          FROM purchase purchase0
-          GROUP BY purchase0.product_id) subquery0
-        JOIN product product1 ON (subquery0.res_0 = product1.id)
-      """
-}
-*/
 //class subqueryInFilterSubqueryTest extends SQLStringTest[AllCommerceDBs, Buyer] {
 //  def testDescription = "Subquery: subqueryInFilter"
 //  def query() =

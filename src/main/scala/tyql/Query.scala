@@ -35,6 +35,8 @@ object Query:
   case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean]
   case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean]
 
+  // TODO: spark-style groupBy or SQL groupBy that requires an aggregate?
+  case class GroupBy[A, B]($q: Query[A], $f: Fun[A, Expr[B]], $having: Fun[A, Expr[Boolean]]) extends Query[A]
 
   // Extension methods to support for-expression syntax for queries
   extension [R](x: Query[R])
@@ -112,7 +114,12 @@ object Query:
     def isEmpty(): Expr[Boolean] =
       IsEmpty(x)
 
-    // def single(): R =
+    def groupBy[B, C](f: Ref[R] => Expr[B], having: Ref[R] => Expr[Boolean]): Query[R] =
+      val ref1 = Ref[R]()
+      val ref2 = Ref[R]()
+      GroupBy(x, Fun(ref1, f(ref1)), Fun(ref2, having(ref2)))
+
+  // def single(): R =
     //   Expr.Single(x)
 
 end Query
