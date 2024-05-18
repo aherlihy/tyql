@@ -224,6 +224,24 @@ class groupByJoinSubqueryTest extends SQLStringTest[AllCommerceDBs, (name: Strin
 //        FROM buyer buyer0
 //      """
 //}
+//class subqueryInMapNestedConcatSubqueryTest extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, dateOfBirth: LocalDate, occurances: Int)] {
+//  def testDescription = "Subquery: subqueryInMapNested"
+//  def query() =
+//    testDB.tables.buyers.map(c =>
+//      c.concat((occurances = testDB.tables.shipInfos.filter(p => p.buyerId == c.id).size == 1))
+//    )
+//  def sqlString = """
+//        SELECT
+//          buyer0.id AS res_0_id,
+//          buyer0.name AS res_0_name,
+//          buyer0.date_of_birth AS res_0_date_of_birth,
+//          ((SELECT
+//            COUNT(1) AS res
+//            FROM shipping_info shipping_info1
+//            WHERE (buyer0.id = shipping_info1.buyer_id)) = ?) AS res_1
+//        FROM buyer buyer0
+//      """
+//}
 
 class selectLimitUnionSelectSubqueryTest extends SQLStringTest[AllCommerceDBs, String] {
   def testDescription = "Subquery: selectLimitUnionSelect"
@@ -260,7 +278,7 @@ class ExceptAggregateSubqueryTest extends SQLStringTest[AllCommerceDBs, (max: Do
   def testDescription = "Subquery: exceptAggregate"
   def query() =
     testDB.tables.products
-      .map(p => (name = p.name.toLowerCase, price = p.price))
+      .map(p => (name = p.name.toLowerCase, price = p.price).toRow)
       .except(
         testDB.tables.products.map(p => (name = p.name.toLowerCase, price = p.price).toRow)
       )

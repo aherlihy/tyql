@@ -6,7 +6,7 @@ import NamedTuple.{NamedTuple, AnyNamedTuple}
 
 
 /** The type of expressions in the query language */
-trait Expr[Result] extends Selectable:
+trait Expr[Result] extends Selectable: // TODO: should Result be a subtype of named tuple, so `concat` always works?
   /** This type is used to support selection with any of the field names
    *  defined by Fields.
    */
@@ -25,6 +25,7 @@ trait Expr[Result] extends Selectable:
   def == (other: String): Expr[Boolean] = Expr.Eq(this, Expr.StringLit(other))
   def == (other: Int): Expr[Boolean] = Expr.Eq(this, Expr.IntLit(other))
 
+//  def concat[B](other: Expr[B]) = Expr.Concat(Expr.Project(this), other)
   // def single: Expr[Result] = Expr.Single(this)
 
 object Expr:
@@ -45,7 +46,7 @@ object Expr:
     @targetName("gtDoubleLit")
     def > (y: Double): Expr[Boolean] = GtDouble(x, DoubleLit(y))
     @targetName("sumDouble")
-    def sum: Expr[Double] = Expr.Sum(x) // TODO: require summable type?
+    def sum: Expr[Double] = Expr.Sum(x)
     @targetName("avgDouble")
     def avg: Expr[Double] = Expr.Avg(x)
     @targetName("maxDouble")
@@ -126,13 +127,14 @@ object Expr:
 
   type Pred[A] = Fun[A, Expr[Boolean]]
 
-
   /** Explicit conversion from
    *      (name_1: Expr[T_1], ..., name_n: Expr[T_n])
    *  to
    *      Expr[(name_1: T_1, ..., name_n: T_n)]
    */
-  extension [A <: AnyNamedTuple](x: A) def toRow: Project[A] = Project(x)
+  extension [A <: AnyNamedTuple](x: A)
+    def toRow: Project[A] = Project(x)
+    def concat[B <: AnyNamedTuple](other: Expr[B]) = Concat(x, other)
 
   /** Same as _.toRow, as an implicit conversion */
   given [A <: AnyNamedTuple]: Conversion[A, Expr.Project[A]] = Expr.Project(_)
