@@ -33,6 +33,8 @@ object Expr:
   extension (x: Expr[Int])
     def sum: Expr[Int] = Expr.Sum(x) // TODO: require summable type?
     def avg: Expr[Int] = Expr.Avg(x)
+    def max: Expr[Int] = Expr.Max(x)
+    def min: Expr[Int] = Expr.Min(x)
     def > (y: Expr[Int]): Expr[Boolean] = Gt(x, y)
     def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y))
 
@@ -46,10 +48,18 @@ object Expr:
     def sum: Expr[Double] = Expr.Sum(x) // TODO: require summable type?
     @targetName("avgDouble")
     def avg: Expr[Double] = Expr.Avg(x)
+    @targetName("maxDouble")
+    def max: Expr[Double] = Expr.Max(x)
+    @targetName("minDouble")
+    def min: Expr[Double] = Expr.Min(x)
 
   extension (x: Expr[Boolean])
     def && (y: Expr[Boolean]): Expr[Boolean] = And(x, y)
     def || (y: Expr[Boolean]): Expr[Boolean] = Or(x, y)
+
+  extension (x: Expr[String])
+    def toLowerCase: Expr[String] = Expr.Lower(x)
+    def toUpperCase: Expr[String] = Expr.Upper(x)
 
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
@@ -62,6 +72,9 @@ object Expr:
   case class Plus(x: Expr[Int], y: Expr[Int]) extends Expr[Int]
   case class And($x: Expr[Boolean], $y: Expr[Boolean]) extends Expr[Boolean]
   case class Or($x: Expr[Boolean], $y: Expr[Boolean]) extends Expr[Boolean]
+
+  case class Upper(x: Expr[String]) extends Expr[String]
+  case class Lower(x: Expr[String]) extends Expr[String]
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // Todo: Make it strongly typed like the other cases
@@ -76,6 +89,9 @@ object Expr:
   trait AggregationExpr[B]
   case class Sum[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
   case class Avg[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
+  case class Max[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
+  case class Min[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
+  case class Count[A]($a: Expr[A]) extends Expr[Int] with AggregationExpr[Int]
 
   type StripExpr[E] = E match
     case Expr[b] => b

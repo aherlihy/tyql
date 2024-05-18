@@ -1,7 +1,7 @@
 package tyql
 
 import language.experimental.namedTuples
-import NamedTuple.{NamedTuple, AnyNamedTuple}
+import NamedTuple.{AnyNamedTuple, NamedTuple}
 
 // trait DatabaseAST[ReturnValue]:
 //   def toSQLString: String =
@@ -29,6 +29,7 @@ object Query:
 
   case class Union[A]($this: Query[A], $other: Query[A], $dedup: Boolean) extends Query[A]
   case class Intersect[A]($this: Query[A], $other: Query[A]) extends Query[A]
+  case class Except[A]($this: Query[A], $other: Query[A]) extends Query[A]
 
   case class Contains[A]($this: Query[A], $other: Expr[A]) extends Expr[Boolean]
   case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean]
@@ -77,6 +78,18 @@ object Query:
       val ref = Ref[R]()
       Aggregation(x, Fun(ref, Expr.Avg(f(ref))))
 
+    def max[B](f: Ref[R] => Expr[B]): Aggregation[R, B, B] =
+      val ref = Ref[R]()
+      Aggregation(x, Fun(ref, Expr.Max(f(ref))))
+
+    def min[B](f: Ref[R] => Expr[B]): Aggregation[R, B, B] =
+      val ref = Ref[R]()
+      Aggregation(x, Fun(ref, Expr.Min(f(ref))))
+
+//    def size: Aggregation[R, R, Int] = // TODO: this should probably not return an iterable
+//      val ref = Ref[R]()
+//      Aggregation(x, Fun(ref, Expr.Count(ref)))
+
     def union(that: Query[R]): Query[R] =
       Union(x, that, true)
 
@@ -85,6 +98,9 @@ object Query:
 
     def intersect(that: Query[R]): Query[R] =
       Intersect(x, that)
+
+    def except(that: Query[R]): Query[R] =
+      Except(x, that)
 
     // Does not work for subsets, need to match types exactly
     def contains(that: Expr[R]): Expr[Boolean] =

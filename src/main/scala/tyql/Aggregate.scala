@@ -6,6 +6,9 @@ package tyql
  * the library could just treat it like an iterable of length 1, so the type system should not
  * care if an operation is an aggregation or a regular expression.
  *
+ * However, aggregation[T] should be treated equivalently to Expr[T] so they can be embedded in queries.
+ * For now, have Aggregation extend both Expr and Query, TODO: maybe revise
+ *
  * Currently support ASTs of Map[Aggregation] as well as Aggregation[Aggregation] depending on user code
  *
  **/
@@ -15,4 +18,4 @@ case class Aggregation[
   QueryType,
   InputToAgg,
   AggregateReturnType // For many will be the same as input type (e.g. sum) but not always
-]($this: Query[QueryType], $f: Fun[QueryType, AggregationExpr[InputToAgg]]) extends Query[AggregateReturnType]
+]($this: Query[QueryType], $f: Fun[QueryType, AggregationExpr[InputToAgg]]) extends Query[AggregateReturnType] with Expr[AggregateReturnType]
