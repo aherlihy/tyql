@@ -15,11 +15,11 @@ class JoinSimple1Test extends SQLStringTest[AllCommerceDBs, (name: String, shipp
   def testDescription = "Join: two-table simple join on int equality + project"
   def query() =
     // val q =
-      for
-        b <- testDB.tables.buyers
-        si <- testDB.tables.shipInfos
-        if si.buyerId == b.id
-      yield (name = b.name, shippingDate = si.shippingDate).toRow
+    for
+      b <- testDB.tables.buyers
+      si <- testDB.tables.shipInfos
+      if si.buyerId == b.id
+    yield (name = b.name, shippingDate = si.shippingDate).toRow
     //q
 
   def sqlString = """

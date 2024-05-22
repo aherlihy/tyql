@@ -16,7 +16,7 @@ type CityDB = (cities: CityT)
 given cityDB: TestDatabase[CityDB] with
   override def tables = (
     cities = Table[CityT]("cities")
-  )
+    )
 
 given TestDatabase[AllLocDBs] with
   override def tables = (
@@ -148,52 +148,52 @@ class ContainsTest extends SQLStringTest[AllCommerceDBs, Product] {
   """
 }
 
- class NonEmptyTest extends SQLStringTest[AllCommerceDBs, Product] {
-   def testDescription: String = "NonEmpty"
-   def query() =
-     testDB.tables.products
-       .filter(p =>
-         testDB.tables.purchases.filter(
-           purch =>
-             purch.id == p.id
-         ).nonEmpty()
-       )
-   def sqlString: String = """SELECT *
+class NonEmptyTest extends SQLStringTest[AllCommerceDBs, Product] {
+  def testDescription: String = "NonEmpty"
+  def query() =
+    testDB.tables.products
+      .filter(p =>
+        testDB.tables.purchases.filter(
+          purch =>
+            purch.id == p.id
+        ).nonEmpty()
+      )
+  def sqlString: String = """SELECT *
      FROM Products p
      WHERE EXISTS (
        SELECT 1
        FROM purchases
        WHERE purchases.id = p.id
      )"""
- }
+}
 
- class IsEmptyTest extends SQLStringTest[AllCommerceDBs, Product] {
-   def testDescription: String = "Empty"
-   def query() =
-     testDB.tables.products
-       .filter(p => testDB.tables.purchases.filter(purch => purch.id == p.id).isEmpty())
-   def sqlString: String = """SELECT *
+class IsEmptyTest extends SQLStringTest[AllCommerceDBs, Product] {
+  def testDescription: String = "Empty"
+  def query() =
+    testDB.tables.products
+      .filter(p => testDB.tables.purchases.filter(purch => purch.id == p.id).isEmpty())
+  def sqlString: String = """SELECT *
    FROM Products p
    WHERE NOT EXISTS (
      SELECT 1
      FROM purchases
      WHERE purchases.id = p.id
    )"""
- }
+}
 
- // class CaseTest extends SQLStringTest[AllCommerceDBs, Int] {
- //   def testDescription: String = "CaseTest"
- //   def query() =
- //     testDB.tables.products
- //       .map: prod => (name: prod.name, price: prod.price, op: (prod.price > 1000) ? "Expensive" "Cheap")
- //   def sqlString: String = """
- // SELECT
- //   Name,
- //   Price,
- //   CASE
- //     WHEN Price > 1000 THEN 'Expensive'
- //     ELSE 'Cheap'
- //   END
- // FROM Products;
- //   """
- // }
+// class CaseTest extends SQLStringTest[AllCommerceDBs, Int] {
+//   def testDescription: String = "CaseTest"
+//   def query() =
+//     testDB.tables.products
+//       .map: prod => (name: prod.name, price: prod.price, op: (prod.price > 1000) ? "Expensive" "Cheap")
+//   def sqlString: String = """
+// SELECT
+//   Name,
+//   Price,
+//   CASE
+//     WHEN Price > 1000 THEN 'Expensive'
+//     ELSE 'Cheap'
+//   END
+// FROM Products;
+//   """
+// }

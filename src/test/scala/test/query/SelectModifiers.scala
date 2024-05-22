@@ -30,7 +30,7 @@ class SelectModifiersRepeatSelect2Test extends SQLStringTest[AllCommerceDBs, (na
 class SelectModifiersSortTest extends SQLStringTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: sort"
   def query() =
-      testDB.tables.products
+    testDB.tables.products
       // .sort: prod => (prod.id = Ord.ASC, ...) // alternative structure
       .sort(_.id, Ord.ASC)
       .map: prod =>
@@ -41,7 +41,7 @@ class SelectModifiersSortTest extends SQLStringTest[AllCommerceDBs, (name: Strin
 class SelectModifiersSort2Test extends SQLStringTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: sort with 2 keys"
   def query() =
-      testDB.tables.products
+    testDB.tables.products
       // .sort: prod => (prod.id = Ord.ASC, prod.price = Ord.DESC) // alternative structure
       .sort(_.id, Ord.ASC)
       .sort(_.price, Ord.DESC)
@@ -53,7 +53,7 @@ class SelectModifiersSort2Test extends SQLStringTest[AllCommerceDBs, (name: Stri
 class SelectModifiersSort3Test extends SQLStringTest[AllCommerceDBs, (name2: String)] {
   def testDescription: String = "SelectModifiers: sort on new name"
   def query() =
-      testDB.tables.products
+    testDB.tables.products
       .map: prod =>
         (name2 = prod.name).toRow
       .sort(_.name2, Ord.DESC)
@@ -63,7 +63,7 @@ class SelectModifiersSort3Test extends SQLStringTest[AllCommerceDBs, (name2: Str
 class SelectModifiersSortlimitSelectTest extends SQLStringTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: sortLimit"
   def query() =
-      testDB.tables.products
+    testDB.tables.products
       .sort(_.id, Ord.ASC)
       .map: prod =>
         (name = prod.name).toRow
@@ -74,7 +74,7 @@ class SelectModifiersSortlimitSelectTest extends SQLStringTest[AllCommerceDBs, (
 class SelectModifiersSortoffsetSelectTest extends SQLStringTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: sortOffset"
   def query() =
-      testDB.tables.products
+    testDB.tables.products
       .sort(_.id, Ord.ASC)
       .map: prod =>
         (name = prod.name).toRow
@@ -86,7 +86,7 @@ class SelectModifiersSortoffsetSelectTest extends SQLStringTest[AllCommerceDBs, 
 class SelectModifiersSortlimittwiceSelectTest extends SQLStringTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: sortLimitTwice"
   def query() =
-      testDB.tables.products
+    testDB.tables.products
       .sort(_.id, Ord.ASC)
       .map: prod =>
         (name = prod.name).toRow
@@ -98,7 +98,7 @@ class SelectModifiersSortlimittwiceSelectTest extends SQLStringTest[AllCommerceD
 class SelectModifiersDistinctSelectTest extends SQLStringTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: distinct"
   def query() =
-      testDB.tables.products
+    testDB.tables.products
       .sort(_.id, Ord.ASC)
       .map: prod =>
         (name = prod.name).toRow

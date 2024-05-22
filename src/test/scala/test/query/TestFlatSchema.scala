@@ -14,12 +14,12 @@ case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
 case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
 
 case class Purchase(
-    id: Int,
-    shippingInfoId: Int,
-    productId: Int,
-    count: Int,
-    total: Double
-)
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
 
 type AllCommerceDBs = (products: Product, buyers: Buyer, shipInfos: ShippingInfo, purchases: Purchase)
 

@@ -54,11 +54,11 @@ class sortTake2JoinSubqueryTest extends SQLStringTest[AllCommerceDBs, Double] {
 class sortTakeFromSubqueryTest extends SQLStringTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeFrom"
   def query() =
-        testDB.tables.products.sort(_.price, Ord.DESC).take(1).flatMap(prod =>
-          testDB.tables.purchases.filter(purch => prod.id == purch.productId).map(purch =>
-            purch.total
-          )
-        )
+    testDB.tables.products.sort(_.price, Ord.DESC).take(1).flatMap(prod =>
+      testDB.tables.purchases.filter(purch => prod.id == purch.productId).map(purch =>
+        purch.total
+      )
+    )
   def sqlString = """
         SELECT purchase1.total AS res
         FROM (SELECT product0.id AS id, product0.price AS price
