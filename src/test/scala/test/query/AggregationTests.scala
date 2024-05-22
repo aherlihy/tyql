@@ -8,20 +8,40 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 
-class AggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
+class SimpleAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum on expr"
+
   def query() =
     testDB.tables.products
-      .withFilter(p =>
-        p.price != 0
-      )
-      .map(p => (sum = p.price.sum).toRow)
+      .flatMap(p => p.price.sum)
 
-  def sqlString: String = """
-        SELECT SUM(purchase.price)
-        FROM purchase
-      """
+  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
+// TODO: not sure if this should compile or not
+
+//class SimpleAggregation2ExprTest extends SQLStringTest[AllCommerceDBs, Double] {
+//  def testDescription: String = "Aggregation: sum on expr witih named tuple"
+//
+//  def query() =
+//    testDB.tables.products
+//      .flatMap(p => (sum = p.price.sum))
+//  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
+//}
+//
+//class AggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
+//  def testDescription: String = "Aggregation: sum on expr with condition"
+//  def query() =
+//    testDB.tables.products
+//      .withFilter(p =>
+//        p.price != 0
+//      )
+//      .map(p => (sum = p.price.sum).toRow)
+//
+//  def sqlString: String = """
+//        SELECT SUM(purchase.price)
+//        FROM purchase
+//      """
+//}
 
 class AggregationQueryTest extends SQLStringTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum on query"

@@ -3,19 +3,39 @@ package tyql
 import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 
-// trait DatabaseAST[ReturnValue]:
-//   def toSQLString: String =
-//     "query"
+/**
+ * Shared supertype of query and aggregation
+ * @tparam ReturnValue
+ */
+trait DatabaseAST[ReturnValue]:
+  def toSQLString: String = "query"
 
+// TODO: there has got to be a better way to do this?
+trait FlatMapEvidence[R, B, Out]:
+  def flatMap(x: Query[R], f: Expr.Ref[R] => B): Out
+
+object FlatMapEvidence:
+  implicit def aggEvidence[R, B]: FlatMapEvidence[R, Aggregation[B], Aggregation[B]] =
+    new FlatMapEvidence[R, Aggregation[B], Aggregation[B]] {
+      def flatMap(x: Query[R], f: Expr.Ref[R] => Aggregation[B]): Aggregation[B] =
+        val ref = Expr.Ref[R]()
+        Aggregation.AggFlatMap(x, Expr.Fun(ref, f(ref)))
+    }
+  implicit def queryEvidence[R, B]: FlatMapEvidence[R, Query[B], Query[B]] =
+    new FlatMapEvidence[R, Query[B], Query[B]] {
+      def flatMap(x: Query[R], f: Expr.Ref[R] => Query[B]): Query[B] =
+        val ref = Expr.Ref[R]()
+        Query.FlatMap(x, Expr.Fun(ref, f(ref)))
+    }
 
 /** The type of database queries. So far, we have queries
  *  that represent whole DB tables and queries that reify
  *  for-expressions as data.
  */
-trait Query[A] //extends DatabaseAST[A]
+trait Query[A] extends DatabaseAST[A]
 
 object Query:
-  import Expr.{Pred, Fun, Ref, Single}
+  import Expr.{Pred, Fun, Ref}
 
   case class Filter[A]($q: Query[A], $p: Pred[A]) extends Query[A]
   case class Map[A, B]($q: Query[A], $f: Fun[A, Expr[B]]) extends Query[B]
@@ -50,15 +70,12 @@ object Query:
 
     def filter(p: Ref[R] => Expr[Boolean]): Query[R] = withFilter(p)
 
-    // for the cases where you are projecting one field
     def map[B](f: Ref[R] => Expr[B]): Query[B] =
       val ref = Ref[R]()
       Map(x, Fun(ref, f(ref)))
 
-    // for the cases where you are projecting multiple fields
-    def flatMap[B](f: Ref[R] => Query[B]): Query[B] =
-      val ref = Ref[R]()
-      FlatMap(x, Fun(ref, f(ref)))
+    def flatMap[B, Out](f: Ref[R] => B)(implicit ev: FlatMapEvidence[R, B, Out]): Out =
+      ev.flatMap(x, f)
 
     def sort[B](f: Ref[R] => Expr[B], ord: Ord): Query[R] =
       val ref = Ref[R]()
@@ -72,26 +89,26 @@ object Query:
 
     def distinct: Query[R] = Distinct(x)
 
-    def sum[B](f: Ref[R] => Expr[B]): Aggregation[R, B, B] =
+    def sum[B](f: Ref[R] => Expr[B]):Aggregation[B] =
       val ref = Ref[R]()
-      Aggregation(x, Fun(ref, Expr.Sum(f(ref))))
+      Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Sum(f(ref))))
 
-    def avg[B](f: Ref[R] => Expr[B]): Aggregation[R, B, B] =
+    def avg[B](f: Ref[R] => Expr[B]):Aggregation[B] =
       val ref = Ref[R]()
-      Aggregation(x, Fun(ref, Expr.Avg(f(ref))))
+       Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Avg(f(ref))))
 
-    def max[B](f: Ref[R] => Expr[B]): Aggregation[R, B, B] =
+    def max[B](f: Ref[R] => Expr[B]):Aggregation[B] =
       val ref = Ref[R]()
-      Aggregation(x, Fun(ref, Expr.Max(f(ref))))
+       Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Max(f(ref))))
 
-    def min[B](f: Ref[R] => Expr[B]): Aggregation[R, B, B] =
+    def min[B](f: Ref[R] => Expr[B]):Aggregation[B] =
       val ref = Ref[R]()
-      Aggregation(x, Fun(ref, Expr.Min(f(ref))))
+       Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Min(f(ref))))
 
 //    def size: Aggregation[R, R, Int] = // TODO: this should probably not return an iterable
 //      val ref = Ref[R]()
 //      Aggregation(x, Fun(ref, Expr.Count(ref)))
-
+//
     def union(that: Query[R]): Query[R] =
       Union(x, that, true)
 

@@ -32,10 +32,10 @@ object Expr:
 
   /** Sample extension methods for individual types */
   extension (x: Expr[Int])
-    def sum: Expr[Int] = Expr.Sum(x) // TODO: require summable type?
-    def avg: Expr[Int] = Expr.Avg(x)
-    def max: Expr[Int] = Expr.Max(x)
-    def min: Expr[Int] = Expr.Min(x)
+    def sum: Aggregation[Int] = Aggregation.Sum(x) // TODO: require summable type?
+    def avg: Aggregation[Int] = Aggregation.Avg(x)
+    def max: Aggregation[Int] = Aggregation.Max(x)
+    def min: Aggregation[Int] = Aggregation.Min(x)
     def > (y: Expr[Int]): Expr[Boolean] = Gt(x, y)
     def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y))
 
@@ -46,13 +46,13 @@ object Expr:
     @targetName("gtDoubleLit")
     def > (y: Double): Expr[Boolean] = GtDouble(x, DoubleLit(y))
     @targetName("sumDouble")
-    def sum: Expr[Double] = Expr.Sum(x)
+    def sum: Aggregation[Double] = Aggregation.Sum(x)
     @targetName("avgDouble")
-    def avg: Expr[Double] = Expr.Avg(x)
+    def avg: Aggregation[Double] = Aggregation.Avg(x)
     @targetName("maxDouble")
-    def max: Expr[Double] = Expr.Max(x)
+    def max: Aggregation[Double] = Aggregation.Max(x)
     @targetName("minDouble")
-    def min: Expr[Double] = Expr.Min(x)
+    def min: Aggregation[Double] = Aggregation.Min(x)
 
   extension (x: Expr[Boolean])
     def && (y: Expr[Boolean]): Expr[Boolean] = And(x, y)
@@ -87,13 +87,6 @@ object Expr:
 
   case class Project[A <: AnyNamedTuple]($a: A) extends Expr[NamedTuple.Map[A, StripExpr]]
 
-  trait AggregationExpr[B]
-  case class Sum[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
-  case class Avg[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
-  case class Max[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
-  case class Min[A]($a: Expr[A]) extends Expr[A] with AggregationExpr[A]
-  case class Count[A]($a: Expr[A]) extends Expr[Int] with AggregationExpr[Int]
-
   type StripExpr[E] = E match
     case Expr[b] => b
 
@@ -102,7 +95,7 @@ object Expr:
   case class Ne($x: Expr[?], $y: Expr[?]) extends Expr[Boolean]
 
   /** References are placeholders for parameters */
-  private var refCount = 0
+  private var refCount = 0 // TODO: do we want to recount from 0 for each query?
 
   case class Ref[A]($name: String = "") extends Expr[A]:
     private val id = refCount
@@ -124,6 +117,7 @@ object Expr:
    *  Query languages are ususally first-order, so Fun is not an Expr
    */
   case class Fun[A, B]($param: Ref[A], $f: B)
+  case class AggFun[A, B]($param: Ref[A], $f: B)
 
   type Pred[A] = Fun[A, Expr[Boolean]]
 
