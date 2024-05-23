@@ -133,79 +133,79 @@ class sortLimitSortLimitSubqueryTest extends SQLStringTest[AllCommerceDBs, Strin
         LIMIT ?
       """
 }
-//class subqueryInFilterSubqueryTest extends SQLStringTest[AllCommerceDBs, Buyer] {
-//  def testDescription = "Subquery: subqueryInFilter"
-//  def query() =
-//    testDB.tables.buyers.filter(c =>
-//      testDB.tables.shipInfos.filter(s =>
-//        c.id == s.buyerId
-//      ).size == 0
-//    )
-//  def sqlString = """
-//        SELECT
-//          buyer0.id AS id,
-//          buyer0.name AS name,
-//          buyer0.date_of_birth AS date_of_birth
-//        FROM buyer buyer0
-//        WHERE ((SELECT
-//            COUNT(1) AS res
-//            FROM shipping_info shipping_info1
-//            WHERE (buyer0.id = shipping_info1.buyer_id)) = ?)
-//      """
-//}
-//class SubqueryInMapSubqueryTest extends SQLStringTest[AllCommerceDBs, (buyer: Buyer, count: Int)] {
-//  def testDescription = "Subquery: subqueryInMap"
-//  def query() =
-//    testDB.tables.buyers.map(c =>
-//      (buyer = c, count = testDB.tables.shipInfos.filter(p => c.id == p.buyerId).size)
-//    )
-//  def sqlString = """
-//        SELECT
-//          buyer0.id AS res_0_id,
-//          buyer0.name AS res_0_name,
-//          buyer0.date_of_birth AS res_0_date_of_birth,
-//          (SELECT COUNT(1) AS res
-//            FROM shipping_info shipping_info1
-//            WHERE (buyer0.id = shipping_info1.buyer_id)) AS res_1
-//        FROM buyer buyer0
-//      """
-//}
-//class subqueryInMapNestedSubqueryTest extends SQLStringTest[AllCommerceDBs, (buyer: Buyer, occurances: Int)] {
-//  def testDescription = "Subquery: subqueryInMapNested"
-//  def query() =
-//    testDB.tables.buyers.map(c =>
-//      (buyer = c, occurances = testDB.tables.shipInfos.filter(p => p.buyerId == c.id).size == 1)
-//    )
-//  def sqlString = """
-//        SELECT
-//          buyer0.id AS res_0_id,
-//          buyer0.name AS res_0_name,
-//          buyer0.date_of_birth AS res_0_date_of_birth,
-//          ((SELECT
-//            COUNT(1) AS res
-//            FROM shipping_info shipping_info1
-//            WHERE (buyer0.id = shipping_info1.buyer_id)) = ?) AS res_1
-//        FROM buyer buyer0
-//      """
-//}
-//class subqueryInMapNestedConcatSubqueryTest extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, dateOfBirth: LocalDate, occurances: Int)] {
-//  def testDescription = "Subquery: subqueryInMapNested"
-//  def query() =
-//    testDB.tables.buyers.map(c =>
-//      c.concat((occurances = testDB.tables.shipInfos.filter(p => p.buyerId == c.id).size == 1))
-//    )
-//  def sqlString = """
-//        SELECT
-//          buyer0.id AS res_0_id,
-//          buyer0.name AS res_0_name,
-//          buyer0.date_of_birth AS res_0_date_of_birth,
-//          ((SELECT
-//            COUNT(1) AS res
-//            FROM shipping_info shipping_info1
-//            WHERE (buyer0.id = shipping_info1.buyer_id)) = ?) AS res_1
-//        FROM buyer buyer0
-//      """
-//}
+class subqueryInFilterSubqueryTest extends SQLStringTest[AllCommerceDBs, Buyer] {
+  def testDescription = "Subquery: subqueryInFilter"
+  def query() =
+    testDB.tables.buyers.filter(c =>
+      testDB.tables.shipInfos.filter(s =>
+        c.id == s.buyerId
+      ).size == 0
+    )
+  def sqlString = """
+        SELECT
+          buyer0.id AS id,
+          buyer0.name AS name,
+          buyer0.date_of_birth AS date_of_birth
+        FROM buyer buyer0
+        WHERE ((SELECT
+            COUNT(1) AS res
+            FROM shipping_info shipping_info1
+            WHERE (buyer0.id = shipping_info1.buyer_id)) = ?)
+      """
+}
+class SubqueryInMapSubqueryTest extends SQLStringTest[AllCommerceDBs, (buyer: Buyer, count: Int)] {
+  def testDescription = "Subquery: subqueryInMap"
+  def query() =
+    testDB.tables.buyers.map(c =>
+      (buyer = c, count = testDB.tables.shipInfos.filter(p => c.id == p.buyerId).size).toRow
+    )
+  def sqlString = """
+        SELECT
+          buyer0.id AS res_0_id,
+          buyer0.name AS res_0_name,
+          buyer0.date_of_birth AS res_0_date_of_birth,
+          (SELECT COUNT(1) AS res
+            FROM shipping_info shipping_info1
+            WHERE (buyer0.id = shipping_info1.buyer_id)) AS res_1
+        FROM buyer buyer0
+      """
+}
+class subqueryInMapNestedSubqueryTest extends SQLStringTest[AllCommerceDBs, (buyer: Buyer, occurances: Boolean)] {
+  def testDescription = "Subquery: subqueryInMapNested"
+  def query() =
+    testDB.tables.buyers.map(c =>
+      (buyer = c, occurances = testDB.tables.shipInfos.filter(p => p.buyerId == c.id).size == 1).toRow
+    )
+  def sqlString = """
+        SELECT
+          buyer0.id AS res_0_id,
+          buyer0.name AS res_0_name,
+          buyer0.date_of_birth AS res_0_date_of_birth,
+          ((SELECT
+            COUNT(1) AS res
+            FROM shipping_info shipping_info1
+            WHERE (buyer0.id = shipping_info1.buyer_id)) = ?) AS res_1
+        FROM buyer buyer0
+      """
+}
+class subqueryInMapNestedConcatSubqueryTest extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, dateOfBirth: LocalDate, occurances: Int)] {
+  def testDescription = "Subquery: subqueryInMapNested"
+  def query() =
+    testDB.tables.buyers.map(c =>
+      (id = c.id, name = c.name, dateOfBirth = c.dateOfBirth).toRow.concat((occurances = testDB.tables.shipInfos.filter(p => p.buyerId == c.id).size))
+    )
+  def sqlString = """
+        SELECT
+          buyer0.id AS res_0_id,
+          buyer0.name AS res_0_name,
+          buyer0.date_of_birth AS res_0_date_of_birth,
+          ((SELECT
+            COUNT(1) AS res
+            FROM shipping_info shipping_info1
+            WHERE (buyer0.id = shipping_info1.buyer_id)) = ?) AS res_1
+        FROM buyer buyer0
+      """
+}
 
 class selectLimitUnionSelectSubqueryTest extends SQLStringTest[AllCommerceDBs, String] {
   def testDescription = "Subquery: selectLimitUnionSelect"
@@ -283,54 +283,3 @@ class UnionAllAggregateSubqueryTest extends SQLStringTest[AllCommerceDBs, (max: 
           FROM product product0) subquery0
       """
 }
-//class DeeplyNestedSubqueryTest extends SQLStringTest[AllCommerceDBs, (max: Double, min: Double)] {
-//  def testDescription = "Subquery: deeplyNested"
-//  def query() =
-//        Buyer.select.map { buyer =>
-//          buyer.name ->
-//            ShippingInfo.select
-//              .filter(_.buyerId === buyer.id)
-//              .map { shippingInfo =>
-//                Purchase.select
-//                  .filter(_.shippingInfoId === shippingInfo.id)
-//                  .map { purchase =>
-//                    Product.select
-//                      .filter(_.id === purchase.productId)
-//                      .map(_.price)
-//                      .sorted
-//                      .desc
-//                      .take(1)
-//                      .toExpr
-//                  }
-//                  .sorted
-//                  .desc
-//                  .take(1)
-//                  .toExpr
-//              }
-//              .sorted
-//              .desc
-//              .take(1)
-//              .toExpr
-//        }
-//  def sqlString = """
-//      SELECT
-//        buyer0.name AS res_0,
-//        (SELECT
-//          (SELECT
-//            (SELECT product3.price AS res
-//            FROM product product3
-//            WHERE (product3.id = purchase2.product_id)
-//            ORDER BY res DESC
-//            LIMIT ?) AS res
-//          FROM purchase purchase2
-//          WHERE (purchase2.shipping_info_id = shipping_info1.id)
-//          ORDER BY res DESC
-//          LIMIT ?) AS res
-//        FROM shipping_info shipping_info1
-//        WHERE (shipping_info1.buyer_id = buyer0.id)
-//        ORDER BY res DESC
-//        LIMIT ?) AS res_1
-//      FROM buyer buyer0
-//      """
-//}
-

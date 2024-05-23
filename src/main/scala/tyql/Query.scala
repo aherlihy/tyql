@@ -130,10 +130,10 @@ object Query:
       val ref = Ref[R]()
        Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Min(f(ref))))
 
-//    def size: Aggregation[R, R, Int] = // TODO: this should probably not return an iterable
-//      val ref = Ref[R]()
-//      Aggregation(x, Fun(ref, Expr.Count(ref)))
-//
+    def size: Aggregation[Int] = // TODO: can potentially avoid identity
+      val ref = Ref[R]()
+      Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Count(ref)))
+
     def union(that: Query[R]): Query[R] =
       Union(x, that, true)
 

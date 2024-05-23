@@ -31,7 +31,7 @@ object Aggregation {
   case class Count[A]($a: Expr[A]) extends Aggregation[Int]
 
   // Needed because project can be a final result for aggregation but not query
-  case class AggProject[A <: AnyNamedTuple]($a: A) extends Aggregation[NamedTuple.Map[A, StripAgg]] with DatabaseAST[]
+  case class AggProject[A <: AnyNamedTuple]($a: A) extends Aggregation[NamedTuple.Map[A, StripAgg]]
 
   type StripAgg[E] = E match
     case Aggregation[b] => b
