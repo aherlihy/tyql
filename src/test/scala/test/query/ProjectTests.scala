@@ -102,32 +102,32 @@ class Project3Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String,
   def testDescription = "Project: project to tuple with concat with literal"
   def query() =
     testDB.tables.products.map: c =>
-      (id = c.id, name = c.name, price =  c.price).concat((extra = Expr.IntLit(1)))
+      (id = c.id, name = c.name, price =  c.price).toRow.concat((extra = Expr.IntLit(1)))
   def sqlString ="""
         """
 }
 
-//class Project4Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
-//  def testDescription = "Project: project to tuple with concat with another tuple"
-//  def query() =
-//    val tupleProd = testDB.tables.products
-//      .map: c =>
-//        (id = c.id, name = c.name, price = c.price).toRow
-//    val tupleShip = testDB.tables.shipInfos
-//      .map: s =>
-//        (buyerId = s.buyerId, shippingDate = s.shippingDate).toRow
-//    for
-//      t1 <- tupleProd
-//      t2 <- tupleShip
-//    yield t1.concat(t2)
-//
-////    tupleProd.flatMap: c =>
-////      tupleShip.map: s =>
-////        s.concat(c)
-//
-//  def sqlString ="""
-//        """
-//}
+class Project4Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
+  def testDescription = "Project: project to tuple with concat with another tuple"
+  def query() =
+    val tupleProd = testDB.tables.products
+      .map: c =>
+        (id = c.id, name = c.name, price = c.price).toRow
+    val tupleShip = testDB.tables.shipInfos
+      .map: s =>
+        (buyerId = s.buyerId, shippingDate = s.shippingDate).toRow
+    for
+      t1 <- tupleProd
+      t2 <- tupleShip
+    yield t1.concat(t2)
+
+//    tupleProd.flatMap: c =>
+//      tupleShip.map: s =>
+//        s.concat(c)
+
+  def sqlString ="""
+        """
+}
 
 /** TODO:
  * Concat doesn't work on these tests because the original types are defined as case classes.

@@ -128,6 +128,7 @@ object Expr:
    */
   extension [A <: AnyNamedTuple](x: A)
     def toRow: Project[A] = Project(x)
+
   extension [A <: AnyNamedTuple](x: Expr[A])
     def concat[B <: AnyNamedTuple](other: Expr[B]) = Concat(x, other)
 
