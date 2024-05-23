@@ -1,5 +1,8 @@
 package tyql
 
+import language.experimental.namedTuples
+import NamedTuple.{NamedTuple, AnyNamedTuple}
+
 /** TODO: Can chose to distinguish aggregation from regular select statements because they will
  * return only 1 element. So the type system could prevent further chaining of operations, given
  * that any expression with an aggregation wouldn't return an iterable, just a value. Could also
@@ -26,4 +29,17 @@ object Aggregation {
   case class Min[A]($a: Expr[A]) extends Aggregation[A]
 
   case class Count[A]($a: Expr[A]) extends Aggregation[Int]
+
+  // Needed because project can be a final result for aggregation but not query
+  case class AggProject[A <: AnyNamedTuple]($a: A) extends Aggregation[NamedTuple.Map[A, StripAgg]] with DatabaseAST[]
+
+  type StripAgg[E] = E match
+    case Aggregation[b] => b
+
+  extension [A <: AnyNamedTuple](x: A)
+    def toRow: AggProject[A] = AggProject(x)
+
+  /** Same as _.toRow, as an implicit conversion */
+  given [A <: AnyNamedTuple]: Conversion[A, Aggregation.AggProject[A]] = Aggregation.AggProject(_)
+
 }

@@ -11,18 +11,18 @@ trait DatabaseAST[ReturnValue]:
   def toSQLString: String = "query"
 
 // TODO: there has got to be a better way to do this?
-trait FlatMapEvidence[R, B, Out]:
-  def flatMap(x: Query[R], f: Expr.Ref[R] => B): Out
+trait FlatMapEvidence[R, B]:
+  def flatMap(x: Query[R], f: Expr.Ref[R] => B): B
 
 object FlatMapEvidence:
-  implicit def aggEvidence[R, B]: FlatMapEvidence[R, Aggregation[B], Aggregation[B]] =
-    new FlatMapEvidence[R, Aggregation[B], Aggregation[B]] {
+  implicit def aggEvidence[R, B]: FlatMapEvidence[R, Aggregation[B]] =
+    new FlatMapEvidence[R, Aggregation[B]] {
       def flatMap(x: Query[R], f: Expr.Ref[R] => Aggregation[B]): Aggregation[B] =
         val ref = Expr.Ref[R]()
         Aggregation.AggFlatMap(x, Expr.Fun(ref, f(ref)))
     }
-  implicit def queryEvidence[R, B]: FlatMapEvidence[R, Query[B], Query[B]] =
-    new FlatMapEvidence[R, Query[B], Query[B]] {
+  implicit def queryEvidence[R, B]: FlatMapEvidence[R, Query[B]] =
+    new FlatMapEvidence[R, Query[B]] {
       def flatMap(x: Query[R], f: Expr.Ref[R] => Query[B]): Query[B] =
         val ref = Expr.Ref[R]()
         Query.FlatMap(x, Expr.Fun(ref, f(ref)))
@@ -74,8 +74,33 @@ object Query:
       val ref = Ref[R]()
       Map(x, Fun(ref, f(ref)))
 
-    def flatMap[B, Out](f: Ref[R] => B)(implicit ev: FlatMapEvidence[R, B, Out]): Out =
+    /**
+     * Top-level queries:
+     *    map + aggregation => Query[Result], e.g. iterable with length 1
+     *    flatMap + aggregation = Aggregation[Result], e.g. single return value
+     *    map + query = Query[Result], e.g. iterable with length n
+     *    flatMap + query = shouldn't compile
+     */
+    def flatMap[B](f: Ref[R] => B)(implicit ev: FlatMapEvidence[R, B]): B =
       ev.flatMap(x, f)
+
+//  What I really want, but get ambiguous overload:
+//    def flatMap[B](f: Ref[R] => Query[B]): Query[B] =
+//      val ref = Expr.Ref[R]()
+//      Query.FlatMap(x, Expr.Fun(ref, f(ref)))
+//
+//    def flatMap[B](f: Ref[R] => Aggregation[B]): Aggregation[B] =
+//      val ref = Expr.Ref[R]()
+//      Aggregation.AggFlatMap(x, Expr.Fun(ref, f(ref)))
+//
+//  Alternative that also shouldn't work, but would be convenient:
+//    def flatMap[Q](f: Ref[R] => Q): Q =
+//      val ref = Expr.Ref[R]()
+//      f match
+//        case q: Ref[R] => Query[StripAST[Q]] =>
+//          Query.FlatMap(x, Expr.Fun(ref, f(ref)))
+//        case a: Ref[R] => Aggregation[StripAST[Q]] =>
+//          Aggregation.AggFlatMap(x, Expr.Fun(ref, f(ref)))
 
     def sort[B](f: Ref[R] => Expr[B], ord: Ord): Query[R] =
       val ref = Ref[R]()
