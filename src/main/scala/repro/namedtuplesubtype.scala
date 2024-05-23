@@ -36,7 +36,7 @@ object Repro3:
 [error]    |    repro.Expr2.toRow[A](x1)
 */
 
-// x1.concat(x2)
+  x1.concat(x2)
 /* Similar error:
 [error] 42 |  x1.concat(x2)
 [error]    |  ^^^^^^^^^
