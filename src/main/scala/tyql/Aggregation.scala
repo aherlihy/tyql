@@ -36,11 +36,13 @@ object Aggregation {
   type StripAgg[E] = E match
     case Aggregation[b] => b
 
-  extension [A <: AnyNamedTuple](x: A)
+  type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Aggregation[?]
+
+  extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
     def toRow: AggProject[A] = AggProject(x)
 
   /** Same as _.toRow, as an implicit conversion */
-  given [A <: AnyNamedTuple]: Conversion[A, Aggregation.AggProject[A]] = Aggregation.AggProject(_)
+  given [A <: AnyNamedTuple : IsTupleOfAgg]: Conversion[A, Aggregation.AggProject[A]] = Aggregation.AggProject(_)
 
   /**
    * NOTE: For group by, require that the result is a named tuple so that it can be referred to in the next clause?
