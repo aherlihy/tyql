@@ -115,9 +115,21 @@ class FlowMapFilterTest7 extends SQLStringTest[AllCommerceDBs, (bName: String, b
 }
 
 class FlowMapAggregateTest extends SQLStringTest[AllCommerceDBs, Int] {
-  def testDescription = "Flow: project tuple, 2 nest, map+map should not fail because aggregation is Expr"
+  def testDescription = "Flow: project tuple, 2 nest, map+flatMap should not fail because aggregation is Expr"
   def query() =
     testDB.tables.buyers.map(b =>
+      testDB.tables.shipInfos.flatMap(si => // silly but correct syntax
+        si.buyerId.sum
+      )
+    )
+
+  def sqlString = "SELECT MAX(r1.buyerId) FROM buyers r0, shipInfos r1"
+}
+
+class FlowMapAggregate2Test extends SQLStringTest[AllCommerceDBs, Int] {
+  def testDescription = "Flow: project tuple, 2 nest, flatMap+flatMap should not fail because aggregation is Expr"
+  def query() =
+    testDB.tables.buyers.flatMap(b =>
       testDB.tables.shipInfos.flatMap(si => // silly but correct syntax
         si.buyerId.sum
       )

@@ -25,13 +25,11 @@ trait Expr[Result] extends Selectable: // TODO: should Result be a subtype of na
   def == (other: String): Expr[Boolean] = Expr.Eq(this, Expr.StringLit(other))
   def == (other: Int): Expr[Boolean] = Expr.Eq(this, Expr.IntLit(other))
 
-//  def concat[B](other: Expr[B]) = Expr.Concat(Expr.Project(this), other)
-  // def single: Expr[Result] = Expr.Single(this)
-
 object Expr:
 
   /** Sample extension methods for individual types */
   extension (x: Expr[Int])
+    // TODO: this may cause a name conflict if there are fields named 'sum' or 'count'. Could require .aggregate.sum to avoid
     def sum: Aggregation[Int] = Aggregation.Sum(x) // TODO: require summable type?
     def avg: Aggregation[Int] = Aggregation.Avg(x)
     def max: Aggregation[Int] = Aggregation.Max(x)
@@ -70,12 +68,12 @@ object Expr:
   case class Gt($x: Expr[Int], $y: Expr[Int]) extends Expr[Boolean]
   case class GtDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
 
-  case class Plus(x: Expr[Int], y: Expr[Int]) extends Expr[Int]
+  case class Plus($x: Expr[Int], $y: Expr[Int]) extends Expr[Int]
   case class And($x: Expr[Boolean], $y: Expr[Boolean]) extends Expr[Boolean]
   case class Or($x: Expr[Boolean], $y: Expr[Boolean]) extends Expr[Boolean]
 
-  case class Upper(x: Expr[String]) extends Expr[String]
-  case class Lower(x: Expr[String]) extends Expr[String]
+  case class Upper($x: Expr[String]) extends Expr[String]
+  case class Lower($x: Expr[String]) extends Expr[String]
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // Todo: Make it strongly typed like the other cases
@@ -90,7 +88,7 @@ object Expr:
   type StripExpr[E] = E match
     case Expr[b] => b
 
-  // Also weakly typed in the arguents since these two classes model universal equality */
+  // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq($x: Expr[?], $y: Expr[?]) extends Expr[Boolean]
   case class Ne($x: Expr[?], $y: Expr[?]) extends Expr[Boolean]
 

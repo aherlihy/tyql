@@ -8,8 +8,10 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 
-class SimpleAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
-  def testDescription: String = "Aggregation: sum on expr"
+// Expression-based aggregation:
+
+class FlatMapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
+  def testDescription: String = "Aggregation: flatMap + expr.sum"
 
   def query() =
     testDB.tables.products
@@ -19,8 +21,8 @@ class SimpleAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
 }
 
 // TODO: these should compile?
-//class SimpleAggregation2ExprTest extends SQLStringTest[AllCommerceDBs, Any] {
-//  def testDescription: String = "Aggregation: sum on expr with named tuple"
+//class FlatMapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, Any] {
+//  def testDescription: String = "Aggregation: flatMap + expr.sum with named tuple"
 //
 //  def query() =
 //    testDB.tables.products
@@ -29,8 +31,30 @@ class SimpleAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
 //      )
 //  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 //}
-//class AggregationMultiAggregate2Test extends SQLStringTest[AllCommerceDBs, (sum: Double, avg: Double)] {
-//  def testDescription: String = "Aggregation: aggregate with  map (so returns regular flatMap not aggFlatMap)"
+
+class MapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
+  def testDescription: String = "Aggregation: map + expr.sum"
+
+  def query() =
+    testDB.tables.products
+      .map(p => p.price.sum)
+
+  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
+}
+
+class MapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
+  def testDescription: String = "Aggregation: map + expr.sum with named tuple"
+
+  def query() =
+    testDB.tables.products
+      .map(p => (sum = p.price.sum).toRow)
+
+  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
+}
+
+// TODO: same issue as above with flatMap + project
+//class AggregationMultiAggregateTest extends SQLStringTest[AllCommerceDBs, (sum: Double, avg: Double)] {
+//  def testDescription: String = "Aggregation: filter then flatMap with named tuple)"
 //
 //  def query() =
 //    testDB.tables.products
@@ -46,8 +70,8 @@ class SimpleAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
 //        """
 //}
 
-class AggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
-  def testDescription: String = "Aggregation: sum on expr with condition"
+class MapFilterAggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
+  def testDescription: String = "Aggregation: filter then map with named tuple"
   def query() =
     testDB.tables.products
       .withFilter(p =>
@@ -57,12 +81,20 @@ class AggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
 
   def sqlString: String = """
         SELECT SUM(purchase.price)
-        FROM purchase
+        FROM purchase WHERE purchase.price != 0
       """
 }
 
+// Query-based aggregation:
 class AggregationQueryTest extends SQLStringTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum on query"
+  def query() =
+    testDB.tables.products.sum(_.price)
+  def sqlString: String = "SELECT SUM(product.price) FROM product"
+}
+
+class FilterAggregationQueryTest extends SQLStringTest[AllCommerceDBs, Double] {
+  def testDescription: String = "Aggregation: filter then  sum on query"
   def query() =
     testDB.tables.products
       .withFilter(p =>
@@ -72,48 +104,26 @@ class AggregationQueryTest extends SQLStringTest[AllCommerceDBs, Double] {
 
   def sqlString: String = """
         SELECT SUM(purchase.price)
-        FROM purchase
+        FROM purchase WHERE purchase.price
       """
 }
 
-class AggregationQueryProjectTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
-  def testDescription: String = "Aggregation: sum on query"
+class FilterAggregationProjectQueryTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
+  def testDescription: String = "Aggregation: sum on query with tuple"
   def query() =
     testDB.tables.products
       .withFilter(p =>
         p.price != 0
       )
-      .sum(p => (sum = p.price).toRow)
+      .sum(p => (sum = p.price).toRow) // TODO: should sum only allow attributes instead of any expr?
 
   def sqlString: String = """
         SELECT SUM(purchase.price)
-        FROM purchase
+        FROM purchase WHERE purchase.price != 0
       """
 }
 
-
-class AggregationSumSelectTest extends SQLStringTest[AllCommerceDBs, Double] {
-  def testDescription: String = "Aggregation: sum"
-  def query() =
-    testDB.tables.products.sum(_.price)
-  def sqlString: String = "SELECT SUM(product.price) FROM product"
-}
-
-class AggregationSum2SelectTest extends SQLStringTest[AllCommerceDBs, Double] {
-  def testDescription: String = "Aggregation: sum with filter"
-  def query() =
-    testDB.tables.products.withFilter(p => p.price != 0).sum(_.price)
-  def sqlString: String = "SELECT SUM(product.price) FROM product WHERE product.price > 0"
-}
-
-class AggregationSum3SelectTest extends SQLStringTest[AllCommerceDBs, Double] {
-  def testDescription: String = "Aggregation: sum with map"
-  def query() =
-    testDB.tables.products.withFilter(p => p.price != 0).sum(_.price)
-  def sqlString: String = "SELECT SUM(product.price) FROM product WHERE product.price > 0"
-}
-
-class AggregationSum4SelectTest extends SQLStringTest[AllCommerceDBs, Double] {
+class FilterMapAggregationQuerySelectTest extends SQLStringTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum with map"
   def query() =
     testDB.tables.products
@@ -125,19 +135,4 @@ class AggregationSum4SelectTest extends SQLStringTest[AllCommerceDBs, Double] {
           FROM product
           WHERE product.price > 0)
   """
-}
-
-class AggregationMultiAggregateTest extends SQLStringTest[AllCommerceDBs, (sum: Double, avg: Double)] {
-  def testDescription: String = "Aggregation: aggregate with  map (so returns regular flatMap not aggFlatMap)"
-  def query() =
-    testDB.tables.products
-      .withFilter(p =>
-        p.price != 0
-      )
-      .map(p => (sum = p.price.sum, avg = p.price.avg).toRow)
-
-  def sqlString: String = """
-        SELECT SUM(purchase.price), AVG(purchase.price)
-        FROM purchase
-      """
 }

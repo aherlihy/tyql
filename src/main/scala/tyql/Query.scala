@@ -156,6 +156,7 @@ object Query:
     def isEmpty(): Expr[Boolean] =
       IsEmpty(x)
 
+    // TODO: change so that it takes seq of fields
     def groupBy[B, C](f: Ref[R] => Expr[B], having: Ref[R] => Expr[Boolean]): Query[R] =
       val ref1 = Ref[R]()
       val ref2 = Ref[R]()

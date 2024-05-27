@@ -8,8 +8,22 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 
-class sortGroupBySubqueryTest extends SQLStringTest[AllCommerceDBs, Purchase] {
-  def testDescription = "Subquery: sortGroupBy"
+class GroupByTest extends SQLStringTest[AllCommerceDBs, Purchase] {
+  def testDescription = "GroupBy: simple"
+
+  def query() =
+    testDB.tables.purchases.map(_.total.avg).groupBy(
+      p => p.count,
+      p => p.id == 10
+    )
+
+  def sqlString =
+    """ SELECT AVG(purchases.total) FROM purchases GROUP BY purchases.count
+        """
+}
+
+class SortGroupByTest extends SQLStringTest[AllCommerceDBs, Purchase] {
+  def testDescription = "GroupBy: sort then GroupBy"
   def query() =
     testDB.tables.purchases.sort(_.count, Ord.ASC).take(5).groupBy(
       p => p.total.avg,
@@ -18,8 +32,8 @@ class sortGroupBySubqueryTest extends SQLStringTest[AllCommerceDBs, Purchase] {
   def sqlString = """
       """
 }
-class groupByJoinSubqueryTest extends SQLStringTest[AllCommerceDBs, (id: Int, total: Double)] {
-  def testDescription = "Subquery: groupByJoin"
+class JoinGroupByTest extends SQLStringTest[AllCommerceDBs, (id: Int, total: Double)] {
+  def testDescription = "GroupBy: GroupByJoin"
   def query() =
     for
       p1 <- testDB.tables.purchases.groupBy(_.total.sum, f => f.id == 1)
