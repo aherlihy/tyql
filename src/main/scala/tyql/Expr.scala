@@ -119,18 +119,20 @@ object Expr:
 
   type Pred[A] = Fun[A, Expr[Boolean]]
 
+  type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?]
+
   /** Explicit conversion from
    *      (name_1: Expr[T_1], ..., name_n: Expr[T_n])
    *  to
    *      Expr[(name_1: T_1, ..., name_n: T_n)]
    */
-  extension [A <: AnyNamedTuple](x: A)
+  extension [A <: AnyNamedTuple : IsTupleOfExpr](x: A)
     def toRow: Project[A] = Project(x)
 
   extension [A <: AnyNamedTuple](x: Expr[A])
     def concat[B <: AnyNamedTuple](other: Expr[B]) = Concat(x, other)
 
   /** Same as _.toRow, as an implicit conversion */
-  given [A <: AnyNamedTuple]: Conversion[A, Expr.Project[A]] = Expr.Project(_)
+  given [A <: AnyNamedTuple : IsTupleOfExpr]: Conversion[A, Expr.Project[A]] = Expr.Project(_)
 
 end Expr
