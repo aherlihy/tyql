@@ -3,7 +3,6 @@ import test.SQLStringTest
 import test.query.{commerceDBs,  AllCommerceDBs}
 
 import tyql.*
-import tyql.Expr.toRow
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
@@ -20,7 +19,6 @@ class FlatMapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
   def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
 
-// TODO: these should compile?
 class FlatMapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (s: Double)] {
   def testDescription: String = "Aggregation: flatMap + expr.sum with named tuple"
 
@@ -53,22 +51,22 @@ class MapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: 
 }
 
 // TODO: same issue as above with flatMap + project
-//class AggregationMultiAggregateTest extends SQLStringTest[AllCommerceDBs, (sum: Double, avg: Double)] {
-//  def testDescription: String = "Aggregation: filter then flatMap with named tuple)"
-//
-//  def query() =
-//    testDB.tables.products
-//      .withFilter(p =>
-//        p.price != 0
-//      )
-//      .flatMap(p => (sum = p.price.sum, avg = p.price.avg).toRow)
-//
-//  def sqlString: String =
-//    """
-//          SELECT SUM(purchase.price), AVG(purchase.price)
-//          FROM purchase
-//        """
-//}
+class AggregationMultiAggregateTest extends SQLStringTest[AllCommerceDBs, (sum: Double, avg: Double)] {
+  def testDescription: String = "Aggregation: filter then flatMap with named tuple)"
+
+  def query() =
+    testDB.tables.products
+      .withFilter(p =>
+        p.price != 0
+      )
+      .flatMap(p => (sum = p.price.sum, avg = p.price.avg).toRow)
+
+  def sqlString: String =
+    """
+          SELECT SUM(purchase.price), AVG(purchase.price)
+          FROM purchase
+        """
+}
 
 class MapFilterAggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
   def testDescription: String = "Aggregation: filter then map with named tuple"

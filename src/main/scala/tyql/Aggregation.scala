@@ -30,10 +30,6 @@ object Aggregation {
 
   case class Count[A]($a: Expr[A]) extends Aggregation[Int]
 
-  // TODO: spark-style groupBy or SQL groupBy that requires an aggregate?
-  // TODO: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
-  case class GroupBy[A, B]($q: Aggregation[A], $f: Fun[A, Expr[B]]/*, $having: Fun[A, Expr[Boolean]]*/) extends Query[A]
-
   // Needed because project can be a final result for aggregation but not query
   case class AggProject[A <: AnyNamedTuple]($a: A) extends Aggregation[NamedTuple.Map[A, StripAgg]]
 
@@ -51,10 +47,10 @@ object Aggregation {
    * Also require groupBy to occur on an aggregation only
    * Otherwise have groupBy on a flat list which does not have meaning.
    */
-  extension[R/* <: AnyNamedTuple*/] (x: Aggregation[R] )
-    // For now, dont treat HAVING as anything special since AST transform will be responsible for special casing filter + groupBy
-    def groupBy[B, C](f: Expr.Ref[R] => Expr[B]): Query[R] =
-      val ref1 = Expr.Ref[R]()
-      GroupBy(x, Fun(ref1, f(ref1)))
-
+//  extension[R/* <: AnyNamedTuple*/] (x: Aggregation[R] )
+//    // For now, dont treat HAVING as anything special since AST transform will be responsible for special casing filter + groupBy
+//    // groupBy will return a Query (not agg) since it will usually be an iterable
+//    def groupBy[B, C](f: Expr.Ref[R] => Expr[B]): Query[R] =
+//      val ref1 = Expr.Ref[R]()
+//      GroupBy(x, Fun(ref1, f(ref1)))
 }

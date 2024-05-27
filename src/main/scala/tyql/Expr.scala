@@ -115,7 +115,7 @@ object Expr:
    *  Query languages are ususally first-order, so Fun is not an Expr
    */
   case class Fun[A, B]($param: Ref[A], $f: B)
-  case class AggFun[A, B]($param: Ref[A], $f: B)
+//  case class AggFun[A, B]($param: Ref[A], $f: B)
 
   type Pred[A] = Fun[A, Expr[Boolean]]
 
