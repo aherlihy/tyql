@@ -13,20 +13,18 @@ trait DatabaseAST[ReturnValue]:
 // TODO: there has got to be a better way to do this?
 trait FlatMapEvidence[R, B]:
   def flatMap(x: Query[R], f: Expr.Ref[R] => B): B
-
 object FlatMapEvidence:
   implicit def aggEvidence[R, B]: FlatMapEvidence[R, Aggregation[B]] =
-    new FlatMapEvidence[R, Aggregation[B]] {
+    new FlatMapEvidence[R, Aggregation[B]]:
       def flatMap(x: Query[R], f: Expr.Ref[R] => Aggregation[B]): Aggregation[B] =
         val ref = Expr.Ref[R]()
         Aggregation.AggFlatMap(x, Expr.Fun(ref, f(ref)))
-    }
+        
   implicit def queryEvidence[R, B]: FlatMapEvidence[R, Query[B]] =
-    new FlatMapEvidence[R, Query[B]] {
+    new FlatMapEvidence[R, Query[B]]:
       def flatMap(x: Query[R], f: Expr.Ref[R] => Query[B]): Query[B] =
         val ref = Expr.Ref[R]()
         Query.FlatMap(x, Expr.Fun(ref, f(ref)))
-    }
 
 /** The type of database queries. So far, we have queries
  *  that represent whole DB tables and queries that reify
@@ -40,7 +38,7 @@ object Query:
   case class Filter[A]($q: Query[A], $p: Pred[A]) extends Query[A]
   case class Map[A, B]($q: Query[A], $f: Fun[A, Expr[B]]) extends Query[B]
   case class FlatMap[A, B]($q: Query[A], $f: Fun[A, Query[B]]) extends Query[B]
-  // case class Sort[A]($q: Query[A], $o: Ordering[A]) extends Query[A]
+  // case class Sort[A]($q: Query[A], $o: Ordering[A]) extends Query[A] // alternative syntax to avoid chaining .sort for multi-key sort
   case class Sort[A, B]($q: Query[A], $f: Fun[A, Expr[B]], $ord: Ord) extends Query[A]
   case class Limit[A]($q: Query[A], $limit: Int) extends Query[A]
   case class Offset[A]($q: Query[A], $offset: Int) extends Query[A]
@@ -54,9 +52,6 @@ object Query:
   case class Contains[A]($this: Query[A], $other: Expr[A]) extends Expr[Boolean]
   case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean]
   case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean]
-
-  // TODO: spark-style groupBy or SQL groupBy that requires an aggregate?
-  case class GroupBy[A, B]($q: Query[A], $f: Fun[A, Expr[B]], $having: Fun[A, Expr[Boolean]]) extends Query[A]
 
   // Extension methods to support for-expression syntax for queries
   extension [R](x: Query[R])
@@ -84,6 +79,7 @@ object Query:
     def flatMap[B](f: Ref[R] => B)(implicit ev: FlatMapEvidence[R, B]): B =
       ev.flatMap(x, f)
 
+//  Goal: the shape of the return from map/flatMap depends if you call a nested aggregate function.
 //  What I really want, but get ambiguous overload:
 //    def flatMap[B](f: Ref[R] => Query[B]): Query[B] =
 //      val ref = Expr.Ref[R]()
@@ -155,13 +151,7 @@ object Query:
 
     def isEmpty(): Expr[Boolean] =
       IsEmpty(x)
-
-    // TODO: change so that it takes seq of fields
-    def groupBy[B, C](f: Ref[R] => Expr[B], having: Ref[R] => Expr[Boolean]): Query[R] =
-      val ref1 = Ref[R]()
-      val ref2 = Ref[R]()
-      GroupBy(x, Fun(ref1, f(ref1)), Fun(ref2, having(ref2)))
-
+  
   // def single(): R =
     //   Expr.Single(x)
 
