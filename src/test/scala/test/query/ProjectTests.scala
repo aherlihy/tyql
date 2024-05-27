@@ -17,6 +17,8 @@ class ReturnIntTest extends SQLStringTest[AllCommerceDBs, Int] {
       c.id
 
   def sqlString = """
+  SELECT products.id
+  FROM products
       """
 }
 
@@ -26,7 +28,8 @@ class ReturnStringTest extends SQLStringTest[AllCommerceDBs, String] {
     testDB.tables.products.map: c =>
       c.name
 
-  def sqlString = """
+  def sqlString = """SELECT products.name
+  FROM products
       """
 }
 
@@ -36,7 +39,8 @@ class ProjectIntTest extends SQLStringTest[AllCommerceDBs, (id: Int)] {
     testDB.tables.products.map: c =>
       (id = c.id).toRow
 
-  def sqlString = """
+  def sqlString = """SELECT products.id
+  FROM products
       """
 }
 
@@ -47,6 +51,8 @@ class ProjectStringTest extends SQLStringTest[AllCommerceDBs, (name: String)] {
       (name = c.name).toRow
 
   def sqlString = """
+  SELECT products.id
+  FROM products
       """
 }
 
@@ -57,6 +63,8 @@ class ProjectMixedTest extends SQLStringTest[AllCommerceDBs, (name: String, id: 
       (name = c.name, id = c.id).toRow
 
   def sqlString = """
+  SELECT products.name, products.id
+FROM products
       """
 }
 
@@ -66,7 +74,8 @@ class ProjectString2Test extends SQLStringTest[AllCommerceDBs, (name: String, na
     testDB.tables.products.map: c =>
       (name = c.name, name2 = c.name).toRow
 
-  def sqlString = """
+  def sqlString = """SELECT products.name, products.name AS name2
+FROM products
       """
 }
 
@@ -76,7 +85,8 @@ class JoinProjectInt2Test extends SQLStringTest[AllCommerceDBs, (id: Int, id2: I
     testDB.tables.products.map: c =>
       (id = c.id, id2 = c.id).toRow
 
-  def sqlString = """
+  def sqlString = """SELECT products.id, products.id AS id2
+FROM products
       """
 }
 
@@ -85,7 +95,8 @@ class ProjectTest extends SQLStringTest[AllCommerceDBs, Product] {
   def query() =
     testDB.tables.products.map: c =>
       c
-  def sqlString = """
+  def sqlString = """SELECT products.*
+FROM products
       """
 }
 
@@ -95,6 +106,8 @@ class Project2Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String,
     testDB.tables.products.map: c =>
       (id = c.id, name = c.name, price =  c.price).toRow
   def sqlString ="""
+  SELECT products.id, products.name, products.price
+FROM products
         """
 }
 
@@ -104,6 +117,8 @@ class Project3Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String,
     testDB.tables.products.map: c =>
       (id = c.id, name = c.name, price =  c.price).toRow.concat((extra = Expr.IntLit(1)))
   def sqlString ="""
+  SELECT products.id, products.name, products.price, 1 AS extra
+FROM products
         """
 }
 
@@ -121,11 +136,13 @@ class Project4Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String,
       t2 <- tupleShip
     yield t1.concat(t2)
 
-//    tupleProd.flatMap: c =>
-//      tupleShip.map: s =>
-//        s.concat(c)
+  //    tupleProd.flatMap: c =>
+  //      tupleShip.map: s =>
+  //        s.concat(c)
 
-  def sqlString ="""
+  def sqlString ="""SELECT p.id, p.name, p.price, s.buyerId, s.shippingDate
+FROM products p
+CROSS JOIN shipInfos s
         """
 }
 

@@ -127,7 +127,7 @@ object Query:
     def groupBy[B, C](
      selectFn: Expr.Ref[R] => Expr[C],
      groupingFn: Expr.Ref[R] => Expr[B],
-     havingFn: Expr.Ref[C] => Expr[Boolean]
+     havingFn: Expr.Ref[C] => Expr[Boolean] // TODO: make optional
    ): Query[C] =
       val ref1 = Expr.Ref[R]()
       val ref2 = Expr.Ref[R]()
