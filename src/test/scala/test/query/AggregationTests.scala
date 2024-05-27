@@ -3,7 +3,6 @@ import test.SQLStringTest
 import test.query.{commerceDBs,  AllCommerceDBs}
 
 import tyql.*
-import tyql.Expr.toRow
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
@@ -27,7 +26,7 @@ class FlatMapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (s
   def query() =
     testDB.tables.products
       .flatMap(p =>
-        Aggregation.AggProject((s = p.price.sum))
+        (s = p.price.sum).toRow
       )
   def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
