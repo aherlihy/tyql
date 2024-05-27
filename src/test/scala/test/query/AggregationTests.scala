@@ -21,16 +21,16 @@ class FlatMapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
 }
 
 // TODO: these should compile?
-//class FlatMapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, Any] {
-//  def testDescription: String = "Aggregation: flatMap + expr.sum with named tuple"
-//
-//  def query() =
-//    testDB.tables.products
-//      .flatMap(p =>
-//        (sum = p.price.sum).toRow
-//      )
-//  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
-//}
+class FlatMapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (s: Double)] {
+  def testDescription: String = "Aggregation: flatMap + expr.sum with named tuple"
+
+  def query() =
+    testDB.tables.products
+      .flatMap(p =>
+        (s = p.price.sum).toRow
+      )
+  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
+}
 
 class MapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: map + expr.sum"
