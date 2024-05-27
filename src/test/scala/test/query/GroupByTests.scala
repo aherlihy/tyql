@@ -100,27 +100,27 @@ class SortGroupByTest extends SQLStringTest[AllCommerceDBs, (avg: Double)] {
   def sqlString = """
       """
 }
-//class JoinGroupByTest extends SQLStringTest[AllCommerceDBs, (id: Int, total: Double)] {
-//  def testDescription = "GroupBy: GroupByJoin"
-//  def query() =
-//    for
-//      p1 <- testDB.tables.purchases.groupBy(
-//        p => (s = p.total.sum, id = p.id).toRow,
-//        _.total.sum,
-//        f => f.s == 1
-//      )
-//      p2 <- testDB.tables.products
-//      if p1.s == p2.id
-//    yield (id = p1.id, total = p2.price.avg).toRow
-//  def sqlString = """
-//        SELECT
-//          product1.name AS res_0,
-//          subquery0.res_1 AS res_1
-//        FROM (SELECT
-//            purchase0.product_id AS res_0,
-//            SUM(purchase0.total) AS res_1
-//          FROM purchase purchase0
-//          GROUP BY purchase0.product_id) subquery0
-//        JOIN product product1 ON (subquery0.res_0 = product1.id)
-//      """
-//}
+class JoinGroupByTest extends SQLStringTest[AllCommerceDBs, (id: Int, total: Double)] {
+  def testDescription = "GroupBy: GroupByJoin"
+  def query() =
+    for
+      p1 <- testDB.tables.purchases.groupBy(
+        p => (s = p.total.sum, id = p.id).toRow,
+        _.total.sum,
+        f => f.s == 1
+      )
+      p2 <- testDB.tables.products
+      if p1.s == p2.id
+    yield (id = p1.id, total = p2.price.avg).toRow
+  def sqlString = """
+        SELECT
+          product1.name AS res_0,
+          subquery0.res_1 AS res_1
+        FROM (SELECT
+            purchase0.product_id AS res_0,
+            SUM(purchase0.total) AS res_1
+          FROM purchase purchase0
+          GROUP BY purchase0.product_id) subquery0
+        JOIN product product1 ON (subquery0.res_0 = product1.id)
+      """
+}
