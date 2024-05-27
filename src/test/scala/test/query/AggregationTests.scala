@@ -27,7 +27,7 @@ class FlatMapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (s
   def query() =
     testDB.tables.products
       .flatMap(p =>
-        (s = p.price.sum).toRow
+        Aggregation.AggProject((s = p.price.sum))
       )
   def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
