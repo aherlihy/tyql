@@ -3,6 +3,7 @@ package tyql
 import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.compiletime.*
+import scala.deriving.Mirror
 
 enum ResultTag[T]:
   case IntTag extends ResultTag[Int]
@@ -10,6 +11,7 @@ enum ResultTag[T]:
   case StringTag extends ResultTag[String]
   case BoolTag extends ResultTag[Boolean]
   case NamedTupleTag[N <: Tuple, V <: Tuple](names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
+  case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]]) extends ResultTag[T]
   // TODO: Add more types, specialize for DB backend
 object ResultTag:
   given ResultTag[Int] = ResultTag.IntTag
@@ -20,8 +22,13 @@ object ResultTag:
     val names = constValueTuple[N]
     val tpes = summonAll[Tuple.Map[V, ResultTag]]
     NamedTupleTag(names.toList.asInstanceOf[List[String]], tpes.toList.asInstanceOf[List[ResultTag[?]]])
-  // TODO: provide a default or a given for case class?
-//  inline given [N]: ResultTag[N] = ???
+
+  // We don't really need `fields` and could use `m` for everything, but maybe we can share a cached
+  // version of `fields`.
+  // Alternatively if we don't care about the case class name we could use only `fields`.
+  inline given [T](using m: Mirror.ProductOf[T], fields: ResultTag[NamedTuple.From[T]]): ResultTag[T] =
+    val productName = constValue[m.MirroredLabel]
+    ProductTag(productName, fields)
 
 /**
  * Shared supertype of query and aggregation
