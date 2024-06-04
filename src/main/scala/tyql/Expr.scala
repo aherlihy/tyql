@@ -127,13 +127,13 @@ object Expr:
    *      Expr[(name_1: T_1, ..., name_n: T_n)]
    */
   extension [A <: AnyNamedTuple : IsTupleOfExpr](x: A)
-    def toRow: Project[A] = Project(x)
+    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): Project[A] = Project(x)
 
 // TODO: use NamedTuple.from to convert case classes to named tuples before using concat
   extension [A <: AnyNamedTuple](x: Expr[A])
-    def concat[B <: AnyNamedTuple](other: Expr[B]) = Concat(x, other)
+    def concat[B <: AnyNamedTuple](other: Expr[B])(using ResultTag[NamedTuple.Concat[A, B]]) = Concat(x, other)
 
   /** Same as _.toRow, as an implicit conversion */
-  given [A <: AnyNamedTuple : IsTupleOfExpr]: Conversion[A, Expr.Project[A]] = Expr.Project(_)
+  given [A <: AnyNamedTuple : IsTupleOfExpr](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, Expr.Project[A]] = Expr.Project(_)
 
 end Expr

@@ -16,7 +16,7 @@ import NamedTuple.{NamedTuple, AnyNamedTuple}
  **/
 import Expr.Fun
 
-trait Aggregation[Result](using ResultTag[Result]) extends Expr[Result] with DatabaseAST[Result]
+trait Aggregation[Result](using override val tag: ResultTag[Result]) extends Expr[Result] with DatabaseAST[Result]
 object Aggregation {
   case class AggFlatMap[A, B: ResultTag]($q: Query[A], $f: Fun[A, Aggregation[B]]) extends Aggregation[B]
 
@@ -40,10 +40,10 @@ object Aggregation {
   type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Aggregation[?]
 
   extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
-    def toRow: AggProject[A] = AggProject(x)
+    def toRow(using ResultTag[NamedTuple.Map[A, StripAgg]]): AggProject[A] = AggProject(x)
 
   /** Same as _.toRow, as an implicit conversion */
-  given [A <: AnyNamedTuple : IsTupleOfAgg]: Conversion[A, Aggregation.AggProject[A]] = Aggregation.AggProject(_)
+  given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripAgg]]): Conversion[A, Aggregation.AggProject[A]] = Aggregation.AggProject(_)
 
   /**
    * NOTE: For group by, require that the result is a named tuple so that it can be referred to in the next clause?

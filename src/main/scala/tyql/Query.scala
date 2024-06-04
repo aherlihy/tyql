@@ -20,6 +20,9 @@ object ResultTag:
     val names = constValueTuple[N]
     val tpes = summonAll[Tuple.Map[V, ResultTag]]
     NamedTupleTag(names.toList.asInstanceOf[List[String]], tpes.toList.asInstanceOf[List[ResultTag[?]]])
+  // TODO: provide a default or a given for case class?
+//  inline given [N]: ResultTag[N] = ???
+
 /**
  * Shared supertype of query and aggregation
  * @tparam Result
