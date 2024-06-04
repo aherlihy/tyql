@@ -2,15 +2,43 @@ package tyql
 
 import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
+import scala.compiletime.*
 
+enum ResultTag[T]:
+  case IntTag extends ResultTag[Int]
+  case DoubleTag extends ResultTag[Double]
+  case StringTag extends ResultTag[String]
+  case BoolTag extends ResultTag[Boolean]
+  case NamedTupleTag[N <: Tuple, V <: Tuple](names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
+  // TODO: Add more types, specialize for DB backend
+object ResultTag:
+  given ResultTag[Int] = ResultTag.IntTag
+  given ResultTag[String] = ResultTag.StringTag
+  given ResultTag[Boolean] = ResultTag.BoolTag
+  given ResultTag[Double] = ResultTag.DoubleTag
+  inline given [N <: Tuple, V <: Tuple]: ResultTag[NamedTuple[N, V]] =
+    val names = constValueTuple[N]
+    val tpes = summonAll[Tuple.Map[V, ResultTag]]
+    NamedTupleTag(names.toList.asInstanceOf[List[String]], tpes.toList.asInstanceOf[List[ResultTag[?]]])
 /**
  * Shared supertype of query and aggregation
- * @tparam ReturnValue
+ * @tparam Result
  */
-trait DatabaseAST[ReturnValue]:
-  def toSQLString: String = "query"
+trait DatabaseAST[Result](using val tag: ResultTag[Result]):
+  def toSQLString: String = toQueryIR.toSQLString
 
-trait Query[A] extends DatabaseAST[A]:
+//  given ResultTag[T]: ResultTag = inline erasedValue[T] match
+//    case _: Int => ResultTag.Int
+//    case _: String => ResultTag.String
+//    case _: Boolean => ResultTag.Bool
+//    // TODO: Add more cases
+//    case  _: t *: ts => ResultTag.Tuple(recCall[t], recCall[ts])
+//    case _ => throw new IllegalArgumentException(s"Unsupported type")
+
+  private def toQueryIR: QueryIRTree =
+    QueryIRTree(this)
+
+trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   /**
    * Top-level queries:
    * map + aggregation => Query[Result], e.g. iterable with length 1
@@ -18,47 +46,44 @@ trait Query[A] extends DatabaseAST[A]:
    * map + query = Query[Result], e.g. iterable with length n
    * flatMap + query = shouldn't compile
    */
-  def flatMap[B](f: Expr.Ref[A] => Query[B]): Query[B] =
+  def flatMap[B: ResultTag](f: Expr.Ref[A] => Query[B]): Query[B] =
     val ref = Expr.Ref[A]()
     Query.FlatMap(this, Expr.Fun(ref, f(ref)))
 
-  def flatMap[B](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
+  def flatMap[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
     val ref = Expr.Ref[A]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
 object Query:
   import Expr.{Pred, Fun, Ref}
 
-  case class Filter[A]($q: Query[A], $p: Pred[A]) extends Query[A]
-  case class Map[A, B]($q: Query[A], $f: Fun[A, Expr[B]]) extends Query[B]
-  case class FlatMap[A, B]($q: Query[A], $f: Fun[A, Query[B]]) extends Query[B]
+  case class Filter[A: ResultTag]($q: Query[A], $p: Pred[A]) extends Query[A]
+  case class Map[A, B: ResultTag]($q: Query[A], $f: Fun[A, Expr[B]]) extends Query[B]
+  case class FlatMap[A, B: ResultTag]($q: Query[A], $f: Fun[A, Query[B]]) extends Query[B]
   // case class Sort[A]($q: Query[A], $o: Ordering[A]) extends Query[A] // alternative syntax to avoid chaining .sort for multi-key sort
-  case class Sort[A, B]($q: Query[A], $f: Fun[A, Expr[B]], $ord: Ord) extends Query[A]
-  case class Limit[A]($q: Query[A], $limit: Int) extends Query[A]
-  case class Offset[A]($q: Query[A], $offset: Int) extends Query[A]
-  case class Drop[A]($q: Query[A], $offset: Int) extends Query[A]
-  case class Distinct[A]($q: Query[A]) extends Query[A]
+  case class Sort[A: ResultTag, B]($q: Query[A], $f: Fun[A, Expr[B]], $ord: Ord) extends Query[A]
+  case class Limit[A: ResultTag]($q: Query[A], $limit: Int) extends Query[A]
+  case class Offset[A: ResultTag]($q: Query[A], $offset: Int) extends Query[A]
+  case class Drop[A: ResultTag]($q: Query[A], $offset: Int) extends Query[A]
+  case class Distinct[A: ResultTag]($q: Query[A]) extends Query[A]
 
-  case class Union[A]($this: Query[A], $other: Query[A], $dedup: Boolean) extends Query[A]
-  case class Intersect[A]($this: Query[A], $other: Query[A]) extends Query[A]
-  case class Except[A]($this: Query[A], $other: Query[A]) extends Query[A]
+  case class Union[A: ResultTag]($this: Query[A], $other: Query[A], $dedup: Boolean) extends Query[A]
+  case class Intersect[A: ResultTag]($this: Query[A], $other: Query[A]) extends Query[A]
+  case class Except[A: ResultTag]($this: Query[A], $other: Query[A]) extends Query[A]
 
   case class Contains[A]($this: Query[A], $other: Expr[A]) extends Expr[Boolean]
   case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean]
   case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean]
 
-  // TODO: spark-style groupBy or SQL groupBy that requires an aggregate?
+  // TODO: also support spark-style groupBy or only SQL groupBy that requires an aggregate operation?
   // TODO: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
-  case class GroupBy[A, B, C]($q: Query[A],
+  case class GroupBy[A, B: ResultTag, C]($q: Query[A],
                            $selectFn: Fun[A, Expr[B]],
                            $groupingFn: Fun[A, Expr[C]],
                            $havingFn: Fun[B, Expr[Boolean]]) extends Query[B]
 
   // Extension methods to support for-expression syntax for queries
-  extension [R](x: Query[R])
-
-    def toSQLString: String =
-      "query"
+  extension [R: ResultTag](x: Query[R])
 
     def withFilter(p: Ref[R] => Expr[Boolean]): Query[R] =
       val ref = Ref[R]()
@@ -66,7 +91,7 @@ object Query:
 
     def filter(p: Ref[R] => Expr[Boolean]): Query[R] = withFilter(p)
 
-    def map[B](f: Ref[R] => Expr[B]): Query[B] =
+    def map[B: ResultTag](f: Ref[R] => Expr[B]): Query[B] =
       val ref = Ref[R]()
       Map(x, Fun(ref, f(ref)))
 
@@ -82,19 +107,19 @@ object Query:
 
     def distinct: Query[R] = Distinct(x)
 
-    def sum[B](f: Ref[R] => Expr[B]):Aggregation[B] =
+    def sum[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
       val ref = Ref[R]()
       Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Sum(f(ref))))
 
-    def avg[B](f: Ref[R] => Expr[B]):Aggregation[B] =
+    def avg[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
       val ref = Ref[R]()
        Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Avg(f(ref))))
 
-    def max[B](f: Ref[R] => Expr[B]):Aggregation[B] =
+    def max[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
       val ref = Ref[R]()
        Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Max(f(ref))))
 
-    def min[B](f: Ref[R] => Expr[B]):Aggregation[B] =
+    def min[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
       val ref = Ref[R]()
        Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Min(f(ref))))
 
@@ -124,7 +149,7 @@ object Query:
     def isEmpty(): Expr[Boolean] =
       IsEmpty(x)
 
-    def groupBy[B, C](
+    def groupBy[B, C: ResultTag](
      selectFn: Expr.Ref[R] => Expr[C],
      groupingFn: Expr.Ref[R] => Expr[B],
      havingFn: Expr.Ref[C] => Expr[Boolean] // TODO: make optional

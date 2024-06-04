@@ -6,7 +6,7 @@ import NamedTuple.{NamedTuple, AnyNamedTuple}
 
 
 /** The type of expressions in the query language */
-trait Expr[Result] extends Selectable: // TODO: should Result be a subtype of named tuple, so `concat` always works?
+trait Expr[Result](using val tag: ResultTag[Result]) extends Selectable: // TODO: should Result be a subtype of named tuple, so `concat` always works?
   /** This type is used to support selection with any of the field names
    *  defined by Fields.
    */
@@ -77,13 +77,13 @@ object Expr:
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // Todo: Make it strongly typed like the other cases
-  case class Select[A]($x: Expr[A], $name: String) extends Expr
+  case class Select[A: ResultTag]($x: Expr[A], $name: String) extends Expr[A]
 
-  case class Single[S <: String, A]($x: Expr[A]) extends Expr[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]
+  case class Single[S <: String, A]($x: Expr[A])(using ResultTag[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]) extends Expr[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]
 
-  case class Concat[A <: AnyNamedTuple, B <: AnyNamedTuple]($x: Expr[A], $y: Expr[B]) extends Expr[NamedTuple.Concat[A, B]]
+  case class Concat[A <: AnyNamedTuple, B <: AnyNamedTuple]($x: Expr[A], $y: Expr[B])(using ResultTag[NamedTuple.Concat[A, B]]) extends Expr[NamedTuple.Concat[A, B]]
 
-  case class Project[A <: AnyNamedTuple]($a: A) extends Expr[NamedTuple.Map[A, StripExpr]]
+  case class Project[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends Expr[NamedTuple.Map[A, StripExpr]]
 
   type StripExpr[E] = E match
     case Expr[b] => b
@@ -95,7 +95,7 @@ object Expr:
   /** References are placeholders for parameters */
   private var refCount = 0 // TODO: do we want to recount from 0 for each query?
 
-  case class Ref[A]($name: String = "") extends Expr[A]:
+  case class Ref[A: ResultTag]($name: String = "") extends Expr[A]:
     private val id = refCount
     refCount += 1
     override def toString = s"ref$id(${$name})"
@@ -129,6 +129,7 @@ object Expr:
   extension [A <: AnyNamedTuple : IsTupleOfExpr](x: A)
     def toRow: Project[A] = Project(x)
 
+// TODO: use NamedTuple.from to convert case classes to named tuples before using concat
   extension [A <: AnyNamedTuple](x: Expr[A])
     def concat[B <: AnyNamedTuple](other: Expr[B]) = Concat(x, other)
 
