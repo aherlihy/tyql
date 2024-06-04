@@ -4,12 +4,14 @@ import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.compiletime.*
 import scala.deriving.Mirror
+import java.time.LocalDate
 
 enum ResultTag[T]:
   case IntTag extends ResultTag[Int]
   case DoubleTag extends ResultTag[Double]
   case StringTag extends ResultTag[String]
   case BoolTag extends ResultTag[Boolean]
+  case LocalDateTag extends ResultTag[LocalDate]
   case NamedTupleTag[N <: Tuple, V <: Tuple](names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
   case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]]) extends ResultTag[T]
   // TODO: Add more types, specialize for DB backend
@@ -18,6 +20,7 @@ object ResultTag:
   given ResultTag[String] = ResultTag.StringTag
   given ResultTag[Boolean] = ResultTag.BoolTag
   given ResultTag[Double] = ResultTag.DoubleTag
+  given ResultTag[LocalDate] = ResultTag.LocalDateTag
   inline given [N <: Tuple, V <: Tuple]: ResultTag[NamedTuple[N, V]] =
     val names = constValueTuple[N]
     val tpes = summonAll[Tuple.Map[V, ResultTag]]
