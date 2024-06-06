@@ -186,7 +186,7 @@ class FlatJoin4Test extends SQLStringTest[AllCommerceDBs, LocalDate] {
   def query() =
     testDB.tables.buyers.flatMap(b =>
         testDB.tables.shipInfos.map(s =>
-          (buyer = b, shipInfo = s)
+          (buyer = b, shipInfo = s).toRow
         )
       )
       .filter(tup => tup.buyer.id == tup.shipInfo.buyerId && tup.buyer.name == "name")

@@ -110,7 +110,7 @@ class SelectModifiersNestSortSelectTest extends SQLStringTest[AllCommerceDBs, (n
   def testDescription: String = "SelectModifiers: sort before join"
   def query() =
     for
-      prod <- testDB.tables.products.sort(_.id, Ord.ASC).map(prod => (name2 = prod.name, id = prod.id))
+      prod <- testDB.tables.products.sort(_.id, Ord.ASC).map(prod => (name2 = prod.name, id = prod.id).toRow)
       purch <- testDB.tables.purchases
       if prod.id == purch.id
     yield (name = prod.name2, id = purch.id).toRow

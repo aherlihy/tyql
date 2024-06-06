@@ -76,15 +76,6 @@ class SelectNested extends SQLStringTest[AllLocDBs, CityT] {
   def sqlString: String =  "SELECT city.* FROM cities AS city JOIN addresses AS address ON city=address.city"
 }
 
-class SelectWithProjectTestImplicit extends SQLStringTest[CityDB, (name: String, zipCode: Int)] {
-  def testDescription: String = "Select: select with project"
-  def query() =
-    val q = testDB.tables.cities.map: city =>
-      (name = city.name, zipCode = city.zipCode)
-    q
-  def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
-}
-
 class SelectWithProjectTestToRow extends SQLStringTest[CityDB, (name: String, zipCode: Int)] {
   def testDescription: String = "Select: select with project"
   def query() =
@@ -133,7 +124,7 @@ class ContainsTest extends SQLStringTest[AllCommerceDBs, Product] {
     testDB.tables.products
       .filter(p =>
         testDB.tables.purchases.map(
-          pu => (id = pu.id)
+          pu => (id = pu.id).toRow
         ).contains(
           (id = p.id).toRow
         )

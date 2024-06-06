@@ -35,6 +35,7 @@ object Aggregation {
 
   type StripAgg[E] = E match
     case Aggregation[b] => b
+    // case Expr[b] => b, for when ->
 
   // TODO: Should indicate if *any* single element is an aggregation, even if some elements are exprs. Tuple of ONLY expr's should be Expr.toRow
   type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Aggregation[?]

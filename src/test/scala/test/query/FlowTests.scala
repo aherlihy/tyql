@@ -2,7 +2,6 @@ package test.query.flow
 import test.SQLStringTest
 import test.query.{AllCommerceDBs, ShippingInfo, commerceDBs}
 import tyql.*
-import tyql.Expr.toRow
 
 import language.experimental.namedTuples
 import NamedTuple.*
@@ -86,7 +85,22 @@ class FlowFlatMapTest2 extends SQLStringTest[AllCommerceDBs, (name: String, ship
   def sqlString = "SELECT r0.name, r1.shippingDate FROM buyers r0, shipInfos r1"
 }
 
-class FlowMapFilterWithTest5 extends SQLStringTest[AllCommerceDBs, (bName: String, bId: Int)] {
+class FlowFlatMapTest3 extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate1: LocalDate, shippingDate2: LocalDate)] {
+  def testDescription = "Flow: project tuple, 3 nest, flatMap + flatmap+map"
+
+  def query() =
+    testDB.tables.shipInfos.flatMap(si1 =>
+      testDB.tables.buyers.flatMap(b =>
+        testDB.tables.shipInfos.map(si2 =>
+          (name = b.name, shippingDate1 = si1.shippingDate, shippingDate2 = si2.shippingDate).toRow
+        )
+      )
+    )
+
+  def sqlString = ""
+}
+
+class FlowMapFilterWithTest extends SQLStringTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map + filterWith"
 
   def query() =
@@ -95,7 +109,7 @@ class FlowMapFilterWithTest5 extends SQLStringTest[AllCommerceDBs, (bName: Strin
     )
   def sqlString = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
 }
-class FlowMapFilterTest6 extends SQLStringTest[AllCommerceDBs, (bName: String, bId: Int)] {
+class FlowMapFilterTest extends SQLStringTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map + filter"
 
   def query() =
@@ -104,7 +118,7 @@ class FlowMapFilterTest6 extends SQLStringTest[AllCommerceDBs, (bName: String, b
     )
   def sqlString = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
 }
-class FlowMapFilterTest7 extends SQLStringTest[AllCommerceDBs, (bName: String, bId: Int)] {
+class FlowMapFilterTest2 extends SQLStringTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, filter after map"
 
   def query() =
@@ -115,25 +129,102 @@ class FlowMapFilterTest7 extends SQLStringTest[AllCommerceDBs, (bName: String, b
 }
 
 class FlowMapAggregateTest extends SQLStringTest[AllCommerceDBs, Int] {
-  def testDescription = "Flow: project tuple, 2 nest, map+flatMap should not fail because aggregation is Expr"
+  def testDescription = "Flow: map on aggregate"
+
+  def query() =
+      testDB.tables.shipInfos.map(si =>
+        si.buyerId.sum
+      )
+
+  def sqlString = ""
+}
+
+class FlowMapAggregateTest2 extends SQLStringTest[AllCommerceDBs, Int] {
+  def testDescription = "Flow: flatMap on aggregate"
+
+  def query() =
+    testDB.tables.shipInfos.flatMap(si =>
+      si.buyerId.sum
+    )
+
+  def sqlString = ""
+}
+
+class FlowMapAggregateTest3 extends SQLStringTest[AllCommerceDBs, Int] {
+  def testDescription = "Flow: 2 nest, map+flatMap should not fail because aggregation is Expr"
   def query() =
     testDB.tables.buyers.map(b =>
-      testDB.tables.shipInfos.flatMap(si => // silly but correct syntax
+      testDB.tables.shipInfos.flatMap(si =>
         si.buyerId.sum
       )
     )
 
-  def sqlString = "SELECT MAX(r1.buyerId) FROM buyers r0, shipInfos r1"
+  def sqlString = ""
 }
 
-class FlowMapAggregate2Test extends SQLStringTest[AllCommerceDBs, Int] {
-  def testDescription = "Flow: project tuple, 2 nest, flatMap+flatMap should not fail because aggregation is Expr"
+class FlowMapAggregateTest4 extends SQLStringTest[AllCommerceDBs, Int] {
+  def testDescription = "Flow: 2 nest, flatMap+flatMap should not fail because aggregation is Expr"
   def query() =
     testDB.tables.buyers.flatMap(b =>
-      testDB.tables.shipInfos.flatMap(si => // silly but correct syntax
+      testDB.tables.shipInfos.flatMap(si => // silly but correct syntax, equivalent to map + flatMap
         si.buyerId.sum
       )
     )
 
-  def sqlString = "SELECT MAX(r1.buyerId) FROM buyers r0, shipInfos r1"
+  def sqlString = ""
 }
+
+class FlowMapAggregateTest5 extends SQLStringTest[AllCommerceDBs, Int] {
+  def testDescription = "Flow: 2 nest, map+map should not fail because aggregation is Expr and also DatabaseAST"
+
+  def query() =
+    testDB.tables.buyers.map(b =>
+      testDB.tables.shipInfos.map(si => // silly but correct syntax, equivalent to map + flatMap
+        si.buyerId.sum
+      )
+    )
+
+  def sqlString = ""
+}
+
+class FlowMapAggregateTest6 extends SQLStringTest[AllCommerceDBs, (sum: Int)] {
+  def testDescription = "Flow: project + map on aggregate"
+
+  def query() =
+    testDB.tables.shipInfos.map(si =>
+      (sum = si.buyerId.sum).toRow
+    )
+
+  def sqlString = ""
+}
+
+class FlowMapAggregateTest7 extends SQLStringTest[AllCommerceDBs, (sum: Int)] {
+  def testDescription = "Flow: project + flatMap on aggregate"
+
+  def query() =
+    testDB.tables.shipInfos.flatMap(si =>
+      (sum = si.buyerId.sum).toRow
+    )
+
+  def sqlString = ""
+}
+
+class FlowMapConvertedTest extends SQLStringTest[AllCommerceDBs, (name: String, date: LocalDate)] {
+  def testDescription = "Flow: project tuple, version of map that calls toRow for conversion"
+  def query() =
+    testDB.tables.buyers.map: b =>
+      (name = b.name, date = b.dateOfBirth)
+  def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
+}
+
+class FlowMapAggregateConvertedTest extends SQLStringTest[AllCommerceDBs, (sum: Int)] {
+  def testDescription = "Flow: project tuple, version of map that calls toRow for conversion for aggregate"
+
+  def query() =
+    testDB.tables.shipInfos.map(si =>
+      (sum = si.buyerId.sum)
+    )
+
+  def sqlString = ""
+}
+

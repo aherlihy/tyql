@@ -54,10 +54,10 @@ trait DatabaseAST[Result](using val tag: ResultTag[Result]):
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   /**
    * Top-level queries:
-   * map + aggregation => Query[Result], e.g. iterable with length 1
-   * flatMap + aggregation = Aggregation[Result], e.g. single return value
-   * map + query = Query[Result], e.g. iterable with length n
-   * flatMap + query = shouldn't compile
+   * map + aggregation => Aggregation[Result]
+   * flatMap + aggregation => Aggregation[Result]
+   * map + query => Query[Result], e.g. iterable with length n
+   * flatMap + query = compilation error
    */
   def flatMap[B: ResultTag](f: Expr.Ref[A] => Query[B]): Query[B] =
     val ref = Expr.Ref[A]()
@@ -66,6 +66,32 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   def flatMap[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
     val ref = Expr.Ref[A]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
+
+  // TODO: cover common cases so that user doesn't see implementation-specific typing error, e.g.
+  inline def flatMap[B: ResultTag](f: Expr.Ref[A] => Expr[B]): Expr[B] = // inline so error points to use site
+    error("Cannot return an Expr from a flatMap. Did you mean to use map?")
+
+  def map[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
+    val ref = Expr.Ref[A]()
+    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
+
+  def map[B: ResultTag](f: Expr.Ref[A] => Expr[B]): Query[B] =
+    val ref = Expr.Ref[A]()
+    Query.Map(this, Expr.Fun(ref, f(ref)))
+
+// TODO: differentiate between scalar and aggregate expressions
+//  def map[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, tyql.Aggregation.StripAgg]])(f: Expr.Ref[A] => B): Aggregation[NamedTuple.Map[B, tyql.Aggregation.StripAgg]] =
+//    import Aggregation.toRow
+//    val ref = Expr.Ref[A]()
+//    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref).toRow))
+
+  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A] => B): Query[ NamedTuple.Map[B, Expr.StripExpr] ] =
+    import Expr.toRow
+    val ref = Expr.Ref[A]()
+    Query.Map(this, Expr.Fun(ref, f(ref).toRow))
+
+  inline def map[B: ResultTag](f: Expr.Ref[A] => Query[B]): Nothing =
+    error("Cannot return an Query from a map. Did you mean to use flatMap?")
 
 object Query:
   import Expr.{Pred, Fun, Ref}
@@ -103,10 +129,6 @@ object Query:
       Filter(x, Fun(ref, p(ref)))
 
     def filter(p: Ref[R] => Expr[Boolean]): Query[R] = withFilter(p)
-
-    def map[B: ResultTag](f: Ref[R] => Expr[B]): Query[B] =
-      val ref = Ref[R]()
-      Map(x, Fun(ref, f(ref)))
 
     def sort[B](f: Ref[R] => Expr[B], ord: Ord): Query[R] =
       val ref = Ref[R]()

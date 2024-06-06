@@ -126,7 +126,7 @@ class FilterMapAggregationQuerySelectTest extends SQLStringTest[AllCommerceDBs, 
   def query() =
     testDB.tables.products
       .withFilter(p => p.price != 0)
-      .map(p => (newPrice = p.price))
+      .map(p => (newPrice = p.price).toRow)
       .sum(_.newPrice)
   def sqlString: String = """
   SELECT SUM(p.newPrice) FROM (SELECT product.price as newPrice

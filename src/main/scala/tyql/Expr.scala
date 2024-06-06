@@ -6,7 +6,7 @@ import NamedTuple.{NamedTuple, AnyNamedTuple}
 
 
 /** The type of expressions in the query language */
-trait Expr[Result](using val tag: ResultTag[Result]) extends Selectable: // TODO: should Result be a subtype of named tuple, so `concat` always works?
+trait Expr[Result](using val tag: ResultTag[Result]) extends Selectable:
   /** This type is used to support selection with any of the field names
    *  defined by Fields.
    */
@@ -24,6 +24,14 @@ trait Expr[Result](using val tag: ResultTag[Result]) extends Selectable: // TODO
 
   def == (other: String): Expr[Boolean] = Expr.Eq(this, Expr.StringLit(other))
   def == (other: Int): Expr[Boolean] = Expr.Eq(this, Expr.IntLit(other))
+
+/**
+ * Necessary to distinguish expressions that are NOT aggregations. Scalar expressions
+ * produce one element per input row, as opposed to aggregate expressions produce one
+ * element for the entire table.
+ * @tparam Result
+ */
+trait ScalarExpr[Result](using override val tag: ResultTag[Result]) extends Expr[Result]
 
 object Expr:
 
