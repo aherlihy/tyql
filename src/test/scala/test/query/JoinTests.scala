@@ -1,5 +1,5 @@
 package test.query.join
-import test.SQLStringTest
+import test.SQLStringQueryTest
 import test.query.{commerceDBs,  AllCommerceDBs}
 
 import tyql.*
@@ -11,7 +11,7 @@ import NamedTuple.*
 
 import java.time.LocalDate
 
-class JoinSimple1Test extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
+class JoinSimple1Test extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
   def testDescription = "Join: two-table simple join on int equality + project"
   def query() =
     // val q =
@@ -28,7 +28,7 @@ class JoinSimple1Test extends SQLStringTest[AllCommerceDBs, (name: String, shipp
         JOIN shipping_info shipping_info1 ON (shipping_info1.buyer_id = buyer0.id)
       """
 }
-class JoinSimple2Test extends SQLStringTest[AllCommerceDBs, (id: Int, id2: Int)] {
+class JoinSimple2Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, id2: Int)] {
   def testDescription = "Join: two-table simple join on string equality + project"
   def query() =
     for
@@ -43,7 +43,7 @@ FROM products p
 JOIN buyers b ON (p.name = b.name)
       """
 }
-class JoinSimple3Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple3Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join on string literal comparison"
   def query() =
     for
@@ -59,7 +59,7 @@ WHERE b.name = 'string constant'
       """
 }
 
-class JoinSimple4Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple4Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join with separate conditions"
   def query() =
     for
@@ -77,7 +77,7 @@ WHERE b.name = 'string constant'
       """
 }
 
-class JoinSimple5Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple5Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join with &&"
   def query() =
     for
@@ -93,7 +93,7 @@ JOIN products p ON (b.name = p.name AND p.id = b.id)
       """
 }
 
-class JoinSimple6Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple6Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join with && and string literal"
   def query() =
     for
@@ -109,7 +109,7 @@ JOIN products p ON (b.name = 'string constant' AND p.id = b.id)
       """
 }
 
-class JoinSimple7Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple7Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join with && and int literal"
   def query() =
     for
@@ -126,7 +126,7 @@ JOIN products p ON (b.id = 5 AND p.id = b.id)
 }
 
 // TODO: Join flavors, cross/left/etc
-class FlatJoin2Test extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
+class FlatJoin2Test extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
   def testDescription = "Join: simple flatmap"
   def query() =
     for {
@@ -141,7 +141,7 @@ class FlatJoin2Test extends SQLStringTest[AllCommerceDBs, (name: String, shippin
         JOIN shipping_info shipping_info1 ON (shipping_info1.buyer_id = buyer0.id)
       """
 }
-class FlatJoin3Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class FlatJoin3Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: flat join 3"
   def query() =
     for {
@@ -166,7 +166,7 @@ class FlatJoin3Test extends SQLStringTest[AllCommerceDBs, (buyerName: String, pr
       """
 }
 
-class LeftJoinFlatJoinTest extends SQLStringTest[AllCommerceDBs, (buyerName: String, shippingDate: LocalDate)] {
+class LeftJoinFlatJoinTest extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, shippingDate: LocalDate)] {
   def testDescription = "Join: leftJoin"
   def query() =
     for {
@@ -181,7 +181,7 @@ class LeftJoinFlatJoinTest extends SQLStringTest[AllCommerceDBs, (buyerName: Str
         LEFT JOIN shipping_info shipping_info1 ON (shipping_info1.buyer_id = buyer0.id)
       """
 }
-class FlatJoin4Test extends SQLStringTest[AllCommerceDBs, LocalDate] {
+class FlatJoin4Test extends SQLStringQueryTest[AllCommerceDBs, LocalDate] {
   def testDescription = "Join: flat join 4"
   def query() =
     testDB.tables.buyers.flatMap(b =>
@@ -200,7 +200,7 @@ class FlatJoin4Test extends SQLStringTest[AllCommerceDBs, LocalDate] {
       """
 }
 
-class FlatJoin5Test extends SQLStringTest[AllCommerceDBs, LocalDate] {
+class FlatJoin5Test extends SQLStringQueryTest[AllCommerceDBs, LocalDate] {
   def testDescription = "Join: flat join 5"
   def query() =
     for {
@@ -217,7 +217,7 @@ class FlatJoin5Test extends SQLStringTest[AllCommerceDBs, LocalDate] {
       """
 }
 
-class FlatJoin6Test extends SQLStringTest[AllCommerceDBs, LocalDate] {
+class FlatJoin6Test extends SQLStringQueryTest[AllCommerceDBs, LocalDate] {
   def testDescription = "Join: flat join 6"
   def query() =
     for {
@@ -234,7 +234,7 @@ class FlatJoin6Test extends SQLStringTest[AllCommerceDBs, LocalDate] {
       """
 }
 
-class flatMapForCompoundFlatJoinTest extends SQLStringTest[AllCommerceDBs, (name: String, date: LocalDate)] {
+class flatMapForCompoundFlatJoinTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, date: LocalDate)] {
   def testDescription = "Join: flatMapForCompound"
   def query() =
     for {

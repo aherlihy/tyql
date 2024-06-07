@@ -1,5 +1,5 @@
 package test.query.aggregation
-import test.SQLStringTest
+import test.{SQLStringQueryTest, SQLStringAggregationTest}
 import test.query.{commerceDBs,  AllCommerceDBs}
 
 import tyql.*
@@ -8,8 +8,7 @@ import NamedTuple.*
 import scala.language.implicitConversions
 
 // Expression-based aggregation:
-
-class FlatMapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
+class FlatMapAggregationExprTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: flatMap + expr.sum"
 
   def query() =
@@ -19,7 +18,18 @@ class FlatMapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
   def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
 
-class FlatMapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (s: Double)] {
+class AggregateAggregationExprTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
+  def testDescription: String = "Aggregation: aggregate + expr.sum"
+
+  def query() =
+    testDB.tables.products
+      .aggregate(p => p.price.sum)
+
+  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
+}
+
+
+class FlatMapProjectAggregationExprTest extends SQLStringAggregationTest[AllCommerceDBs, (s: Double)] {
   def testDescription: String = "Aggregation: flatMap + expr.sum with named tuple"
 
   def query() =
@@ -27,11 +37,35 @@ class FlatMapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (s
       .flatMap(p =>
         (s = p.price.sum).toRow
       )
-  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
+  def sqlString: String = "SELECT SUM(purchase.price) as s FROM purchase"
 }
 
-class MapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
-  def testDescription: String = "Aggregation: map + expr.sum"
+class AggregateProjectAggregationExprTest extends SQLStringAggregationTest[AllCommerceDBs, (s: Double)] {
+  def testDescription: String = "Aggregation: aggregate + expr.sum with named tuple"
+
+  def query() =
+    testDB.tables.products
+      .aggregate(p =>
+        (s = p.price.sum).toRow
+      )
+
+  def sqlString: String = "SELECT SUM(purchase.price) as s FROM purchase"
+}
+
+class AggregateProjectAggregationExprConvertTest extends SQLStringAggregationTest[AllCommerceDBs, (s: Double)] {
+  def testDescription: String = "Aggregation: aggregate + expr.sum with named tuple, auto convert toRow"
+
+  def query() =
+    testDB.tables.products
+      .aggregate(p =>
+        (s = p.price.sum)
+      )
+
+  def sqlString: String = "SELECT SUM(purchase.price) as s FROM purchase"
+}
+
+class MapAggregationExprTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
+  def testDescription: String = "Aggregation: map + expr.sum, return query"
 
   def query() =
     testDB.tables.products
@@ -40,7 +74,7 @@ class MapAggregationExprTest extends SQLStringTest[AllCommerceDBs, Double] {
   def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
 
-class MapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
+class MapProjectAggregationExprTest extends SQLStringQueryTest[AllCommerceDBs, (sum: Double)] {
   def testDescription: String = "Aggregation: map + expr.sum with named tuple"
 
   def query() =
@@ -50,8 +84,7 @@ class MapProjectAggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: 
   def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
 
-// TODO: same issue as above with flatMap + project
-class AggregationMultiAggregateTest extends SQLStringTest[AllCommerceDBs, (sum: Double, avg: Double)] {
+class FlatMapMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Double, avg: Double)] {
   def testDescription: String = "Aggregation: filter then flatMap with named tuple)"
 
   def query() =
@@ -62,13 +95,28 @@ class AggregationMultiAggregateTest extends SQLStringTest[AllCommerceDBs, (sum: 
       .flatMap(p => (sum = p.price.sum, avg = p.price.avg).toRow)
 
   def sqlString: String =
-    """
-          SELECT SUM(purchase.price), AVG(purchase.price)
+    """SELECT SUM(purchase.price), AVG(purchase.price)
           FROM purchase
-        """
+    """
 }
 
-class MapFilterAggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
+class AggregateMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Double, avg: Double)] {
+  def testDescription: String = "Aggregation: filter then aggregate with named tuple)"
+
+  def query() =
+    testDB.tables.products
+      .withFilter(p =>
+        p.price != 0
+      )
+      .aggregate(p => (sum = p.price.sum, avg = p.price.avg).toRow)
+
+  def sqlString: String =
+    """SELECT SUM(purchase.price), AVG(purchase.price)
+            FROM purchase
+      """
+}
+
+class MapFilterAggregationExprTest extends SQLStringQueryTest[AllCommerceDBs, (sum: Double)] {
   def testDescription: String = "Aggregation: filter then map with named tuple"
   def query() =
     testDB.tables.products
@@ -83,15 +131,15 @@ class MapFilterAggregationExprTest extends SQLStringTest[AllCommerceDBs, (sum: D
       """
 }
 
-// Query-based aggregation:
-class AggregationQueryTest extends SQLStringTest[AllCommerceDBs, Double] {
+// Query helper-method based aggregation:
+class AggregationQueryTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum on query"
   def query() =
     testDB.tables.products.sum(_.price)
   def sqlString: String = "SELECT SUM(product.price) FROM product"
 }
 
-class FilterAggregationQueryTest extends SQLStringTest[AllCommerceDBs, Double] {
+class FilterAggregationQueryTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: filter then  sum on query"
   def query() =
     testDB.tables.products
@@ -106,7 +154,7 @@ class FilterAggregationQueryTest extends SQLStringTest[AllCommerceDBs, Double] {
       """
 }
 
-class FilterAggregationProjectQueryTest extends SQLStringTest[AllCommerceDBs, (sum: Double)] {
+class FilterAggregationProjectQueryTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Double)] {
   def testDescription: String = "Aggregation: sum on query with tuple"
   def query() =
     testDB.tables.products
@@ -121,7 +169,7 @@ class FilterAggregationProjectQueryTest extends SQLStringTest[AllCommerceDBs, (s
       """
 }
 
-class FilterMapAggregationQuerySelectTest extends SQLStringTest[AllCommerceDBs, Double] {
+class FilterMapAggregationQuerySelectTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum with map"
   def query() =
     testDB.tables.products
@@ -133,4 +181,65 @@ class FilterMapAggregationQuerySelectTest extends SQLStringTest[AllCommerceDBs, 
           FROM product
           WHERE product.price > 0)
   """
+}
+
+class AggregationSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Boolean] {
+  def testDescription: String = "Aggregation: regular query with aggregate subquery as expr (returns query)"
+  def query() =
+    testDB.tables.products
+      .map(p => p.price > testDB.tables.products.avg(_.price))
+
+  def sqlString: String = """
+        SELECT product.price > (SELECT avg(product.price) FROM products)
+        FROM product
+      """
+}
+
+// TODO: this is a bit strange but most closely resembles SQL behavior
+class AggregationSubqueryTest2 extends SQLStringQueryTest[AllCommerceDBs, Boolean] {
+  def testDescription: String = "Aggregation: query with aggregation as expr (returns )"
+  def query() =
+    testDB.tables.products
+      .map(p => p.price > p.price.avg)
+
+  def sqlString: String = """
+        SELECT product.price > avg(product.price)
+        FROM product
+      """
+}
+
+class AggregationSubqueryTest3 extends SQLStringQueryTest[AllCommerceDBs, Boolean] {
+  def testDescription: String = "Aggregation: aggregate with aggregation as expr (returns aggregate)"
+
+  def query() =
+    testDB.tables.products
+      .aggregate(p => p.price > p.price.avg)
+
+  def sqlString: String =
+    """
+          SELECT product.price > avg(product.price)
+          FROM product
+        """
+}
+
+class AggregationSubqueryTest4 extends SQLStringQueryTest[AllCommerceDBs, Boolean] {
+  def testDescription: String = "Aggregation: regular query with aggregate subquery as source (returns query)"
+  def query() =
+    testDB.tables.products.map(p => (avgPrice = p.price.avg)).map(r => r == 10)
+
+  def sqlString: String = """
+        SELECT avgPrice = 10
+        FROM (SELECT AVG(price) as avgPrice FROM products)
+      """
+}
+
+class AggregationSubqueryTest5 extends SQLStringAggregationTest[AllCommerceDBs, Double] {
+  def testDescription: String = "Aggregation: aggregation with aggregate subquery as source (returns aggregation)"
+  def query() =
+    testDB.tables.products.map(p => (avgPrice = p.price.avg)).map(r => r.avgPrice.max)
+
+  def sqlString: String = """
+        SELECT MAX(avgPrice)
+        FROM (SELECT AVG(price) as avgPrice FROM products)
+      """
 }

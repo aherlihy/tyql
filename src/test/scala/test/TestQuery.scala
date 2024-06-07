@@ -8,13 +8,13 @@ class TestDatabase[Rows <: AnyNamedTuple] {
   def init(): Unit = ???
 }
 
-trait TestQuery[Rows <: AnyNamedTuple, Return](using val testDB: TestDatabase[Rows]) {
+trait TestQuery[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]](using val testDB: TestDatabase[Rows]) {
   def testDescription: String
-  def query(): DatabaseAST[Return]
+  def query(): ReturnShape
   def sqlString: String
 }
 
-trait TestSQLString[Rows <: AnyNamedTuple, Return] extends munit.FunSuite with TestQuery[Rows, Return] {
+trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extends munit.FunSuite with TestQuery[Rows, ReturnShape] {
   test(testDescription) {
     val q = query()
     println(s"$testDescription:\n\t$q")
@@ -22,4 +22,7 @@ trait TestSQLString[Rows <: AnyNamedTuple, Return] extends munit.FunSuite with T
   }
 }
 
-abstract class SQLStringTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) extends TestSQLString[Rows, Return] with TestQuery[Rows, Return]
+abstract class SQLStringQueryTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
+  extends TestSQLString[Rows, Query[Return]] with TestQuery[Rows, Query[Return]]
+abstract class SQLStringAggregationTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
+  extends TestSQLString[Rows, Aggregation[Return]] with TestQuery[Rows, Aggregation[Return]]

@@ -71,6 +71,15 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   inline def flatMap[B: ResultTag](f: Expr.Ref[A] => Expr[B]): Expr[B] = // inline so error points to use site
     error("Cannot return an Expr from a flatMap. Did you mean to use map?")
 
+  def aggregate[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
+    val ref = Expr.Ref[A]()
+    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
+
+  def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Aggregation.StripAgg]])(f: Expr.Ref[A] => B): Aggregation[ NamedTuple.Map[B, Aggregation.StripAgg] ] =
+    import Aggregation.toRow
+    val ref = Expr.Ref[A]()
+    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref).toRow))
+
   def map[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
     val ref = Expr.Ref[A]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))

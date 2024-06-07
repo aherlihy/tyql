@@ -1,5 +1,5 @@
-package test.query.select2tests
-import test.SQLStringTest
+package test.query.groupby
+import test.SQLStringQueryTest
 import test.query.{commerceDBs, AllCommerceDBs, Purchase}
 
 import tyql.*
@@ -7,7 +7,7 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 
-class GroupByTest extends SQLStringTest[AllCommerceDBs, (a: Double)] {
+class GroupByTest extends SQLStringQueryTest[AllCommerceDBs, (a: Double)] {
   def testDescription = "GroupBy: simple"
 
   def query() =
@@ -22,7 +22,7 @@ class GroupByTest extends SQLStringTest[AllCommerceDBs, (a: Double)] {
 }
 
 // NOTE: this should fail since can't groupBy without named field
-class GroupByUnamedTest extends SQLStringTest[AllCommerceDBs, Double] {
+class GroupByUnamedTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "GroupBy: simple without named tuple"
 
   def query() =
@@ -36,7 +36,7 @@ class GroupByUnamedTest extends SQLStringTest[AllCommerceDBs, Double] {
 }
 
 // TODO: use seq to avoid chaining, update sort with the same
-//class GroupBy2Test extends SQLStringTest[AllCommerceDBs, Purchase] {
+//class GroupBy2Test extends SQLStringQueryTest[AllCommerceDBs, Purchase] {
 //  def testDescription = "GroupBy: simple multiple keys"
 //
 //  def query() =
@@ -49,7 +49,7 @@ class GroupByUnamedTest extends SQLStringTest[AllCommerceDBs, Double] {
 //}
 
 // NOTE: this should fail because flatMap out the .count field, then try to group by it
-//class GroupBy3FailTest extends SQLStringTest[AllCommerceDBs, Purchase] {
+//class GroupBy3FailTest extends SQLStringQueryTest[AllCommerceDBs, Purchase] {
 //  def testDescription = "GroupBy: simple with having"
 //
 //  def query() =
@@ -61,7 +61,7 @@ class GroupByUnamedTest extends SQLStringTest[AllCommerceDBs, Double] {
 //    """SELECT AVG(purchases.total) AS avg FROM purchases GROUP BY purchases.count HAVING avg = 10"""
 //}
 
-class GroupBy3Test extends SQLStringTest[AllCommerceDBs, (avg: Double)] {
+class GroupBy3Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def testDescription = "GroupBy: simple with having"
 
   def query() =
@@ -75,7 +75,7 @@ class GroupBy3Test extends SQLStringTest[AllCommerceDBs, (avg: Double)] {
     """SELECT AVG(purchases.total) AS avg FROM purchases GROUP BY purchases.count HAVING avg = 10"""
 }
 
-class GroupBy4Test extends SQLStringTest[AllCommerceDBs, (avg: Double)] {
+class GroupBy4Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def testDescription = "GroupBy: simple with filter"
 
   def query() =
@@ -89,7 +89,7 @@ class GroupBy4Test extends SQLStringTest[AllCommerceDBs, (avg: Double)] {
     """SELECT AVG(purchases.total) AS avg FROM purchases WHERE purchases.id = 10 GROUP BY AVG(purchases.count)"""
 }
 
-class SortGroupByTest extends SQLStringTest[AllCommerceDBs, (avg: Double)] {
+class SortGroupByTest extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def testDescription = "GroupBy: sort then GroupBy"
   def query() =
     testDB.tables.purchases.sort(_.count, Ord.ASC).take(5).groupBy(
@@ -100,7 +100,7 @@ class SortGroupByTest extends SQLStringTest[AllCommerceDBs, (avg: Double)] {
   def sqlString = """
       """
 }
-class JoinGroupByTest extends SQLStringTest[AllCommerceDBs, (id: Int, total: Double)] {
+class JoinGroupByTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, total: Double)] {
   def testDescription = "GroupBy: GroupByJoin"
   def query() =
     for

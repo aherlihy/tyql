@@ -1,5 +1,5 @@
 package test.query.project
-import test.SQLStringTest
+import test.SQLStringQueryTest
 import test.query.{commerceDBs,  AllCommerceDBs, Product}
 
 import tyql.*
@@ -10,7 +10,7 @@ import scala.language.implicitConversions
 
 import java.time.LocalDate
 
-class ReturnIntTest extends SQLStringTest[AllCommerceDBs, Int] {
+class ReturnIntTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Project: return int"
   def query() =
     testDB.tables.products.map: c =>
@@ -22,7 +22,7 @@ class ReturnIntTest extends SQLStringTest[AllCommerceDBs, Int] {
       """
 }
 
-class ReturnStringTest extends SQLStringTest[AllCommerceDBs, String] {
+class ReturnStringTest extends SQLStringQueryTest[AllCommerceDBs, String] {
   def testDescription = "Project: return string"
   def query() =
     testDB.tables.products.map: c =>
@@ -33,7 +33,7 @@ class ReturnStringTest extends SQLStringTest[AllCommerceDBs, String] {
       """
 }
 
-class ProjectIntTest extends SQLStringTest[AllCommerceDBs, (id: Int)] {
+class ProjectIntTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)] {
   def testDescription = "Project: project int"
   def query() =
     testDB.tables.products.map: c =>
@@ -44,7 +44,7 @@ class ProjectIntTest extends SQLStringTest[AllCommerceDBs, (id: Int)] {
       """
 }
 
-class ProjectStringTest extends SQLStringTest[AllCommerceDBs, (name: String)] {
+class ProjectStringTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
   def testDescription = "Project: project string"
   def query() =
     testDB.tables.products.map: c =>
@@ -56,7 +56,7 @@ class ProjectStringTest extends SQLStringTest[AllCommerceDBs, (name: String)] {
       """
 }
 
-class ProjectMixedTest extends SQLStringTest[AllCommerceDBs, (name: String, id: Int)] {
+class ProjectMixedTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, id: Int)] {
   def testDescription = "Project: project string+int"
   def query() =
     testDB.tables.products.map: c =>
@@ -68,7 +68,7 @@ FROM products
       """
 }
 
-class ProjectString2Test extends SQLStringTest[AllCommerceDBs, (name: String, name2: String)] {
+class ProjectString2Test extends SQLStringQueryTest[AllCommerceDBs, (name: String, name2: String)] {
   def testDescription = "Project: project string+string"
   def query() =
     testDB.tables.products.map: c =>
@@ -79,7 +79,7 @@ FROM products
       """
 }
 
-class JoinProjectInt2Test extends SQLStringTest[AllCommerceDBs, (id: Int, id2: Int)] {
+class JoinProjectInt2Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, id2: Int)] {
   def testDescription = "Project: project int+int"
   def query() =
     testDB.tables.products.map: c =>
@@ -90,7 +90,7 @@ FROM products
       """
 }
 
-class ProjectTest extends SQLStringTest[AllCommerceDBs, Product] {
+class ProjectTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription = "Project: project entire row"
   def query() =
     testDB.tables.products.map: c =>
@@ -100,7 +100,7 @@ FROM products
       """
 }
 
-class Project2Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, price: Double)] {
+class Project2Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double)] {
   def testDescription = "Project: project to tuple, toRow"
   def query() =
     testDB.tables.products.map: c =>
@@ -111,7 +111,7 @@ FROM products
         """
 }
 
-class Project3Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
+class Project3Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
   def testDescription = "Project: project to tuple with concat with literal"
   def query() =
     testDB.tables.products.map: c =>
@@ -122,7 +122,7 @@ FROM products
         """
 }
 
-class Project4Test extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
+class Project4Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
   def testDescription = "Project: project to tuple with concat with another tuple"
   def query() =
     val tupleProd = testDB.tables.products
@@ -153,7 +153,7 @@ CROSS JOIN shipInfos s
  * normal row.
  */
 
-//class ProjectConcatTest extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
+//class ProjectConcatTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
 //  def testDescription = "Project: project + concat literal"
 //  def query() =
 //    testDB.tables.products.map: c =>
@@ -162,7 +162,7 @@ CROSS JOIN shipInfos s
 //      """
 //}
 
-//class ProjectJoinConcatTest extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
+//class ProjectJoinConcatTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
 //  def testDescription = "Project: project + concat literal"
 //  def query() =
 //    testDB.tables.products.flatMap(c =>

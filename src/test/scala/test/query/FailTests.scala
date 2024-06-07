@@ -1,6 +1,6 @@
 package test.query.fail
 
-import test.SQLStringTest
+import test.{SQLStringAggregationTest, SQLStringQueryTest}
 
 import java.time.LocalDate
 // TODO: tests that should fail to compile
@@ -86,3 +86,26 @@ import java.time.LocalDate
 //
 //  def sqlString = "SELECT r0.name, r1.shippingDate FROM buyers r0, shipInfos r1"
 //}
+
+//class AggregateScalarFailTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
+//  def testDescription: String = "Aggregation: aggregate + scalar expr should fail"
+//
+//  def query() =
+//    testDB.tables.products
+//      .aggregate(p => p.price)
+//
+//  def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
+//}
+//class AggregationSubqueryFailTest extends SQLStringQueryTest[AllCommerceDBs, Boolean] {
+//  def testDescription: String = "Aggregation: aggregate with aggregate subquery as source (should fail)"
+//
+//  def query() =
+//    testDB.tables.products.aggregate(p => (avgPrice = p.price.avg)).map(r => r == 10)
+//
+//  def sqlString: String =
+//    """
+//          SELECT avgPrice = 10
+//          FROM (SELECT AVG(price) as avgPrice FROM products)
+//        """
+//}
+//

@@ -1,6 +1,6 @@
 package test.query.subquery
 
-import test.SQLStringTest
+import test.SQLStringQueryTest
 import test.query.{AllCommerceDBs, Buyer, commerceDBs}
 import tyql.*
 import tyql.Expr.*
@@ -11,7 +11,7 @@ import NamedTuple.*
 
 import java.time.LocalDate
 
-class sortTakeJoinSubqueryTest extends SQLStringTest[AllCommerceDBs, Double] {
+class sortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeJoin"
   def query() =
     testDB.tables.purchases.flatMap(purch =>
@@ -30,7 +30,7 @@ class sortTakeJoinSubqueryTest extends SQLStringTest[AllCommerceDBs, Double] {
       """
 }
 
-class sortTake2JoinSubqueryTest extends SQLStringTest[AllCommerceDBs, Double] {
+class sortTake2JoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeJoin (for comprehension)"
   def query() =
     testDB.tables.purchases.flatMap(purch =>
@@ -51,7 +51,7 @@ class sortTake2JoinSubqueryTest extends SQLStringTest[AllCommerceDBs, Double] {
         """
 }
 
-class sortTakeFromSubqueryTest extends SQLStringTest[AllCommerceDBs, Double] {
+class sortTakeFromSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeFrom"
   def query() =
     testDB.tables.products.sort(_.price, Ord.DESC).take(1).flatMap(prod =>
@@ -69,7 +69,7 @@ class sortTakeFromSubqueryTest extends SQLStringTest[AllCommerceDBs, Double] {
       """
 }
 
-class sortTakeFromSubquery2Test extends SQLStringTest[AllCommerceDBs, Double] {
+class sortTakeFromSubquery2Test extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeFrom (for comprehension)"
   def query() =
     for
@@ -88,7 +88,7 @@ class sortTakeFromSubquery2Test extends SQLStringTest[AllCommerceDBs, Double] {
           JOIN purchase purchase1 ON (subquery0.id = purchase1.product_id)
         """
 }
-class sortTakeFromAndJoinSubqueryTest extends SQLStringTest[AllCommerceDBs, (name: String, count: Int)] {
+class sortTakeFromAndJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, count: Int)] {
   def testDescription = "Subquery: sortTakeFromAndJoin"
   def query() =
     for
@@ -117,7 +117,7 @@ class sortTakeFromAndJoinSubqueryTest extends SQLStringTest[AllCommerceDBs, (nam
         ON (subquery0.id = subquery1.product_id)
       """
 }
-class sortLimitSortLimitSubqueryTest extends SQLStringTest[AllCommerceDBs, String] {
+class sortLimitSortLimitSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, String] {
   def testDescription = "Subquery: sortLimitSortLimit"
   def query() =
     testDB.tables.products.sort(_.price, Ord.DESC).take(4).sort(_.price, Ord.DESC).take(2).map(_.name)
@@ -133,7 +133,7 @@ class sortLimitSortLimitSubqueryTest extends SQLStringTest[AllCommerceDBs, Strin
         LIMIT ?
       """
 }
-class subqueryInFilterSubqueryTest extends SQLStringTest[AllCommerceDBs, Buyer] {
+class subqueryInFilterSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: subqueryInFilter"
   def query() =
     testDB.tables.buyers.filter(c =>
@@ -153,7 +153,7 @@ class subqueryInFilterSubqueryTest extends SQLStringTest[AllCommerceDBs, Buyer] 
             WHERE (buyer0.id = shipping_info1.buyer_id)) = ?)
       """
 }
-class SubqueryInMapSubqueryTest extends SQLStringTest[AllCommerceDBs, (buyer: Buyer, count: Int)] {
+class SubqueryInMapSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (buyer: Buyer, count: Int)] {
   def testDescription = "Subquery: subqueryInMap"
   def query() =
     testDB.tables.buyers.map(c =>
@@ -170,7 +170,7 @@ class SubqueryInMapSubqueryTest extends SQLStringTest[AllCommerceDBs, (buyer: Bu
         FROM buyer buyer0
       """
 }
-class subqueryInMapNestedSubqueryTest extends SQLStringTest[AllCommerceDBs, (buyer: Buyer, occurances: Boolean)] {
+class subqueryInMapNestedSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (buyer: Buyer, occurances: Boolean)] {
   def testDescription = "Subquery: subqueryInMapNested"
   def query() =
     testDB.tables.buyers.map(c =>
@@ -188,7 +188,7 @@ class subqueryInMapNestedSubqueryTest extends SQLStringTest[AllCommerceDBs, (buy
         FROM buyer buyer0
       """
 }
-class subqueryInMapNestedConcatSubqueryTest extends SQLStringTest[AllCommerceDBs, (id: Int, name: String, dateOfBirth: LocalDate, occurances: Int)] {
+class subqueryInMapNestedConcatSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, dateOfBirth: LocalDate, occurances: Int)] {
   def testDescription = "Subquery: subqueryInMapNested"
   def query() =
     testDB.tables.buyers.map(c =>
@@ -207,7 +207,7 @@ class subqueryInMapNestedConcatSubqueryTest extends SQLStringTest[AllCommerceDBs
       """
 }
 
-class selectLimitUnionSelectSubqueryTest extends SQLStringTest[AllCommerceDBs, String] {
+class selectLimitUnionSelectSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, String] {
   def testDescription = "Subquery: selectLimitUnionSelect"
   def query() =
     testDB.tables.buyers.map(_.name.toLowerCase).take(2).unionAll(testDB.tables.products.map(_.name.toLowerCase))
@@ -223,7 +223,7 @@ class selectLimitUnionSelectSubqueryTest extends SQLStringTest[AllCommerceDBs, S
       """
 }
 
-class selectUnionSelectLimitSubqueryTest extends SQLStringTest[AllCommerceDBs, String] {
+class selectUnionSelectLimitSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, String] {
   def testDescription = "Subquery: selectUnionSelectLimit"
   def query() =
     testDB.tables.buyers.map(_.name.toLowerCase).unionAll(testDB.tables.products.map(_.name.toLowerCase).take(2))
@@ -238,7 +238,7 @@ class selectUnionSelectLimitSubqueryTest extends SQLStringTest[AllCommerceDBs, S
           LIMIT ?) subquery0
       """
 }
-class ExceptAggregateSubqueryTest extends SQLStringTest[AllCommerceDBs, (max: Double, min: Double)] {
+class ExceptAggregateSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (max: Double, min: Double)] {
   def testDescription = "Subquery: exceptAggregate"
   def query() =
     testDB.tables.products
@@ -263,7 +263,7 @@ class ExceptAggregateSubqueryTest extends SQLStringTest[AllCommerceDBs, (max: Do
       """
 }
 
-class UnionAllAggregateSubqueryTest extends SQLStringTest[AllCommerceDBs, (max: Double, min: Double)] {
+class UnionAllAggregateSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (max: Double, min: Double)] {
   def testDescription = "Subquery: unionAllAggregate"
   def query() =
     testDB.tables.products

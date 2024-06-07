@@ -1,5 +1,5 @@
 package test.query.relationops
-import test.SQLStringTest
+import test.SQLStringQueryTest
 import test.query.{commerceDBs,  AllCommerceDBs, Product}
 
 import tyql.*
@@ -8,7 +8,7 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 
-class RelationOpsUnionTest extends SQLStringTest[AllCommerceDBs, (id: Int)] {
+class RelationOpsUnionTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)] {
   def testDescription: String = "RelationOps: union with project"
   def query() =
     testDB.tables.products
@@ -27,7 +27,7 @@ class RelationOpsUnionTest extends SQLStringTest[AllCommerceDBs, (id: Int)] {
       """
 }
 
-class RelationOpsUnion2Test extends SQLStringTest[AllCommerceDBs, Product] {
+class RelationOpsUnion2Test extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "RelationOps: union"
   def query() =
     testDB.tables.products
@@ -42,7 +42,7 @@ class RelationOpsUnion2Test extends SQLStringTest[AllCommerceDBs, Product] {
       """
 }
 
-class RelationOpsUnionAllTest extends SQLStringTest[AllCommerceDBs, (id: Int)] {
+class RelationOpsUnionAllTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)] {
   def testDescription: String = "RelationOps: unionAll with project"
   def query() =
     testDB.tables.products
@@ -61,7 +61,7 @@ class RelationOpsUnionAllTest extends SQLStringTest[AllCommerceDBs, (id: Int)] {
       """
 }
 
-class RelationOpsIntersectTest extends SQLStringTest[AllCommerceDBs, (id: Int)] {
+class RelationOpsIntersectTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)] {
   def testDescription: String = "RelationOps: intersect with project"
   def query() =
     testDB.tables.products

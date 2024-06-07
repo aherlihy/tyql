@@ -1,5 +1,5 @@
 package test.query.select
-import test.{SQLStringTest, TestDatabase}
+import test.{SQLStringQueryTest, TestDatabase}
 import test.query.{commerceDBs,  AllCommerceDBs, Product}
 
 import tyql.*
@@ -25,7 +25,7 @@ given TestDatabase[AllLocDBs] with
     cities2 = Table[CityT]("cities2")
   )
 
-class SimpleSelectTest extends SQLStringTest[CityDB, Int] {
+class SimpleSelectTest extends SQLStringQueryTest[CityDB, Int] {
   def testDescription: String = "Select: Simple select field"
   def query() =
     testDB.tables.cities.map: c =>
@@ -33,7 +33,7 @@ class SimpleSelectTest extends SQLStringTest[CityDB, Int] {
   def sqlString: String = "SELECT zipcode FROM cities"
 }
 
-class SelectWithFilterTest extends SQLStringTest[CityDB, String] {
+class SelectWithFilterTest extends SQLStringQueryTest[CityDB, String] {
   def testDescription: String = "Select: select with > filter"
   def query() =
     testDB.tables.cities.withFilter: city =>
@@ -43,7 +43,7 @@ class SelectWithFilterTest extends SQLStringTest[CityDB, String] {
   def sqlString: String = "SELECT name FROM cities WHERE city.population > 10000"
 }
 
-class SelectWithGtTest extends SQLStringTest[CityDB, String] {
+class SelectWithGtTest extends SQLStringQueryTest[CityDB, String] {
   def testDescription: String = "Select: select with gt constraint"
   def query() =
     for
@@ -52,7 +52,7 @@ class SelectWithGtTest extends SQLStringTest[CityDB, String] {
   def sqlString: String = "SELECT name from cities where city.population > 10000"
 }
 
-class SelectWithSelfNestTest extends SQLStringTest[CityDB, CityT] {
+class SelectWithSelfNestTest extends SQLStringQueryTest[CityDB, CityT] {
   def testDescription: String = "Select: self-join with condition"
   def query() =
     for
@@ -64,7 +64,7 @@ class SelectWithSelfNestTest extends SQLStringTest[CityDB, CityT] {
   def sqlString: String = "SELECT city.* FROM cities AS city JOIN cities AS alt ON city.name=alt.name AND city.zipcode != alt.zipcode"
 }
 
-class SelectNested extends SQLStringTest[AllLocDBs, CityT] {
+class SelectNested extends SQLStringQueryTest[AllLocDBs, CityT] {
   def testDescription: String = "Select: two-table join with condition "
   def query() =
     for
@@ -76,7 +76,7 @@ class SelectNested extends SQLStringTest[AllLocDBs, CityT] {
   def sqlString: String =  "SELECT city.* FROM cities AS city JOIN addresses AS address ON city=address.city"
 }
 
-class SelectWithProjectTestToRow extends SQLStringTest[CityDB, (name: String, zipCode: Int)] {
+class SelectWithProjectTestToRow extends SQLStringQueryTest[CityDB, (name: String, zipCode: Int)] {
   def testDescription: String = "Select: select with project"
   def query() =
     testDB.tables.cities.map: city =>
@@ -84,7 +84,7 @@ class SelectWithProjectTestToRow extends SQLStringTest[CityDB, (name: String, zi
   def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
 }
 
-class SelectTableTest extends SQLStringTest[AllCommerceDBs, Product] {
+class SelectTableTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "Select: table"
   def query() =
     testDB.tables.products
@@ -93,7 +93,7 @@ class SelectTableTest extends SQLStringTest[AllCommerceDBs, Product] {
     """
 }
 
-class SelectMultipleFilterTest extends SQLStringTest[AllCommerceDBs, Product] {
+class SelectMultipleFilterTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "Select: multiple filter"
   def query() =
     testDB.tables.products
@@ -105,7 +105,7 @@ class SelectMultipleFilterTest extends SQLStringTest[AllCommerceDBs, Product] {
     """
 }
 
-// class SelectSingleTest extends SQLStringTest[AllCommerceDBs, Product] {
+// class SelectSingleTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
 //   def testDescription: String = "Select: single"
 //   def query() =
 //     testDB.tables.products
@@ -118,7 +118,7 @@ class SelectMultipleFilterTest extends SQLStringTest[AllCommerceDBs, Product] {
 //     """
 // }
 //
-class ContainsTest extends SQLStringTest[AllCommerceDBs, Product] {
+class ContainsTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "Contains"
   def query() =
     testDB.tables.products
@@ -139,7 +139,7 @@ class ContainsTest extends SQLStringTest[AllCommerceDBs, Product] {
   """
 }
 
-class NonEmptyTest extends SQLStringTest[AllCommerceDBs, Product] {
+class NonEmptyTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "NonEmpty"
   def query() =
     testDB.tables.products
@@ -158,7 +158,7 @@ class NonEmptyTest extends SQLStringTest[AllCommerceDBs, Product] {
      )"""
 }
 
-class IsEmptyTest extends SQLStringTest[AllCommerceDBs, Product] {
+class IsEmptyTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "Empty"
   def query() =
     testDB.tables.products
@@ -172,7 +172,7 @@ class IsEmptyTest extends SQLStringTest[AllCommerceDBs, Product] {
    )"""
 }
 
-// class CaseTest extends SQLStringTest[AllCommerceDBs, Int] {
+// class CaseTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
 //   def testDescription: String = "CaseTest"
 //   def query() =
 //     testDB.tables.products
