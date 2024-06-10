@@ -29,7 +29,6 @@ class AggregateAggregationExprTest extends SQLStringAggregationTest[AllCommerceD
   def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
 
-
 class FlatMapProjectAggregationExprTest extends SQLStringAggregationTest[AllCommerceDBs, (s: Double)] {
   def testDescription: String = "Aggregation: flatMap + expr.sum with named tuple"
 
