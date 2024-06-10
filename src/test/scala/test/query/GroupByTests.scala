@@ -6,13 +6,14 @@ import tyql.*
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
+import tyql.Expr.{sum, avg}
 
 class GroupByTest extends SQLStringQueryTest[AllCommerceDBs, (a: Double)] {
   def testDescription = "GroupBy: simple"
 
   def query() =
     testDB.tables.purchases.groupBy(
-      p => (a = p.total.avg).toRow,
+      p => (a = avg(p.total)).toRow,
       p => p.count,
       p => p.a == 1
     )
@@ -27,7 +28,7 @@ class GroupByUnamedTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
 
   def query() =
       testDB.tables.purchases.groupBy(
-        p => p.total.avg,
+        p => avg(p.total),
         p => p.count,
         p => p == 1
       )
@@ -53,7 +54,7 @@ class GroupByUnamedTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
 //  def testDescription = "GroupBy: simple with having"
 //
 //  def query() =
-//    testDB.tables.purchases.flatMap(p => (avg = p.total.avg).toRow).groupBy(
+//    testDB.tables.purchases.flatMap(p => (avg = avg(p.total)).toRow).groupBy(
 //      p => p.count,
 //    ).filter(p => p.avg == 10)
 //
@@ -66,7 +67,7 @@ class GroupBy3Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
 
   def query() =
     testDB.tables.purchases.groupBy(
-      p => (avg = p.total.avg).toRow,
+      p => (avg = avg(p.total)).toRow,
       p => p.count,
       p => p.avg == 1
     )
@@ -80,8 +81,8 @@ class GroupBy4Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
 
   def query() =
     testDB.tables.purchases.filter(p => p.id == 10).groupBy(
-      p => (avg = p.total.avg).toRow,
-      p => p.count.avg,
+      p => (avg = avg(p.total)).toRow,
+      p => avg(p.count),
       p => p.avg == 1
     )
 
@@ -93,8 +94,8 @@ class SortGroupByTest extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] 
   def testDescription = "GroupBy: sort then GroupBy"
   def query() =
     testDB.tables.purchases.sort(_.count, Ord.ASC).take(5).groupBy(
-      p => (avg = p.total.avg).toRow,
-      p => p.count.avg,
+      p => (avg = avg(p.total)).toRow,
+      p => avg(p.count),
       p => p.avg == 1
     )
   def sqlString = """
@@ -105,13 +106,13 @@ class JoinGroupByTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, total
   def query() =
     for
       p1 <- testDB.tables.purchases.groupBy(
-        p => (s = p.total.sum, id = p.id).toRow,
-        _.total.sum,
+        p => (s = sum(p.total), id = p.id).toRow,
+        p => sum(p.total),
         f => f.s == 1
       )
       p2 <- testDB.tables.products
       if p1.s == p2.id
-    yield (id = p1.id, total = p2.price.avg).toRow
+    yield (id = p1.id, total = avg(p2.price)).toRow
   def sqlString = """
         SELECT
           product1.name AS res_0,

@@ -1,6 +1,7 @@
 package test.query.fail
 
 import test.{SQLStringAggregationTest, SQLStringQueryTest}
+import tyql.Expr.sum
 
 import java.time.LocalDate
 // TODO: tests that should fail to compile
@@ -108,4 +109,15 @@ import java.time.LocalDate
 //          FROM (SELECT AVG(price) as avgPrice FROM products)
 //        """
 //}
+//class FlowMapAggregateTestFail extends SQLStringAggregationTest[AllCommerceDBs, Int] {
+//  def testDescription = "Flow: 2 nest, map+map should fail even with aggregate"
 //
+//  def query() =
+//    testDB.tables.buyers.map(b =>
+//      testDB.tables.shipInfos.map(si =>
+//        sum(si.buyerId)
+//      )
+//    )
+//
+//  def sqlString = ""
+//}

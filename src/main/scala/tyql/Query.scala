@@ -78,21 +78,16 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Aggregation.StripAgg]])(f: Expr.Ref[A] => B): Aggregation[ NamedTuple.Map[B, Aggregation.StripAgg] ] =
     import Aggregation.toRow
     val ref = Expr.Ref[A]()
-    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref).toRow))
+    val row = f(ref).toRow
+    Aggregation.AggFlatMap(this, Expr.Fun(ref, row))
 
-  def map[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
-    val ref = Expr.Ref[A]()
-    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
+  // TODO: bug? if commented out, then agg test cannot find aggregate ^
+  inline def aggregate[B: ResultTag](f: Expr.Ref[A] => Query[B]): Nothing =
+    error("Cannot return an Query from a aggregate. Did you mean to use flatMap?")
 
   def map[B: ResultTag](f: Expr.Ref[A] => Expr[B]): Query[B] =
     val ref = Expr.Ref[A]()
     Query.Map(this, Expr.Fun(ref, f(ref)))
-
-// TODO: differentiate between scalar and aggregate expressions
-//  def map[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, tyql.Aggregation.StripAgg]])(f: Expr.Ref[A] => B): Aggregation[NamedTuple.Map[B, tyql.Aggregation.StripAgg]] =
-//    import Aggregation.toRow
-//    val ref = Expr.Ref[A]()
-//    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref).toRow))
 
   def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A] => B): Query[ NamedTuple.Map[B, Expr.StripExpr] ] =
     import Expr.toRow

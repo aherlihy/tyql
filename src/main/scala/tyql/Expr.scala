@@ -34,14 +34,15 @@ trait Expr[Result](using val tag: ResultTag[Result]) extends Selectable:
 trait ScalarExpr[Result](using override val tag: ResultTag[Result]) extends Expr[Result]
 
 object Expr:
+  def sum(x: Expr[Int]): Aggregation[Int] = Aggregation.Sum(x) // TODO: require summable type?
+  @targetName("doubleSum")
+  def sum(x: Expr[Double]): Aggregation[Double] = Aggregation.Sum(x) // TODO: require summable type?
+  def avg[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Avg(x)
+  def max[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Max(x)
+  def min[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Min(x)
 
   /** Sample extension methods for individual types */
   extension (x: Expr[Int])
-    // TODO: this may cause a name conflict if there are fields named 'sum' or 'count'. Could require .aggregate.sum to avoid
-    def sum: Aggregation[Int] = Aggregation.Sum(x) // TODO: require summable type?
-    def avg: Aggregation[Int] = Aggregation.Avg(x)
-    def max: Aggregation[Int] = Aggregation.Max(x)
-    def min: Aggregation[Int] = Aggregation.Min(x)
     def > (y: Expr[Int]): Expr[Boolean] = Gt(x, y)
     def > (y: Int): Expr[Boolean] = Gt(x, IntLit(y))
 
@@ -51,14 +52,6 @@ object Expr:
     def > (y: Expr[Double]): Expr[Boolean] = GtDouble(x, y)
     @targetName("gtDoubleLit")
     def > (y: Double): Expr[Boolean] = GtDouble(x, DoubleLit(y))
-    @targetName("sumDouble")
-    def sum: Aggregation[Double] = Aggregation.Sum(x)
-    @targetName("avgDouble")
-    def avg: Aggregation[Double] = Aggregation.Avg(x)
-    @targetName("maxDouble")
-    def max: Aggregation[Double] = Aggregation.Max(x)
-    @targetName("minDouble")
-    def min: Aggregation[Double] = Aggregation.Min(x)
 
   extension (x: Expr[Boolean])
     def && (y: Expr[Boolean]): Expr[Boolean] = And(x, y)

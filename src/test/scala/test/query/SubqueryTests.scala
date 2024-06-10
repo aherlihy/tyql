@@ -3,7 +3,7 @@ package test.query.subquery
 import test.SQLStringQueryTest
 import test.query.{AllCommerceDBs, Buyer, commerceDBs}
 import tyql.*
-import tyql.Expr.*
+import tyql.Expr.{max, min, toRow}
 
 import language.experimental.namedTuples
 import NamedTuple.*
@@ -241,12 +241,13 @@ class selectUnionSelectLimitSubqueryTest extends SQLStringQueryTest[AllCommerceD
 class ExceptAggregateSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (max: Double, min: Double)] {
   def testDescription = "Subquery: exceptAggregate"
   def query() =
+    import Aggregation.toRow as AggrToRow
     testDB.tables.products
       .map(p => (name = p.name.toLowerCase, price = p.price).toRow)
       .except(
         testDB.tables.products.map(p => (name = p.name.toLowerCase, price = p.price).toRow)
       )
-      .map(ps => (max = ps.price.max, min = ps.price.min).toRow)
+      .map(ps => (max = max(ps.price), min = min(ps.price)).AggrToRow)
   def sqlString = """
         SELECT
           MAX(subquery0.res_1) AS res_0,
@@ -266,12 +267,13 @@ class ExceptAggregateSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (ma
 class UnionAllAggregateSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (max: Double, min: Double)] {
   def testDescription = "Subquery: unionAllAggregate"
   def query() =
+    import Aggregation.toRow as AggrToRow
     testDB.tables.products
       .map(p => (name = p.name.toLowerCase, price = p.price).toRow)
       .unionAll(testDB.tables.products
         .map(p2 => (name = p2.name.toLowerCase, price = p2.price).toRow)
       )
-      .map(p => (max = p.price.max, min = p.price.min).toRow)
+      .map(p => (max = max(p.price), min = min(p.price)).AggrToRow)
   def sqlString = """
         SELECT
           MAX(subquery0.res_1) AS res_0,

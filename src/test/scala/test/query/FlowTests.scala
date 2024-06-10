@@ -7,6 +7,7 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 import java.time.LocalDate
+import tyql.Expr.sum
 
 class FlowForTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, for comprehension"
@@ -133,7 +134,7 @@ class FlowMapAggregateTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
 
   def query() =
       testDB.tables.shipInfos.map(si =>
-        si.buyerId.sum
+        sum(si.buyerId)
       )
 
   def sqlString = ""
@@ -144,7 +145,7 @@ class FlowMapAggregateTest2 extends SQLStringAggregationTest[AllCommerceDBs, Int
 
   def query() =
     testDB.tables.shipInfos.flatMap(si =>
-      si.buyerId.sum
+      sum(si.buyerId)
     )
 
   def sqlString = ""
@@ -155,7 +156,7 @@ class FlowMapAggregateTest3 extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def query() =
     testDB.tables.buyers.map(b =>
       testDB.tables.shipInfos.flatMap(si =>
-        si.buyerId.sum
+        sum(si.buyerId)
       )
     )
 
@@ -167,20 +168,7 @@ class FlowMapAggregateTest4 extends SQLStringAggregationTest[AllCommerceDBs, Int
   def query() =
     testDB.tables.buyers.flatMap(b =>
       testDB.tables.shipInfos.flatMap(si => // silly but correct syntax, equivalent to map + flatMap
-        si.buyerId.sum
-      )
-    )
-
-  def sqlString = ""
-}
-
-class FlowMapAggregateTestFail extends SQLStringAggregationTest[AllCommerceDBs, Int] {
-  def testDescription = "Flow: 2 nest, map+map should fail even with aggregate"
-
-  def query() =
-    testDB.tables.buyers.map(b =>
-      testDB.tables.shipInfos.map(si =>
-        si.buyerId.sum
+        sum(si.buyerId)
       )
     )
 
@@ -192,7 +180,7 @@ class FlowMapAggregateTest6 extends SQLStringQueryTest[AllCommerceDBs, (sum: Int
 
   def query() =
     testDB.tables.shipInfos.map(si =>
-      (sum = si.buyerId.sum).toRow
+      (sum = sum(si.buyerId)).toRow
     )
 
   def sqlString = ""
@@ -203,7 +191,7 @@ class FlowMapAggregateTest7 extends SQLStringAggregationTest[AllCommerceDBs, (su
 
   def query() =
     testDB.tables.shipInfos.flatMap(si =>
-      (sum = si.buyerId.sum).toRow
+      (sum = sum(si.buyerId)).toRow
     )
 
   def sqlString = ""
@@ -222,7 +210,7 @@ class FlowMapAggregateConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (
 
   def query() =
     testDB.tables.shipInfos.map(si =>
-      (sum = si.buyerId.sum)
+      (sum = sum(si.buyerId))
     )
 
   def sqlString = ""
