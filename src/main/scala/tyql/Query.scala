@@ -71,8 +71,8 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
   // TODO: cover common cases so that user doesn't see implementation-specific typing error, e.g.
-  inline def flatMap[B: ResultTag](f: Expr.Ref[A, true] => Expr[B, true]): Expr[B, true] = // inline so error points to use site
-    error("Cannot return a scalar Expr from a flatMap. Did you mean to use map?")
+//  inline def flatMap[B: ResultTag](f: Expr.Ref[A, true] => Expr[B, true]): Expr[B, true] = // inline so error points to use site
+//    error("Cannot return a scalar Expr from a flatMap. Did you mean to use map?")
 
   // aggregate only accepts non-scalar expressions
   def aggregate[B: ResultTag](f: Expr.Ref[A, false] => Expr[B, false]): Aggregation[B] =

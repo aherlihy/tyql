@@ -6,10 +6,14 @@ import NamedTuple.{NamedTuple, AnyNamedTuple}
 import scala.compiletime.error
 
 
-type And[X <: Boolean, Y <: Boolean] <: Boolean = (X, Y) match // is this needed? Want an intersection, but true & false should reduce to false, not the type true & false
+type And[X, Y] <: Boolean = (X, Y) match // is this needed? Want an intersection, but true & false should reduce to false, not the type true & false
   case (true, true) => true
   case _ => false
-type AndLambda = [X <: Boolean, Y <: Boolean] =>> And[X, Y]
+type AllTrue[T <: Tuple] <: Boolean = T match
+  case EmptyTuple => true
+  case true *: t => AllTrue[t]
+  case false *: _ => false
+//type AndLambda = [X <: Boolean, Y <: Boolean] =>> And[X, Y]
 
 //type And = [X <: Boolean, Y <: Boolean] =>> (X, Y) match // is this needed? Want an intersection, but true & false should reduce to false, not the type true & false
 //  case (true, true) => true
@@ -17,10 +21,14 @@ type AndLambda = [X <: Boolean, Y <: Boolean] =>> And[X, Y]
 
 /** The type of expressions in the query language */
 trait Expr[Result, Scalar <: Boolean](using val tag: ResultTag[Result]) extends Selectable:
+
+  type SubExpr[R] <: Expr[R, ?] = Scalar match
+    case true => Expr[R, true]
+    case _ => Expr[R, false]
   /** This type is used to support selection with any of the field names
    *  defined by Fields. Keep the same Scalar property as parent tuple.
    */
-  type Fields = NamedTuple.Map[NamedTuple.From[Result], [T] =>> Expr[T, Scalar]]
+  type Fields = NamedTuple.Map[NamedTuple.From[Result], [T] =>> Expr[T, true]] // TODO: for now, accessing an attribute is considered always scalar.
 
  /** A selection of a field name defined by Fields is implemented by `selectDynamic`.
    *  The implementation will add a cast to the right Expr type corresponding
@@ -39,7 +47,7 @@ object Expr:
 //  def sum(x: Expr[Int]): Aggregation[Int] = Aggregation.Sum(x) // TODO: require summable type?
 //  @targetName("doubleSum")
 //  def sum(x: Expr[Double]): Aggregation[Double] = Aggregation.Sum(x) // TODO: require summable type?
-  def sum[T: ResultTag](x: Expr[T, true]): Aggregation[T] = Aggregation.Sum(x)
+  def sum[T: ResultTag, S <: true](x: Expr[T, S]): Aggregation[T] = Aggregation.Sum(x)
 //  def avg[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Avg(x)
 //  def max[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Max(x)
 //  def min[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Min(x)
@@ -81,7 +89,7 @@ object Expr:
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // Todo: Make it strongly typed like the other cases
-  case class Select[A: ResultTag, S <: Boolean]($x: Expr[A, S], $name: String) extends Expr[A, S]
+  case class Select[A: ResultTag, S <: Boolean]($x: Expr[A, S], $name: String) extends Expr
 
 //  case class Single[S <: String, A]($x: Expr[A])(using ResultTag[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]) extends Expr[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]
 
@@ -93,9 +101,9 @@ object Expr:
   type StripScalar[E] = E match
     case Expr[_, s] => s
 
-//  type AllScalar[A <: AnyNamedTuple] = Tuple.Fold[Tuple.Map[NamedTuple.DropNames[A], StripScalar], true, And]
+//  type AllScalar[A <: AnyNamedTuple] = Tuple.Fold[Tuple.Map[NamedTuple.DropNames[A], StripScalar], true, AllTrue]
 
-  case class Project[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends Expr//[NamedTuple.Map[A, StripExpr], AllScalar[A]]
+  case class Project[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends Expr[NamedTuple.Map[A, StripExpr], AllTrue[NamedTuple.DropNames[A]]]
 
 
 // Also weakly typed in the arguments since these two classes model universal equality */
