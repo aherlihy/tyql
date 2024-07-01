@@ -63,6 +63,17 @@ class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, 
   def sqlString = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
 }
 
+class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: String, sumP: Double)] {
+  def testDescription = "Flow: for comprehension with agg"
+
+  def query() =
+    for
+      p <- testDB.tables.products
+    yield (pName = p.name, sumP = sum(p.price))
+
+  def sqlString = "SELECT r0.name, r0.id FROM buyers r0"
+}
+
 class FlowMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map"
   def query() =

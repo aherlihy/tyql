@@ -17,8 +17,10 @@ trait TestQuery[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]](using val 
 trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extends munit.FunSuite with TestQuery[Rows, ReturnShape] {
   test(testDescription) {
     val q = query()
+    val ss = q.toSQLString
     println(s"$testDescription:\n\t$q")
-    assertEquals(q.toSQLString, sqlString)
+    println(s"\tSQLString: $ss")
+    assertEquals(ss, sqlString)
   }
 }
 

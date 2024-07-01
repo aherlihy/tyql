@@ -40,16 +40,8 @@ object ResultTag:
 trait DatabaseAST[Result](using val tag: ResultTag[Result]):
   def toSQLString: String = toQueryIR.toSQLString
 
-//  given ResultTag[T]: ResultTag = inline erasedValue[T] match
-//    case _: Int => ResultTag.Int
-//    case _: String => ResultTag.String
-//    case _: Boolean => ResultTag.Bool
-//    // TODO: Add more cases
-//    case  _: t *: ts => ResultTag.Tuple(recCall[t], recCall[ts])
-//    case _ => throw new IllegalArgumentException(s"Unsupported type")
-
-  private def toQueryIR: QueryIRTree =
-    QueryIRTree(this)
+  private def toQueryIR: QueryIRNode =
+    QueryIRTree.generateQuery(this)
 
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   /**
@@ -100,9 +92,9 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
 object Query:
   import Expr.{Pred, Fun, Ref}
 
-  case class Filter[A: ResultTag]($q: Query[A], $p: Pred[A]) extends Query[A]
-  case class Map[A, B: ResultTag]($q: Query[A], $f: Fun[A, Expr[B]]) extends Query[B]
-  case class FlatMap[A, B: ResultTag]($q: Query[A], $f: Fun[A, Query[B]]) extends Query[B]
+  case class Filter[A: ResultTag]($from: Query[A], $pred: Pred[A]) extends Query[A]
+  case class Map[A, B: ResultTag]($from: Query[A], $query: Fun[A, Expr[B]]) extends Query[B]
+  case class FlatMap[A, B: ResultTag]($from: Query[A], $query: Fun[A, Query[B]]) extends Query[B]
   // case class Sort[A]($q: Query[A], $o: Ordering[A]) extends Query[A] // alternative syntax to avoid chaining .sort for multi-key sort
   case class Sort[A: ResultTag, B]($q: Query[A], $f: Fun[A, Expr[B]], $ord: Ord) extends Query[A]
   case class Limit[A: ResultTag]($q: Query[A], $limit: Int) extends Query[A]

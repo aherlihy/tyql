@@ -31,7 +31,7 @@ trait Expr[Result](using val tag: ResultTag[Result]) extends Selectable:
  * element for the entire table.
  * @tparam Result
  */
-trait ScalarExpr[Result](using override val tag: ResultTag[Result]) extends Expr[Result]
+//trait ScalarExpr[Result](using override val tag: ResultTag[Result]) extends Expr[Result]
 
 object Expr:
   def sum(x: Expr[Int]): Aggregation[Int] = Aggregation.Sum(x) // TODO: require summable type?
