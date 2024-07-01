@@ -13,6 +13,7 @@ type AllTrue[T <: Tuple] <: Boolean = T match
   case EmptyTuple => true
   case true *: t => AllTrue[t]
   case false *: _ => false
+
 //type AndLambda = [X <: Boolean, Y <: Boolean] =>> And[X, Y]
 
 //type And = [X <: Boolean, Y <: Boolean] =>> (X, Y) match // is this needed? Want an intersection, but true & false should reduce to false, not the type true & false
@@ -47,7 +48,7 @@ object Expr:
 //  def sum(x: Expr[Int]): Aggregation[Int] = Aggregation.Sum(x) // TODO: require summable type?
 //  @targetName("doubleSum")
 //  def sum(x: Expr[Double]): Aggregation[Double] = Aggregation.Sum(x) // TODO: require summable type?
-  def sum[T: ResultTag, S <: true](x: Expr[T, S]): Aggregation[T] = Aggregation.Sum(x)
+  def sum[T: ResultTag, S <: true](x: Expr[T, S]): Expr[T, false] = Sum(x)
 //  def avg[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Avg(x)
 //  def max[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Max(x)
 //  def min[T: ResultTag](x: Expr[T]): Aggregation[T] = Aggregation.Min(x)
@@ -104,13 +105,15 @@ object Expr:
 //  type AllScalar[A <: AnyNamedTuple] = Tuple.Fold[Tuple.Map[NamedTuple.DropNames[A], StripScalar], true, AllTrue]
 
   case class Project[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends Expr[NamedTuple.Map[A, StripExpr], AllTrue[NamedTuple.DropNames[A]]]
+  // Needed because project can be a final result for aggregation but not query
 
 
-// Also weakly typed in the arguments since these two classes model universal equality */
+  // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq[S1 <: Boolean, S2 <: Boolean]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, And[S1, S2]]
 //  case class Ne($x: Expr[?], $y: Expr[?]) extends Expr[Boolean]
+  case class Sum[A: ResultTag]($a: Expr[A, ?]) extends Expr[A, false]
 
-  /** References are placeholders for parameters */
+/** References are placeholders for parameters */
   private var refCount = 0 // TODO: do we want to recount from 0 for each query?
 
   case class Ref[A: ResultTag, S <: Boolean]($name: String = "") extends Expr[A, S]:
@@ -137,17 +140,21 @@ object Expr:
 
   type Pred[A, S <: Boolean] = Fun[A, Expr[Boolean, S]]
 
-  type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?]
+  type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, true]
+  type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, false]
 
-  /** Explicit conversion from
+/** Explicit conversion from
    *      (name_1: Expr[T_1], ..., name_n: Expr[T_n])
    *  to
    *      Expr[(name_1: T_1, ..., name_n: T_n)]
    */
   extension [A <: AnyNamedTuple : IsTupleOfExpr](x: A)
-    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]) = ???//: Project[A] = Project(x)
+    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): Project[A] = Project(x)
 
-// TODO: use NamedTuple.from to convert case classes to named tuples before using concat
+  extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
+    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): Aggregation.AggProject[A] = Aggregation.AggProject(x)
+
+  // TODO: use NamedTuple.from to convert case classes to named tuples before using concat
 //  extension [A <: AnyNamedTuple](x: Expr[A])
 //    def concat[B <: AnyNamedTuple](other: Expr[B])(using ResultTag[NamedTuple.Concat[A, B]]) = Concat(x, other)
 

@@ -54,40 +54,32 @@ trait DatabaseAST[Result](using val tag: ResultTag[Result]):
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   /**
    * Top-level queries:
-   * map + aggregation => Aggregation[Result]
-   * flatMap + aggregation => Aggregation[Result]
+   * map + aggregation => Query[Result], e.g. iterable with length 1
    * map + query => Query[Result], e.g. iterable with length n
-   * flatMap + query = compilation error
+   * aggregate + aggregation => Aggregation[Result]
+   * flatMap + expr/agg, or aggregate + scalar expr/query = compilation error
    */
   def flatMap[B: ResultTag](f: Expr.Ref[A, ?] => Query[B]): Query[B] =
     val ref = Expr.Ref[A, true]()
     Query.FlatMap(this, Expr.Fun(ref, f(ref)))
 
-//  def flatMap[B: ResultTag, S <: Boolean](f: Expr.Ref[A, ?] => Expr[B, S])(using S =:= false): Aggregation[B] =
-//    val ref = Expr.Ref[A, false]()
-//    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
-  def flatMap[B: ResultTag](f: Expr.Ref[A, ?] => Expr[B, false]): Aggregation[B] =
-    val ref = Expr.Ref[A, false]()
-    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
-
   // TODO: cover common cases so that user doesn't see implementation-specific typing error, e.g.
-//  inline def flatMap[B: ResultTag](f: Expr.Ref[A, true] => Expr[B, true]): Expr[B, true] = // inline so error points to use site
-//    error("Cannot return a scalar Expr from a flatMap. Did you mean to use map?")
+  inline def flatMap[B: ResultTag](f: Expr.Ref[A, ?] => Expr[B, ?]) = // inline so error points to use site
+    error("Cannot return a scalar expression or aggregation from a flatMap. Did you mean to use map/aggregate?")
 
   // aggregate only accepts non-scalar expressions
-  def aggregate[B: ResultTag](f: Expr.Ref[A, false] => Expr[B, false]): Aggregation[B] =
+  def aggregate[B <: Expr[?, false]](f: Expr.Ref[A, false] => Expr[B, false])(using ResultTag[B]): Aggregation[B] =
     val ref = Expr.Ref[A, false]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
-  def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Aggregation.StripAgg]])(f: Expr.Ref[A, ?] => B): Aggregation[ NamedTuple.Map[B, Aggregation.StripAgg] ] =
-    import Aggregation.toRow
+  def aggregate[B <: AnyNamedTuple : Expr.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, false] => B): Expr[ NamedTuple.Map[B, Expr.StripExpr], false ] =
+    import Expr.toRow
     val ref = Expr.Ref[A, false]()
     val row = f(ref).toRow
     Aggregation.AggFlatMap(this, Expr.Fun(ref, row))
 
-  // TODO: bug? if commented out, then agg test cannot find aggregate ^
-  inline def aggregate[B: ResultTag](f: Expr.Ref[A, true] => Query[B]): Nothing =
-    error("Cannot return an Query from an aggregate. Did you mean to use flatMap?")
+//  inline def aggregate[B <: Expr[?, ?]](f: Expr.Ref[A, ?] => Query[B])(using ResultTag[B]): Aggregation[B] =
+//    error("Cannot return an Query from an aggregate. Did you mean to use flatMap?")
 
   // map doesn't care if scalar or not
   def map[B: ResultTag, S <: Boolean](f: Expr.Ref[A, S] => Expr[B, S]): Query[B] =
@@ -153,7 +145,7 @@ object Query:
 //
     def sum[B: ResultTag](f: Ref[R, ?] => Expr[B, true]): Aggregation[B] =
       val ref = Ref[R, false]()
-      Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Sum(f(ref))))
+      Aggregation.AggFlatMap(x, Expr.Fun(ref, Expr.Sum(f(ref))))
 
 //    def avg[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
 //      val ref = Ref[R]()

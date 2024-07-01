@@ -33,8 +33,9 @@ class AggregateAggregationExprTest extends SQLStringAggregationTest[AllCommerceD
   def testDescription: String = "Aggregation: aggregate + expr.sum"
 
   def query() =
-    testDB.tables.products
+    val v = testDB.tables.products
       .aggregate(p => sum(p.price))
+    ???
 
   def sqlString: String = "SELECT SUM(purchase.price) FROM purchase"
 }
