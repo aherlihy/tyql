@@ -1,9 +1,9 @@
-package test.query.fail
-
-import test.{SQLStringAggregationTest, SQLStringQueryTest}
-import tyql.Expr.sum
-
-import java.time.LocalDate
+//package test.query.fail
+//
+//import test.{SQLStringAggregationTest, SQLStringQueryTest}
+//import tyql.Expr.sum
+//
+//import java.time.LocalDate
 // TODO: tests that should fail to compile
 
 //class FlowMapTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {

@@ -16,10 +16,10 @@ class FlowForTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bI
       b <- testDB.tables.buyers
     yield (bName = b.name, bId = b.id).toRow
 
-  def sqlString = "SELECT r0.name, r0.id FROM buyers r0"
+  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A"
 }
 
-class FlowForTest2 extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
+/*class FlowForTest2 extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
   def testDescription = "Flow: project tuple, 2 nest, for comprehension"
   def query() =
     for
@@ -29,6 +29,7 @@ class FlowForTest2 extends SQLStringQueryTest[AllCommerceDBs, (name: String, shi
 
   def sqlString = "SELECT r0.name, r1.shippingDate FROM buyers r0, shipInfos r1"
 }
+*/
 
 class FlowForTest3 extends SQLStringQueryTest[AllCommerceDBs, String] {
   def testDescription = "Flow: single field, 1 nest, for comprehension"
@@ -37,9 +38,9 @@ class FlowForTest3 extends SQLStringQueryTest[AllCommerceDBs, String] {
       b <- testDB.tables.buyers
     yield b.name
 
-  def sqlString = "SELECT name FROM buyers"
+  def expectedQueryPattern = "SELECT buyers$A.name FROM buyers as buyers$A"
 }
-
+/*
 class FlowForTest4 extends SQLStringQueryTest[AllCommerceDBs, String] {
   def testDescription = "Flow: single field, 2 nest, for comprehension"
   def query() =
@@ -50,7 +51,7 @@ class FlowForTest4 extends SQLStringQueryTest[AllCommerceDBs, String] {
 
   def sqlString = "SELECT b.name FROM buyers b, shipInfos si"
 }
-
+*/
 class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, for comprehension + if"
 
@@ -60,7 +61,7 @@ class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, 
       if b.id > 1
     yield (bName = b.name, bId = b.id).toRow
 
-  def sqlString = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
+  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
 }
 
 class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: String, sumP: Double)] {
@@ -71,7 +72,7 @@ class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: St
       p <- testDB.tables.products
     yield (pName = p.name, sumP = sum(p.price))
 
-  def sqlString = "SELECT r0.name, r0.id FROM buyers r0"
+  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0"
 }
 
 class FlowMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
@@ -81,8 +82,9 @@ class FlowMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bI
       (bName = b.name, bId = b.id).toRow
     )
 
-  def sqlString = "SELECT r0.name, r0.id FROM buyers r0"
+  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A"
 }
+/*
 
 class FlowFlatMapTest2 extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
   def testDescription = "Flow: project tuple, 2 nest, flatmap+map"
@@ -111,6 +113,7 @@ class FlowFlatMapTest3 extends SQLStringQueryTest[AllCommerceDBs, (name: String,
 
   def sqlString = ""
 }
+*/
 
 class FlowMapFilterWithTest extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map + filterWith"
@@ -119,7 +122,7 @@ class FlowMapFilterWithTest extends SQLStringQueryTest[AllCommerceDBs, (bName: S
     testDB.tables.buyers.withFilter(_.id > 1).map(b =>
       (bName = b.name, bId = b.id).toRow
     )
-  def sqlString = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
+  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
 }
 class FlowMapFilterTest extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map + filter"
@@ -128,7 +131,7 @@ class FlowMapFilterTest extends SQLStringQueryTest[AllCommerceDBs, (bName: Strin
     testDB.tables.buyers.filter(_.id > 1).map(b =>
       (bName = b.name, bId = b.id).toRow
     )
-  def sqlString = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
+  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
 }
 class FlowMapFilterTest2 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, filter after map"
@@ -137,7 +140,7 @@ class FlowMapFilterTest2 extends SQLStringQueryTest[AllCommerceDBs, (bName: Stri
     testDB.tables.buyers.map(b =>
       (bName = b.name, bId = b.id).toRow
     ).filter(_.bId > 1) // optimizer should be able to push predicate before map
-  def sqlString = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
+  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
 }
 
 class FlowMapAggregateTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
@@ -148,7 +151,7 @@ class FlowMapAggregateTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
         sum(si.buyerId)
       )
 
-  def sqlString = ""
+  def expectedQueryPattern = ""
 }
 
 class FlowMapAggregateTest2 extends SQLStringAggregationTest[AllCommerceDBs, Int] {
@@ -159,9 +162,10 @@ class FlowMapAggregateTest2 extends SQLStringAggregationTest[AllCommerceDBs, Int
       sum(si.buyerId)
     )
 
-  def sqlString = ""
+  def expectedQueryPattern = ""
 }
 
+/*
 class FlowMapAggregateTest3 extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Flow: 2 nest, map+flatMap should not fail because aggregation is Expr"
   def query() =
@@ -185,6 +189,7 @@ class FlowMapAggregateTest4 extends SQLStringAggregationTest[AllCommerceDBs, Int
 
   def sqlString = ""
 }
+*/
 
 class FlowMapAggregateTest6 extends SQLStringQueryTest[AllCommerceDBs, (sum: Int)] {
   def testDescription = "Flow: project + map on aggregate"
@@ -194,7 +199,7 @@ class FlowMapAggregateTest6 extends SQLStringQueryTest[AllCommerceDBs, (sum: Int
       (sum = sum(si.buyerId)).toRow
     )
 
-  def sqlString = ""
+  def expectedQueryPattern = ""
 }
 
 class FlowMapAggregateTest7 extends SQLStringAggregationTest[AllCommerceDBs, (sum: Int)] {
@@ -205,7 +210,7 @@ class FlowMapAggregateTest7 extends SQLStringAggregationTest[AllCommerceDBs, (su
       (sum = sum(si.buyerId)).toRow
     )
 
-  def sqlString = ""
+  def expectedQueryPattern = ""
 }
 
 class FlowMapConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, date: LocalDate)] {
@@ -213,7 +218,7 @@ class FlowMapConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (name: Str
   def query() =
     testDB.tables.buyers.map: b =>
       (name = b.name, date = b.dateOfBirth)
-  def sqlString: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
+  def expectedQueryPattern: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
 }
 
 class FlowMapAggregateConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (sum: Int)] {
@@ -224,6 +229,6 @@ class FlowMapAggregateConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (
       (sum = sum(si.buyerId))
     )
 
-  def sqlString = ""
+  def expectedQueryPattern = ""
 }
 

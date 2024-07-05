@@ -38,7 +38,7 @@ object ResultTag:
  * @tparam Result
  */
 trait DatabaseAST[Result](using val tag: ResultTag[Result]):
-  def toSQLString: String = toQueryIR.toSQLString
+  def toSQLString: String = toQueryIR.toSQLString()
 
   private def toQueryIR: QueryIRNode =
     QueryIRTree.generateQuery(this)
