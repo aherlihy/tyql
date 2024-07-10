@@ -1,6 +1,6 @@
 package test.query.flow
 import test.{SQLStringQueryTest, SQLStringAggregationTest}
-import test.query.{AllCommerceDBs, ShippingInfo, commerceDBs}
+import test.query.{AllCommerceDBs, ShippingInfo, commerceDBs, Buyer}
 import tyql.*
 
 import language.experimental.namedTuples
@@ -134,17 +134,44 @@ class FlowMapFilterTest extends SQLStringQueryTest[AllCommerceDBs, (bName: Strin
     )
   def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 1"
 }
-/*
+
+class FlowMapSubsequentFilterTest extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
+  def testDescription = "Flow: project tuple, 1 nest, map + filter x 3"
+
+  def query() =
+    testDB.tables.buyers
+      .filter(_.id > 1)
+      .filter(_.id > 10) // ignore nonsensical constraints
+      .filter(_.id > 100)
+      .map(b =>
+      (bName = b.name, bId = b.id).toRow
+    )
+
+  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 100 AND buyers$A.id > 10 AND buyers$A.id > 1"
+}
+
+class FlowAllSubsequentFilterTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
+  def testDescription = "Flow: all, 1 nest, filter x 3"
+
+  def query() =
+    testDB.tables.buyers
+      .filter(_.id > 1)
+      .filter(_.id > 10) // ignore nonsensical constraints
+      .filter(_.id > 100)
+
+  def expectedQueryPattern = "SELECT * FROM buyers as buyers$A WHERE buyers$A.id > 100 AND buyers$A.id > 10 AND buyers$A.id > 1"
+}
+
 class FlowMapFilterTest2 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, filter after map"
 
   def query() =
     testDB.tables.buyers.map(b =>
       (bName = b.name, bId = b.id).toRow
-    ).filter(_.bId > 1) // optimizer should be able to push predicate before map
-  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 1"
+    ).filter(_.bId > 1) // for now generate subquery
+  def expectedQueryPattern = "SELECT * FROM (SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A) as subquery$B WHERE subquery$B.bId > 1"
 }
-
+/*
 class FlowMapAggregateTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Flow: map on aggregate"
 
