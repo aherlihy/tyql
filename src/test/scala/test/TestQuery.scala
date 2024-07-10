@@ -87,8 +87,8 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
 
   test(testDescription) {
     val q = query()
-    val actual = q.toSQLString
     println(s"$testDescription:\n\t$q")
+    val actual = q.toSQLString
     println(s"\tactual: $actual")
     assert(matchStrings(expectedQueryPattern, actual), s"expected '$expectedQueryPattern' but got '$actual'")
   }

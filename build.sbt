@@ -18,5 +18,8 @@ libraryDependencies ++= Seq(
 
 lazy val root = (project in file("."))
   .settings(
-    name := "tyql"
-  )
+    name := "tyql",
+    Test / parallelExecution := false,
+//    Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
+
+)

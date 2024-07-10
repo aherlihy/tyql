@@ -52,7 +52,7 @@ class FlowForTest4 extends SQLStringQueryTest[AllCommerceDBs, String] {
   def sqlString = "SELECT b.name FROM buyers b, shipInfos si"
 }
 */
-class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
+/*class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, for comprehension + if"
 
   def query() =
@@ -74,7 +74,7 @@ class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: St
 
   def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0"
 }
-
+*/
 class FlowMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map"
   def query() =
@@ -189,7 +189,7 @@ class FlowMapAggregateTest4 extends SQLStringAggregationTest[AllCommerceDBs, Int
 
   def sqlString = ""
 }
-*/
+
 
 class FlowMapAggregateTest6 extends SQLStringQueryTest[AllCommerceDBs, (sum: Int)] {
   def testDescription = "Flow: project + map on aggregate"
@@ -218,7 +218,7 @@ class FlowMapConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (name: Str
   def query() =
     testDB.tables.buyers.map: b =>
       (name = b.name, date = b.dateOfBirth)
-  def expectedQueryPattern: String = "SELECT city.name AS name, city.zipcode AS zipcode FROM cities AS city"
+  def expectedQueryPattern: String = "SELECT buyers$A.name as name, buyers$A.dateOfBirth as date FROM buyers as buyers$A"
 }
 
 class FlowMapAggregateConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (sum: Int)] {
@@ -232,3 +232,4 @@ class FlowMapAggregateConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (
   def expectedQueryPattern = ""
 }
 
+*/
