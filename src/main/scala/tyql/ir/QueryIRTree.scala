@@ -8,7 +8,7 @@ import NamedTupleDecomposition.*
  * Moves all type parameters into terms
  */
 trait QueryIRNode:
-  val ast: DatabaseAST[?] | Expr[?] // Keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
+  val ast: DatabaseAST[?] | Expr[?] | Expr.Fun[?, ?] // Keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
 //  var parent: Option[QueryIRNode] = None // TODO: might not need backwards reference
   val children: Seq[QueryIRNode]
   def toSQLString(): String
@@ -25,12 +25,12 @@ object QueryIRTree:
    * Convert table.filter(p1).filter(p2) => table.filter(p1 && p2).
    * Example of a heuristic tree transformation/optimization
    */
-  def collapseFilters(filters: Seq[QueryIRNode], comprehension: DatabaseAST[?]): (Seq[QueryIRNode], QueryIRSource) =
+  def collapseFilters(filters: Seq[Expr.Fun[?, ?]], comprehension: DatabaseAST[?]): (Seq[Expr.Fun[?, ?]], QueryIRSource) =
     comprehension match
       case table: Table[?] =>
         (filters, TableLeaf(table.$name, table))
       case filter: Query.Filter[?] =>
-        collapseFilters(filters :+ PredicateExpr(filter.$pred, filter), filter.$from)
+        collapseFilters(filters :+ filter.$pred, filter.$from)
       case _ => ??? // either error or subquery, TODO
 
   /**
@@ -45,8 +45,11 @@ object QueryIRTree:
           case table: Table[_] => // base case, FROM table
             (TableLeaf(table.$name, table), EmptyLeaf())
           case filter: Query.Filter[_] =>
-            val (predicates, table) = collapseFilters(Seq(), filter)
-            (table, WhereClause(predicates, filter))
+            val (predicateASTs, tableIR) = collapseFilters(Seq(), filter)
+            val predicateExprs = predicateASTs.map(pred =>
+              generateFun(pred, tableIR)
+            )
+            (tableIR, WhereClause(predicateExprs, filter))
           case _ => ??? // either error or subquery, TODO
 
         val projectNode = generateFun(map.$query, fromNode)
@@ -61,7 +64,7 @@ object QueryIRTree:
   def generateExpr(ast: Expr[?], symbols: Map[String, QueryIRSource]): QueryIRNode =
     ast match
       case ref: Expr.Ref[?] =>
-        val sub = symbols(ref.$name)
+        val sub = symbols(ref.$name) // TODO: pass symbols down tree?
         QueryIRVar(sub, ref.$name, ref) // TODO: singleton?
       case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
       case p: Expr.Project[?] =>
@@ -74,7 +77,8 @@ object QueryIRTree:
             AttrExpr(generateExpr(expr.asInstanceOf[Expr[?]], symbols), namedTupleNames(idx), p)
           )
         ProjectClause(children, p)
-
+      case g: Expr.Gt => BinOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
+      case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case _ => PlaceHolderNode(ast)
 
 /**
@@ -85,8 +89,6 @@ case class SelectQuery(project: QueryIRNode,
                        where: QueryIRNode,
                        ast: Query.Map[?, ?]) extends QueryIRSource:
   val children = Seq(project, from, where)
-//  children.foreach(c => c.parent = Some(this))
-
   val latestVar = s"subquery${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
   override def asStr = latestVar
@@ -95,12 +97,15 @@ case class SelectQuery(project: QueryIRNode,
     s"SELECT ${project.toSQLString()} FROM ${from.toSQLString()}${where.toSQLString()}"
 
 case class WhereClause(children: Seq[QueryIRNode], ast: DatabaseAST[?]) extends QueryIRNode:
-//  children.foreach(c => c.parent = Some(this))
   override def toSQLString(): String = s" WHERE ${children.map(_.toSQLString()).mkString("", " AND ", "")}"
 
-case class PredicateExpr(pred: Expr.Pred[?], ast: DatabaseAST[?]) extends QueryIRNode:
-  val children = Seq() // TODO: fill out
-  override def toSQLString(): String = s"$pred"
+case class PredicateExpr(child: QueryIRNode, ast: Expr.Fun[?, ?]) extends QueryIRNode:
+  override val children: Seq[QueryIRNode] = Seq(child)
+  override def toSQLString(): String = ???
+
+case class BinOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?]) extends QueryIRNode:
+  override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
+  override def toSQLString(): String = s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
 
 case class ProjectClause(children: Seq[QueryIRNode], ast: Expr[?]) extends QueryIRNode:
   override def toSQLString(): String = children.map(_.toSQLString()).mkString("", ", ", "")
@@ -124,7 +129,10 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends QueryIRSource wit
   override def toSQLString(): String = s"$tableName as $name"
 
 case class QueryIRVar(toSub: QueryIRSource, name: String, ast: Expr.Ref[?]) extends QueryIRLeaf:
-  override def toSQLString() = toSub.asStr // TODO: by-name rn
+  override def toSQLString() = toSub.asStr
+
+case class Literal(stringRep: String, ast: Expr[?]) extends QueryIRLeaf:
+  override def toSQLString(): String = stringRep // TODO: specialize for particular platform
 
 case class EmptyLeaf(ast: DatabaseAST[?] = null) extends QueryIRLeaf:
   override def toSQLString(): String = ""

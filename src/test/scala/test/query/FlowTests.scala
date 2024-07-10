@@ -52,7 +52,7 @@ class FlowForTest4 extends SQLStringQueryTest[AllCommerceDBs, String] {
   def sqlString = "SELECT b.name FROM buyers b, shipInfos si"
 }
 */
-/*class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
+class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, for comprehension + if"
 
   def query() =
@@ -61,9 +61,9 @@ class FlowForTest4 extends SQLStringQueryTest[AllCommerceDBs, String] {
       if b.id > 1
     yield (bName = b.name, bId = b.id).toRow
 
-  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
+  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 1"
 }
-
+/*
 class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: String, sumP: Double)] {
   def testDescription = "Flow: for comprehension with agg"
 
@@ -122,8 +122,9 @@ class FlowMapFilterWithTest extends SQLStringQueryTest[AllCommerceDBs, (bName: S
     testDB.tables.buyers.withFilter(_.id > 1).map(b =>
       (bName = b.name, bId = b.id).toRow
     )
-  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
+  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 1"
 }
+
 class FlowMapFilterTest extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map + filter"
 
@@ -131,8 +132,9 @@ class FlowMapFilterTest extends SQLStringQueryTest[AllCommerceDBs, (bName: Strin
     testDB.tables.buyers.filter(_.id > 1).map(b =>
       (bName = b.name, bId = b.id).toRow
     )
-  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
+  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 1"
 }
+/*
 class FlowMapFilterTest2 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, filter after map"
 
@@ -140,7 +142,7 @@ class FlowMapFilterTest2 extends SQLStringQueryTest[AllCommerceDBs, (bName: Stri
     testDB.tables.buyers.map(b =>
       (bName = b.name, bId = b.id).toRow
     ).filter(_.bId > 1) // optimizer should be able to push predicate before map
-  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0 WHERE r0.id > 0"
+  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 1"
 }
 
 class FlowMapAggregateTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
@@ -165,7 +167,7 @@ class FlowMapAggregateTest2 extends SQLStringAggregationTest[AllCommerceDBs, Int
   def expectedQueryPattern = ""
 }
 
-/*
+
 class FlowMapAggregateTest3 extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Flow: 2 nest, map+flatMap should not fail because aggregation is Expr"
   def query() =
