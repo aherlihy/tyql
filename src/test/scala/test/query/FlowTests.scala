@@ -63,7 +63,7 @@ class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, 
 
   def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 1"
 }
-/*
+
 class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: String, sumP: Double)] {
   def testDescription = "Flow: for comprehension with agg"
 
@@ -72,9 +72,9 @@ class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: St
       p <- testDB.tables.products
     yield (pName = p.name, sumP = sum(p.price))
 
-  def expectedQueryPattern = "SELECT r0.name, r0.id FROM buyers r0"
+  def expectedQueryPattern = "SELECT product$A.name as pName, SUM(product$A.price) as sumP FROM product as product$A"
 }
-*/
+
 class FlowMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map"
   def query() =
@@ -188,7 +188,7 @@ class FlowMapFilterTest2 extends SQLStringQueryTest[AllCommerceDBs, (bName: Stri
     ).filter(_.bId > 1) // for now generate subquery
   def expectedQueryPattern = "SELECT * FROM (SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A) as subquery$B WHERE subquery$B.bId > 1"
 }
-/*
+
 class FlowMapAggregateTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Flow: map on aggregate"
 
@@ -197,9 +197,9 @@ class FlowMapAggregateTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
         sum(si.buyerId)
       )
 
-  def expectedQueryPattern = ""
+  def expectedQueryPattern = "SELECT SUM(shippingInfo$A.buyerId) FROM shippingInfo as shippingInfo$A"
 }
-
+/*
 class FlowMapAggregateTest2 extends SQLStringAggregationTest[AllCommerceDBs, Int] {
   def testDescription = "Flow: flatMap on aggregate"
 
@@ -236,7 +236,7 @@ class FlowMapAggregateTest4 extends SQLStringAggregationTest[AllCommerceDBs, Int
   def sqlString = ""
 }
 
-
+*/
 class FlowMapAggregateTest6 extends SQLStringQueryTest[AllCommerceDBs, (sum: Int)] {
   def testDescription = "Flow: project + map on aggregate"
 
@@ -245,26 +245,7 @@ class FlowMapAggregateTest6 extends SQLStringQueryTest[AllCommerceDBs, (sum: Int
       (sum = sum(si.buyerId)).toRow
     )
 
-  def expectedQueryPattern = ""
-}
-
-class FlowMapAggregateTest7 extends SQLStringAggregationTest[AllCommerceDBs, (sum: Int)] {
-  def testDescription = "Flow: project + flatMap on aggregate"
-
-  def query() =
-    testDB.tables.shipInfos.flatMap(si =>
-      (sum = sum(si.buyerId)).toRow
-    )
-
-  def expectedQueryPattern = ""
-}
-
-class FlowMapConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, date: LocalDate)] {
-  def testDescription = "Flow: project tuple, version of map that calls toRow for conversion"
-  def query() =
-    testDB.tables.buyers.map: b =>
-      (name = b.name, date = b.dateOfBirth)
-  def expectedQueryPattern: String = "SELECT buyers$A.name as name, buyers$A.dateOfBirth as date FROM buyers as buyers$A"
+  def expectedQueryPattern = "SELECT SUM(shippingInfo$A.buyerId) as sum FROM shippingInfo as shippingInfo$A"
 }
 
 class FlowMapAggregateConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (sum: Int)] {
@@ -275,7 +256,24 @@ class FlowMapAggregateConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (
       (sum = sum(si.buyerId))
     )
 
+  def expectedQueryPattern = "SELECT SUM(shippingInfo$A.buyerId) as sum FROM shippingInfo as shippingInfo$A"
+}
+/*
+class FlowMapAggregateTest7 extends SQLStringAggregationTest[AllCommerceDBs, (sum: Int)] {
+  def testDescription = "Flow: project + flatMap on aggregate"
+
+  def query() =
+    testDB.tables.shipInfos.flatMap(si =>
+      (sum = sum(si.buyerId)).toRow
+    )
+
   def expectedQueryPattern = ""
 }
-
 */
+class FlowMapConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, date: LocalDate)] {
+  def testDescription = "Flow: project tuple, version of map that calls toRow for conversion"
+  def query() =
+    testDB.tables.buyers.map: b =>
+      (name = b.name, date = b.dateOfBirth)
+  def expectedQueryPattern: String = "SELECT buyers$A.name as name, buyers$A.dateOfBirth as date FROM buyers as buyers$A"
+}

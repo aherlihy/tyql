@@ -93,7 +93,17 @@ object QueryIRTree:
         ProjectClause(children, p)
       case g: Expr.Gt => BinOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
+      case a: Aggregation[?] => generateAggregation(a, symbols)
+      case _ =>  ???
+
+  private def generateAggregation(ast: Aggregation[?], symbols: Map[String, QueryIRAliasable]): QueryIRNode =
+    ast match
+      case s: Aggregation.Sum[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
+      case s: Aggregation.Avg[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
+      case s: Aggregation.Min[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
+      case s: Aggregation.Max[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
       case _ => PlaceHolderNode(ast)
+
 
 /**
  * Select: SELECT <ProjectClause> FROM <QueryIRSource> WHERE <WhereClause>
@@ -130,6 +140,11 @@ case class BinOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?]) e
   override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
   override def toSQLString(): String = s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
 
+// TODO: can't assume op is universal, need to specialize for DB backend
+case class UnaryOp(child: QueryIRNode, op: String => String, ast: Expr[?]) extends QueryIRNode:
+  override val children: Seq[QueryIRNode] = Seq(child)
+  override def toSQLString(): String = op(s"${child.toSQLString()}")
+
 case class ProjectClause(children: Seq[QueryIRNode], ast: Expr[?]) extends QueryIRNode:
   override def toSQLString(): String = children.map(_.toSQLString()).mkString("", ", ", "")
 
@@ -165,5 +180,6 @@ case class Literal(stringRep: String, ast: Expr[?]) extends QueryIRLeaf:
 case class EmptyLeaf(ast: DatabaseAST[?] = null) extends QueryIRLeaf:
   override def toSQLString(): String = ""
 
+// Helper to print AST subtree
 case class PlaceHolderNode(ast: DatabaseAST[?] | Expr[?]) extends QueryIRLeaf:
   override def toSQLString(): String = s"$ast"
