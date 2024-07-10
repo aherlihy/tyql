@@ -150,6 +150,23 @@ class FlowMapSubsequentFilterTest extends SQLStringQueryTest[AllCommerceDBs, (bN
   def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 100 AND buyers$A.id > 10 AND buyers$A.id > 1"
 }
 
+class FlowSubsequentMapTest extends SQLStringQueryTest[AllCommerceDBs, (bName3: String, bId3: Int)] {
+  def testDescription = "Flow: project tuple, 1 nest, map x 3"
+
+  def query() =
+    testDB.tables.buyers
+      .map(b =>
+        (bName = b.name, bId = b.id).toRow
+      )
+      .map(b =>
+        (bName2 = b.bName, bId2 = b.bId).toRow
+      )
+      .map(b =>
+        (bName3 = b.bName2, bId3 = b.bId2).toRow
+      )
+  def expectedQueryPattern = "SELECT subquery$A.bName2 as bName3, subquery$A.bId2 as bId3 FROM (SELECT subquery$B.bName as bName2, subquery$B.bId as bId2 FROM (SELECT buyers$C.name as bName, buyers$C.id as bId FROM buyers as buyers$C) as subquery$B) as subquery$A"
+}
+
 class FlowAllSubsequentFilterTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Flow: all, 1 nest, filter x 3"
 
