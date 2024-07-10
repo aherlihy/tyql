@@ -1,7 +1,7 @@
 package tyql
 
 import language.experimental.namedTuples
-import NamedTuple.{NamedTuple, AnyNamedTuple}
+import NamedTuple.{AnyNamedTuple, NamedTuple}
 import NamedTupleDecomposition.*
 /**
  * Logical query plan tree
@@ -26,7 +26,7 @@ object QueryIRTree:
       case f: FromClause => // if we have no project then fill in select *
         SelectQuery(
           SelectAllExpr(),
-          generated,
+          Seq(generated),
           ast
         )
       case s: SelectQuery =>
@@ -48,6 +48,37 @@ object QueryIRTree:
         collapseFilters(filters :+ filter.$pred, filter.$from)
       case _ => (filters, generateQuery(comprehension))
 
+  private def collapseFlatMap(sources: Seq[QueryIRAliasable], symbols: Map[String, QueryIRAliasable], body: DatabaseAST[?] | Expr[?]): (Seq[QueryIRAliasable], QueryIRNode) =
+    body match
+      case map: Query.Map[?, ?] =>
+        val innerSrc = generateQuery(map.$from)
+        val innerFnIR = generateFun(map.$query, innerSrc, symbols)
+        (sources :+ innerSrc, innerFnIR)
+      case flatMap: Query.FlatMap[?, ?] =>
+        val outerSrc = generateQuery(flatMap.$from)
+        val outerFnAST = flatMap.$query
+        collapseFlatMap(
+          sources :+ outerSrc,
+          symbols + (outerFnAST.$param.toString -> outerSrc),
+          outerFnAST.$f
+        )
+      case aggFlatMap: Aggregation.AggFlatMap[?, ?] =>
+        val outerSrc = generateQuery(aggFlatMap.$from)
+        val outerFnAST = aggFlatMap.$query
+        outerFnAST.$f match
+          case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
+            collapseFlatMap(
+              sources :+ outerSrc,
+              symbols + (outerFnAST.$param.toString -> outerSrc),
+              outerFnAST.$f
+            )
+          case _ => // base case
+            val innerFnIR = generateFun(outerFnAST, outerSrc, symbols)
+            (sources :+ outerSrc, innerFnIR)
+//      case filter: Query.Filter[?] =>
+//        collapseFilters(filters :+ filter.$pred, filter.$from)
+      case _ => println(s"got $body"); ???
+
   /**
    * Generate top-level or subquery
    *
@@ -60,7 +91,8 @@ object QueryIRTree:
         FromClause(TableLeaf(table.$name, table), EmptyLeaf(), table)
       case map: Query.Map[?, ?] =>
         val fromNode = generateQuery(map.$from)
-        SelectQuery(generateFun(map.$query, fromNode), fromNode, map)
+        val attrNode = generateFun(map.$query, fromNode)
+        SelectQuery(attrNode, Seq(fromNode), map)
       case filter: Query.Filter[?] =>
         val (predicateASTs, tableIR) = collapseFilters(Seq(), filter)
         val predicateExprs = predicateASTs.map(pred =>
@@ -68,18 +100,26 @@ object QueryIRTree:
         )
         val where = WhereClause(predicateExprs, filter)
         FromClause(tableIR, where, filter)
+      case flatMap: Query.FlatMap[?, ?] =>
+        val (tableIRs, projectIR) = collapseFlatMap(Seq(), Map(), flatMap)
+        SelectQuery(projectIR, tableIRs, flatMap)
+      case aggFlatMap: Aggregation.AggFlatMap[?, ?] =>
+        val (tableIRs, projectIR) = collapseFlatMap(Seq(), Map(), aggFlatMap)
+        SelectQuery(projectIR, tableIRs, aggFlatMap)
+
       case _ => ??? // either flatMap or aggregate, TODO
 
-  private def generateFun(fun: Expr.Fun[?, ?], appliedTo: QueryIRAliasable): QueryIRNode =
+  private def generateFun(fun: Expr.Fun[?, ?], appliedTo: QueryIRAliasable, symbols: Map[String, QueryIRAliasable] = Map.empty): QueryIRNode =
     fun.$f match
-      case e: Expr[?] => generateExpr(e, Map((fun.$param.$name, appliedTo)))
+      case e: Expr[?] => generateExpr(e, symbols + (fun.$param.toString -> appliedTo))
       case _ => ??? // TODO: find better way to differentiate
 
   private def generateExpr(ast: Expr[?], symbols: Map[String, QueryIRAliasable]): QueryIRNode =
     ast match
       case ref: Expr.Ref[?] =>
-        val sub = symbols(ref.$name) // TODO: pass symbols down tree?
-        QueryIRVar(sub, ref.$name, ref) // TODO: singleton?
+        val name = ref.toString
+        val sub = symbols(name) // TODO: pass symbols down tree?
+        QueryIRVar(sub, name, ref) // TODO: singleton?
       case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
       case p: Expr.Project[?] =>
         val a = NamedTuple.toTuple(p.$a.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
@@ -102,17 +142,17 @@ object QueryIRTree:
       case s: Aggregation.Avg[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
       case s: Aggregation.Min[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
       case s: Aggregation.Max[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
-      case _ => PlaceHolderNode(ast)
+      case _ => ???
 
 
 /**
  * Select: SELECT <ProjectClause> FROM <QueryIRSource> WHERE <WhereClause>
  */
 case class SelectQuery(project: QueryIRNode,
-                       from: QueryIRAliasable,
+                       from: Seq[QueryIRAliasable],
                        ast: DatabaseAST[?]) extends QueryIRAliasable:
   var topLevel = false
-  val children = Seq(project, from)
+  val children = project +: from // TODO: differentiate?
   val latestVar = s"subquery${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
   override def alias = latestVar
@@ -120,7 +160,7 @@ case class SelectQuery(project: QueryIRNode,
   override def toSQLString(): String =
     val (open, close) = if topLevel then ("", "") else ("(", ")")
     val aliasStr = if topLevel then "" else s" as $alias"
-    s"${open}SELECT ${project.toSQLString()} FROM ${from.toSQLString()}$close$aliasStr"
+    s"${open}SELECT ${project.toSQLString()} FROM ${from.map(f => f.toSQLString()).mkString("", ", ", "")}$close$aliasStr"
 
 // TODO: handle multiple sources with multiple aliases
 case class FromClause(from: QueryIRAliasable, where: QueryIRNode, ast: DatabaseAST[?]) extends QueryIRAliasable:
@@ -181,5 +221,6 @@ case class EmptyLeaf(ast: DatabaseAST[?] = null) extends QueryIRLeaf:
   override def toSQLString(): String = ""
 
 // Helper to print AST subtree
-case class PlaceHolderNode(ast: DatabaseAST[?] | Expr[?]) extends QueryIRLeaf:
+case class PlaceHolderNode(ast: DatabaseAST[?] | Expr[?]) extends QueryIRLeaf with QueryIRAliasable:
+  override def alias: String = "placeholder"
   override def toSQLString(): String = s"$ast"

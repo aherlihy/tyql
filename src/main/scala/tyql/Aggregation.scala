@@ -20,7 +20,7 @@ import Expr.Fun
 
 trait Aggregation[Result](using override val tag: ResultTag[Result]) extends Expr[Result] with DatabaseAST[Result]
 object Aggregation {
-  case class AggFlatMap[A, B: ResultTag]($q: Query[A], $f: Fun[A, Expr[B]]) extends Aggregation[B]
+  case class AggFlatMap[A, B: ResultTag]($from: Query[A], $query: Fun[A, Expr[B]]) extends Aggregation[B]
 
   case class Sum[A: ResultTag]($a: Expr[A]) extends Aggregation[A]
 
