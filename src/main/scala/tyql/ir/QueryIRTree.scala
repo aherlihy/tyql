@@ -18,15 +18,19 @@ trait QueryIRLeaf extends QueryIRNode:
 trait QueryIRAliasable extends QueryIRNode:
   def alias: String
 
+enum SelectFlags:
+  case Distinct
+  case TopLevel
+
 trait TopLevel:
-  var topLevel: Boolean = false
+  var flags: Set[SelectFlags] = Set.empty
 
 object QueryIRTree:
 
-  def generateFullQuery(ast: DatabaseAST[?]): QueryIRNode =
+  def generateFullQuery(ast: DatabaseAST[?]): (QueryIRNode & TopLevel) =
     val generated = generateQuery(ast)
     val result = generated match
-      case f: FromClause => // if we have no project then fill in select *
+      case f: (FromClause | OrderedFrom) => // if we have no project then fill in select *
         SelectQuery(
           SelectAllExpr(),
           Seq(generated),
@@ -35,7 +39,7 @@ object QueryIRTree:
       case s: (SelectQuery | BinRelationOp) =>
         s
       case _ => throw Exception("Malformed AST: Non-top level query returned from generate query")
-    result.topLevel = true // ignore top-level parens
+    result.flags = result.flags + SelectFlags.TopLevel // ignore top-level parens
     result
 
   var idCount = 0
@@ -82,6 +86,14 @@ object QueryIRTree:
 //        collapseFilters(filters :+ filter.$pred, filter.$from)
       case _ => println(s"got $body"); ???
 
+  // TODO: probably should parametrize collapse so it works with different nodes
+  private def collapseSort(sorts: Seq[(Expr.Fun[?, ?], Ord)], comprehension: DatabaseAST[?]): (Seq[(Expr.Fun[?, ?], Ord)], QueryIRAliasable) =
+    comprehension match
+      case table: Table[?] =>
+        (sorts.reverse, TableLeaf(table.$name, table)) // reverse because order matters, unlike filters
+      case sort: Query.Sort[?, ?] =>
+        collapseSort(sorts :+ (sort.$body, sort.$ord), sort.$from)
+      case _ => (sorts, generateQuery(comprehension))
   /**
    * Generate top-level or subquery
    *
@@ -118,6 +130,23 @@ object QueryIRTree:
         val lhs = generateFullQuery(intersect.$this)
         val rhs = generateFullQuery(intersect.$other)
         BinRelationOp(lhs, rhs, "INTERSECT", intersect)
+      case sort: Query.Sort[?, ?] =>
+        val (orderByASTs, tableIR) = collapseSort(Seq(), sort)
+        println(s"tableIR = ${tableIR.toSQLString()}")
+        val orderByExprs = orderByASTs.map(ord =>
+          (generateFun(ord._1, tableIR), ord._2)
+        )
+        OrderedFrom(tableIR, orderByExprs, sort)
+      case limit: Query.Limit[?] =>
+        val from = generateFullQuery(limit.$from)
+        BinRelationOp(from, Literal(limit.$limit.toString(), limit.$limit), "LIMIT", limit)
+      case offset: Query.Offset[?] =>
+        val from = generateFullQuery(offset.$from)
+        BinRelationOp(from, Literal(offset.$offset.toString(), offset.$offset), "OFFSET", offset)
+      case distinct: Query.Distinct[?] =>
+        val query = generateFullQuery(distinct.$from)
+        query.flags = query.flags + SelectFlags.Distinct
+        query.asInstanceOf[QueryIRAliasable] // TODO: can we avoid this?
 
       case _ =>  println(s"Unimplemented Relation-Op AST: $ast"); ???
 
@@ -173,9 +202,17 @@ case class SelectQuery(project: QueryIRNode,
   override def alias = latestVar
 
   override def toSQLString(): String =
-    val (open, close) = if topLevel then ("", "") else ("(", ")")
-    val aliasStr = if topLevel then "" else s" as $alias"
-    s"${open}SELECT ${project.toSQLString()} FROM ${from.map(f => f.toSQLString()).mkString("", ", ", "")}$close$aliasStr"
+    val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.TopLevel) then "" else s" as $alias"
+    val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
+    s"${open}SELECT $flagsStr${project.toSQLString()} FROM ${from.map(f => f.toSQLString()).mkString("", ", ", "")}$close$aliasStr"
+
+case class OrderedFrom(from: QueryIRAliasable, sortFn: Seq[(QueryIRNode, Ord)], ast: DatabaseAST[?]) extends QueryIRAliasable:
+  override def alias: String = from.alias
+  override val children: Seq[QueryIRNode] = from +: sortFn.map(_._1)
+  val orders: Seq[Ord] = sortFn.map(_._2)
+  override def toSQLString(): String =
+    s"${from.toSQLString()} ORDER BY ${sortFn.map(s => s"${s._1.toSQLString()} ${s._2.toString}").mkString("", ", ", "")}"
 
 // TODO: handle multiple sources with multiple aliases
 case class FromClause(from: QueryIRAliasable, where: QueryIRNode, ast: DatabaseAST[?]) extends QueryIRAliasable:
@@ -197,8 +234,8 @@ case class BinRelationOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Qu
   override def alias = latestVar
 
   override def toSQLString(): String =
-    val (open, close) = if topLevel then ("", "") else ("(", ")")
-    val aliasStr = if topLevel then "" else s" as $alias"
+    val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.TopLevel) then "" else s" as $alias"
     s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
 
 // TODO: can't assume op is universal, need to specialize for DB backend

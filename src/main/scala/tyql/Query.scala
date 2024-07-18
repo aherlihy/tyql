@@ -96,11 +96,11 @@ object Query:
   case class Map[A, B: ResultTag]($from: Query[A], $query: Fun[A, Expr[B]]) extends Query[B]
   case class FlatMap[A, B: ResultTag]($from: Query[A], $query: Fun[A, Query[B]]) extends Query[B]
   // case class Sort[A]($q: Query[A], $o: Ordering[A]) extends Query[A] // alternative syntax to avoid chaining .sort for multi-key sort
-  case class Sort[A: ResultTag, B]($q: Query[A], $f: Fun[A, Expr[B]], $ord: Ord) extends Query[A]
-  case class Limit[A: ResultTag]($q: Query[A], $limit: Int) extends Query[A]
-  case class Offset[A: ResultTag]($q: Query[A], $offset: Int) extends Query[A]
-  case class Drop[A: ResultTag]($q: Query[A], $offset: Int) extends Query[A]
-  case class Distinct[A: ResultTag]($q: Query[A]) extends Query[A]
+  case class Sort[A: ResultTag, B]($from: Query[A], $body: Fun[A, Expr[B]], $ord: Ord) extends Query[A]
+  case class Limit[A: ResultTag]($from: Query[A], $limit: Int) extends Query[A]
+  case class Offset[A: ResultTag]($from: Query[A], $offset: Int) extends Query[A]
+  case class Drop[A: ResultTag]($from: Query[A], $offset: Int) extends Query[A]
+  case class Distinct[A: ResultTag]($from: Query[A]) extends Query[A]
 
   case class Union[A: ResultTag]($this: Query[A], $other: Query[A], $dedup: Boolean) extends Query[A]
   case class Intersect[A: ResultTag]($this: Query[A], $other: Query[A]) extends Query[A]
