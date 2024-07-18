@@ -18,9 +18,12 @@ trait QueryIRLeaf extends QueryIRNode:
 trait QueryIRAliasable extends QueryIRNode:
   def alias: String
 
+trait TopLevel:
+  var topLevel: Boolean = false
+
 object QueryIRTree:
 
-  def generateTopQuery(ast: DatabaseAST[?]): SelectQuery =
+  def generateFullQuery(ast: DatabaseAST[?]): QueryIRNode =
     val generated = generateQuery(ast)
     val result = generated match
       case f: FromClause => // if we have no project then fill in select *
@@ -29,7 +32,7 @@ object QueryIRTree:
           Seq(generated),
           ast
         )
-      case s: SelectQuery =>
+      case s: (SelectQuery | BinRelationOp) =>
         s
       case _ => throw Exception("Malformed AST: Non-top level query returned from generate query")
     result.topLevel = true // ignore top-level parens
@@ -106,8 +109,17 @@ object QueryIRTree:
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] =>
         val (tableIRs, projectIR) = collapseFlatMap(Seq(), Map(), aggFlatMap)
         SelectQuery(projectIR, tableIRs, aggFlatMap)
+      case union: Query.Union[?] =>
+        val lhs = generateFullQuery(union.$this)
+        val rhs = generateFullQuery(union.$other)
+        val op = if union.$dedup then "UNION" else "UNION ALL"
+        BinRelationOp(lhs, rhs, op, union)
+      case intersect: Query.Intersect[?] =>
+        val lhs = generateFullQuery(intersect.$this)
+        val rhs = generateFullQuery(intersect.$other)
+        BinRelationOp(lhs, rhs, "INTERSECT", intersect)
 
-      case _ => ??? // either flatMap or aggregate, TODO
+      case _ =>  println(s"Unimplemented Relation-Op AST: $ast"); ???
 
   private def generateFun(fun: Expr.Fun[?, ?], appliedTo: QueryIRAliasable, symbols: Map[String, QueryIRAliasable] = Map.empty): QueryIRNode =
     fun.$body match
@@ -132,20 +144,20 @@ object QueryIRTree:
             AttrExpr(generateExpr(expr.asInstanceOf[Expr[?]], symbols), namedTupleNames(idx), p)
           )
         ProjectClause(children, p)
-      case g: Expr.Gt => BinOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
-      case a: Expr.And => BinOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
-      case a: Expr.Eq => BinOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
-      case a: Expr.Concat[?, ?] => BinOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), ",", a)
+      case g: Expr.Gt => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
+      case a: Expr.And => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
+      case a: Expr.Eq => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
+      case a: Expr.Concat[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), ",", a)
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case a: Aggregation[?] => generateAggregation(a, symbols)
-      case _ =>  println(s"Unimplemented AST: $ast"); ???
+      case _ =>  println(s"Unimplemented Expr AST: $ast"); ???
 
   private def generateAggregation(ast: Aggregation[?], symbols: Map[String, QueryIRAliasable]): QueryIRNode =
     ast match
-      case s: Aggregation.Sum[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
-      case s: Aggregation.Avg[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
-      case s: Aggregation.Min[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
-      case s: Aggregation.Max[?] => UnaryOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
+      case s: Aggregation.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
+      case s: Aggregation.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
+      case s: Aggregation.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
+      case s: Aggregation.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
       case _ => ???
 
 
@@ -154,8 +166,7 @@ object QueryIRTree:
  */
 case class SelectQuery(project: QueryIRNode,
                        from: Seq[QueryIRAliasable],
-                       ast: DatabaseAST[?]) extends QueryIRAliasable:
-  var topLevel = false
+                       ast: DatabaseAST[?]) extends QueryIRAliasable with TopLevel:
   val children = project +: from // TODO: differentiate?
   val latestVar = s"subquery${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
@@ -179,13 +190,24 @@ case class PredicateExpr(child: QueryIRNode, ast: Expr.Fun[?, ?]) extends QueryI
   override val children: Seq[QueryIRNode] = Seq(child)
   override def toSQLString(): String = ???
 
+case class BinRelationOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Query[?]) extends QueryIRAliasable with TopLevel:
+  override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
+  val latestVar = s"subquery${QueryIRTree.idCount}"
+  QueryIRTree.idCount += 1
+  override def alias = latestVar
+
+  override def toSQLString(): String =
+    val (open, close) = if topLevel then ("", "") else ("(", ")")
+    val aliasStr = if topLevel then "" else s" as $alias"
+    s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
+
 // TODO: can't assume op is universal, need to specialize for DB backend
-case class BinOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?]) extends QueryIRNode:
+case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?]) extends QueryIRNode:
   override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
   override def toSQLString(): String = s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
 
 // TODO: can't assume op is universal, need to specialize for DB backend
-case class UnaryOp(child: QueryIRNode, op: String => String, ast: Expr[?]) extends QueryIRNode:
+case class UnaryExprOp(child: QueryIRNode, op: String => String, ast: Expr[?]) extends QueryIRNode:
   override val children: Seq[QueryIRNode] = Seq(child)
   override def toSQLString(): String = op(s"${child.toSQLString()}")
 
