@@ -106,10 +106,6 @@ object Query:
   case class Intersect[A: ResultTag]($this: Query[A], $other: Query[A]) extends Query[A]
   case class Except[A: ResultTag]($this: Query[A], $other: Query[A]) extends Query[A]
 
-  case class Contains[A]($this: Query[A], $other: Expr[A]) extends Expr[Boolean]
-  case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean]
-  case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean]
-
   // TODO: also support spark-style groupBy or only SQL groupBy that requires an aggregate operation?
   // TODO: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
   case class GroupBy[A, B: ResultTag, C]($q: Query[A],
@@ -172,13 +168,13 @@ object Query:
 
     // Does not work for subsets, need to match types exactly
     def contains(that: Expr[R]): Expr[Boolean] =
-      Contains(x, that)
+      Expr.Contains(x, that)
 
     def nonEmpty(): Expr[Boolean] =
-      NonEmpty(x)
+      Expr.NonEmpty(x)
 
     def isEmpty(): Expr[Boolean] =
-      IsEmpty(x)
+      Expr.IsEmpty(x)
 
     def groupBy[B, C: ResultTag](
      selectFn: Expr.Ref[R] => Expr[C],

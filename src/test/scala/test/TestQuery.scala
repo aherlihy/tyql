@@ -24,7 +24,7 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
     val placeholderPattern: Regex = "\\$[A-Z]".r
 
     // Split stringA on placeholders and also extract the placeholders
-    val parts = placeholderPattern.split(expectedQuery)
+    val parts = placeholderPattern.split(expectedQuery.trim())
     val placeholders = placeholderPattern.findAllIn(expectedQuery).toList
 
     // Define initial position and result accumulator
@@ -90,7 +90,8 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
     println(s"$testDescription:\n\t$q")
     val actual = q.toSQLString
     println(s"\tactual: $actual")
-    assert(matchStrings(expectedQueryPattern, actual), s"expected '$expectedQueryPattern' but got '$actual'")
+    val stripped = expectedQueryPattern.trim().replace("\n", " ").replaceAll("\\s+", " ")
+    assert(matchStrings(stripped, actual), s"expected '${stripped}' but got '$actual'")
   }
 }
 

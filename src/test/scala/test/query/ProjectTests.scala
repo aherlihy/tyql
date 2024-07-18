@@ -1,127 +1,127 @@
-//package test.query.project
-//import test.SQLStringQueryTest
-//import test.query.{commerceDBs,  AllCommerceDBs, Product}
-//
-//import tyql.*
-//import tyql.Expr.toRow
-//import language.experimental.namedTuples
-//import NamedTuple.*
-//import scala.language.implicitConversions
-//
-//import java.time.LocalDate
-//
-//class ReturnIntTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
-//  def testDescription = "Project: return int"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      c.id
-//
-//  def sqlString = """
-//  SELECT products.id
-//  FROM products
-//      """
-//}
-//
-//class ReturnStringTest extends SQLStringQueryTest[AllCommerceDBs, String] {
-//  def testDescription = "Project: return string"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      c.name
-//
-//  def sqlString = """SELECT products.name
-//  FROM products
-//      """
-//}
-//
-//class ProjectIntTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)] {
-//  def testDescription = "Project: project int"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      (id = c.id).toRow
-//
-//  def sqlString = """SELECT products.id
-//  FROM products
-//      """
-//}
-//
-//class ProjectStringTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
-//  def testDescription = "Project: project string"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      (name = c.name).toRow
-//
-//  def sqlString = """
-//  SELECT products.id
-//  FROM products
-//      """
-//}
-//
-//class ProjectMixedTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, id: Int)] {
-//  def testDescription = "Project: project string+int"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      (name = c.name, id = c.id).toRow
-//
-//  def sqlString = """
-//  SELECT products.name, products.id
-//FROM products
-//      """
-//}
-//
-//class ProjectString2Test extends SQLStringQueryTest[AllCommerceDBs, (name: String, name2: String)] {
-//  def testDescription = "Project: project string+string"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      (name = c.name, name2 = c.name).toRow
-//
-//  def sqlString = """SELECT products.name, products.name AS name2
-//FROM products
-//      """
-//}
-//
-//class JoinProjectInt2Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, id2: Int)] {
-//  def testDescription = "Project: project int+int"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      (id = c.id, id2 = c.id).toRow
-//
-//  def sqlString = """SELECT products.id, products.id AS id2
-//FROM products
-//      """
-//}
-//
-//class ProjectTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
-//  def testDescription = "Project: project entire row"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      c
-//  def sqlString = """SELECT products.*
-//FROM products
-//      """
-//}
-//
-//class Project2Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double)] {
-//  def testDescription = "Project: project to tuple, toRow"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      (id = c.id, name = c.name, price =  c.price).toRow
-//  def sqlString ="""
-//  SELECT products.id, products.name, products.price
-//FROM products
-//        """
-//}
-//
-//class Project3Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
-//  def testDescription = "Project: project to tuple with concat with literal"
-//  def query() =
-//    testDB.tables.products.map: c =>
-//      (id = c.id, name = c.name, price =  c.price).toRow.concat((extra = Expr.IntLit(1)))
-//  def sqlString ="""
-//  SELECT products.id, products.name, products.price, 1 AS extra
-//FROM products
-//        """
-//}
-//
+package test.query.project
+import test.SQLStringQueryTest
+import test.query.{commerceDBs,  AllCommerceDBs, Product}
+
+import tyql.*
+import tyql.Expr.toRow
+import language.experimental.namedTuples
+import NamedTuple.*
+import scala.language.implicitConversions
+
+import java.time.LocalDate
+
+class ReturnIntTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
+  def testDescription = "Project: return int"
+  def query() =
+    testDB.tables.products.map: c =>
+      c.id
+
+  def expectedQueryPattern: String = """
+  SELECT product$A.id
+  FROM product as product$A
+      """
+}
+
+class ReturnStringTest extends SQLStringQueryTest[AllCommerceDBs, String] {
+  def testDescription = "Project: return string"
+  def query() =
+    testDB.tables.products.map: c =>
+      c.name
+
+  def expectedQueryPattern: String = """SELECT product$A.name
+  FROM product as product$A
+      """
+}
+
+class ProjectIntTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)] {
+  def testDescription = "Project: project int"
+  def query() =
+    testDB.tables.products.map: c =>
+      (id = c.id).toRow
+
+  def expectedQueryPattern: String = """SELECT product$A.id as id
+  FROM product as product$A
+      """
+}
+
+class ProjectStringTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+  def testDescription = "Project: project string"
+  def query() =
+    testDB.tables.products.map: c =>
+      (name = c.name).toRow
+
+  def expectedQueryPattern: String = """
+  SELECT product$A.name as name
+  FROM product as product$A
+      """
+}
+
+class ProjectMixedTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, id: Int)] {
+  def testDescription = "Project: project string+int"
+  def query() =
+    testDB.tables.products.map: c =>
+      (name = c.name, id = c.id).toRow
+
+  def expectedQueryPattern: String = """
+  SELECT product$A.name as name, product$A.id as id
+FROM product as product$A
+      """
+}
+
+class ProjectString2Test extends SQLStringQueryTest[AllCommerceDBs, (name: String, name2: String)] {
+  def testDescription = "Project: project string+string"
+  def query() =
+    testDB.tables.products.map: c =>
+      (name = c.name, name2 = c.name).toRow
+
+  def expectedQueryPattern: String = """SELECT product$A.name as name, product$A.name as name2
+FROM product as product$A
+      """
+}
+
+class JoinProjectInt2Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, id2: Int)] {
+  def testDescription = "Project: project int+int"
+  def query() =
+    testDB.tables.products.map: c =>
+      (id = c.id, id2 = c.id).toRow
+
+  def expectedQueryPattern: String = """SELECT product$A.id as id, product$A.id as id2
+FROM product as product$A
+      """
+}
+
+class ProjectTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription = "Project: project entire row"
+  def query() =
+    testDB.tables.products.map: c =>
+      c
+  def expectedQueryPattern: String = """SELECT *
+FROM product as product$A
+      """
+}
+
+class Project2Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double)] {
+  def testDescription = "Project: project to tuple, toRow"
+  def query() =
+    testDB.tables.products.map: c =>
+      (id = c.id, name = c.name, price =  c.price).toRow
+  def expectedQueryPattern: String ="""
+  SELECT product$A.id as id, product$A.name as name, product$A.price as price
+FROM product as product$A
+        """
+}
+
+class Project3Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
+  def testDescription = "Project: project to tuple with concat with literal"
+  def query() =
+    testDB.tables.products.map: c =>
+      (id = c.id, name = c.name, price =  c.price).toRow.concat((extra = Expr.IntLit(1)))
+  def expectedQueryPattern: String ="""
+  SELECT product$A.id as id, product$A.name as name, product$A.price as price , 1 as extra
+FROM product as product$A
+        """
+}
+
 //class Project4Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
 //  def testDescription = "Project: project to tuple with concat with another tuple"
 //  def query() =
@@ -140,8 +140,8 @@
 //  //      tupleShip.map: s =>
 //  //        s.concat(c)
 //
-//  def sqlString ="""SELECT p.id, p.name, p.price, s.buyerId, s.shippingDate
-//FROM products p
+//  def expectedQueryPattern: String ="""SELECT p.id, p.name, p.price, s.buyerId, s.shippingDate
+//FROM product as product$A p
 //CROSS JOIN shipInfos s
 //        """
 //}
@@ -158,7 +158,7 @@
 ////  def query() =
 ////    testDB.tables.products.map: c =>
 ////      c.concat((extra = 1))
-////  def sqlString = """
+////  def expectedQueryPattern: String = """
 ////      """
 ////}
 //
@@ -172,6 +172,6 @@
 ////          s.toRow//.concat(c.toRow)
 ////        )
 ////    )
-////  def sqlString = """
+////  def expectedQueryPattern: String = """
 ////      """
 ////}

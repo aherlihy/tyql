@@ -93,13 +93,19 @@ object Expr:
   case class Eq($x: Expr[?], $y: Expr[?]) extends Expr[Boolean]
   case class Ne($x: Expr[?], $y: Expr[?]) extends Expr[Boolean]
 
+  case class Contains[A]($this: Query[A], $other: Expr[A]) extends Expr[Boolean]
+
+  case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean]
+
+  case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean]
+
   /** References are placeholders for parameters */
   private var refCount = 0 // TODO: do we want to recount from 0 for each query?
 
-  case class Ref[A: ResultTag]($name: String = "") extends Expr[A]:
+  case class Ref[A: ResultTag]() extends Expr[A]:
     private val id = refCount
     refCount += 1
-    override def toString = s"ref$id(${$name})"
+    def stringRef() = s"ref$id"
 
   /** Literals are type-specific, tailored to the types that the DB supports */
   case class IntLit($value: Int) extends Expr[Int]
@@ -115,7 +121,7 @@ object Expr:
   /** The internal representation of a function `A => B`
    *  Query languages are ususally first-order, so Fun is not an Expr
    */
-  case class Fun[A, B]($param: Ref[A], $f: B)
+  case class Fun[A, B]($param: Ref[A], $body: B)
 //  case class AggFun[A, B]($param: Ref[A], $f: B)
 
   type Pred[A] = Fun[A, Expr[Boolean]]

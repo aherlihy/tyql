@@ -59,18 +59,18 @@ object QueryIRTree:
         val outerFnAST = flatMap.$query
         collapseFlatMap(
           sources :+ outerSrc,
-          symbols + (outerFnAST.$param.toString -> outerSrc),
-          outerFnAST.$f
+          symbols + (outerFnAST.$param.stringRef() -> outerSrc),
+          outerFnAST.$body
         )
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] =>
         val outerSrc = generateQuery(aggFlatMap.$from)
         val outerFnAST = aggFlatMap.$query
-        outerFnAST.$f match
+        outerFnAST.$body match
           case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
             collapseFlatMap(
               sources :+ outerSrc,
-              symbols + (outerFnAST.$param.toString -> outerSrc),
-              outerFnAST.$f
+              symbols + (outerFnAST.$param.stringRef() -> outerSrc),
+              outerFnAST.$body
             )
           case _ => // base case
             val innerFnIR = generateFun(outerFnAST, outerSrc, symbols)
@@ -110,14 +110,15 @@ object QueryIRTree:
       case _ => ??? // either flatMap or aggregate, TODO
 
   private def generateFun(fun: Expr.Fun[?, ?], appliedTo: QueryIRAliasable, symbols: Map[String, QueryIRAliasable] = Map.empty): QueryIRNode =
-    fun.$f match
-      case e: Expr[?] => generateExpr(e, symbols + (fun.$param.toString -> appliedTo))
+    fun.$body match
+      case r: Expr.Ref[?] if r.stringRef() == fun.$param.stringRef() => SelectAllExpr() // special case identity function
+      case e: Expr[?] => generateExpr(e, symbols + (fun.$param.stringRef() -> appliedTo))
       case _ => ??? // TODO: find better way to differentiate
 
   private def generateExpr(ast: Expr[?], symbols: Map[String, QueryIRAliasable]): QueryIRNode =
     ast match
       case ref: Expr.Ref[?] =>
-        val name = ref.toString
+        val name = ref.stringRef()
         val sub = symbols(name) // TODO: pass symbols down tree?
         QueryIRVar(sub, name, ref) // TODO: singleton?
       case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
@@ -132,9 +133,12 @@ object QueryIRTree:
           )
         ProjectClause(children, p)
       case g: Expr.Gt => BinOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
+      case a: Expr.And => BinOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
+      case a: Expr.Eq => BinOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
+      case a: Expr.Concat[?, ?] => BinOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), ",", a)
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case a: Aggregation[?] => generateAggregation(a, symbols)
-      case _ =>  ???
+      case _ =>  println(s"Unimplemented AST: $ast"); ???
 
   private def generateAggregation(ast: Aggregation[?], symbols: Map[String, QueryIRAliasable]): QueryIRNode =
     ast match
