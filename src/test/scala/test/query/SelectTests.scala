@@ -51,6 +51,43 @@ class SelectWithGtTest extends SQLStringQueryTest[CityDB, String] {
     yield city.name
   def expectedQueryPattern: String = "SELECT cities$A.name FROM cities as cities$A WHERE cities$A.population > 10000"
 }
+//
+//SelectQuery(
+//  SelectExpr(
+//    name,
+//    QueryIRVar(
+//      SelectQuery(
+//        SelectAllExpr(),
+//        List(
+//          TableLeaf(cities, //Table(cities))
+//        ),
+//        List(
+//          WhereClause(
+//            List(
+//              BinExprOp(SelectExpr(population, QueryIRVar(TableLeaf(cities, Table(cities)), ref5, Ref()), Select(Ref(), population)), Literal(10000, IntLit(10000)), >, Gt(Select(Ref(), population), IntLit(10000)))
+//            ),
+////            Gt(Select(Ref(), population), IntLit(10000)))
+//        ),
+////        Filter(Table(cities), Fun(Ref(), Gt(Select(Ref(), population), IntLit(10000))))
+//      ),
+//      ref6,
+//      /*Ref()*/
+//    ),
+//    /*Select(Ref(), name)*/
+//  ),
+//  List(
+//    TableLeaf(cities /*Table(cities)*/)
+//  ),
+//  List(
+//    WhereClause(
+//      List(
+//        BinExprOp(SelectExpr(population, QueryIRVar(TableLeaf(cities, Table(cities)), ref5, Ref()), Select(Ref(), population)), Literal(10000, IntLit(10000)), >, Gt(Select(Ref(), population), IntLit(10000)))
+//      ),
+//      //Gt(Select(Ref(), population), IntLit(10000))
+//    )
+//  ),
+//  //Map(Filter(Table(cities), Fun(Ref(), Gt(Select(Ref(), population), IntLit(10000)))), Fun(Ref(), Select(Ref(), name)))
+//)
 /*
 class SelectWithSelfNestTest extends SQLStringQueryTest[CityDB, CityT] {
   def testDescription: String = "Select: self-join with condition"
