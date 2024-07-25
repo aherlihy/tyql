@@ -27,8 +27,8 @@ class SelectModifiersRepeatSelect2Test extends SQLStringQueryTest[AllCommerceDBs
       (name3 = prod.name2, id3 = prod.id2).toRow
   def expectedQueryPattern: String =  "SELECT subquery$A.name2 as name3, subquery$A.id2 as id3 FROM (SELECT product$B.name as name2, product$B.id as id2 FROM product as product$B) as subquery$A"
 }
-class SelectModifiersSortTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
-  def testDescription: String = "SelectModifiers: sort"
+class SelectModifiersSort1Test extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+  def testDescription: String = "SelectModifiers: sort first, subquery"
   def query() =
     testDB.tables.products
       // .sort: prod => (prod.id = Ord.ASC, ...) // alternative structure
@@ -36,6 +36,19 @@ class SelectModifiersSortTest extends SQLStringQueryTest[AllCommerceDBs, (name: 
       .map: prod =>
         (name = prod.name).toRow
   def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY product$A.id ASC"
+}
+
+class SelectModifiersSort1aTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+  def testDescription: String = "SelectModifiers: sort after map, no subquery"
+
+  def query() =
+    testDB.tables.products
+      .map: prod =>
+        (name = prod.name).toRow
+      // .sort: prod => (prod.id = Ord.ASC, ...) // alternative structure
+      .sort(_.name, Ord.ASC)
+
+  def expectedQueryPattern: String = "SELECT subquery$B.name as name FROM (SELECT * FROM product as product$A ORDER BY product$A.id ASC) as subquery$B"
 }
 
 class SelectModifiersSort2Test extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {

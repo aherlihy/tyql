@@ -87,7 +87,7 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
 
   test(testDescription) {
     val q = query()
-    println(s"$testDescription:\n\t$q")
+    println(s"$testDescription:\n\tAST: $q")
     val actual = q.toSQLString
     println(s"\tactual: $actual")
     val stripped = expectedQueryPattern.trim().replace("\n", " ").replaceAll("\\s+", " ")

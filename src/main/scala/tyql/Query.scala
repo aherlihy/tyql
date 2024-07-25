@@ -41,7 +41,9 @@ trait DatabaseAST[Result](using val tag: ResultTag[Result]):
   def toSQLString: String = toQueryIR.toSQLString()
 
   private def toQueryIR: QueryIRNode =
-    QueryIRTree.generateFullQuery(this)
+    val q = QueryIRTree.generateFullQuery(this, Map.empty)
+    println(s"IR: $q")
+    q
 
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   /**
