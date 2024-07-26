@@ -122,56 +122,57 @@ FROM product as product$A
         """
 }
 
-//class Project4Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
-//  def testDescription = "Project: project to tuple with concat with another tuple"
+class Project4Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
+  def testDescription = "Project: project to tuple with concat with another tuple"
+  def query() =
+    val tupleProd = testDB.tables.products
+      .map: c =>
+        (id = c.id, name = c.name, price = c.price).toRow
+    val tupleShip = testDB.tables.shipInfos
+      .map: s =>
+        (buyerId = s.buyerId, shippingDate = s.shippingDate).toRow
+    for
+      t1 <- tupleProd
+      t2 <- tupleShip
+    yield t1.concat(t2)
+
+  //    tupleProd.flatMap: c =>
+  //      tupleShip.map: s =>
+  //        s.concat(c)
+
+  def expectedQueryPattern: String ="""
+    SELECT subquery$A.* , subquery$B.* FROM
+       (SELECT product$C.id as id, product$C.name as name, product$C.price as price FROM product as product$C) as subquery$A,
+       (SELECT shippingInfo$D.buyerId as buyerId, shippingInfo$D.shippingDate as shippingDate FROM shippingInfo as shippingInfo$D) as subquery$B
+        """
+}
+
+/** TODO:
+ * Concat doesn't work on these tests because the original types are defined as case classes.
+ * Should we have some automatic conversion from case class to named tuple, or generate a named
+ * tuple from a case class + extra fields? Otherwise it's odd that you can't call concat on a
+ * normal row.
+ */
+
+//class ProjectConcatTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
+//  def testDescription = "Project: project + concat literal"
 //  def query() =
-//    val tupleProd = testDB.tables.products
-//      .map: c =>
-//        (id = c.id, name = c.name, price = c.price).toRow
-//    val tupleShip = testDB.tables.shipInfos
-//      .map: s =>
-//        (buyerId = s.buyerId, shippingDate = s.shippingDate).toRow
-//    for
-//      t1 <- tupleProd
-//      t2 <- tupleShip
-//    yield t1.concat(t2)
-//
-//  //    tupleProd.flatMap: c =>
-//  //      tupleShip.map: s =>
-//  //        s.concat(c)
-//
-//  def expectedQueryPattern: String ="""SELECT p.id, p.name, p.price, s.buyerId, s.shippingDate
-//FROM product as product$A p
-//CROSS JOIN shipInfos s
-//        """
+//    testDB.tables.products.map: c =>
+//      c.concat((extra = 1))
+//  def expectedQueryPattern: String = """
+//      """
 //}
-//
-///** TODO:
-// * Concat doesn't work on these tests because the original types are defined as case classes.
-// * Should we have some automatic conversion from case class to named tuple, or generate a named
-// * tuple from a case class + extra fields? Otherwise it's odd that you can't call concat on a
-// * normal row.
-// */
-//
-////class ProjectConcatTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
-////  def testDescription = "Project: project + concat literal"
-////  def query() =
-////    testDB.tables.products.map: c =>
-////      c.concat((extra = 1))
-////  def expectedQueryPattern: String = """
-////      """
-////}
-//
-////class ProjectJoinConcatTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
-////  def testDescription = "Project: project + concat literal"
-////  def query() =
-////    testDB.tables.products.flatMap(c =>
-////      testDB.tables.shipInfos
-//////        .map(s => (buyerId = s.buyerId, shippingDate = s.shippingDate))
-////        .map(s =>
-////          s.toRow//.concat(c.toRow)
-////        )
-////    )
-////  def expectedQueryPattern: String = """
-////      """
-////}
+
+//class ProjectJoinConcatTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
+//  def testDescription = "Project: project + concat literal"
+//  def query() =
+//    testDB.tables.products.flatMap(c =>
+//      testDB.tables.shipInfos
+////        .map(s => (buyerId = s.buyerId, shippingDate = s.shippingDate))
+//        .map(s =>
+//          s.toRow//.concat(c.toRow)
+//        )
+//    )
+//  def expectedQueryPattern: String = """
+//      """
+//}

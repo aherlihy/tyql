@@ -185,7 +185,22 @@ object QueryIRTree:
       case a: Expr.And => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
       case a: Expr.Eq => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
       case a: Expr.Ne => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "<>", a)
-      case a: Expr.Concat[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), ",", a)
+      case a: Expr.Concat[?, ?] =>
+        val lhsIR = generateExpr(a.$x, symbols) match
+          case p: ProjectClause => p
+          case v: QueryIRVar => SelectExpr("*", v, a.$x)
+          case _ => throw new Exception("Unimplemented: concatting something that is not a literal nor a variable")
+        val rhsIR = generateExpr(a.$y, symbols) match
+          case p: ProjectClause => p
+          case v: QueryIRVar => SelectExpr("*", v, a.$y)
+          case _ => throw new Exception("Unimplemented: concatting something that is not a literal nor a variable")
+
+        BinExprOp(
+          lhsIR,
+          rhsIR,
+          ",",
+          a
+        )
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
       case a: Aggregation[?] => generateAggregation(a, symbols)
