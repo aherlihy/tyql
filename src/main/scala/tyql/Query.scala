@@ -69,7 +69,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
     val ref = Expr.Ref[A]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
-  def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
+  def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Aggregation.StripAgg]])(f: Expr.Ref[A] => B): Aggregation[ NamedTuple.Map[B, Aggregation.StripAgg] ] =
     import Aggregation.toRow
     val ref = Expr.Ref[A]()
     val row = f(ref).toRow

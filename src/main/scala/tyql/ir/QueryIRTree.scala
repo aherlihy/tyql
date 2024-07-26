@@ -15,29 +15,24 @@ trait QueryIRNode:
 trait QueryIRLeaf extends QueryIRNode:
   override val children: Seq[QueryIRNode] = Seq()
 
-trait QueryIRAliasable extends QueryIRNode:
-  def alias: String
-
 enum SelectFlags:
   case Distinct
   case TopLevel
+  case ExprLevel
 
-trait TopLevel:
-  var flags: Set[SelectFlags] = Set.empty
+type SymbolTable = Map[String, RelationOp]
 
 object QueryIRTree:
 
-  def generateFullQuery(ast: DatabaseAST[?], symbols: Map[String, RelationOp]): (QueryIRNode & TopLevel) =
-    val result = generateQuery(ast, symbols)
-    result.flags = result.flags + SelectFlags.TopLevel // ignore top-level parens
-    result
+  def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
+    generateQuery(ast, symbols).appendTopLevel() // ignore top-level parens
 
   var idCount = 0
   /**
    * Convert table.filter(p1).filter(p2) => table.filter(p1 && p2).
    * Example of a heuristic tree transformation/optimization
    */
-  private def collapseFilters(filters: Seq[Expr.Fun[?, ?]], comprehension: DatabaseAST[?], symbols: Map[String, RelationOp]): (Seq[Expr.Fun[?, ?]], RelationOp) =
+  private def collapseFilters(filters: Seq[Expr.Fun[?, ?]], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[Expr.Fun[?, ?]], RelationOp) =
     comprehension match
       case table: Table[?] =>
         (filters, TableLeaf(table.$name, table))
@@ -45,7 +40,7 @@ object QueryIRTree:
         collapseFilters(filters :+ filter.$pred, filter.$from, symbols)
       case _ => (filters, generateQuery(comprehension, symbols))
 
-  private def collapseFlatMap(sources: Seq[RelationOp], symbols: Map[String, RelationOp], body: DatabaseAST[?] | Expr[?]): (Seq[RelationOp], QueryIRNode) =
+  private def collapseFlatMap(sources: Seq[RelationOp], symbols: SymbolTable, body: DatabaseAST[?] | Expr[?]): (Seq[RelationOp], QueryIRNode) =
     body match
       case map: Query.Map[?, ?] =>
         val srcIR = generateQuery(map.$from, symbols)
@@ -59,7 +54,7 @@ object QueryIRTree:
           symbols + (bodyAST.$param.stringRef() -> srcIR),
           bodyAST.$body
         )
-      case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // TODO: merge into flatMap
+      case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
         val srcIR = generateQuery(aggFlatMap.$from, symbols)
         val outerBodyAST = aggFlatMap.$query
         outerBodyAST.$body match
@@ -75,10 +70,10 @@ object QueryIRTree:
       case _ => throw Exception(s"Unimplemented: collapsing flatMap on type $body")
 
   // TODO: probably should parametrize collapse so it works with different nodes
-  private def collapseSort(sorts: Seq[(Expr.Fun[?, ?], Ord)], comprehension: DatabaseAST[?], symbols: Map[String, RelationOp]): (Seq[(Expr.Fun[?, ?], Ord)], RelationOp) =
+  private def collapseSort(sorts: Seq[(Expr.Fun[?, ?], Ord)], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[(Expr.Fun[?, ?], Ord)], RelationOp) =
     comprehension match
       case table: Table[?] =>
-        (sorts.reverse, TableLeaf(table.$name, table)) // reverse because order matters, unlike filters
+        (sorts, TableLeaf(table.$name, table)) // do not reverse, since chained collection.sortBy(a).sortBy(b).sortBy(c) => ORDER BY c, b, a
       case sort: Query.Sort[?, ?] =>
         collapseSort(sorts :+ (sort.$body, sort.$ord), sort.$from, symbols)
       case _ => (sorts, generateQuery(comprehension, symbols))
@@ -89,7 +84,7 @@ object QueryIRTree:
    * @param ast
    * @return
    */
-  private def generateQuery(ast: DatabaseAST[?], symbols: Map[String, RelationOp]): RelationOp =
+  private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
     println(s"genQuery: ast=$ast")
     ast match
       case table: Table[?] =>
@@ -114,10 +109,11 @@ object QueryIRTree:
       case flatMap: (Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
         val (tableIRs, projectIR) = collapseFlatMap(Seq(), Map(), flatMap)
 //        println(s"in flatMap, tableIRs=$tableIRs, projectIR=$projectIR")
-        // TODO: this is where could create more complex join nodes,
-        //  for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
+        /** TODO: this is where could create more complex join nodes,
+         * for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
+         */
         if tableIRs.length == 1 then
-          SelectQuery(projectIR, tableIRs, Seq(), None, flatMap)
+          tableIRs.head.appendProject(projectIR, flatMap)
         else try
           tableIRs.reduce((q1, q2) =>
             q2 match
@@ -131,77 +127,93 @@ object QueryIRTree:
           case e: Exception => SelectQuery(projectIR, tableIRs, Seq(), None, flatMap)
 
       case union: Query.Union[?] =>
-        val lhs = generateQuery(union.$this, symbols)
-        val rhs = generateQuery(union.$other, symbols)
+        val lhs = generateQuery(union.$this, symbols).appendTopLevel()
+        val rhs = generateQuery(union.$other, symbols).appendTopLevel()
         val op = if union.$dedup then "UNION" else "UNION ALL"
         BinRelationOp(lhs, rhs, op, union)
       case intersect: Query.Intersect[?] =>
-        val lhs = generateQuery(intersect.$this, symbols)
-        val rhs = generateQuery(intersect.$other, symbols)
+        val lhs = generateQuery(intersect.$this, symbols).appendTopLevel()
+        val rhs = generateQuery(intersect.$other, symbols).appendTopLevel()
         BinRelationOp(lhs, rhs, "INTERSECT", intersect)
       case sort: Query.Sort[?, ?] =>
         val (orderByASTs, tableIR) = collapseSort(Seq(), sort, symbols)
         val orderByExprs = orderByASTs.map(ord =>
           (generateFun(ord._1, tableIR, symbols), ord._2)
         )
-        OrderedQuery(tableIR, orderByExprs, sort)
+        OrderedQuery(tableIR.appendTopLevel(), orderByExprs, sort)
       case limit: Query.Limit[?] =>
         val from = generateQuery(limit.$from, symbols)
-        BinRelationOp(from, Literal(limit.$limit.toString, limit.$limit), "LIMIT", limit)
+        BinRelationOp(from.appendTopLevel(), Literal(limit.$limit.toString, limit.$limit), "LIMIT", limit)
       case offset: Query.Offset[?] =>
         val from = generateQuery(offset.$from, symbols)
-        BinRelationOp(from, Literal(offset.$offset.toString, offset.$offset), "OFFSET", offset)
+        BinRelationOp(from.appendTopLevel(), Literal(offset.$offset.toString, offset.$offset), "OFFSET", offset)
       case distinct: Query.Distinct[?] =>
-        val query = generateQuery(distinct.$from, symbols)
-        query.flags = query.flags + SelectFlags.Distinct
-        query
+        generateQuery(distinct.$from, symbols).appendDistinct()
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
-  private def generateFun(fun: Expr.Fun[?, ?], appliedTo: QueryIRAliasable, symbols: Map[String, QueryIRAliasable]): QueryIRNode =
+  private def generateFun(fun: Expr.Fun[?, ?], appliedTo: RelationOp, symbols: SymbolTable): QueryIRNode =
     fun.$body match
       case r: Expr.Ref[?] if r.stringRef() == fun.$param.stringRef() => SelectAllExpr() // special case identity function
       case e: Expr[?] => generateExpr(e, symbols + (fun.$param.stringRef() -> appliedTo))
       case _ => ??? // TODO: find better way to differentiate
 
-  private def generateExpr(ast: Expr[?], symbols: Map[String, QueryIRAliasable]): QueryIRNode =
+  private def generateProjection(p: Expr.Project[?] | Aggregation.AggProject[?], symbols: SymbolTable): QueryIRNode =
+    val inner = p match
+      case e: Expr.Project[?] => e.$a
+      case a: Aggregation.AggProject[?] => a.$a
+    val a = NamedTuple.toTuple(inner.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
+    val namedTupleNames = p.tag match
+      case ResultTag.NamedTupleTag(names, types) => names.lift
+      case _ => Seq()
+    val children = a.toList.zipWithIndex
+      .map((expr, idx) =>
+        val e = expr.asInstanceOf[Expr[?]]
+        AttrExpr(generateExpr(e, symbols), namedTupleNames(idx), e)
+      )
+    ProjectClause(children, p)
+
+  private def generateExpr(ast: Expr[?], symbols: SymbolTable): QueryIRNode =
     ast match
       case ref: Expr.Ref[?] =>
         val name = ref.stringRef()
         val sub = symbols(name)
         QueryIRVar(sub, name, ref) // TODO: singleton?
       case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
-      case p: Expr.Project[?] =>
-        val a = NamedTuple.toTuple(p.$a.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
-        val namedTupleNames = p.tag match
-          case ResultTag.NamedTupleTag(names, types) => names.lift
-          case _ => Seq()
-        val children = a.toList.zipWithIndex
-          .map((expr, idx) =>
-            val e = expr.asInstanceOf[Expr[?]]
-            AttrExpr(generateExpr(e, symbols), namedTupleNames(idx), e)
-          )
-        ProjectClause(children, p)
+      case p: Expr.Project[?] => generateProjection(p, symbols)
       case g: Expr.Gt => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
+      case g: Expr.GtDouble => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
       case a: Expr.And => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
       case a: Expr.Eq => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
+      case a: Expr.Ne => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "<>", a)
       case a: Expr.Concat[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), ",", a)
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
       case a: Aggregation[?] => generateAggregation(a, symbols)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
-  private def generateAggregation(ast: Aggregation[?], symbols: Map[String, QueryIRAliasable]): QueryIRNode =
+  private def generateAggregation(ast: Aggregation[?], symbols: SymbolTable): QueryIRNode =
     ast match
       case s: Aggregation.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
       case s: Aggregation.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
       case s: Aggregation.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
       case s: Aggregation.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
+      case p: Aggregation.AggProject[?] => generateProjection(p, symbols)
+      case sub: Aggregation.AggFlatMap[?, ?] =>
+        val subg = generateQuery(sub, symbols)
+        println(s"setting level to expr for $subg")
+        subg.appendExprLevel() // special case, remove alias
       case _ => throw new Exception(s"Unimplemented aggregation op: $ast")
 
-trait RelationOp extends QueryIRAliasable with TopLevel:
+trait RelationOp extends QueryIRNode:
+  var flags: Set[SelectFlags] = Set.empty
+  def alias: String
+  // TODO: decide if we want to mutate, copy, or discard IR nodes. Right now its a mix
   def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp
   def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp
   def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp
+  def appendDistinct(): RelationOp
+  def appendTopLevel(): RelationOp
+  def appendExprLevel(): RelationOp
 
 case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with QueryIRLeaf:
   val name = s"$tableName${QueryIRTree.idCount}"
@@ -217,21 +229,36 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(p, Seq(this), Seq(), None, astOther)
 
-
   override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(
       q.project,
       this +: q.from,
       q.where,
-      None, //Some(q.alias),
+      None,
       astOther
     )
+
+  override def appendDistinct(): RelationOp =
+    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), Some(alias), ast)
+    q.flags = q.flags + SelectFlags.Distinct
+    q
+
+  override def appendTopLevel(): RelationOp =
+    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), None, ast)
+    q.flags = q.flags + SelectFlags.TopLevel
+    q
+
+  override def appendExprLevel(): RelationOp =
+    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), None, ast)
+    q.flags = q.flags + SelectFlags.ExprLevel
+    q
+
 
 /**
  * Select: SELECT <ProjectClause> FROM <QueryIRSource> WHERE <WhereClause>
  */
 case class SelectQuery(project: QueryIRNode,
-                       from: Seq[QueryIRAliasable],
+                       from: Seq[RelationOp],
                        where: Seq[QueryIRNode],
                        overrideAlias: Option[String],
                        ast: DatabaseAST[?]) extends RelationOp:
@@ -248,7 +275,7 @@ case class SelectQuery(project: QueryIRNode,
   // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))?
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     project match
-      case s: SelectAllExpr => SelectQuery(p, from, where, overrideAlias, ast)
+      case s: SelectAllExpr => SelectQuery(p, from, where, None, ast)
       case _ => // Could collapse, for now use subquery
         SelectQuery(p, Seq(this), Seq(), None, astOther)
 
@@ -268,9 +295,21 @@ case class SelectQuery(project: QueryIRNode,
     val newW = where ++ q.where
     SelectQuery(newP, newF, newW, None, astOther) // TODO: alias?
 
+  override def appendDistinct(): RelationOp =
+    flags = flags + SelectFlags.Distinct
+    this
+
+  override def appendTopLevel(): RelationOp =
+    flags = flags + SelectFlags.TopLevel
+    this
+
+  override def appendExprLevel(): RelationOp =
+    flags = flags + SelectFlags.ExprLevel
+    this
+
   override def toSQLString(): String =
     val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) then "" else s" as $alias"
+    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val projectStr = project.toSQLString()
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
@@ -283,11 +322,8 @@ case class SelectQuery(project: QueryIRNode,
     s"SelectQuery(\n\talias=$alias,\n\tproject=$project,\n\tfrom=$from,\n\twhere=$where\n)"
 
 case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast: DatabaseAST[?]) extends RelationOp:
-  query.flags = query.flags + SelectFlags.TopLevel
   override val children: Seq[QueryIRNode] = query +: sortFn.map(_._1)
-  val latestVar = s"subquery${QueryIRTree.idCount}"
-  QueryIRTree.idCount += 1
-  override def alias = latestVar
+  override def alias = query.alias
 
   val orders: Seq[Ord] = sortFn.map(_._2)
 
@@ -315,13 +351,29 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
       None,
       astOther
     )
+  override def appendDistinct(): RelationOp =
+    query.appendDistinct()
+    this
+
+  override def appendTopLevel(): RelationOp =
+    flags = flags + SelectFlags.TopLevel
+    this
+
+  override def appendExprLevel(): RelationOp =
+    flags = flags + SelectFlags.ExprLevel
+    this
 
   override def toSQLString(): String =
     val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) then "" else s" as $alias"
-    s"$open${query.toSQLString()} ORDER BY ${sortFn.map(s => s"${s._1.toSQLString()} ${s._2.toString}").mkString("", ", ", "")}$close$aliasStr"
+    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    s"$open${query.toSQLString()} ORDER BY ${sortFn.map(s =>
+      val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
+        case v: SelectExpr => v.attrName
+        case o => o.toSQLString()
+      s"$varStr ${s._2.toString}"
+    ).mkString("", ", ", "")}$close$aliasStr"
 
-case class BinRelationOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Query[?]) extends RelationOp:
+case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Query[?]) extends RelationOp:
   override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
   val latestVar = s"subquery${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
@@ -354,9 +406,23 @@ case class BinRelationOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Qu
       astOther
     )
 
+  override def appendDistinct(): RelationOp =
+    lhs.appendDistinct()
+    rhs match
+      case r: RelationOp => r.appendDistinct()
+    this
+
+  override def appendTopLevel(): RelationOp =
+    flags = flags + SelectFlags.TopLevel
+    this
+
+  override def appendExprLevel(): RelationOp =
+    flags = flags + SelectFlags.ExprLevel
+    this
+
   override def toSQLString(): String =
     val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) then "" else s" as $alias"
+    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
 
 // Single WHERE clause containing 1+ predicates
@@ -396,7 +462,8 @@ case class SelectAllExpr() extends QueryIRLeaf:
   val ast = null
   override def toSQLString(): String = "*"
 
-case class QueryIRVar(toSub: QueryIRAliasable, name: String, ast: Expr.Ref[?]) extends QueryIRLeaf:
+// TODO: probably don't need to store the entire value, just an alias
+case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?]) extends QueryIRLeaf:
   override def toSQLString() = toSub.alias
 
   override def toString: String = s"VAR(${toSub.alias}.$name)"
@@ -407,8 +474,3 @@ case class Literal(stringRep: String, ast: Expr[?]) extends QueryIRLeaf:
 
 case class EmptyLeaf(ast: DatabaseAST[?] = null) extends QueryIRLeaf:
   override def toSQLString(): String = ""
-
-// Helper to print AST subtree
-case class PlaceHolderNode(ast: DatabaseAST[?] | Expr[?]) extends QueryIRLeaf with QueryIRAliasable:
-  override def alias: String = "placeholder"
-  override def toSQLString(): String = s"$ast"

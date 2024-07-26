@@ -1,6 +1,6 @@
 package test.query.selectmodifiers
 import test.SQLStringQueryTest
-import test.query.{commerceDBs,  AllCommerceDBs}
+import test.query.{commerceDBs,  AllCommerceDBs, Product}
 
 import tyql.*
 import tyql.Expr.toRow
@@ -8,7 +8,7 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 
-class SelectModifiersRepeatSelectTest extends SQLStringQueryTest[AllCommerceDBs, (name3: String, id3: Int)] {
+class SelectModifiersRepeatTest extends SQLStringQueryTest[AllCommerceDBs, (name3: String, id3: Int)] {
   def testDescription: String = "SelectModifiers: double map on temporary"
   def query() =
     val q = testDB.tables.products.map: prod =>
@@ -35,24 +35,80 @@ class SelectModifiersSort1Test extends SQLStringQueryTest[AllCommerceDBs, (name:
       .sort(_.id, Ord.ASC)
       .map: prod =>
         (name = prod.name).toRow
-  def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY product$A.id ASC"
+  def expectedQueryPattern: String = "SELECT subquery$B.name as name FROM (SELECT * FROM product as product$A ORDER BY id ASC) as subquery$B"
 }
 
-class SelectModifiersSort1aTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+class SelectModifiersSort1aTest extends SQLStringQueryTest[AllCommerceDBs, (name2: String)] {
   def testDescription: String = "SelectModifiers: sort after map, no subquery"
 
   def query() =
     testDB.tables.products
       .map: prod =>
-        (name = prod.name).toRow
+        (name2 = prod.name).toRow
       // .sort: prod => (prod.id = Ord.ASC, ...) // alternative structure
-      .sort(_.name, Ord.ASC)
+      .sort(_.name2, Ord.ASC)
 
-  def expectedQueryPattern: String = "SELECT subquery$B.name as name FROM (SELECT * FROM product as product$A ORDER BY product$A.id ASC) as subquery$B"
+  def expectedQueryPattern: String =  "SELECT product$A.name as name2 FROM product as product$A ORDER BY name2 ASC"
+}
+
+class SelectModifiersSort1bTest extends SQLStringQueryTest[AllCommerceDBs, (name3: String)] {
+  def testDescription: String = "SelectModifiers: sort before+after map"
+
+  def query() =
+    testDB.tables.products
+      .map: prod =>
+        (name2 = prod.name).toRow
+      .sort(_.name2, Ord.ASC)
+      .map: prod =>
+          (name3 = prod.name2).toRow
+      .sort(_.name3, Ord.ASC)
+
+  def expectedQueryPattern: String = "SELECT subquery$B.name2 as name3 FROM (SELECT product$A.name as name2 FROM product as product$A ORDER BY name2 ASC) as subquery$B ORDER BY name3 ASC"
+}
+
+class SelectModifiersSort1cTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription: String = "SelectModifiers: sort on table"
+
+  def query() =
+    testDB.tables.products
+      .sort(_.id, Ord.ASC)
+
+  def expectedQueryPattern: String = "SELECT * FROM product as product$A ORDER BY id ASC"
+}
+
+
+class SelectModifiersDistinct1cTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription: String = "SelectModifiers: distinct on table"
+
+  def query() =
+    testDB.tables.products
+      .distinct
+
+  def expectedQueryPattern: String = "SELECT DISTINCT * FROM product as product$A"
+}
+
+class SelectModifiersLimit1cTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription: String = "SelectModifiers: limit on table"
+
+  def query() =
+    testDB.tables.products
+      .limit(1)
+
+  def expectedQueryPattern: String = "SELECT * FROM product as product$A LIMIT 1"
+}
+
+class SelectModifiersOffset1cTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription: String = "SelectModifiers: offset on table"
+
+  def query() =
+    testDB.tables.products
+      .drop(1)
+
+  def expectedQueryPattern: String = "SELECT * FROM product as product$A OFFSET 1"
 }
 
 class SelectModifiersSort2Test extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
-  def testDescription: String = "SelectModifiers: sort with 2 keys"
+  def testDescription: String = "SelectModifiers: sort with 3 keys, subquery"
   def query() =
     testDB.tables.products
       // .sort: prod => (prod.id = Ord.ASC, prod.price = Ord.DESC) // alternative structure
@@ -61,101 +117,64 @@ class SelectModifiersSort2Test extends SQLStringQueryTest[AllCommerceDBs, (name:
       .sort(_.name, Ord.DESC)
       .map: prod =>
         (name = prod.name).toRow
-  def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY product$A.id ASC, product$A.price DESC, product$A.name DESC"
+  def expectedQueryPattern: String =  "SELECT subquery$B.name as name FROM (SELECT * FROM product as product$A ORDER BY name DESC, price DESC, id ASC) as subquery$B"
 }
 
-class SelectModifiersSort3Test extends SQLStringQueryTest[AllCommerceDBs, (name2: String)] {
-  def testDescription: String = "SelectModifiers: sort on new name"
+class SelectModifiersSort2bTest extends SQLStringQueryTest[AllCommerceDBs, (name2: String, id2: Int, price2: Double)] {
+  def testDescription: String = "SelectModifiers: sort with 3 keys, no subquery"
+
   def query() =
     testDB.tables.products
       .map: prod =>
-        (name2 = prod.name).toRow
+        (name2 = prod.name, id2 = prod.id, price2 = prod.price).toRow
+      .sort(_.id2, Ord.ASC)
+      .sort(_.price2, Ord.DESC)
       .sort(_.name2, Ord.DESC)
-  def expectedQueryPattern: String =  "SELECT * FROM (SELECT product$A.name as name2 FROM product as product$A) as subquery$B ORDER BY subquery$B.name2 DESC"
+
+  def expectedQueryPattern: String = "SELECT product$A.name as name2, product$A.id as id2, product$A.price as price2 FROM product as product$A ORDER BY name2 DESC, price2 DESC, id2 ASC"
 }
 
-class SelectModifiersSortlimitSelectTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+class SelectModifiersSortLimitTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: sortLimit"
   def query() =
     testDB.tables.products
-      .sort(_.id, Ord.ASC)
       .map: prod =>
         (name = prod.name).toRow
+      .sort(_.name, Ord.ASC)
       .limit(3)
-  def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY product$A.id ASC LIMIT 3"
+  def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY name ASC LIMIT 3"
 }
 
-class SelectModifiersSortoffsetSelectTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+class SelectModifiersSortOffsetTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, id: Int)] {
   def testDescription: String = "SelectModifiers: sortOffset"
   def query() =
     testDB.tables.products
-      .sort(_.id, Ord.ASC)
       .map: prod =>
-        (name = prod.name).toRow
+        (name = prod.name, id = prod.id).toRow
+      .sort(_.id, Ord.ASC)
       .drop(2)
-  def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY product$A.id ASC OFFSET 2" // TODO: offset in other DBs
+  def expectedQueryPattern: String =  "SELECT product$A.name as name, product$A.id as id FROM product as product$A ORDER BY id ASC OFFSET 2"
 }
 
-class SelectModifiersSortlimittwiceSelectTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+class SelectModifiersSortLimit2Test extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: sortLimitTwice"
   def query() =
     testDB.tables.products
-      .sort(_.id, Ord.ASC)
       .map: prod =>
         (name = prod.name).toRow
+      .sort(_.name, Ord.ASC)
       .drop(2)
       .take(4)
-  def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY product$A.id ASC OFFSET 2 LIMIT 4"
+  def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY name ASC OFFSET 2 LIMIT 4"
 }
 
-class SelectModifiersDistinctSelectTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+class SelectModifiersDistinctTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
   def testDescription: String = "SelectModifiers: distinct"
   def query() =
     testDB.tables.products
-      .sort(_.price, Ord.ASC)
       .map: prod =>
         (name = prod.name).toRow
+      .sort(_.name, Ord.ASC)
       .distinct
-  def expectedQueryPattern: String =  "SELECT DISTINCT product$A.name as name FROM product as product$A ORDER BY product$A.price ASC"
+  def expectedQueryPattern: String =  "SELECT DISTINCT product$A.name as name FROM product as product$A ORDER BY name ASC"
 }
-
-// TODO: inline subqueries
-//class SelectModifiersNestSortSelectTest extends SQLStringQueryTest[AllCommerceDBs, (name: String, id: Int)] {
-//  def testDescription: String = "SelectModifiers: sort before join"
-//  def query() =
-//    for
-//      prod <- testDB.tables.products.sort(_.id, Ord.ASC).map(prod => (name2 = prod.name, id = prod.id).toRow)
-//      purch <- testDB.tables.purchases
-//      if prod.id == purch.id
-//    yield (name = prod.name2, id = purch.id).toRow
-//
-//  def expectedQueryPattern: String =  """
-//    SELECT product1.name AS res
-//      FROM (SELECT purchase0.product_id AS product_id, purchase0.total AS total
-//        FROM purchase purchase0
-//        ORDER BY total DESC
-//        LIMIT ?) subquery0
-//      CROSS JOIN product product1
-//      WHERE (product1.id = subquery0.product_id)
-//    """
-//}
-//
-//class SelectModifiersFlatmapSelectTest extends SQLStringQueryTest[AllCommerceDBs, (id1: Int, id: Int)] {
-//  def testDescription: String = "SelectModifiers: flatMap"
-//  def query() =
-//    for
-//      prod <- testDB.tables.products.sort(_.id, Ord.ASC).map(prod => prod.id)
-//      purch <- testDB.tables.purchases
-//      if prod == purch.id
-//    yield (id1 = purch.id, id = prod).toRow
-//
-//  def expectedQueryPattern: String =  """
-//    SELECT product1.name AS res
-//      FROM (SELECT purchase0.product_id AS product_id, purchase0.total AS total
-//        FROM purchase purchase0
-//        ORDER BY total DESC
-//        LIMIT ?) subquery0
-//      CROSS JOIN product product1
-//      WHERE (product1.id = subquery0.product_id)
-//    """
-//}

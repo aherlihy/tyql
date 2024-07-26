@@ -72,6 +72,7 @@ FROM buyers as buyers$A, product as product$B
 WHERE (buyers$A.name = "string constant" AND product$B.id = buyers$A.id)
       """
 }
+// TODO: Not implemented yet, Join flavors, cross/left/etc
 //
 //class JoinSimple5Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
 //  def testDescription = "Join: two-table simple join with &&"
@@ -121,7 +122,6 @@ WHERE (buyers$A.name = "string constant" AND product$B.id = buyers$A.id)
 //      """
 //}
 //
-//// TODO: Join flavors, cross/left/etc
 //class FlatJoin2Test extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
 //  def testDescription = "Join: simple flatmap"
 //  def query() =

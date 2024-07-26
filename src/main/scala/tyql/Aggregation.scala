@@ -11,7 +11,7 @@ import NamedTuple.{AnyNamedTuple, NamedTuple}
  * embed aggregations within queries and treat them as expressions.
  *
  * Alternatively, could just treat it like an iterable of length 1, so the type system should not
- * care if an operation is an aggregation or a regular expression.
+ * care if an operation is an aggregation or a regular expression, which would greatly simplify things.
  *
  * Currently support ASTs of Map[Aggregation] as well as Aggregation[Aggregation] depending on user code
  *
@@ -33,20 +33,19 @@ object Aggregation {
   case class Count[A]($a: Expr[A]) extends Aggregation[Int]
 
   // Needed because project can be a top-level result for aggregation but not query??
-//  case class AggProject[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripAgg]]) extends Aggregation[NamedTuple.Map[A, StripAgg]]
+  case class AggProject[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripAgg]]) extends Aggregation[NamedTuple.Map[A, StripAgg]]
 
-//  type StripAgg[E] = E match
-//    case Aggregation[b] => b
-    // case Expr[b] => b, for when ->
+  type StripAgg[E] = E match
+    case Aggregation[b] => b
 
 //   TODO: Should indicate if *any* single element is an aggregation, even if some elements are exprs. Tuple of ONLY expr's should be Expr.toRow
   type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Aggregation[?]
 
   extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
-    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): Expr.Project[A] = Expr.Project(x)
+    def toRow(using ResultTag[NamedTuple.Map[A, StripAgg]]): AggProject[A] = AggProject(x)
 
   /** Same as _.toRow, as an implicit conversion */
-  given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, Expr.Project[A]] = Expr.Project(_)
+  given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripAgg]]): Conversion[A, AggProject[A]] = AggProject(_)
 
   /**
    * NOTE: For group by, require that the result is a named tuple so that it can be referred to in the next clause?
