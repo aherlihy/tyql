@@ -51,7 +51,7 @@ class SelectWithGtTest extends SQLStringQueryTest[CityDB, String] {
     yield city.name
   def expectedQueryPattern: String = "SELECT cities$A.name FROM cities as cities$A WHERE cities$A.population > 10000"
 }
-/*
+
 class SelectWithSelfNestTest extends SQLStringQueryTest[CityDB, CityT] {
   def testDescription: String = "Select: self-join with condition"
   def query() =
@@ -61,9 +61,10 @@ class SelectWithSelfNestTest extends SQLStringQueryTest[CityDB, CityT] {
       if city.name == alt.name && city.zipCode != alt.zipCode
     yield
       city
-  def expectedQueryPattern: String = "SELECT * FROM cities AS cities$A JOIN cities AS alt ON city.name=alt.name AND city.zipcode != alt.zipcode"
+  def expectedQueryPattern: String = "SELECT cities$A FROM cities as cities$A, cities as cities$B WHERE cities$A.name = cities$B.name AND cities$A.zipCode <> cities$B.zipCode"
 }
 
+// TODO: Nested types require more thought
 class SelectNested extends SQLStringQueryTest[AllLocDBs, CityT] {
   def testDescription: String = "Select: two-table join with condition "
   def query() =
@@ -73,9 +74,9 @@ class SelectNested extends SQLStringQueryTest[AllLocDBs, CityT] {
       if city == address.city
     yield
       city
-  def expectedQueryPattern: String =  "SELECT city.* FROM cities AS city JOIN addresses AS address ON city=address.city"
+  def expectedQueryPattern: String =  "SELECT cities$A FROM cities as cities$A, addresses as addresses$B WHERE cities$A = addresses$B.city"
 }
-*/
+
 class SelectWithProjectTestToRow extends SQLStringQueryTest[CityDB, (name: String, zipCode: Int)] {
   def testDescription: String = "Select: select with project"
   def query() =
@@ -101,7 +102,7 @@ class SelectMultipleFilterTest extends SQLStringQueryTest[AllCommerceDBs, Produc
 }
 
 /*
-// TODO: probably use take not single
+// TODO: not yet implemented, probably use take not single
  class SelectSingleTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
    def testDescription: String = "Select: single"
    def query() =
@@ -115,7 +116,7 @@ class SelectMultipleFilterTest extends SQLStringQueryTest[AllCommerceDBs, Produc
      """
  }
 
-// TODO: determine what contains, nonempty, and isEmpty syntax makes the most sense
+// TODO: determine what contains, nonempty, and isEmpty, case syntax makes the most sense
 class ContainsTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "Contains"
   def query() =
@@ -170,20 +171,20 @@ class IsEmptyTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
    )"""
 }
 
-// class CaseTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
-//   def testDescription: String = "CaseTest"
-//   def query() =
-//     testDB.tables.products
-//       .map: prod => (name: prod.name, price: prod.price, op: (prod.price > 1000) ? "Expensive" "Cheap")
-//   def expectedQueryPattern: String = """
-// SELECT
-//   Name,
-//   Price,
-//   CASE
-//     WHEN Price > 1000 THEN 'Expensive'
-//     ELSE 'Cheap'
-//   END
-// FROM Products;
-//   """
-// }
+ class CaseTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
+   def testDescription: String = "CaseTest"
+   def query() =
+     testDB.tables.products
+       .map: prod => (name: prod.name, price: prod.price, op: (prod.price > 1000) ? "Expensive" "Cheap")
+   def expectedQueryPattern: String = """
+ SELECT
+   Name,
+   Price,
+   CASE
+     WHEN Price > 1000 THEN 'Expensive'
+     ELSE 'Cheap'
+   END
+ FROM Products;
+   """
+ }
  */
