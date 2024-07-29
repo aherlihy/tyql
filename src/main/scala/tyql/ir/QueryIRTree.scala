@@ -3,25 +3,11 @@ package tyql
 import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 import NamedTupleDecomposition.*
+
 /**
  * Logical query plan tree
  * Moves all type parameters into terms
  */
-trait QueryIRNode:
-  val ast: DatabaseAST[?] | Expr[?] | Expr.Fun[?, ?] // Best-effort, keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
-  val children: Seq[QueryIRNode]
-  def toSQLString(): String
-
-trait QueryIRLeaf extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq()
-
-enum SelectFlags:
-  case Distinct
-  case TopLevel
-  case ExprLevel
-
-type SymbolTable = Map[String, RelationOp]
-
 object QueryIRTree:
 
   def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
@@ -85,7 +71,7 @@ object QueryIRTree:
    * @return
    */
   private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
-    println(s"genQuery: ast=$ast")
+//    println(s"genQuery: ast=$ast")
     ast match
       case table: Table[?] =>
         TableLeaf(table.$name, table)
@@ -108,7 +94,6 @@ object QueryIRTree:
             SelectQuery(SelectAllExpr(), Seq(tableIR), Seq(where), None, filter)
       case flatMap: (Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
         val (tableIRs, projectIR) = collapseFlatMap(Seq(), Map(), flatMap)
-//        println(s"in flatMap, tableIRs=$tableIRs, projectIR=$projectIR")
         /** TODO: this is where could create more complex join nodes,
          * for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
          */
@@ -215,277 +200,5 @@ object QueryIRTree:
       case p: Aggregation.AggProject[?] => generateProjection(p, symbols)
       case sub: Aggregation.AggFlatMap[?, ?] =>
         val subg = generateQuery(sub, symbols)
-        println(s"setting level to expr for $subg")
         subg.appendExprLevel() // special case, remove alias
       case _ => throw new Exception(s"Unimplemented aggregation op: $ast")
-
-trait RelationOp extends QueryIRNode:
-  var flags: Set[SelectFlags] = Set.empty
-  def alias: String
-  // TODO: decide if we want to mutate, copy, or discard IR nodes. Right now its a mix
-  def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp
-  def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp
-  def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp
-  def appendDistinct(): RelationOp
-  def appendTopLevel(): RelationOp
-  def appendExprLevel(): RelationOp
-
-case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with QueryIRLeaf:
-  val name = s"$tableName${QueryIRTree.idCount}"
-  QueryIRTree.idCount += 1
-  override def alias = name
-  override def toSQLString(): String = s"$tableName as $name"
-
-  override def toString: String = s"TableLeaf($tableName as $name)"
-
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(SelectAllExpr(), Seq(this), w, Some(alias), astOther)
-
-  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(p, Seq(this), Seq(), None, astOther)
-
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(
-      q.project,
-      this +: q.from,
-      q.where,
-      None,
-      astOther
-    )
-
-  override def appendDistinct(): RelationOp =
-    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), Some(alias), ast)
-    q.flags = q.flags + SelectFlags.Distinct
-    q
-
-  override def appendTopLevel(): RelationOp =
-    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), None, ast)
-    q.flags = q.flags + SelectFlags.TopLevel
-    q
-
-  override def appendExprLevel(): RelationOp =
-    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), None, ast)
-    q.flags = q.flags + SelectFlags.ExprLevel
-    q
-
-
-/**
- * Select: SELECT <ProjectClause> FROM <QueryIRSource> WHERE <WhereClause>
- */
-case class SelectQuery(project: QueryIRNode,
-                       from: Seq[RelationOp],
-                       where: Seq[QueryIRNode],
-                       overrideAlias: Option[String],
-                       ast: DatabaseAST[?]) extends RelationOp:
-  val children = project +: (from ++ where)
-  val name = overrideAlias.getOrElse({
-    val latestVar = s"subquery${QueryIRTree.idCount}"
-    QueryIRTree.idCount += 1
-    latestVar
-  })
-  override def alias = name
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(project, from, where ++ w, Some(alias), astOther)
-
-  // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))?
-  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    project match
-      case s: SelectAllExpr => SelectQuery(p, from, where, None, ast)
-      case _ => // Could collapse, for now use subquery
-        SelectQuery(p, Seq(this), Seq(), None, astOther)
-
-  /**
-   * Merge with another select query to avoid extra nesting
-   */
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    val newP = if (project.isInstanceOf[SelectAllExpr]) // TODO: differentiate between * and no map?
-      q.project
-    else if (q.project.isInstanceOf[SelectAllExpr])
-      project
-    else
-      // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))?
-      throw new Exception("Unimplemented: merging two subqueries with project stmts")
-
-    val newF = from ++ q.from
-    val newW = where ++ q.where
-    SelectQuery(newP, newF, newW, None, astOther) // TODO: alias?
-
-  override def appendDistinct(): RelationOp =
-    flags = flags + SelectFlags.Distinct
-    this
-
-  override def appendTopLevel(): RelationOp =
-    flags = flags + SelectFlags.TopLevel
-    this
-
-  override def appendExprLevel(): RelationOp =
-    flags = flags + SelectFlags.ExprLevel
-    this
-
-  override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
-    val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
-    val projectStr = project.toSQLString()
-    val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
-    val whereStr = if where.nonEmpty then
-      s" WHERE ${if where.size == 1 then where.head.toSQLString() else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")}" else
-      ""
-    s"${open}SELECT $flagsStr$projectStr FROM $fromStr$whereStr$close$aliasStr"
-
-  override def toString: String = // for debugging
-    s"SelectQuery(\n\talias=$alias,\n\tproject=$project,\n\tfrom=$from,\n\twhere=$where\n)"
-
-case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast: DatabaseAST[?]) extends RelationOp:
-  override val children: Seq[QueryIRNode] = query +: sortFn.map(_._1)
-  override def alias = query.alias
-
-  val orders: Seq[Ord] = sortFn.map(_._2)
-
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
-    // Does not trigger subquery, e.g. relation.sort(s).filter(f) => SELECT * FROM relation WHERE f ORDER BY s
-    OrderedQuery(query.appendWhere(w, astOther), sortFn, ast)
-
-  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    // Triggers a subquery, e.g. relation.sort(s).map(m) => SELECT m FROM (SELECT * from relation ORDER BY s).
-    // Note relation.map(m).sort(s) => SELECT m FROM relation ORDER BY s
-    SelectQuery(
-      p,
-      Seq(this),
-      Seq(),
-      None,
-      astOther
-    )
-
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    // Triggers subquery
-    SelectQuery(
-      SelectAllExpr(),
-      Seq(this),
-      Seq(),
-      None,
-      astOther
-    )
-  override def appendDistinct(): RelationOp =
-    query.appendDistinct()
-    this
-
-  override def appendTopLevel(): RelationOp =
-    flags = flags + SelectFlags.TopLevel
-    this
-
-  override def appendExprLevel(): RelationOp =
-    flags = flags + SelectFlags.ExprLevel
-    this
-
-  override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
-    s"$open${query.toSQLString()} ORDER BY ${sortFn.map(s =>
-      val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
-        case v: SelectExpr => v.attrName
-        case o => o.toSQLString()
-      s"$varStr ${s._2.toString}"
-    ).mkString("", ", ", "")}$close$aliasStr"
-
-case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Query[?]) extends RelationOp:
-  override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
-  val latestVar = s"subquery${QueryIRTree.idCount}"
-  QueryIRTree.idCount += 1
-  override def alias = latestVar
-
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(
-      SelectAllExpr(),
-      Seq(this),
-      w,
-      None,
-      astOther
-    )
-
-  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(
-      p,
-      Seq(this),
-      Seq(),
-      None,
-      astOther
-    )
-
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(
-      SelectAllExpr(),
-      Seq(this),
-      Seq(),
-      None,
-      astOther
-    )
-
-  override def appendDistinct(): RelationOp =
-    lhs.appendDistinct()
-    rhs match
-      case r: RelationOp => r.appendDistinct()
-    this
-
-  override def appendTopLevel(): RelationOp =
-    flags = flags + SelectFlags.TopLevel
-    this
-
-  override def appendExprLevel(): RelationOp =
-    flags = flags + SelectFlags.ExprLevel
-    this
-
-  override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
-    s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
-
-// Single WHERE clause containing 1+ predicates
-case class WhereClause(children: Seq[QueryIRNode], ast: Expr[?]) extends QueryIRNode:
-  override def toSQLString(): String = if children.size == 1 then children.head.toSQLString() else  s"${children.map(_.toSQLString()).mkString("", " AND ", "")}"
-
-case class PredicateExpr(child: QueryIRNode, ast: Expr.Fun[?, ?]) extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq(child)
-  override def toSQLString(): String = ???
-
-// TODO: can't assume op is universal, need to specialize for DB backend
-case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?]) extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
-  override def toSQLString(): String = s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
-
-// TODO: can't assume op is universal, need to specialize for DB backend
-case class UnaryExprOp(child: QueryIRNode, op: String => String, ast: Expr[?]) extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq(child)
-  override def toSQLString(): String = op(s"${child.toSQLString()}")
-
-case class ProjectClause(children: Seq[QueryIRNode], ast: Expr[?]) extends QueryIRNode:
-  override def toSQLString(): String = children.map(_.toSQLString()).mkString("", ", ", "")
-
-// TODO: generate anonymous names, or allow generated queries to be unnamed, or only allow named tuple results?
-// Note projected attributes with names is not the same as aliasing, and just exists for readability
-case class AttrExpr(child: QueryIRNode, projectedName: Option[String], ast: Expr[?]) extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq(child)
-  val asStr = projectedName match
-    case Some(value) => s" as $value"
-    case None => ""
-  override def toSQLString(): String = s"${child.toSQLString()}$asStr"
-
-case class SelectExpr(attrName: String, from: QueryIRNode, ast: Expr[?]) extends QueryIRLeaf:
-  override def toSQLString(): String = s"${from.toSQLString()}.$attrName"
-
-case class SelectAllExpr() extends QueryIRLeaf:
-  val ast = null
-  override def toSQLString(): String = "*"
-
-// TODO: probably don't need to store the entire value, just an alias
-case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?]) extends QueryIRLeaf:
-  override def toSQLString() = toSub.alias
-
-  override def toString: String = s"VAR(${toSub.alias}.$name)"
-
-// TODO: can't assume stringRep is universal, need to specialize for DB backend
-case class Literal(stringRep: String, ast: Expr[?]) extends QueryIRLeaf:
-  override def toSQLString(): String = stringRep
-
-case class EmptyLeaf(ast: DatabaseAST[?] = null) extends QueryIRLeaf:
-  override def toSQLString(): String = ""
