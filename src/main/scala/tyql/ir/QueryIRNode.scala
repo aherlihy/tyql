@@ -5,12 +5,10 @@ package tyql
  */
 trait QueryIRNode:
   val ast: DatabaseAST[?] | Expr[?] | Expr.Fun[?, ?] // Best-effort, keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
-  val children: Seq[QueryIRNode]
 
   def toSQLString(): String
 
-trait QueryIRLeaf extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq()
+trait QueryIRLeaf extends QueryIRNode
 
 /**
  * Single WHERE clause containing 1+ predicates
@@ -22,7 +20,6 @@ case class WhereClause(children: Seq[QueryIRNode], ast: Expr[?]) extends QueryIR
  * Single predicate expression
  */
 case class PredicateExpr(child: QueryIRNode, ast: Expr.Fun[?, ?]) extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq(child)
   override def toSQLString(): String = ???
 
 /**
@@ -30,7 +27,6 @@ case class PredicateExpr(child: QueryIRNode, ast: Expr.Fun[?, ?]) extends QueryI
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
  */
 case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?]) extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
   override def toSQLString(): String = s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
 
 /**
@@ -38,7 +34,6 @@ case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
  */
 case class UnaryExprOp(child: QueryIRNode, op: String => String, ast: Expr[?]) extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq(child)
   override def toSQLString(): String = op(s"${child.toSQLString()}")
 
 /**
@@ -56,7 +51,6 @@ case class ProjectClause(children: Seq[QueryIRNode], ast: Expr[?]) extends Query
  * Note projected attributes with names is not the same as aliasing, and just exists for readability
  */
 case class AttrExpr(child: QueryIRNode, projectedName: Option[String], ast: Expr[?]) extends QueryIRNode:
-  override val children: Seq[QueryIRNode] = Seq(child)
   val asStr = projectedName match
     case Some(value) => s" as $value"
     case None => ""
@@ -67,13 +61,6 @@ case class AttrExpr(child: QueryIRNode, projectedName: Option[String], ast: Expr
  */
 case class SelectExpr(attrName: String, from: QueryIRNode, ast: Expr[?]) extends QueryIRLeaf:
   override def toSQLString(): String = s"${from.toSQLString()}.$attrName"
-
-/**
- * Shortcut for the * part of SELECT * FROM ...
- */
-case class SelectAllExpr() extends QueryIRLeaf:
-  val ast = null
-  override def toSQLString(): String = "*"
 
 /**
  * A variable that points to a table or subquery.

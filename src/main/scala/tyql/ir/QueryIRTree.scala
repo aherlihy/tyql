@@ -87,12 +87,12 @@ object QueryIRTree:
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         tableIR match
-          case s: SelectQuery if s.project.isInstanceOf[SelectAllExpr] =>
+          case s: SelectQuery if s.project.isEmpty =>
             tableIR.appendWhere(Seq(where), filter)
           case t: TableLeaf =>
             tableIR.appendWhere(Seq(where), filter)
           case _ => // cannot unnest because source had projection, sort, etc.
-            SelectQuery(SelectAllExpr(), Seq(tableIR), Seq(where), None, filter)
+            SelectQuery(None, Seq(tableIR), Seq(where), None, filter)
       case flatMap: (Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
         val (tableIRs, projectIR) = collapseFlatMap(Seq(), Map(), flatMap)
         /** TODO: this is where could create more complex join nodes,
@@ -106,11 +106,11 @@ object QueryIRTree:
               case s: SelectQuery =>
                 q1.appendSubquery(s, flatMap)
               case t: TableLeaf =>
-                q1.appendSubquery(SelectQuery(SelectAllExpr(), Seq(t), Seq(), None, t.ast), flatMap)
+                q1.appendSubquery(SelectQuery(None, Seq(t), Seq(), None, t.ast), flatMap)
               case _ => throw new Exception(s"Cannot unnest query")
           ).appendProject(projectIR, flatMap)
         catch
-          case e: Exception => SelectQuery(projectIR, tableIRs, Seq(), None, flatMap)
+          case e: Exception => SelectQuery(Some(projectIR), tableIRs, Seq(), None, flatMap)
 
       case union: Query.Union[?] =>
         val lhs = generateQuery(union.$this, symbols).appendFlag(SelectFlags.FinalLevel)
@@ -139,7 +139,7 @@ object QueryIRTree:
 
   private def generateFun(fun: Expr.Fun[?, ?], appliedTo: RelationOp, symbols: SymbolTable): QueryIRNode =
     fun.$body match
-      case r: Expr.Ref[?] if r.stringRef() == fun.$param.stringRef() => SelectAllExpr() // special case identity function
+//      case r: Expr.Ref[?] if r.stringRef() == fun.$param.stringRef() => SelectAllExpr() // special case identity function
       case e: Expr[?] => generateExpr(e, symbols + (fun.$param.stringRef() -> appliedTo))
       case _ => ??? // TODO: find better way to differentiate
 

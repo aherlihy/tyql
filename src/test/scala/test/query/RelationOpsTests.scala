@@ -34,10 +34,10 @@ class RelationOpsUnion2Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
       .map(prod => prod)
       .union(testDB.tables.products.map(purch => purch))
   def expectedQueryPattern: String =  """
-        SELECT *
+        SELECT product$A
         FROM product as product$A
         UNION
-        SELECT *
+        SELECT product$B
         FROM product as product$B
       """
 }

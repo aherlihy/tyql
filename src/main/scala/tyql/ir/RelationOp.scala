@@ -34,10 +34,10 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
   override def toString: String = s"TableLeaf($tableName as $name)"
 
   override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(SelectAllExpr(), Seq(this), w, Some(alias), astOther)
+    SelectQuery(None, Seq(this), w, Some(alias), astOther)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(p, Seq(this), Seq(), None, astOther)
+    SelectQuery(Some(p), Seq(this), Seq(), None, astOther)
 
   override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(
@@ -51,9 +51,9 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
   override def appendFlag(f: SelectFlags): RelationOp =
     val q = f match
       case SelectFlags.Distinct => // Distinct is special case because needs to be "hoisted" to enclosing SELECT
-        SelectQuery(SelectAllExpr(), Seq(this), Seq(), Some(alias), ast)
+        SelectQuery(None, Seq(this), Seq(), Some(alias), ast)
       case _ =>
-        SelectQuery(SelectAllExpr(), Seq(this), Seq(), None, ast)
+        SelectQuery(None, Seq(this), Seq(), None, ast)
 
     q.flags = q.flags + f
     q
@@ -61,12 +61,11 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
 /**
  * Select query, e.g. SELECT <Project> FROM <Relations> WHERE <where>
  */
-case class SelectQuery(project: QueryIRNode,
+case class SelectQuery(project: Option[QueryIRNode],
                        from: Seq[RelationOp],
                        where: Seq[QueryIRNode],
                        overrideAlias: Option[String],
                        ast: DatabaseAST[?]) extends RelationOp:
-  val children = project +: (from ++ where)
   val name = overrideAlias.getOrElse({
     val latestVar = s"subquery${QueryIRTree.idCount}"
     QueryIRTree.idCount += 1
@@ -76,24 +75,23 @@ case class SelectQuery(project: QueryIRNode,
   override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(project, from, where ++ w, Some(alias), astOther)
 
-  // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))?
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     project match
-      case s: SelectAllExpr => SelectQuery(p, from, where, None, ast)
-      case _ => // Could collapse, for now use subquery
-        SelectQuery(p, Seq(this), Seq(), None, astOther)
+      case None => // This is a SELECT * query, so just add the project clause
+        SelectQuery(Some(p), from, where, None, ast)
+      case _ => // There is already a project clause, so could collapse, for now use subquery
+        // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))?
+        SelectQuery(Some(p), Seq(this), Seq(), None, astOther)
 
   /**
    * Merge with another select query to avoid extra nesting
    */
   override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    val newP = if (project.isInstanceOf[SelectAllExpr]) // TODO: differentiate between * and no map?
-      q.project
-    else if (q.project.isInstanceOf[SelectAllExpr])
-      project
-    else
-      // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))?
-      throw new Exception("Unimplemented: merging two subqueries with project stmts")
+    val newP = (q.project, project) match
+      case (Some(p1), Some(p2)) =>
+        // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))?
+        throw new Exception("Unimplemented: merging two subqueries with project stmts")
+      case _ => q.project.orElse(project)
 
     val newF = from ++ q.from
     val newW = where ++ q.where
@@ -107,7 +105,7 @@ case class SelectQuery(project: QueryIRNode,
     val (open, close) = if flags.contains(SelectFlags.FinalLevel) then ("", "") else ("(", ")")
     val aliasStr = if flags.contains(SelectFlags.FinalLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
-    val projectStr = project.toSQLString()
+    val projectStr = project.fold("*")(_.toSQLString())
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
     val whereStr = if where.nonEmpty then
       s" WHERE ${if where.size == 1 then where.head.toSQLString() else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")}" else
@@ -121,7 +119,6 @@ case class SelectQuery(project: QueryIRNode,
  * Query with ORDER BY clause
  */
 case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast: DatabaseAST[?]) extends RelationOp:
-  override val children: Seq[QueryIRNode] = query +: sortFn.map(_._1)
   override def alias = query.alias
 
   val orders: Seq[Ord] = sortFn.map(_._2)
@@ -132,9 +129,9 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     // Triggers a subquery, e.g. relation.sort(s).map(m) => SELECT m FROM (SELECT * from relation ORDER BY s).
-    // Note relation.map(m).sort(s) => SELECT m FROM relation ORDER BY s
+    // Note relation.map(m).sort(s) does not trigger a subquery => SELECT m FROM relation ORDER BY s
     SelectQuery(
-      p,
+      Some(p),
       Seq(this),
       Seq(),
       None,
@@ -144,7 +141,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
   override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
     // Triggers subquery
     SelectQuery(
-      SelectAllExpr(),
+      None,
       Seq(this),
       Seq(),
       None,
@@ -172,14 +169,13 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
  * Binary relation-level operation, e.g. union
  */
 case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Query[?]) extends RelationOp:
-  override val children: Seq[QueryIRNode] = Seq(lhs, rhs)
   val latestVar = s"subquery${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
   override def alias = latestVar
 
   override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(
-      SelectAllExpr(),
+      None,
       Seq(this),
       w,
       None,
@@ -188,7 +184,7 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(
-      p,
+      Some(p),
       Seq(this),
       Seq(),
       None,
@@ -197,7 +193,7 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
 
   override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(
-      SelectAllExpr(),
+      None,
       Seq(this),
       Seq(),
       None,
