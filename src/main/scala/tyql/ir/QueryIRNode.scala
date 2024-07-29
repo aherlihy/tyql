@@ -17,12 +17,6 @@ case class WhereClause(children: Seq[QueryIRNode], ast: Expr[?]) extends QueryIR
   override def toSQLString(): String = if children.size == 1 then children.head.toSQLString() else  s"${children.map(_.toSQLString()).mkString("", " AND ", "")}"
 
 /**
- * Single predicate expression
- */
-case class PredicateExpr(child: QueryIRNode, ast: Expr.Fun[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = ???
-
-/**
  * Binary expression-level operation.
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
  */

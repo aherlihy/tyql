@@ -84,10 +84,11 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
     allMatches
   }
 
-  import tyql.ASTPrinter.*
+  import tyql.TreePrettyPrinter.*
   test(testDescription) {
     val q = query()
-    println(s"$testDescription:\nAST:\n${q.prettyPrint(0)}")
+    println(s"$testDescription:")
+//    println(s"AST:\n${q.prettyPrint(0)}")
     val actual = q.toSQLString
     println(s"\tactual: $actual")
     val stripped = expectedQueryPattern.trim().replace("\n", " ").replaceAll("\\s+", " ")

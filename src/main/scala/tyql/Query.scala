@@ -42,7 +42,8 @@ trait DatabaseAST[Result](using val tag: ResultTag[Result]):
 
   private def toQueryIR: QueryIRNode =
     val q = QueryIRTree.generateFullQuery(this, Map.empty)
-    println(s"IR: $q")
+    import tyql.TreePrettyPrinter.*
+    println(s"IR: ${q.prettyPrintIR(0, true)}")
     q
 
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
