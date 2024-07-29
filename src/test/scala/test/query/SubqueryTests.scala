@@ -34,27 +34,27 @@ AST:
 FlatMap(
   Table(purchase),
   Fun(
-    Ref(),
+    Ref[1],
     Map(
       Filter(
         Limit(
           Sort(
             Table(product),
-            Fun(Ref(),
-              Select(Ref(), price)
+            Fun(Ref[1],
+              Select(Ref[1], price)
             ),
             DESC
           ),
           1
         ),
         Fun(
-          Ref(),
-          Eq(Select(Ref(), id), Select(Ref(), id))
+          Ref[2],
+          Eq(Select(Ref[2], id), Select(Ref[2], id))
         )
       ),
       Fun(
-        Ref(),
-        Select(Ref(), total)
+        Ref[3],
+        Select(Ref[3], total)
       )
     )
   )
