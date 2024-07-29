@@ -4,9 +4,9 @@ package tyql
  * Modifiers for query generation, e.g. queries at the expression level need surrounding parens.
  */
 enum SelectFlags:
-  case Distinct
-  case TopLevel
-  case ExprLevel
+  case Distinct   // used by select queries
+  case FinalLevel // top-level final result, e.g. avoid extra parens or aliasing
+  case ExprLevel  // expression-level relation operation
 
 type SymbolTable = Map[String, RelationOp]
 
@@ -16,13 +16,11 @@ type SymbolTable = Map[String, RelationOp]
 trait RelationOp extends QueryIRNode:
   var flags: Set[SelectFlags] = Set.empty
   def alias: String
-  // TODO: decide if we want to mutate, copy, or discard IR nodes. Right now its a mix
+  // TODO: decide if we want to mutate, or copy + discard IR nodes. Right now its a mix
   def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp
   def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp
   def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp
-  def appendDistinct(): RelationOp
-  def appendTopLevel(): RelationOp
-  def appendExprLevel(): RelationOp
+  def appendFlag(f: SelectFlags): RelationOp
 
 /**
  * Simple table read.
@@ -50,21 +48,15 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
       astOther
     )
 
-  override def appendDistinct(): RelationOp =
-    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), Some(alias), ast)
-    q.flags = q.flags + SelectFlags.Distinct
-    q
+  override def appendFlag(f: SelectFlags): RelationOp =
+    val q = f match
+      case SelectFlags.Distinct => // Distinct is special case because needs to be "hoisted" to enclosing SELECT
+        SelectQuery(SelectAllExpr(), Seq(this), Seq(), Some(alias), ast)
+      case _ =>
+        SelectQuery(SelectAllExpr(), Seq(this), Seq(), None, ast)
 
-  override def appendTopLevel(): RelationOp =
-    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), None, ast)
-    q.flags = q.flags + SelectFlags.TopLevel
+    q.flags = q.flags + f
     q
-
-  override def appendExprLevel(): RelationOp =
-    val q = SelectQuery(SelectAllExpr(), Seq(this), Seq(), None, ast)
-    q.flags = q.flags + SelectFlags.ExprLevel
-    q
-
 
 /**
  * Select query, e.g. SELECT <Project> FROM <Relations> WHERE <where>
@@ -107,21 +99,13 @@ case class SelectQuery(project: QueryIRNode,
     val newW = where ++ q.where
     SelectQuery(newP, newF, newW, None, astOther)
 
-  override def appendDistinct(): RelationOp =
-    flags = flags + SelectFlags.Distinct
-    this
-
-  override def appendTopLevel(): RelationOp =
-    flags = flags + SelectFlags.TopLevel
-    this
-
-  override def appendExprLevel(): RelationOp =
-    flags = flags + SelectFlags.ExprLevel
+  override def appendFlag(f: SelectFlags): RelationOp =
+    flags = flags + f
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    val (open, close) = if flags.contains(SelectFlags.FinalLevel) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.FinalLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val projectStr = project.toSQLString()
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
@@ -166,21 +150,17 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
       None,
       astOther
     )
-  override def appendDistinct(): RelationOp =
-    query.appendDistinct()
-    this
-
-  override def appendTopLevel(): RelationOp =
-    flags = flags + SelectFlags.TopLevel
-    this
-
-  override def appendExprLevel(): RelationOp =
-    flags = flags + SelectFlags.ExprLevel
+  override def appendFlag(f: SelectFlags): RelationOp =
+    f match
+      case SelectFlags.Distinct =>
+        query.appendFlag(f)
+      case _ =>
+        flags = flags + f
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    val (open, close) = if flags.contains(SelectFlags.FinalLevel) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.FinalLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     s"$open${query.toSQLString()} ORDER BY ${sortFn.map(s =>
       val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
         case v: SelectExpr => v.attrName
@@ -224,22 +204,18 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
       astOther
     )
 
-  override def appendDistinct(): RelationOp =
-    lhs.appendDistinct()
-    rhs match
-      case r: RelationOp => r.appendDistinct()
-    this
-
-  override def appendTopLevel(): RelationOp =
-    flags = flags + SelectFlags.TopLevel
-    this
-
-  override def appendExprLevel(): RelationOp =
-    flags = flags + SelectFlags.ExprLevel
+  override def appendFlag(f: SelectFlags): RelationOp =
+    f match
+      case SelectFlags.Distinct =>
+        lhs.appendFlag(f)
+        rhs match
+          case r: RelationOp => r.appendFlag(f)
+      case _ =>
+        flags = flags + f
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.TopLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.TopLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    val (open, close) = if flags.contains(SelectFlags.FinalLevel) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.FinalLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
 
