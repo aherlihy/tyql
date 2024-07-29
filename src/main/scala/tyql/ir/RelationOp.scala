@@ -5,7 +5,7 @@ package tyql
  */
 enum SelectFlags:
   case Distinct   // used by select queries
-  case FinalLevel // top-level final result, e.g. avoid extra parens or aliasing
+  case Final      // top-level final result, e.g. avoid extra parens or aliasing
   case ExprLevel  // expression-level relation operation
 
 type SymbolTable = Map[String, RelationOp]
@@ -16,10 +16,31 @@ type SymbolTable = Map[String, RelationOp]
 trait RelationOp extends QueryIRNode:
   var flags: Set[SelectFlags] = Set.empty
   def alias: String
-  // TODO: decide if we want to mutate, or copy + discard IR nodes. Right now its a mix
+  // TODO: decide if we want to mutate, or copy + discard IR nodes. Right now its a mix, which should be improved
+
+  /**
+   * Equivalent to adding a .filter(w)
+   * @param w - predicate expression
+   */
   def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp
+
+  /**
+   * Equivalent to adding a .map(p)
+   * @param p - a projection expression
+   */
   def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp
+
+  /**
+   * Equivalent to adding a .flatMap(q)
+   * @param q - the subquery
+   */
   def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp
+
+  /**
+   * Add some extra metadata needed to generate "nice" SQL strings.
+   * Also used to handle edge cases, e.g. expression-level relation-ops should get aliases, etc.
+   * @param f - the flag
+   */
   def appendFlag(f: SelectFlags): RelationOp
 
 /**
@@ -50,7 +71,7 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
 
   override def appendFlag(f: SelectFlags): RelationOp =
     val q = f match
-      case SelectFlags.Distinct => // Distinct is special case because needs to be "hoisted" to enclosing SELECT
+      case SelectFlags.Distinct => // Distinct is special case because needs to be "hoisted" to enclosing SELECT, so alias is kept
         SelectQuery(None, Seq(this), Seq(), Some(alias), ast)
       case _ =>
         SelectQuery(None, Seq(this), Seq(), None, ast)
@@ -102,8 +123,8 @@ case class SelectQuery(project: Option[QueryIRNode],
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.FinalLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.FinalLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val projectStr = project.fold("*")(_.toSQLString())
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
@@ -156,8 +177,8 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.FinalLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.FinalLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     s"$open${query.toSQLString()} ORDER BY ${sortFn.map(s =>
       val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
         case v: SelectExpr => v.attrName
@@ -211,7 +232,7 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.FinalLevel) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.FinalLevel) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
-    s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
+    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    s"$open${lhs.toSQLString()} $op ${rhs.toSQLString()}$close$aliasStr"
 

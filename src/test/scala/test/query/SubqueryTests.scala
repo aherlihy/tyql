@@ -11,25 +11,87 @@ import NamedTuple.*
 
 import java.time.LocalDate
 
-//class sortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
-//  def testDescription = "Subquery: sortTakeJoin"
-//  def query() =
-//    testDB.tables.purchases.flatMap(purch =>
-//      testDB.tables.products.sort(_.price, Ord.DESC).take(1)
-//        .filter(prod => prod.id == purch.id)
-//        .map(prod => purch.total)
-//    )
-//  def expectedQueryPattern = """
-//        SELECT purchase0.total AS res
-//        FROM purchase purchase0
-//        JOIN (SELECT product1.id AS id, product1.price AS price
-//          FROM product product1
-//          ORDER BY price DESC
-//          LIMIT ?) subquery1
-//        ON (purchase0.product_id = subquery1.id)
-//      """
-//}
+class sortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
+  def testDescription = "Subquery: sortTakeJoin"
+  def query() =
+    testDB.tables.purchases.flatMap(purch =>
+      testDB.tables.products.sort(_.price, Ord.DESC).take(1)
+        .filter(prod => prod.id == purch.id)
+        .map(prod => purch.total)
+    )
+  def expectedQueryPattern = """
+        SELECT purchase$A.total
+        FROM purchase as purchase$A,
+          (SELECT *
+          FROM product as product$B
+          ORDER BY price DESC
+          LIMIT 1) as subquery$C
+        WHERE subquery$C.id = purchase$A.id
+      """
+}
+/*
+AST:
+FlatMap(
+  Table(purchase),
+  Fun(
+    Ref(),
+    Map(
+      Filter(
+        Limit(
+          Sort(
+            Table(product),
+            Fun(Ref(),
+              Select(Ref(), price)
+            ),
+            DESC
+          ),
+          1
+        ),
+        Fun(
+          Ref(),
+          Eq(Select(Ref(), id), Select(Ref(), id))
+        )
+      ),
+      Fun(
+        Ref(),
+        Select(Ref(), total)
+      )
+    )
+  )
+)
 
+IR:
+SelectQuery(
+  alias = subquery6,
+  project = Some(SelectExpr(total, VAR(purchase0.ref0), Select(Ref(), total))),
+  from = List(
+    TableLeaf(purchase as purchase0),
+    BinRelationOp(
+      OrderedQuery(
+        SelectQuery(
+          alias = subquery2,
+          project = None,
+          from = List(TableLeaf(product as product1)),
+          where = List()
+        ),
+        List((SelectExpr(price, VAR(product1.ref1), Select(Ref(), price)), DESC)),
+        Sort(Table(product), Fun(Ref(), Select(Ref(), price)), DESC)
+      ),
+      Literal(1, IntLit(1)),
+      LIMIT,
+      Limit(Sort(Table(product), Fun(Ref(), Select(Ref(), price)), DESC), 1)
+    )
+  ),
+  where = List(
+    WhereClause(
+      List(
+        BinExprOp(SelectExpr(id, VAR(subquery3.ref2), Select(Ref(), id)), SelectExpr(id, VAR(purchase0.ref0), Select(Ref(), id)), =, Eq(Select(Ref(), id), Select(Ref(), id)))
+      ),
+      Eq(Select(Ref(), id), Select(Ref(), id))
+    )
+  )
+)
+*/
 //class sortTake2JoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
 //  def testDescription = "Subquery: sortTakeJoin (for comprehension)"
 //  def query() =

@@ -1,17 +1,18 @@
 package tyql
 
 import language.experimental.namedTuples
-import NamedTuple.{AnyNamedTuple, NamedTuple}
+import NamedTuple.NamedTuple
 import NamedTupleDecomposition.*
 
 /**
- * Logical query plan tree
- * Moves all type parameters into terms
+ * Logical query plan tree.
+ * Moves all type parameters into terms (using ResultTag).
+ * Collapses nested queries where possible. 
  */
 object QueryIRTree:
 
   def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
-    generateQuery(ast, symbols).appendFlag(SelectFlags.FinalLevel) // ignore top-level parens
+    generateQuery(ast, symbols).appendFlag(SelectFlags.Final) // ignore top-level parens
 
   var idCount = 0
   /**
@@ -113,26 +114,26 @@ object QueryIRTree:
           case e: Exception => SelectQuery(Some(projectIR), tableIRs, Seq(), None, flatMap)
 
       case union: Query.Union[?] =>
-        val lhs = generateQuery(union.$this, symbols).appendFlag(SelectFlags.FinalLevel)
-        val rhs = generateQuery(union.$other, symbols).appendFlag(SelectFlags.FinalLevel)
+        val lhs = generateQuery(union.$this, symbols).appendFlag(SelectFlags.Final)
+        val rhs = generateQuery(union.$other, symbols).appendFlag(SelectFlags.Final)
         val op = if union.$dedup then "UNION" else "UNION ALL"
         BinRelationOp(lhs, rhs, op, union)
       case intersect: Query.Intersect[?] =>
-        val lhs = generateQuery(intersect.$this, symbols).appendFlag(SelectFlags.FinalLevel)
-        val rhs = generateQuery(intersect.$other, symbols).appendFlag(SelectFlags.FinalLevel)
+        val lhs = generateQuery(intersect.$this, symbols).appendFlag(SelectFlags.Final)
+        val rhs = generateQuery(intersect.$other, symbols).appendFlag(SelectFlags.Final)
         BinRelationOp(lhs, rhs, "INTERSECT", intersect)
       case sort: Query.Sort[?, ?] =>
         val (orderByASTs, tableIR) = collapseSort(Seq(), sort, symbols)
         val orderByExprs = orderByASTs.map(ord =>
           (generateFun(ord._1, tableIR, symbols), ord._2)
         )
-        OrderedQuery(tableIR.appendFlag(SelectFlags.FinalLevel), orderByExprs, sort)
+        OrderedQuery(tableIR.appendFlag(SelectFlags.Final), orderByExprs, sort)
       case limit: Query.Limit[?] =>
         val from = generateQuery(limit.$from, symbols)
-        BinRelationOp(from.appendFlag(SelectFlags.FinalLevel), Literal(limit.$limit.toString, limit.$limit), "LIMIT", limit)
+        BinRelationOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, limit.$limit), "LIMIT", limit)
       case offset: Query.Offset[?] =>
         val from = generateQuery(offset.$from, symbols)
-        BinRelationOp(from.appendFlag(SelectFlags.FinalLevel), Literal(offset.$offset.toString, offset.$offset), "OFFSET", offset)
+        BinRelationOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, offset.$offset), "OFFSET", offset)
       case distinct: Query.Distinct[?] =>
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
