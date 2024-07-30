@@ -162,10 +162,10 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
   override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
     // Triggers subquery
     SelectQuery(
-      None,
-      Seq(this),
-      Seq(),
-      None,
+      q.project, // TODO: need to update reference in project
+      q.from :+ this,
+      q.where,
+      Some(q.alias),
       astOther
     )
   override def appendFlag(f: SelectFlags): RelationOp =
@@ -199,7 +199,7 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
       None,
       Seq(this),
       w,
-      None,
+      Some(alias),
       astOther
     )
 
@@ -208,16 +208,16 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
       Some(p),
       Seq(this),
       Seq(),
-      None,
+      Some(alias),
       astOther
     )
 
   override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(
-      None,
-      Seq(this),
-      Seq(),
-      None,
+      q.project, // TODO: need to update reference in project
+      q.from :+ this,
+      q.where,
+      Some(q.alias),
       astOther
     )
 

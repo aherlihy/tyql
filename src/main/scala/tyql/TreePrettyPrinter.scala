@@ -127,25 +127,25 @@ object TreePrettyPrinter {
     def prettyPrintIR(depth: Int, printAST: Boolean): String = relationOp match {
       case tableLeaf: TableLeaf =>
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", tableLeaf.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}TableLeaf{${relationOp.flags.mkString(",")}}(${tableLeaf.tableName}$astPrint)"
+        s"${indent(depth)}TableLeaf{${relationOp.alias}{${relationOp.flags.mkString(",")}}(${tableLeaf.tableName}$astPrint)"
       case selectQuery: SelectQuery =>
         val projectPrint =  indentWithKey(depth + 1, "project", selectQuery.project.map(_.prettyPrintIR(depth + 1, printAST)).getOrElse("None"))
         val fromPrint =     indentListWithKey(depth + 1, "from", selectQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
         val wherePrint =    indentListWithKey(depth + 1, "where", selectQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", selectQuery.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}SelectQuery{${relationOp.flags.mkString(",")}}(\n$projectPrint,\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
+        s"${indent(depth)}SelectQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$projectPrint,\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
       case orderedQuery: OrderedQuery =>
         val queryPrint = orderedQuery.query.prettyPrintIR(depth + 1, printAST)
         val sortFnPrint = indentListWithKey(depth+1, "sort", orderedQuery.sortFn.map { case (node, ord) =>
           s"${indent(depth + 2)}${ord.toString}::${node.prettyPrintIR(depth + 2, printAST).stripLeading()}"
         })
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", orderedQuery.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}OrderedQuery{${relationOp.flags.mkString(",")}}(\n$queryPrint,\n$sortFnPrint$astPrint\n${indent(depth)})"
+        s"${indent(depth)}OrderedQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$queryPrint,\n$sortFnPrint$astPrint\n${indent(depth)})"
       case binRelationOp: BinRelationOp =>
         val lhsPrint = binRelationOp.lhs.prettyPrintIR(depth + 1, printAST)
         val rhsPrint = binRelationOp.rhs.prettyPrintIR(depth + 1, printAST)
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", binRelationOp.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}BinRelationOp{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${binRelationOp.op}'\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
+        s"${indent(depth)}BinRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${binRelationOp.op}'\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
 
       case _ => throw new Exception(s"Unimplemented pretty print RelationOp $relationOp")
     }
@@ -180,7 +180,7 @@ object TreePrettyPrinter {
         s"${indent(depth)}SelectExpr(\n${indent(depth + 1)}attrName='${selectExpr.attrName}',\n$fromPrint$astPrint\n${indent(depth)})"
       case irVar: QueryIRVar =>
         val astPrint = if (printAST) s", ${irVar.ast.prettyPrint(0)}" else ""
-        s"${indent(depth)}QueryIRVar(${irVar.name}$astPrint)"
+        s"${indent(depth)}QueryIRVar(${irVar.name} -> ${irVar.toSub.alias}$astPrint)"
       case literal: Literal =>
         val astPrint = if (printAST) s", ${literal.ast.prettyPrint(0)}" else ""
         s"${indent(depth)}Literal(${literal.stringRep}$astPrint)"

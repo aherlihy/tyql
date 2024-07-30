@@ -88,10 +88,15 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
   test(testDescription) {
     val q = query()
     println(s"$testDescription:")
-//    println(s"AST:\n${q.prettyPrint(0)}")
-    val actual = q.toSQLString
-    println(s"\tactual: $actual")
+    val actualIR = q.toQueryIR
+    val actual = actualIR.toSQLString()
     val stripped = expectedQueryPattern.trim().replace("\n", " ").replaceAll("\\s+", " ")
+    // Only print debugging trees if test fails
+    if (!matchStrings(stripped, actual))
+      println(s"AST:\n${q.prettyPrint(0)}")
+      println(s"IR: ${actualIR.prettyPrintIR(0, false)}") // set to true to print ASTs inline with IR
+      println(s"\tactual: $actual")
+
     assert(matchStrings(stripped, actual), s"expected '${stripped}' but got '$actual'")
   }
 }

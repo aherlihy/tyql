@@ -7,7 +7,7 @@ import NamedTupleDecomposition.*
 /**
  * Logical query plan tree.
  * Moves all type parameters into terms (using ResultTag).
- * Collapses nested queries where possible. 
+ * Collapses nested queries where possible.
  */
 object QueryIRTree:
 
@@ -54,7 +54,11 @@ object QueryIRTree:
           case _ => // base case
             val innerBodyIR = generateFun(outerBodyAST, srcIR, symbols)
             (sources :+ srcIR, innerBodyIR)
-      case _ => throw Exception(s"Unimplemented: collapsing flatMap on type $body")
+      case _ => throw Exception(s"""
+          Unimplemented: collapsing flatMap on type $body.
+          Would mean returning a row of type Row (instead of row of DB types).
+          TODO: decide semantics, e.g. should it automatically flatten? Nested data types? etc.
+          """)
 
   // TODO: probably should parametrize collapse so it works with different nodes
   private def collapseSort(sorts: Seq[(Expr.Fun[?, ?], Ord)], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[(Expr.Fun[?, ?], Ord)], RelationOp) =
@@ -73,6 +77,7 @@ object QueryIRTree:
    * @return
    */
   private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
+    import TreePrettyPrinter.*
 //    println(s"genQuery: ast=$ast")
     ast match
       case table: Table[?] =>
@@ -84,7 +89,7 @@ object QueryIRTree:
       case filter: Query.Filter[?] =>
         val (predicateASTs, tableIR) = collapseFilters(Seq(), filter, symbols)
         val predicateExprs = predicateASTs.map(pred =>
-          generateFun(pred, tableIR, symbols)
+          generateFun(pred, tableIR, symbols) // NOTE: the arguments of all predicate functions are mapped to tableIR
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         tableIR match
@@ -92,10 +97,11 @@ object QueryIRTree:
             tableIR.appendWhere(Seq(where), filter)
           case t: TableLeaf =>
             tableIR.appendWhere(Seq(where), filter)
-          case _ => // cannot unnest because source had projection, sort, etc.
-            SelectQuery(None, Seq(tableIR), Seq(where), None, filter)
+          case _ => // cannot unnest because source had sort, etc. TODO: some ops like limit might be unnestable
+            SelectQuery(None, Seq(tableIR), Seq(where), Some(tableIR.alias), filter)
       case flatMap: (Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
         val (tableIRs, projectIR) = collapseFlatMap(Seq(), Map(), flatMap)
+        import TreePrettyPrinter.*
         /** TODO: this is where could create more complex join nodes,
          * for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
          */
@@ -103,15 +109,21 @@ object QueryIRTree:
           tableIRs.head.appendProject(projectIR, flatMap)
         else try
           tableIRs.reduce((q1, q2) =>
+//            println(s"q1=\n${q1.prettyPrintIR(0, false)}\nq2=${q2.prettyPrintIR(0,false)}")
             q2 match
               case s: SelectQuery =>
                 q1.appendSubquery(s, flatMap)
               case t: TableLeaf =>
-                q1.appendSubquery(SelectQuery(None, Seq(t), Seq(), None, t.ast), flatMap)
-              case _ => throw new Exception(s"Cannot unnest query")
+                q1.appendSubquery(
+                  SelectQuery(None, Seq(t), Seq(), None, t.ast), flatMap
+                )
+              case _ =>
+                println("Could not unnest query")
+                throw new Exception(s"Cannot unnest query")
           ).appendProject(projectIR, flatMap)
         catch
-          case e: Exception => SelectQuery(Some(projectIR), tableIRs, Seq(), None, flatMap)
+          case e: Exception =>
+            SelectQuery(Some(projectIR), tableIRs, Seq(), None, flatMap)
 
       case union: Query.Union[?] =>
         val lhs = generateQuery(union.$this, symbols).appendFlag(SelectFlags.Final)
