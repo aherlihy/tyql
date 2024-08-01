@@ -129,11 +129,16 @@ object TreePrettyPrinter {
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", tableLeaf.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}TableLeaf{${relationOp.alias}{${relationOp.flags.mkString(",")}}(${tableLeaf.tableName}$astPrint)"
       case selectQuery: SelectQuery =>
-        val projectPrint =  indentWithKey(depth + 1, "project", selectQuery.project.map(_.prettyPrintIR(depth + 1, printAST)).getOrElse("None"))
+        val projectPrint =  indentWithKey(depth + 1, "project", selectQuery.project.prettyPrintIR(depth + 1, printAST))
         val fromPrint =     indentListWithKey(depth + 1, "from", selectQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
         val wherePrint =    indentListWithKey(depth + 1, "where", selectQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", selectQuery.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}SelectQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$projectPrint,\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
+      case selectAllQuery: SelectAllQuery =>
+        val fromPrint =     indentListWithKey(depth + 1, "from", selectAllQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
+        val wherePrint =    indentListWithKey(depth + 1, "where", selectAllQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
+        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", selectAllQuery.ast.prettyPrint(depth + 1))}" else ""
+        s"${indent(depth)}SelectAllQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
       case orderedQuery: OrderedQuery =>
         val queryPrint = orderedQuery.query.prettyPrintIR(depth + 1, printAST)
         val sortFnPrint = indentListWithKey(depth+1, "sort", orderedQuery.sortFn.map { case (node, ord) =>

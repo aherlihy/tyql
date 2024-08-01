@@ -164,7 +164,17 @@ class FlowSubsequentMapTest extends SQLStringQueryTest[AllCommerceDBs, (bName3: 
       .map(b =>
         (bName3 = b.bName2, bId3 = b.bId2).toRow
       )
-  def expectedQueryPattern = "SELECT subquery$A.bName2 as bName3, subquery$A.bId2 as bId3 FROM (SELECT subquery$B.bName as bName2, subquery$B.bId as bId2 FROM (SELECT buyers$C.name as bName, buyers$C.id as bId FROM buyers as buyers$C) as subquery$B) as subquery$A"
+  def expectedQueryPattern = """
+    SELECT
+      subquery$A.bName2 as bName3, subquery$A.bId2 as bId3
+    FROM
+      (SELECT
+          subquery$B.bName as bName2, subquery$B.bId as bId2
+       FROM
+         (SELECT
+            buyers$C.name as bName, buyers$C.id as bId
+          FROM buyers as buyers$C) as subquery$B) as subquery$A
+    """
 }
 
 class FlowAllSubsequentFilterTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {

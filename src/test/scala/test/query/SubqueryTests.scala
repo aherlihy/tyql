@@ -1139,14 +1139,14 @@ class NestedJoinSubqueryLimit7Test extends SQLStringQueryTest[AllCommerceDBs, Bu
       SELECT
         buyers$B
       FROM
+          buyers as buyers$B,
           (SELECT
              product$D
            FROM
               purchase as purchase$C,
               product as product$D
            LIMIT 4) as subquery$F,
-          shippingInfo as shippingInfo$E,
-          buyers as buyers$B
+          shippingInfo as shippingInfo$E
       """
 }
 
