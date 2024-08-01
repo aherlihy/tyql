@@ -95,7 +95,8 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
     if (!matchStrings(stripped, actual))
       println(s"AST:\n${q.prettyPrint(0)}")
       println(s"IR: ${actualIR.prettyPrintIR(0, false)}") // set to true to print ASTs inline with IR
-      println(s"\tactual: $actual")
+      println(s"\texpected: $stripped") // because munit has annoying formatting
+      println(s"\tactual  : $actual")
 
     assert(matchStrings(stripped, actual), s"expected '${stripped}' but got '$actual'")
   }

@@ -52,7 +52,7 @@ class JoinSimple3Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: Str
     yield (buyerName = b.name, productName = pr.name, price = pr.price).toRow
 
   def expectedQueryPattern: String = """
-SELECT buyers$B.name as buyerName, product$P.name as productName, product$P.price as price FROM buyers as buyers$B, product as product$P WHERE buyers$B.name = "string constant"
+SELECT buyers$B.name as buyerName, product$P.name as productName, product$P.price as price FROM product as product$P, buyers as buyers$B WHERE buyers$B.name = "string constant"
       """
 }
 

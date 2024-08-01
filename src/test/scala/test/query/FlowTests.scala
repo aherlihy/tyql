@@ -111,7 +111,7 @@ class FlowFlatMapTest3 extends SQLStringQueryTest[AllCommerceDBs, (name: String,
       )
     )
 
-  def expectedQueryPattern = "SELECT buyers$A.name as name, shippingInfo$B.shippingDate as shippingDate1, shippingInfo$C.shippingDate as shippingDate2 FROM shippingInfo as shippingInfo$B, buyers as buyers$A, shippingInfo as shippingInfo$C"
+  def expectedQueryPattern = "SELECT buyers$A.name as name, shippingInfo$B.shippingDate as shippingDate1, shippingInfo$C.shippingDate as shippingDate2 FROM shippingInfo as shippingInfo$C, shippingInfo as shippingInfo$B, buyers as buyers$A"
 }
 
 
