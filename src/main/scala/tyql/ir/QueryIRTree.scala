@@ -84,72 +84,9 @@ object QueryIRTree:
       case _ => (sorts, generateQuery(comprehension, symbols))
 
   private def unnest(tableIRs: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
-    val res =
-        tableIRs.reduce((q1, q2) =>
-          println(s"combining '${q1.toSQLString()}' and '${q2.toSQLString()}'")
-          (q1, q2) match
-            case (leaf1: TableLeaf, leaf2: TableLeaf) =>
-              leaf1.appendSelectAll(SelectAllQuery(Seq(leaf2), Seq(), None, flatMap), flatMap)
-//              println(s"\t=> combining leafs")
-//              SelectAllQuery(Seq(leaf1, leaf2), Seq(), None, flatMap)
-
-            // table + select
-            case (leaf: TableLeaf, select: SelectAllQuery) =>
-              println(s"\t=> combining leaf + selectAll")
-              leaf.appendSelectAll(select, flatMap)
-            case (leaf: TableLeaf, select: SelectQuery) =>
-              println(s"\t=> combining leaf + select")
-              SelectAllQuery(Seq(q1, q2), Seq(), None, flatMap)
-            case (select: SelectAllQuery, leaf: TableLeaf) =>
-              println(s"\t=> combining selectAll + leaf")
-              leaf.appendSelectAll(select, flatMap)
-            case (select: SelectQuery, leaf: TableLeaf) =>
-              println(s"\t=> combining select + leaf")
-              SelectAllQuery(Seq(q1, q2), Seq(), None, flatMap)
-
-            // two select
-            case (select1: SelectAllQuery, select2: SelectAllQuery) =>
-              println(s"\t=> combining selectAll + selectAll, both empty")
-              select1.appendSelectAll(select2, flatMap)
-            case (select1: SelectAllQuery, select2: SelectQuery) =>
-              println(s"\t=> combining selectAll + select")
-              SelectAllQuery(select1.from :+ select2, select1.where, None, flatMap)
-            case (select1: SelectQuery, select2: SelectQuery) =>
-              println(s"\t=> combining select + select, neither empty")
-              SelectAllQuery(Seq(q1, q2), Seq(), None, flatMap)
-            case (select1: SelectQuery, select2: SelectAllQuery) =>
-              println(s"\t=> combining selectAll + select")
-              SelectAllQuery(select1 +: select2.from, select2.where, None, flatMap)
-
-            // relation op +
-            case (anyOp: RelationOp, leaf: TableLeaf) =>
-              println(s"\t=> combining relOp + tableLeaf")
-              SelectAllQuery(Seq(q1, q2), Seq(), None, flatMap)
-            case (leaf: TableLeaf, anyOp: RelationOp) =>
-              println(s"\t=> combining tableLeaf + relOp")
-              SelectAllQuery(Seq(q1, q2), Seq(), None, flatMap)
-            case (anyOp: RelationOp, select: SelectAllQuery) =>
-              println(s"\t=> combining relOp + selectAll")
-              anyOp.appendSelectAll(select, flatMap)
-            case (anyOp: RelationOp, select: SelectQuery) =>
-              println(s"\t=> combining relOp + select")
-              SelectAllQuery(Seq(q1, q2), Seq(), None, flatMap)
-            case (select: SelectAllQuery, anyOp: RelationOp) =>
-              println(s"\t=> combining selectAll + relOp")
-              anyOp.appendSelectAll(select, flatMap)
-            case (select: SelectQuery, anyOp: RelationOp) =>
-              println(s"\t=> combining select + relOp")
-              SelectAllQuery(Seq(q1, q2), Seq(), None, flatMap)
-            case (relOp1: RelationOp, relOp2: RelationOp) =>
-              println(s"\t=> combining relOp + relOp")
-              SelectAllQuery(Seq(q1, q2), Seq(), None, flatMap)
-            case _ =>
-              println("****** EXCEPTION")
-              throw new Exception(s"Cannot unnest query")
-        ).appendProject(projectIR, flatMap)
-    println(s"===> RETURNING '${res.toSQLString()}'")
-    res
-
+    tableIRs.reduce((q1, q2) =>
+      q1.mergeWith(q2, flatMap)
+    ).appendProject(projectIR, flatMap)
 
   /**
    * Generate top-level or subquery
@@ -176,7 +113,7 @@ object QueryIRTree:
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         tableIR match
           case s: (SelectAllQuery | TableLeaf) =>
-            s.appendWhere(Seq(where), filter)
+            s.appendWhere(where, filter)
           case _ => // cannot unnest because source had project, sort, etc. TODO: some ops like limit might be unnestable
             println(s"Cannot unnest value! $tableIR")
             SelectAllQuery(Seq(tableIR), Seq(where), Some(tableIR.alias), filter)

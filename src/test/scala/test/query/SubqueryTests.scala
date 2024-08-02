@@ -451,9 +451,9 @@ class NestedJoinSubquery3Test extends SQLStringQueryTest[AllCommerceDBs, (name: 
     """
       SELECT product$A.name as name, purchase$B.id as id, shippingInfo$C.shippingDate as sd
       FROM
-        shippingInfo as shippingInfo$C,
         purchase as purchase$B,
-        product as product$A
+        product as product$A,
+        shippingInfo as shippingInfo$C
     """
 }
 
@@ -632,13 +632,13 @@ class NestedJoinSubquery12Test extends SQLStringQueryTest[AllCommerceDBs, (inner
       SELECT
         subquery$A.outerK1 as innerK1, buyers$B.name as innerK2, shippingInfo$E.id as innerK3
       FROM
-        buyers as buyers$B,
         (SELECT
             purchase$C.id as outerK1, product$D.id as outerK2
          FROM
             purchase as purchase$C,
             product as product$D) as subquery$A,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       """
 }
 
@@ -662,13 +662,13 @@ class NestedJoinSubquery13Test extends SQLStringQueryTest[AllCommerceDBs, Buyer]
       SELECT
         buyers$B
       FROM
-        buyers as buyers$B,
         (SELECT
            product$D
          FROM
             purchase as purchase$C,
             product as product$D) as subquery$A,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       """
 }
 
@@ -692,13 +692,13 @@ class NestedJoinSubquery14Test extends SQLStringQueryTest[AllCommerceDBs, Buyer]
       SELECT
         buyers$B
       FROM
-        buyers as buyers$B,
         (SELECT
            product$D
          FROM
             purchase as purchase$C,
             product as product$D) as subquery$A,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       """
 }
 
@@ -774,14 +774,14 @@ class NestedJoinSubqueryFilter1Test extends SQLStringQueryTest[AllCommerceDBs, B
       SELECT
         buyers$B
       FROM
-        buyers as buyers$B,
         (SELECT
            product$D
          FROM
             purchase as purchase$C,
             product as product$D
          WHERE product$D.id > 1) as subquery$A,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       """
 }
 
@@ -805,14 +805,14 @@ class NestedJoinSubqueryFilter2Test extends SQLStringQueryTest[AllCommerceDBs, B
       SELECT
         buyers$B
       FROM
-        buyers as buyers$B,
         (SELECT
            product$D
          FROM
             purchase as purchase$C,
             product as product$D
          WHERE (purchase$C.id > 2 AND product$D.id > 1)) as subquery$A,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       """
 }
 
@@ -832,19 +832,21 @@ class NestedJoinSubqueryFilter3Test extends SQLStringQueryTest[AllCommerceDBs, B
 
   def expectedQueryPattern =
     """
-      SELECT * FROM
+     SELECT
+        *
+     FROM
         (SELECT
-          buyers$B
-        FROM
-          buyers as buyers$B,
-          (SELECT
-             product$D
-           FROM
-              purchase as purchase$C,
-              product as product$D
-           WHERE (purchase$C.id > 2 AND product$D.id > 1)) as subquery$A,
-          shippingInfo as shippingInfo$E) as subquery$F
-      WHERE subquery$F.id > 3
+            buyers$B
+         FROM
+            (SELECT
+                product$D
+             FROM
+                purchase as purchase$C,
+                product as product$D
+             WHERE (purchase$C.id > 2 AND product$D.id > 1)) as subquery$A,
+            shippingInfo as shippingInfo$E,
+            buyers as buyers$B) as subquery$F
+         WHERE subquery$F.id > 3
       """
 
 }
@@ -927,13 +929,13 @@ class NestedJoinSubqueryFilter7Test extends SQLStringQueryTest[AllCommerceDBs, B
       SELECT
         buyers$B
       FROM
-          buyers as buyers$B,
-          shippingInfo as shippingInfo$E,
           (SELECT
              product$D
            FROM
               purchase as purchase$C,
-              product as product$D) as subquery$F
+              product as product$D) as subquery$F,
+          shippingInfo as shippingInfo$E,
+          buyers as buyers$B
       WHERE subquery$F.id > 4
       """
 }
@@ -991,13 +993,13 @@ class NestedJoinSubqueryLimit1Test extends SQLStringQueryTest[AllCommerceDBs, Bu
       SELECT
         buyers$B
       FROM
-        buyers as buyers$B,
         (SELECT
            subquery$A
          FROM
             purchase as purchase$C,
             (SELECT * FROM product as product$D LIMIT 1) as subquery$A,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       """
 }
 
@@ -1021,13 +1023,13 @@ class NestedJoinSubqueryLimit2Test extends SQLStringQueryTest[AllCommerceDBs, Bu
       SELECT
         buyers$B
       FROM
-        buyers as buyers$B,
         (SELECT
            subquery$Y
          FROM
             (SELECT * FROM purchase as purchase$C LIMIT 2) as subquery$X,
             (SELECT * FROM product as product$D LIMIT 1) as subquery$Y) as subquery$Z,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       """
 }
 
@@ -1050,13 +1052,13 @@ class NestedJoinSubqueryLimit3Test extends SQLStringQueryTest[AllCommerceDBs, Bu
       SELECT
         buyers$B
       FROM
-        buyers as buyers$B,
         (SELECT
            subquery$Y
          FROM
             (SELECT * FROM purchase as purchase$C LIMIT 2) as subquery$X,
             (SELECT * FROM product as product$D LIMIT 1) as subquery$Y) as subquery$Z,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       LIMIT 3
       """
 
@@ -1139,14 +1141,14 @@ class NestedJoinSubqueryLimit7Test extends SQLStringQueryTest[AllCommerceDBs, Bu
       SELECT
         buyers$B
       FROM
-          buyers as buyers$B,
           (SELECT
              product$D
            FROM
               purchase as purchase$C,
               product as product$D
            LIMIT 4) as subquery$F,
-          shippingInfo as shippingInfo$E
+          shippingInfo as shippingInfo$E,
+          buyers as buyers$B
       """
 }
 
@@ -1201,14 +1203,14 @@ class NestedJoinSubqueryFilterMap1Test extends SQLStringQueryTest[AllCommerceDBs
       SELECT
         buyers$B.id as newId
       FROM
-        buyers as buyers$B,
         (SELECT
            product$D.id as newId
          FROM
             purchase as purchase$C,
             product as product$D
          WHERE product$D.id > 1) as subquery$A,
-        shippingInfo as shippingInfo$E
+        shippingInfo as shippingInfo$E,
+        buyers as buyers$B
       """
 }
 
@@ -1231,15 +1233,20 @@ class NestedJoinSubqueryFilterMap2Test extends SQLStringQueryTest[AllCommerceDBs
     """
       SELECT
         buyers$B.id as newId
-      FROM buyers as buyers$B,
-      (SELECT
+      FROM
+        (SELECT
           product$D.id as newId
-       FROM
-          (SELECT purchase$C.id as newId FROM purchase as purchase$C WHERE purchase$C.id > 2) as subquery$Z,
+        FROM
+          (SELECT
+              purchase$C.id as newId
+            FROM
+              purchase as purchase$C
+            WHERE purchase$C.id > 2) as subquery$Z,
           product as product$D
-       WHERE
-        product$D.id > 1) as subquery$A,
-       shippingInfo as shippingInfo$E
+        WHERE
+          product$D.id > 1) as subquery$A,
+       shippingInfo as shippingInfo$E,
+       buyers as buyers$B
       """
 }
 
@@ -1265,14 +1272,14 @@ class NestedJoinSubqueryFilterMap3Test extends SQLStringQueryTest[AllCommerceDBs
         (SELECT
           buyers$A.id as newId
          FROM
-            buyers as buyers$A,
-            (SELECT
+           (SELECT
                 product$B.id as newId
              FROM
                 (SELECT purchase$C.id as newId FROM purchase as purchase$C WHERE purchase$C.id > 2) as subquery$Z,
                 product as product$B
              WHERE product$B.id > 1) as subquery$G,
-             shippingInfo as shippingInfo$D) as subquery$F
+           shippingInfo as shippingInfo$D,
+           buyers as buyers$A) as subquery$F
     WHERE subquery$F.newId > 3
     """
 
@@ -1357,13 +1364,13 @@ class NestedJoinSubqueryFilterMap7Test extends SQLStringQueryTest[AllCommerceDBs
       SELECT
         buyers$B.id as newId
       FROM
-          buyers as buyers$B,
           (SELECT
              subquery$F.id as newId
            FROM
               (SELECT product$D FROM purchase as purchase$C, product as product$D) as subquery$F
            WHERE subquery$F.id > 4) as subquery$G,
-          shippingInfo as shippingInfo$E
+          shippingInfo as shippingInfo$E,
+          buyers as buyers$B
       """
 }
 

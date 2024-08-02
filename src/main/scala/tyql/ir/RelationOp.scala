@@ -8,6 +8,9 @@ enum SelectFlags:
   case Final      // top-level final result, e.g. avoid extra parens or aliasing
   case ExprLevel  // expression-level relation operation
 
+enum PositionFlag:
+  case Project, Where, Subquery
+
 type SymbolTable = Map[String, RelationOp]
 
 /**
@@ -16,13 +19,25 @@ type SymbolTable = Map[String, RelationOp]
 trait RelationOp extends QueryIRNode:
   var flags: Set[SelectFlags] = Set.empty
   def alias: String
-  // TODO: decide if we want to mutate, or copy + discard IR nodes. Right now its a mix, which should be improved
+
+  /**
+   * Avoid overloading
+   * TODO: decide if we want to mutate, or copy + discard IR nodes. Right now its a mix, which should be improved
+   */
+  def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: TableLeaf => appendLeaf(t, astOther)
+      case a: SelectAllQuery => appendSelectAll(a, astOther)
+      case s: SelectQuery => appendSubquery(s, astOther)
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
   /**
    * Equivalent to adding a .filter(w)
    * @param w - predicate expression
    */
-  def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp
+  def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp
 
   /**
    * Equivalent to adding a .map(p)
@@ -30,13 +45,16 @@ trait RelationOp extends QueryIRNode:
    */
   def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp
 
+
+  /**
+   * This method exists to avoid making an intermediate SelectAllQuery only for it to get merged away.
+   */
+  def appendLeaf(t: TableLeaf, astOther: DatabaseAST[?]): RelationOp
   /**
    * Equivalent to adding a .flatMap(q)
    * @param q - the subquery
    */
   def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp
-
-
   def appendSelectAll(q: SelectAllQuery, astOther: DatabaseAST[?]): RelationOp
 
   /**
@@ -57,8 +75,11 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
 
   override def toString: String = s"TableLeaf($tableName as $name)"
 
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(Seq(this), w, Some(alias), astOther)
+  override def appendLeaf(w: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(Seq(this, w), Seq(), None, astOther)
+
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(p, Seq(this), Seq(), None, astOther)
@@ -101,8 +122,11 @@ case class SelectAllQuery(from: Seq[RelationOp],
 
   override def alias = name
 
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(from, where ++ w, Some(alias), astOther)
+  override def appendLeaf(q: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(from :+ q, where, None, astOther)
+
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(from, where :+ w, Some(alias), astOther)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(p, from, where, None, ast)
@@ -150,29 +174,25 @@ case class SelectQuery(project: QueryIRNode,
     latestVar
   })
   override def alias = name
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(project, from, where ++ w, Some(alias), astOther)
+  override def appendLeaf(q: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(Seq(this, q), Seq(), None, astOther)
+
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
+    SelectQuery(project, from, where :+ w, Some(alias), astOther)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
-//    throw new Exception(s"Appending project to a select query that already has a project")
     SelectQuery(p, Seq(this), Seq(), None, astOther)
 
   /**
    * Merge with another select query to avoid extra nesting
    */
   override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-//    val newP = combineProjects(q.project, project)
-//    val newF = from ++ q.from
-//    val newW = where ++ q.where
-//    SelectQuery(newP, newF, newW, None, astOther)
-    throw new Exception(s"Appending subquery to a select query that already has a project")
-//    SelectQuery(p, Seq(this), Seq(), None, astOther)
+    // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
+    SelectAllQuery(Seq(this, q), Seq(), None, astOther)
 
   override def appendSelectAll(q: SelectAllQuery, astOther: DatabaseAST[?]): RelationOp =
-    val newF = from ++ q.from
-    val newW = where ++ q.where
-    SelectQuery(project, newF, newW, None, astOther)
+    SelectAllQuery(this +: q.from, q.where, None, astOther)
 
   override def appendFlag(f: SelectFlags): RelationOp =
     flags = flags + f
@@ -200,7 +220,10 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 
   val orders: Seq[Ord] = sortFn.map(_._2)
 
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
+  override def appendLeaf(q: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
+    OrderedQuery(query.appendLeaf(q, astOther), sortFn, ast)
+
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     // Does not trigger subquery, e.g. relation.sort(s).filter(f) => SELECT * FROM relation WHERE f ORDER BY s
     OrderedQuery(query.appendWhere(w, astOther), sortFn, ast)
 
@@ -259,10 +282,18 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
   QueryIRTree.idCount += 1
   override def alias = latestVar
 
-  override def appendWhere(w: Seq[QueryIRNode], astOther: DatabaseAST[?]): RelationOp =
+  override def appendLeaf(q: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(
+      Seq(this, q),
+      Seq(),
+      Some(alias),
+      astOther
+    )
+
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     SelectAllQuery(
       Seq(this),
-      w,
+      Seq(w),
       Some(alias),
       astOther
     )

@@ -111,7 +111,16 @@ class FlowFlatMapTest3 extends SQLStringQueryTest[AllCommerceDBs, (name: String,
       )
     )
 
-  def expectedQueryPattern = "SELECT buyers$A.name as name, shippingInfo$B.shippingDate as shippingDate1, shippingInfo$C.shippingDate as shippingDate2 FROM shippingInfo as shippingInfo$C, shippingInfo as shippingInfo$B, buyers as buyers$A"
+  def expectedQueryPattern = """
+     SELECT
+        buyers$A.name as name,
+        shippingInfo$B.shippingDate as shippingDate1,
+        shippingInfo$C.shippingDate as shippingDate2
+     FROM
+        shippingInfo as shippingInfo$B,
+        buyers as buyers$A,
+        shippingInfo as shippingInfo$C
+     """
 }
 
 
@@ -144,7 +153,7 @@ class FlowMapSubsequentFilterTest extends SQLStringQueryTest[AllCommerceDBs, (bN
       .filter(_.id > 10) // ignore nonsensical constraints
       .filter(_.id > 100)
       .map(b =>
-      (bName = b.name, bId = b.id).toRow
+        (bName = b.name, bId = b.id).toRow
     )
 
   def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 100 AND buyers$A.id > 10 AND buyers$A.id > 1"
