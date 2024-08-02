@@ -35,7 +35,6 @@ object QueryIRTree:
    *    SELECT t1 as k1, t2 as k3, t3 as k3 FROM table1, table2, table3
    */
   private def collapseFlatMap(sources: Seq[RelationOp], symbols: SymbolTable, body: DatabaseAST[?] | Expr[?]): (Seq[RelationOp], QueryIRNode) =
-//    println(s"\tcollapseFlatMap: sources=${sources.map(s => s"'${s.toSQLString()}'").mkString("[", ", ", "]")}, body=$body")
     body match
       case map: Query.Map[?, ?] =>
         val srcIR = generateQuery(map.$from, symbols)
@@ -97,7 +96,7 @@ object QueryIRTree:
    */
   private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
     import TreePrettyPrinter.*
-    println(s"genQuery: ast=$ast")
+//    println(s"genQuery: ast=$ast")
     ast match
       case table: Table[?] =>
         TableLeaf(table.$name, table)
@@ -115,7 +114,6 @@ object QueryIRTree:
           case s: (SelectAllQuery | TableLeaf) =>
             s.appendWhere(where, filter)
           case _ => // cannot unnest because source had project, sort, etc. TODO: some ops like limit might be unnestable
-            println(s"Cannot unnest value! $tableIR")
             SelectAllQuery(Seq(tableIR), Seq(where), Some(tableIR.alias), filter)
       case flatMap: Query.FlatMap[?, ?] =>
         val sourceIR = generateQuery(flatMap.$from, symbols)
@@ -125,7 +123,6 @@ object QueryIRTree:
           symbols + (bodyAST.$param.stringRef() -> sourceIR),
           bodyAST.$body
         )
-        println(s"FINAL result from collapseFlatMap = ${tableIRs.map(_.toSQLString()).mkString("[\n\t", ",\n\t", "\n]")}, ${projectIR.toSQLString()}")
         import TreePrettyPrinter.*
         /** TODO: this is where could create more complex join nodes,
          * for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2

@@ -24,14 +24,7 @@ trait RelationOp extends QueryIRNode:
    * Avoid overloading
    * TODO: decide if we want to mutate, or copy + discard IR nodes. Right now its a mix, which should be improved
    */
-  def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
-    r match
-      case t: TableLeaf => appendLeaf(t, astOther)
-      case a: SelectAllQuery => appendSelectAll(a, astOther)
-      case s: SelectQuery => appendSubquery(s, astOther)
-      case r: RelationOp =>
-        // default to subquery, some ops may want to override
-        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
+  def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp
 
   /**
    * Equivalent to adding a .filter(w)
@@ -44,18 +37,6 @@ trait RelationOp extends QueryIRNode:
    * @param p - a projection expression
    */
   def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp
-
-
-  /**
-   * This method exists to avoid making an intermediate SelectAllQuery only for it to get merged away.
-   */
-  def appendLeaf(t: TableLeaf, astOther: DatabaseAST[?]): RelationOp
-  /**
-   * Equivalent to adding a .flatMap(q)
-   * @param q - the subquery
-   */
-  def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp
-  def appendSelectAll(q: SelectAllQuery, astOther: DatabaseAST[?]): RelationOp
 
   /**
    * Add some extra metadata needed to generate "nice" SQL strings.
@@ -75,26 +56,29 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
 
   override def toString: String = s"TableLeaf($tableName as $name)"
 
-  override def appendLeaf(w: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(Seq(this, w), Seq(), None, astOther)
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: TableLeaf =>
+        SelectAllQuery(Seq(this, t), Seq(), None, astOther)
+      case q: SelectAllQuery =>
+        SelectAllQuery(this +: q.from, q.where, None, astOther)
+      case q: SelectQuery =>
+        SelectQuery(
+          q.project,
+          this +: q.from,
+          q.where,
+          None,
+          astOther
+        )
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(p, Seq(this), Seq(), None, astOther)
-
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(
-      q.project,
-      this +: q.from,
-      q.where,
-      None,
-      astOther
-    )
-
-  override def appendSelectAll(q: SelectAllQuery, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(this +: q.from, q.where, None, astOther)
 
   override def appendFlag(f: SelectFlags): RelationOp =
     val q = f match
@@ -122,27 +106,27 @@ case class SelectAllQuery(from: Seq[RelationOp],
 
   override def alias = name
 
-  override def appendLeaf(q: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(from :+ q, where, None, astOther)
-
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     SelectAllQuery(from, where :+ w, Some(alias), astOther)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(p, from, where, None, ast)
 
-  /**
-   * Merge with another select query to avoid extra nesting
-   */
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    val newF = from ++ q.from
-    val newW = where ++ q.where
-    SelectQuery(q.project, newF, newW, None, astOther)
-
-  override def appendSelectAll(q: SelectAllQuery, astOther: DatabaseAST[?]): RelationOp =
-    val newF = from ++ q.from
-    val newW = where ++ q.where
-    SelectAllQuery(newF, newW, None, astOther)
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: TableLeaf =>
+        SelectAllQuery(from :+ t, where, None, astOther)
+      case q: SelectAllQuery =>
+        val newF = from ++ q.from
+        val newW = where ++ q.where
+        SelectAllQuery(newF, newW, None, astOther)
+      case q: SelectQuery =>
+        val newF = from ++ q.from
+        val newW = where ++ q.where
+        SelectQuery(q.project, newF, newW, None, astOther)
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
   override def appendFlag(f: SelectFlags): RelationOp =
     flags = flags + f
@@ -162,6 +146,8 @@ case class SelectAllQuery(from: Seq[RelationOp],
     s"SelectAllQuery(\n\talias=$alias,\n\tfrom=$from,\n\twhere=$where\n)"
 /**
  * Select query, e.g. SELECT <Project> FROM <Relations> WHERE <where>
+ * TODO: Eventually specialize join nodes, for now use Select with multiple FROM fields to indicate join.
+ * Right now the AST only supports nested flatMaps, will eventually expand syntax to support specifying join type.
  */
 case class SelectQuery(project: QueryIRNode,
                        from: Seq[RelationOp],
@@ -174,8 +160,6 @@ case class SelectQuery(project: QueryIRNode,
     latestVar
   })
   override def alias = name
-  override def appendLeaf(q: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(Seq(this, q), Seq(), None, astOther)
 
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     SelectQuery(project, from, where :+ w, Some(alias), astOther)
@@ -184,15 +168,19 @@ case class SelectQuery(project: QueryIRNode,
     // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
     SelectQuery(p, Seq(this), Seq(), None, astOther)
 
-  /**
-   * Merge with another select query to avoid extra nesting
-   */
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
-    SelectAllQuery(Seq(this, q), Seq(), None, astOther)
 
-  override def appendSelectAll(q: SelectAllQuery, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(this +: q.from, q.where, None, astOther)
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: TableLeaf =>
+        SelectAllQuery(Seq(this, t), Seq(), None, astOther)
+      case q: SelectAllQuery =>
+        SelectAllQuery(this +: q.from, q.where, None, astOther)
+      case q: SelectQuery =>
+        // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
+        SelectAllQuery(Seq(this, q), Seq(), None, astOther)
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
   override def appendFlag(f: SelectFlags): RelationOp =
     flags = flags + f
@@ -220,9 +208,6 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 
   val orders: Seq[Ord] = sortFn.map(_._2)
 
-  override def appendLeaf(q: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
-    OrderedQuery(query.appendLeaf(q, astOther), sortFn, ast)
-
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     // Does not trigger subquery, e.g. relation.sort(s).filter(f) => SELECT * FROM relation WHERE f ORDER BY s
     OrderedQuery(query.appendWhere(w, astOther), sortFn, ast)
@@ -238,24 +223,29 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
       astOther
     )
 
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    // Triggers subquery
-    SelectQuery(
-      q.project,
-      q.from :+ this,
-      q.where,
-      Some(q.alias),
-      astOther
-    )
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: TableLeaf =>
+        OrderedQuery(query.mergeWith(t, astOther), sortFn, ast)
+      case q: SelectAllQuery =>
+        SelectAllQuery(
+          q.from :+ this,
+          q.where,
+          Some(q.alias),
+          astOther
+        )
+      case q: SelectQuery =>
+        SelectQuery(
+          q.project,
+          q.from :+ this,
+          q.where,
+          Some(q.alias),
+          astOther
+        )
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
-  override def appendSelectAll(q: SelectAllQuery, astOther: DatabaseAST[?]): RelationOp =
-    // Triggers subquery
-    SelectAllQuery(
-      q.from :+ this,
-      q.where,
-      Some(q.alias),
-      astOther
-    )
   override def appendFlag(f: SelectFlags): RelationOp =
     f match
       case SelectFlags.Distinct =>
@@ -282,14 +272,6 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
   QueryIRTree.idCount += 1
   override def alias = latestVar
 
-  override def appendLeaf(q: TableLeaf, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(
-      Seq(this, q),
-      Seq(),
-      Some(alias),
-      astOther
-    )
-
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     SelectAllQuery(
       Seq(this),
@@ -306,23 +288,33 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
       Some(alias),
       astOther
     )
-
-  override def appendSubquery(q: SelectQuery, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(
-      q.project,
-      q.from :+ this,
-      q.where,
-      Some(q.alias),
-      astOther
-    )
-
-  override def appendSelectAll(q: SelectAllQuery, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(
-      q.from :+ this,
-      q.where,
-      Some(q.alias),
-      astOther
-    )
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: TableLeaf =>
+        SelectAllQuery(
+          Seq(this, t),
+          Seq(),
+          Some(alias),
+          astOther
+        )
+      case q: SelectAllQuery =>
+        SelectAllQuery(
+          q.from :+ this,
+          q.where,
+          Some(q.alias),
+          astOther
+        )
+      case q: SelectQuery =>
+        SelectQuery(
+          q.project,
+          q.from :+ this,
+          q.where,
+          Some(q.alias),
+          astOther
+        )
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
   override def appendFlag(f: SelectFlags): RelationOp =
     f match
