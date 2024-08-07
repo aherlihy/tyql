@@ -45,6 +45,11 @@ trait RelationOp extends QueryIRNode:
    */
   def appendFlag(f: SelectFlags): RelationOp
 
+  def wrapString(inner: String): String =
+    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    s"$open$inner$close$aliasStr"
+
 /**
  * Simple table read.
  */
@@ -137,14 +142,14 @@ case class SelectAllQuery(from: Seq[RelationOp],
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
     val whereStr = if where.nonEmpty then
       s" WHERE ${if where.size == 1 then where.head.toSQLString() else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")}" else
       ""
-    s"${open}SELECT $flagsStr* FROM $fromStr$whereStr$close$aliasStr"
+    wrapString(
+      s"SELECT $flagsStr* FROM $fromStr$whereStr"
+    )
 
   override def toString: String = // for debugging
     s"SelectAllQuery(\n\talias=$alias,\n\tfrom=$from,\n\twhere=$where\n)"
@@ -191,15 +196,13 @@ case class SelectQuery(project: QueryIRNode,
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val projectStr = project.toSQLString()
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
     val whereStr = if where.nonEmpty then
       s" WHERE ${if where.size == 1 then where.head.toSQLString() else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")}" else
       ""
-    s"${open}SELECT $flagsStr$projectStr FROM $fromStr$whereStr$close$aliasStr"
+    wrapString(s"SELECT $flagsStr$projectStr FROM $fromStr$whereStr")
 
   override def toString: String = // for debugging
     s"SelectQuery(\n\talias=$alias,\n\tproject=$project,\n\tfrom=$from,\n\twhere=$where\n)"
@@ -259,19 +262,17 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
-    s"$open${query.toSQLString()} ORDER BY ${sortFn.map(s =>
+    wrapString(s"${query.toSQLString()} ORDER BY ${sortFn.map(s =>
       val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
         case v: SelectExpr => v.attrName
         case o => o.toSQLString()
       s"$varStr ${s._2.toString}"
-      ).mkString("", ", ", "")}$close$aliasStr"
+    ).mkString("", ", ", "")}")
 
 /**
- * Binary relation-level operation, e.g. union
+ * N-ary relation-level operation
  */
-case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Query[?]) extends RelationOp:
+case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseAST[?]) extends RelationOp:
   val latestVar = s"subquery${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
   override def alias = latestVar
@@ -321,24 +322,16 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
         SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
   override def appendFlag(f: SelectFlags): RelationOp =
-    f match
-      case SelectFlags.Distinct =>
-        lhs.appendFlag(f)
-        rhs match
-          case r: RelationOp => r.appendFlag(f)
-      case _ =>
-        flags = flags + f
+    flags = flags + f
     this
 
   override def toSQLString(): String =
-    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
-    s"$open${lhs.toSQLString()} $op ${rhs.toSQLString()}$close$aliasStr"
+    wrapString(children.map(_.toSQLString()).mkString(s" $op "))
 
 // TODO: store subquery separately or as a UnionAll?
 case class RecursiveRelationOp(alias: String, query: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
 
-  // TODO: for now reuse BinRelationOp's methods
+  // TODO: for now reuse NaryRelationOp's methods
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     SelectAllQuery(
       Seq(this),
@@ -389,6 +382,7 @@ case class RecursiveRelationOp(alias: String, query: RelationOp, ast: DatabaseAS
     this
 
   override def toSQLString(): String =
+    // NOTE: no parens or alias needed, since already defined
     s"WITH RECURSIVE $alias AS (${query.toSQLString()}); SELECT * FROM $alias"
 
 /**

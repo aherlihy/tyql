@@ -155,11 +155,10 @@ object TreePrettyPrinter {
         })
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", orderedQuery.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}OrderedQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$queryPrint,\n$sortFnPrint$astPrint\n${indent(depth)})"
-      case binRelationOp: BinRelationOp =>
-        val lhsPrint = binRelationOp.lhs.prettyPrintIR(depth + 1, printAST)
-        val rhsPrint = binRelationOp.rhs.prettyPrintIR(depth + 1, printAST)
-        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", binRelationOp.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}BinRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${binRelationOp.op}'\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
+      case naryRelationOp: NaryRelationOp =>
+        val childrenPrint = naryRelationOp.children.map(_.prettyPrintIR(depth + 1, printAST))
+        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", naryRelationOp.ast.prettyPrint(depth + 1))}" else ""
+        s"${indent(depth)}BinRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
       case recursiveRelationOp: RecursiveRelationOp =>
         s"${indent(depth)}RecursiveOp{${recursiveRelationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}${recursiveRelationOp.query.prettyPrintIR(depth + 1, printAST)}"
       case recursiveIRVar: RecursiveIRVar =>

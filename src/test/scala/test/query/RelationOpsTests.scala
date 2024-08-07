@@ -42,6 +42,53 @@ class RelationOpsUnion2Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
       """
 }
 
+class RelationOpsUnion3Test extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription: String = "RelationOps: union n-ary"
+
+  def query() =
+    testDB.tables.products
+      .map(prod => prod)
+      .union(testDB.tables.products.map(purch => purch))
+      .union(testDB.tables.products.map(purch => purch))
+
+  def expectedQueryPattern: String =
+    """
+          SELECT product$A
+          FROM product as product$A
+          UNION
+          SELECT product$B
+          FROM product as product$B
+          UNION
+          SELECT product$C
+          FROM product as product$C
+        """
+}
+
+class RelationOpsUnion4Test extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription: String = "RelationOps: union n-ary"
+
+  def query() =
+    testDB.tables.products.map(prod => prod)
+      .union(testDB.tables.products.map(prod => prod))
+      .union(testDB.tables.products.map(prod => prod))
+      .union(testDB.tables.products.map(prod => prod))
+
+  def expectedQueryPattern: String =
+    """
+            SELECT product$A
+            FROM product as product$A
+            UNION
+            SELECT product$B
+            FROM product as product$B
+            UNION
+            SELECT product$C
+            FROM product as product$C
+            UNION
+            SELECT product$D
+            FROM product as product$D
+          """
+}
+
 class RelationOpsUnionAllTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)] {
   def testDescription: String = "RelationOps: unionAll with project"
   def query() =

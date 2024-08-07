@@ -15,7 +15,6 @@ given TCDBs: TestDatabase[TCDB] with
     edges = Table[Edge]("edges")
   )
 
-// Expression-based aggregation:
 class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "TC"
 
@@ -35,6 +34,30 @@ class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
         UNION ALL
       SELECT recursive$A.x as x, edges$C.y as y
       FROM recursive$A, edges as edges$C
-      WHERE recursive$A.y = edges$C.x); SELECT * FROM recursive0
+      WHERE recursive$A.y = edges$C.x); SELECT * FROM recursive$A
+      """
+}
+class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "TC with multiple base cases"
+
+  def query() =
+    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
+    path.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+    )
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE recursive$A AS
+      (SELECT * FROM edges as edges$B
+        UNION ALL
+      SELECT * FROM edges as edges$E
+        UNION ALL
+      SELECT recursive$A.x as x, edges$C.y as y
+      FROM recursive$A, edges as edges$C
+      WHERE recursive$A.y = edges$C.x); SELECT * FROM recursive$A
       """
 }

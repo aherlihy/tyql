@@ -82,6 +82,21 @@ object QueryIRTree:
         collapseSort(sorts :+ (sort.$body, sort.$ord), sort.$from, symbols)
       case _ => (sorts, generateQuery(comprehension, symbols))
 
+  private def collapseNaryOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: DatabaseAST[?]): NaryRelationOp =
+    val flattened = (
+      lhs match
+        case NaryRelationOp(lhsChildren, lhsOp, lhsAst) if op == lhsOp =>
+          lhsChildren
+        case _ => Seq(lhs)
+      ) ++ (
+      rhs match
+        case NaryRelationOp(rhsChildren, rhsOp, rhsAST) if op == rhsOp =>
+          rhsChildren
+        case _ => Seq(rhs)
+      )
+
+    NaryRelationOp(flattened, op, ast)
+
   private def unnest(tableIRs: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
     tableIRs.reduce((q1, q2) =>
       q1.mergeWith(q2, flatMap)
@@ -146,15 +161,15 @@ object QueryIRTree:
         val lhs = generateQuery(union.$this, symbols).appendFlag(SelectFlags.Final)
         val rhs = generateQuery(union.$other, symbols).appendFlag(SelectFlags.Final)
         val op = if union.$dedup then "UNION" else "UNION ALL"
-        BinRelationOp(lhs, rhs, op, union) // TODO: specialize so can be n-way union, not just 2
+        collapseNaryOp(lhs, rhs, op, union)
       case intersect: Query.Intersect[?] =>
         val lhs = generateQuery(intersect.$this, symbols).appendFlag(SelectFlags.Final)
         val rhs = generateQuery(intersect.$other, symbols).appendFlag(SelectFlags.Final)
-        BinRelationOp(lhs, rhs, "INTERSECT", intersect)
+        collapseNaryOp(lhs, rhs, "INTERSECT", intersect)
       case except: Query.Except[?] =>
         val lhs = generateQuery(except.$this, symbols).appendFlag(SelectFlags.Final)
         val rhs = generateQuery(except.$other, symbols).appendFlag(SelectFlags.Final)
-        BinRelationOp(lhs, rhs, "EXCEPT", except)
+        collapseNaryOp(lhs, rhs, "EXCEPT", except)
       case sort: Query.Sort[?, ?] =>
         val (orderByASTs, tableIR) = collapseSort(Seq(), sort, symbols)
         val orderByExprs = orderByASTs.map(ord =>
@@ -163,10 +178,10 @@ object QueryIRTree:
         OrderedQuery(tableIR.appendFlag(SelectFlags.Final), orderByExprs, sort)
       case limit: Query.Limit[?] =>
         val from = generateQuery(limit.$from, symbols)
-        BinRelationOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, limit.$limit), "LIMIT", limit)
+        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, limit.$limit), "LIMIT", limit)
       case offset: Query.Offset[?] =>
         val from = generateQuery(offset.$from, symbols)
-        BinRelationOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, offset.$offset), "OFFSET", offset)
+        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, offset.$offset), "OFFSET", offset)
       case distinct: Query.Distinct[?] =>
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
       case queryRef: Query.QueryRef[?] =>
@@ -182,9 +197,7 @@ object QueryIRTree:
         val varId = recursive.$query.$param.stringRef()
         // generate subquery
         val recurNode = generateQuery(recursive.$query.$body, symbols + (varId -> variable)).appendFlag(SelectFlags.Final)
-//        val subquery = baseNode match
-//          case multipleBaseCases: BinRelationOp if multipleBaseCases.op.contains("UNION") =>
-        val subquery = BinRelationOp(baseNode, recurNode, "UNION ALL", recursive).appendFlag(SelectFlags.Final)
+        val subquery = collapseNaryOp(baseNode, recurNode, "UNION ALL", recursive).appendFlag(SelectFlags.Final)
         RecursiveRelationOp(rAlias, subquery, recursive)
 
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
