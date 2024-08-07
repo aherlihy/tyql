@@ -61,3 +61,61 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
       WHERE recursive$A.y = edges$C.x); SELECT * FROM recursive$A
       """
 }
+
+class Recursion3Test extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "TC with multiple recursive cases"
+
+  def query() =
+    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
+    val path2 = path.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+    )
+
+    path2.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+    )
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE recursive$A AS
+        (SELECT * FROM edges as edges$B
+          UNION ALL
+        SELECT * FROM edges as edges$E
+          UNION ALL
+        SELECT recursive$A.x as x, edges$C.y as y
+        FROM recursive$A, edges as edges$C
+        WHERE recursive$A.y = edges$C.x
+          UNION ALL
+        SELECT recursive$A.x as x, edges$F.y as y
+        FROM recursive$A, edges as edges$F
+        WHERE recursive$A.y = edges$F.x);
+      SELECT * FROM recursive$A
+        """
+}
+
+class NotRecursiveCTETest extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "No recursion"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.fix(path =>
+      testDB.tables.edges
+    )
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE recursive$A AS
+      (SELECT * FROM edges as edges$B
+        UNION ALL
+      SELECT * FROM edges as edges$E);
+    SELECT * FROM recursive$A
+      """
+}
+

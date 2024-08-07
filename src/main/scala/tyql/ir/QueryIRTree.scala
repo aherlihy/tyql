@@ -187,17 +187,23 @@ object QueryIRTree:
       case queryRef: Query.QueryRef[?] =>
         RecursiveIRVar(symbols(queryRef.stringRef()).alias, queryRef)
       case recursive: Query.Recursive[?] =>
-        // define alias first
-        val rAlias = s"recursive${QueryIRTree.idCount}"
-        QueryIRTree.idCount += 1
         // base case / existing definitions generated per usual:
         val baseNode = generateQuery(recursive.$from, symbols).appendFlag(SelectFlags.Final)
+        // handle previously defined recursive definition
+        val (lhs, rAlias) = baseNode match
+          case RecursiveRelationOp(lhsAlias, query, ast) =>
+            (query, lhsAlias)
+          case _ =>
+            QueryIRTree.idCount += 1
+            (baseNode, s"recursive${QueryIRTree.idCount}")
+
         // assign variable ID to alias in symbol table
         val variable = RecursiveIRVar(rAlias, recursive.$query.$param)
         val varId = recursive.$query.$param.stringRef()
         // generate subquery
         val recurNode = generateQuery(recursive.$query.$body, symbols + (varId -> variable)).appendFlag(SelectFlags.Final)
-        val subquery = collapseNaryOp(baseNode, recurNode, "UNION ALL", recursive).appendFlag(SelectFlags.Final)
+
+        val subquery = collapseNaryOp(lhs, recurNode, "UNION ALL", recursive).appendFlag(SelectFlags.Final)
         RecursiveRelationOp(rAlias, subquery, recursive)
 
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
