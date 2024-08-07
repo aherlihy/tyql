@@ -106,6 +106,7 @@ object Expr:
     private val id = refCount
     refCount += 1
     def stringRef() = s"ref$id"
+    override def toString: String = s"Ref[${stringRef()}]"
 
   /** Literals are type-specific, tailored to the types that the DB supports */
   case class IntLit($value: Int) extends Expr[Int]

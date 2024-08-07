@@ -58,7 +58,6 @@ case class SelectExpr(attrName: String, from: QueryIRNode, ast: Expr[?]) extends
 
 /**
  * A variable that points to a table or subquery.
- * TODO: probably don't need to store the entire `toSub`, just an alias
  */
 case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?]) extends QueryIRLeaf:
   override def toSQLString() = toSub.alias

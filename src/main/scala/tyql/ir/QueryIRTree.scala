@@ -146,7 +146,7 @@ object QueryIRTree:
         val lhs = generateQuery(union.$this, symbols).appendFlag(SelectFlags.Final)
         val rhs = generateQuery(union.$other, symbols).appendFlag(SelectFlags.Final)
         val op = if union.$dedup then "UNION" else "UNION ALL"
-        BinRelationOp(lhs, rhs, op, union)
+        BinRelationOp(lhs, rhs, op, union) // TODO: specialize so can be n-way union, not just 2
       case intersect: Query.Intersect[?] =>
         val lhs = generateQuery(intersect.$this, symbols).appendFlag(SelectFlags.Final)
         val rhs = generateQuery(intersect.$other, symbols).appendFlag(SelectFlags.Final)
@@ -169,6 +169,24 @@ object QueryIRTree:
         BinRelationOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, offset.$offset), "OFFSET", offset)
       case distinct: Query.Distinct[?] =>
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
+      case queryRef: Query.QueryRef[?] =>
+        RecursiveIRVar(symbols(queryRef.stringRef()).alias, queryRef)
+      case recursive: Query.Recursive[?] =>
+        // define alias first
+        val rAlias = s"recursive${QueryIRTree.idCount}"
+        QueryIRTree.idCount += 1
+        // base case / existing definitions generated per usual:
+        val baseNode = generateQuery(recursive.$from, symbols).appendFlag(SelectFlags.Final)
+        // assign variable ID to alias in symbol table
+        val variable = RecursiveIRVar(rAlias, recursive.$query.$param)
+        val varId = recursive.$query.$param.stringRef()
+        // generate subquery
+        val recurNode = generateQuery(recursive.$query.$body, symbols + (varId -> variable)).appendFlag(SelectFlags.Final)
+//        val subquery = baseNode match
+//          case multipleBaseCases: BinRelationOp if multipleBaseCases.op.contains("UNION") =>
+        val subquery = BinRelationOp(baseNode, recurNode, "UNION ALL", recursive).appendFlag(SelectFlags.Final)
+        RecursiveRelationOp(rAlias, subquery, recursive)
+
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
   private def generateFun(fun: Expr.Fun[?, ?], appliedTo: RelationOp, symbols: SymbolTable): QueryIRNode =

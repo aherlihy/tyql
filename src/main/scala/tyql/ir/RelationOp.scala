@@ -52,7 +52,11 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
   val name = s"$tableName${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
   override def alias = name
-  override def toSQLString(): String = s"$tableName as $name"
+  override def toSQLString(): String =
+    if (flags.contains(SelectFlags.Final))
+      tableName
+    else
+      s"$tableName as $name"
 
   override def toString: String = s"TableLeaf($tableName as $name)"
 
@@ -331,3 +335,100 @@ case class BinRelationOp(lhs: RelationOp, rhs: QueryIRNode, op: String, ast: Que
     val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     s"$open${lhs.toSQLString()} $op ${rhs.toSQLString()}$close$aliasStr"
 
+// TODO: store subquery separately or as a UnionAll?
+case class RecursiveRelationOp(alias: String, query: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
+
+  // TODO: for now reuse BinRelationOp's methods
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(
+      Seq(this),
+      Seq(w),
+      Some(alias),
+      astOther
+    )
+
+  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
+    SelectQuery(
+      p,
+      Seq(this),
+      Seq(),
+      Some(alias),
+      astOther
+    )
+
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: TableLeaf =>
+        SelectAllQuery(
+          Seq(this, t),
+          Seq(),
+          Some(alias),
+          astOther
+        )
+      case q: SelectAllQuery =>
+        SelectAllQuery(
+          q.from :+ this,
+          q.where,
+          Some(q.alias),
+          astOther
+        )
+      case q: SelectQuery =>
+        SelectQuery(
+          q.project,
+          q.from :+ this,
+          q.where,
+          Some(q.alias),
+          astOther
+        )
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
+
+  override def appendFlag(f: SelectFlags): RelationOp =
+    flags = flags + f
+    this
+
+  override def toSQLString(): String =
+    s"WITH RECURSIVE $alias AS (${query.toSQLString()}); SELECT * FROM $alias"
+
+/**
+ * A recursive variable that points to a table or subquery.
+ */
+case class RecursiveIRVar(alias: String, ast: DatabaseAST[?]) extends RelationOp:
+  override def toSQLString() = alias
+  override def toString: String = s"Q-VAR($alias)"
+
+  // TODO: for now reuse TableOp's methods
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: TableLeaf =>
+        SelectAllQuery(Seq(this, t), Seq(), None, astOther)
+      case q: SelectAllQuery =>
+        SelectAllQuery(this +: q.from, q.where, None, astOther)
+      case q: SelectQuery =>
+        SelectQuery(
+          q.project,
+          this +: q.from,
+          q.where,
+          None,
+          astOther
+        )
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
+
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther)
+
+  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
+    SelectQuery(p, Seq(this), Seq(), None, astOther)
+
+  override def appendFlag(f: SelectFlags): RelationOp =
+    val q = f match
+      case SelectFlags.Distinct => // Distinct is special case because needs to be "hoisted" to enclosing SELECT, so alias is kept
+        SelectAllQuery(Seq(this), Seq(), Some(alias), ast)
+      case _ =>
+        SelectAllQuery(Seq(this), Seq(), None, ast)
+
+    q.flags = q.flags + f
+    q

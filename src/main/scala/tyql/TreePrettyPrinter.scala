@@ -31,6 +31,12 @@ object TreePrettyPrinter {
       case _ => throw new Exception(s"Unimplemented pretty print FUN $fun")
   }
 
+  extension (fun: QueryFun[?, ?]) {
+    def prettyPrint(depth: Int): String = fun match
+      case QueryFun(param, body: DatabaseAST[?]) =>
+        s"${indent(depth)}FunR(${param.prettyPrint(0)} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
+  }
+
   extension (expr: Expr[?]) {
     def prettyPrint(depth: Int): String = expr match {
       case Select(x, name) => s"${indent(depth)}Select(${x.prettyPrint(0)}.$name)"
@@ -119,6 +125,9 @@ object TreePrettyPrinter {
       case GroupBy(query, selectFn, groupingFn, havingFn) =>
         s"${indent(depth)}GroupBy(\n${query.prettyPrint(depth + 1)},\n${selectFn.prettyPrint(depth + 1)},\n${groupingFn.prettyPrint(depth + 1)},\n${havingFn.prettyPrint(depth + 1)}\n${indent(depth)})"
       case a: Aggregation[?] => a.prettyPrint(depth)
+      case Recursive(from, query) =>
+        s"${indent(depth)}Recursive(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?]].stringRef()})"
       case _ => throw new Exception(s"Unimplemented pretty print AST $ast")
     }
   }
@@ -151,7 +160,10 @@ object TreePrettyPrinter {
         val rhsPrint = binRelationOp.rhs.prettyPrintIR(depth + 1, printAST)
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", binRelationOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}BinRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${binRelationOp.op}'\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
-
+      case recursiveRelationOp: RecursiveRelationOp =>
+        s"${indent(depth)}RecursiveOp{${recursiveRelationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}${recursiveRelationOp.query.prettyPrintIR(depth + 1, printAST)}"
+      case recursiveIRVar: RecursiveIRVar =>
+        s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}"
       case _ => throw new Exception(s"Unimplemented pretty print RelationOp $relationOp")
     }
   }

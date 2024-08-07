@@ -92,6 +92,17 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
 object Query:
   import Expr.{Pred, Fun, Ref}
 
+  case class Recursive[A: ResultTag]($from: Query[A], $query: QueryFun[A, Query[A]]) extends Query[A]
+
+  private var refCount = 0
+  case class QueryRef[A: ResultTag]() extends Query[A]:
+    private val id = refCount
+    refCount += 1
+    def stringRef() = s"ref$id"
+    override def toString: String = s"QueryRef[${stringRef()}]"
+
+  case class QueryFun[A, B]($param: QueryRef[A], $body: B)
+
   case class Filter[A: ResultTag]($from: Query[A], $pred: Pred[A]) extends Query[A]
   case class Map[A, B: ResultTag]($from: Query[A], $query: Fun[A, Expr[B]]) extends Query[B]
   case class FlatMap[A, B: ResultTag]($from: Query[A], $query: Fun[A, Query[B]]) extends Query[B]
@@ -115,6 +126,26 @@ object Query:
 
   // Extension methods to support for-expression syntax for queries
   extension [R: ResultTag](x: Query[R])
+    /**
+     * TC DL program:
+     * path(x, y) :- edge(x, y)
+     * path(x, y) :- path(x, z), edge(z, y)
+     *
+     * Turns into, in tyql:
+     * val path = edges
+     * val path = path.fix(path =>
+     *    path.flatMap(p =>
+     *      edge
+     *        .filter(e => p.y == e.x)
+     *        .map(e => (x = p.x, y = e.y))
+     *   )
+     * )
+     *
+     * Define fix as extension method to force the base case to be defined before the recursive case.
+     */
+    def fix(p: QueryRef[R] => Query[R]): Query[R] =
+      val qRef = QueryRef[R]()
+      Recursive(x, QueryFun(qRef, p(qRef)))
 
     def withFilter(p: Ref[R] => Expr[Boolean]): Query[R] =
       val ref = Ref[R]()
