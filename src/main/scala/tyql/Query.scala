@@ -93,13 +93,29 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
 object Query:
   import Expr.{Pred, Fun, Ref}
 
+  /**
+   * Option 1: N-ary argument signature for fix.
+   */
   def fix[Args <: Tuple](f: Args => Args) : Args => Args =
     ???
+  def fixUntupled[F, Args <: Tuple](f: F) (using tf: TupledFunction[F, Args => Args]) = tf.untupled(fix(tf.tupled(f)))
 
-  def fix2[F, Args <: Tuple](f: F) (using tf: TupledFunction[F, Args => Args]) = tf.untupled(fix(tf.tupled(f)))
+  /**
+   * Alternative approach, manually specify tuple length
+   */
+  def fixTwo[P, Q](baseP: Query[P], baseQ: Query[Q])(p: (QueryRef[P], QueryRef[Q]) => (Query[P], Query[Q])): (Query[P], Query[Q]) =
+//    val pRef = QueryRef[P]()
+//    Recursive(baseP, QueryFun(pRef, p(qRef)))
+    ???
+
+  def fixThree[P, Q, S](baseP: Query[P], baseQ: Query[Q], baseS: Query[S])
+                       (p: QueryRef[P] => QueryRef[Q] => QueryRef[S] => (Query[P], Query[Q], Query[S])): (Query[P], Query[Q], Query[S]) =
+    val pRef = QueryRef[P]
+    // TODO: start here, uncurry
+    val pRecursive = Recursive(baseP, QueryFun(pRef, p(qRef)))
+    Recursive(baseP)
 
   case class Recursive[A: ResultTag]($from: Query[A], $query: QueryFun[A, Query[A]]) extends Query[A]
-  case class MultiRecursive[A: ResultTag]($fromSeq: Seq[Recursive[A]], $querySeq: Seq[Query[A]])
 
   private var refCount = 0
   case class QueryRef[A: ResultTag]() extends Query[A]:

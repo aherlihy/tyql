@@ -254,7 +254,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
           astOther
         )
       case o: OrderedQuery =>
-        // hoist where
+        // hoist where, TODO: fix unreachable cases
         (query, o.query) match
           case q: (SelectAllQuery, SelectAllQuery) =>
             SelectAllQuery(
