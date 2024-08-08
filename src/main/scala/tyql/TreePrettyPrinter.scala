@@ -160,7 +160,7 @@ object TreePrettyPrinter {
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", naryRelationOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}BinRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
       case recursiveRelationOp: RecursiveRelationOp =>
-        s"${indent(depth)}RecursiveOp{${recursiveRelationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}${recursiveRelationOp.query.prettyPrintIR(depth + 1, printAST)}"
+        s"${indent(depth)}RecursiveOp{${recursiveRelationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth+1)}base=\n${recursiveRelationOp.finalQ.prettyPrintIR(depth+2, printAST)}\n${indent(depth + 1)}query=\n${recursiveRelationOp.query.prettyPrintIR(depth + 2, printAST)}"
       case recursiveIRVar: RecursiveIRVar =>
         s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}"
       case _ => throw new Exception(s"Unimplemented pretty print RelationOp $relationOp")

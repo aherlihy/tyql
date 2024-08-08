@@ -63,11 +63,11 @@ class SortTakeFromSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double
   def expectedQueryPattern = """
         SELECT purchase$A.total
         FROM
-        purchase as purchase$D,
         (SELECT *
           FROM product as product$B
           ORDER BY price DESC
-          LIMIT 1) as subquery$C
+          LIMIT 1) as subquery$C,
+        purchase as purchase$D
         WHERE subquery$C.id = purchase$D.productId
       """
 }
@@ -106,13 +106,13 @@ class SortTakeFromSubquery3Test extends SQLStringQueryTest[AllCommerceDBs, Doubl
         SELECT subquery$E.total
         FROM
          (SELECT *
-          FROM product as product$B
-          ORDER BY price DESC
-          LIMIT 1) as subquery$D,
-         (SELECT *
           FROM purchase as purchase$A
           ORDER BY total ASC
-          LIMIT 2) as subquery$E
+          LIMIT 2) as subquery$E,
+         (SELECT *
+          FROM product as product$B
+          ORDER BY price DESC
+          LIMIT 1) as subquery$D
         WHERE subquery$D.id = subquery$E.productId
       """
 }
@@ -129,12 +129,12 @@ class NestedSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
         SELECT subquery$B.id
         FROM
           (SELECT *
-           FROM product as product$A
-           ORDER BY price DESC) as subquery$B,
-          (SELECT *
            FROM
            purchase as purchase$D
-           ORDER BY total ASC) as subquery$C
+           ORDER BY total ASC) as subquery$C,
+          (SELECT *
+           FROM product as product$A
+           ORDER BY price DESC) as subquery$B
         WHERE subquery$B.id = subquery$C.productId
       """
 }
@@ -327,8 +327,8 @@ class SimpleNestedSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def expectedQueryPattern = """
         SELECT product$A.id
         FROM
-          product as product$A,
-          (SELECT * FROM purchase as purchase$C OFFSET 1) as subquery$B
+          (SELECT * FROM purchase as purchase$C OFFSET 1) as subquery$B,
+          product as product$A
         WHERE product$A.id = subquery$B.productId
       """
 }
@@ -345,11 +345,11 @@ class SortTakeFromSubquery4Test extends SQLStringQueryTest[AllCommerceDBs, Doubl
     """
         SELECT purchase$A.total
         FROM
-        purchase as purchase$D,
         (SELECT *
           FROM product as product$B
           ORDER BY price DESC
-          LIMIT 1) as subquery$C
+          LIMIT 1) as subquery$C,
+        purchase as purchase$D
         WHERE subquery$C.id = purchase$D.productId
         """
 }
@@ -365,8 +365,8 @@ class SortTakeFromAndJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs,
   def expectedQueryPattern = """
       SELECT subquery$A.name as name, subquery$B.count as count
       FROM
-        (SELECT * FROM purchase as purchase$R ORDER BY count DESC LIMIT 4) as subquery$B,
-        (SELECT * FROM product as product$Q ORDER BY price DESC LIMIT 3) as subquery$A
+        (SELECT * FROM product as product$Q ORDER BY price DESC LIMIT 3) as subquery$A,
+        (SELECT * FROM purchase as purchase$R ORDER BY count DESC LIMIT 4) as subquery$B
       WHERE subquery$A.id = subquery$B.productId
       """
 }

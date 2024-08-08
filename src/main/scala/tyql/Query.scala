@@ -1,6 +1,7 @@
 package tyql
 
 import language.experimental.namedTuples
+import scala.util.TupledFunction
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.compiletime.*
 import scala.deriving.Mirror
@@ -92,7 +93,13 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
 object Query:
   import Expr.{Pred, Fun, Ref}
 
+  def fix[Args <: Tuple](f: Args => Args) : Args => Args =
+    ???
+
+  def fix2[F, Args <: Tuple](f: F) (using tf: TupledFunction[F, Args => Args]) = tf.untupled(fix(tf.tupled(f)))
+
   case class Recursive[A: ResultTag]($from: Query[A], $query: QueryFun[A, Query[A]]) extends Query[A]
+  case class MultiRecursive[A: ResultTag]($fromSeq: Seq[Recursive[A]], $querySeq: Seq[Query[A]])
 
   private var refCount = 0
   case class QueryRef[A: ResultTag]() extends Query[A]:
@@ -146,6 +153,9 @@ object Query:
     def fix(p: QueryRef[R] => Query[R]): Query[R] =
       val qRef = QueryRef[R]()
       Recursive(x, QueryFun(qRef, p(qRef)))
+//    def fix[S](p: QueryRef[R] => Query[R], result: Query[S]): Query[S] =
+//      val qRef = QueryRef[R]()
+//      Recursive(x, QueryFun(qRef, p(qRef)), result)
 
     def withFilter(p: Ref[R] => Expr[Boolean]): Query[R] =
       val ref = Ref[R]()

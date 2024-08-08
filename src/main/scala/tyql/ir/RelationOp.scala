@@ -44,6 +44,8 @@ trait RelationOp extends QueryIRNode:
    * @param f - the flag
    */
   def appendFlag(f: SelectFlags): RelationOp
+  def appendFlags(f: Set[SelectFlags]): RelationOp =
+    f.foldLeft(this)((r: RelationOp, f) => r.appendFlag(f))
 
   def wrapString(inner: String): String =
     val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
@@ -84,10 +86,10 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
         SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther)
+    SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(p, Seq(this), Seq(), None, astOther)
+    SelectQuery(p, Seq(this), Seq(), None, astOther).appendFlags(flags)
 
   override def appendFlag(f: SelectFlags): RelationOp =
     val q = f match
@@ -116,10 +118,10 @@ case class SelectAllQuery(from: Seq[RelationOp],
   override def alias = name
 
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(from, where :+ w, Some(alias), astOther)
+    SelectAllQuery(from, where :+ w, Some(alias), astOther).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(p, from, where, None, ast)
+    SelectQuery(p, from, where, None, ast).appendFlags(flags)
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
@@ -171,11 +173,13 @@ case class SelectQuery(project: QueryIRNode,
   override def alias = name
 
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(project, from, where :+ w, Some(alias), astOther)
+//    SelectQuery(project, from, where :+ w, Some(alias), astOther).appendFlags(flags)
+    // Appending a where clause to something that already has a project triggers subquery
+    SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
-    SelectQuery(p, Seq(this), Seq(), None, astOther)
+    SelectQuery(p, Seq(this), Seq(), None, astOther).appendFlags(flags)
 
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
@@ -217,7 +221,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     // Does not trigger subquery, e.g. relation.sort(s).filter(f) => SELECT * FROM relation WHERE f ORDER BY s
-    OrderedQuery(query.appendWhere(w, astOther), sortFn, ast)
+    OrderedQuery(query.appendWhere(w, astOther), sortFn, ast).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     // Triggers a subquery, e.g. relation.sort(s).map(m) => SELECT m FROM (SELECT * from relation ORDER BY s).
@@ -236,7 +240,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
         OrderedQuery(query.mergeWith(t, astOther), sortFn, ast)
       case q: SelectAllQuery =>
         SelectAllQuery(
-          q.from :+ this,
+          this +: q.from,
           q.where,
           Some(q.alias),
           astOther
@@ -244,11 +248,46 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
       case q: SelectQuery =>
         SelectQuery(
           q.project,
-          q.from :+ this,
+          this +: q.from,
           q.where,
           Some(q.alias),
           astOther
         )
+      case o: OrderedQuery =>
+        // hoist where
+        (query, o.query) match
+          case q: (SelectAllQuery, SelectAllQuery) =>
+            SelectAllQuery(
+              Seq(
+                OrderedQuery(SelectAllQuery(q._1.from, Seq(), Some(q._1.alias), q._1.ast).appendFlag(SelectFlags.Final), sortFn, ast),
+                OrderedQuery(SelectAllQuery(q._2.from, Seq(), Some(q._2.alias), q._2.ast).appendFlag(SelectFlags.Final), o.sortFn, o.ast)
+              ),
+              q._1.where ++ q._2.where,
+              None,
+              astOther
+            )
+          case q: (RelationOp, SelectAllQuery) =>
+            SelectAllQuery(
+              Seq(
+                this,
+                OrderedQuery(SelectAllQuery(q._2.from, Seq(), Some(q._2.alias), q._2.ast).appendFlag(SelectFlags.Final), o.sortFn, o.ast)
+              ),
+              q._2.where,
+              None,
+              astOther
+            )
+          case q: (SelectAllQuery, RelationOp) =>
+            SelectAllQuery(
+              Seq(
+                OrderedQuery(SelectAllQuery(q._1.from, Seq(), Some(q._1.alias), q._1.ast).appendFlag(SelectFlags.Final), sortFn, ast),
+                o
+              ),
+              q._1.where,
+              None,
+              astOther
+            )
+          case _ =>
+            SelectAllQuery(Seq(this, o), Seq(), None, astOther)
       case r: RelationOp =>
         // default to subquery, some ops may want to override
         SelectAllQuery(Seq(this, r), Seq(), None, astOther)
@@ -304,7 +343,7 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
         )
       case q: SelectAllQuery =>
         SelectAllQuery(
-          q.from :+ this,
+          this +: q.from,
           q.where,
           Some(q.alias),
           astOther
@@ -312,7 +351,7 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
       case q: SelectQuery =>
         SelectQuery(
           q.project,
-          q.from :+ this,
+          this +: q.from,
           q.where,
           Some(q.alias),
           astOther
@@ -328,26 +367,17 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
   override def toSQLString(): String =
     wrapString(children.map(_.toSQLString()).mkString(s" $op "))
 
-// TODO: store subquery separately or as a UnionAll?
-case class RecursiveRelationOp(alias: String, query: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
-
-  // TODO: for now reuse NaryRelationOp's methods
+case class RecursiveRelationOp(alias: String, query: RelationOp, finalQ: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
-    SelectAllQuery(
-      Seq(this),
-      Seq(w),
-      Some(alias),
-      astOther
-    )
+    RecursiveRelationOp(
+      alias, query, finalQ.appendWhere(w, astOther), ast
+    ).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    SelectQuery(
-      p,
-      Seq(this),
-      Seq(),
-      Some(alias),
-      astOther
-    )
+    println(s"appending project to recursive")
+    RecursiveRelationOp(
+      alias, query, finalQ.appendProject(p, astOther), ast
+    ).appendFlags(flags)
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
@@ -360,7 +390,7 @@ case class RecursiveRelationOp(alias: String, query: RelationOp, ast: DatabaseAS
         )
       case q: SelectAllQuery =>
         SelectAllQuery(
-          q.from :+ this,
+          this +: q.from,
           q.where,
           Some(q.alias),
           astOther
@@ -368,7 +398,7 @@ case class RecursiveRelationOp(alias: String, query: RelationOp, ast: DatabaseAS
       case q: SelectQuery =>
         SelectQuery(
           q.project,
-          q.from :+ this,
+          this +: q.from,
           q.where,
           Some(q.alias),
           astOther
@@ -383,7 +413,7 @@ case class RecursiveRelationOp(alias: String, query: RelationOp, ast: DatabaseAS
 
   override def toSQLString(): String =
     // NOTE: no parens or alias needed, since already defined
-    s"WITH RECURSIVE $alias AS (${query.toSQLString()}); SELECT * FROM $alias"
+    s"WITH RECURSIVE $alias AS (${query.toSQLString()}); ${finalQ.toSQLString()}"
 
 /**
  * A recursive variable that points to a table or subquery.

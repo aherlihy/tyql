@@ -125,11 +125,13 @@ object QueryIRTree:
           generateFun(pred, tableIR, symbols) // NOTE: the parameters of all predicate functions are mapped to tableIR
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
-        tableIR match
-          case s: (SelectAllQuery | TableLeaf) =>
-            s.appendWhere(where, filter)
-          case _ => // cannot unnest because source had project, sort, etc. TODO: some ops like limit might be unnestable
-            SelectAllQuery(Seq(tableIR), Seq(where), Some(tableIR.alias), filter)
+        println(s"appending where to class ${tableIR.getClass}")
+        tableIR.appendWhere(where, filter)
+//        tableIR match
+//          case s: (SelectAllQuery | TableLeaf) =>
+//            s.appendWhere(where, filter)
+//          case _ => // cannot unnest because source had project, sort, etc. TODO: some ops like limit might be unnestable
+//            SelectAllQuery(Seq(tableIR), Seq(where), Some(tableIR.alias), filter)
       case flatMap: Query.FlatMap[?, ?] =>
         val sourceIR = generateQuery(flatMap.$from, symbols)
         val bodyAST = flatMap.$query
@@ -190,12 +192,14 @@ object QueryIRTree:
         // base case / existing definitions generated per usual:
         val baseNode = generateQuery(recursive.$from, symbols).appendFlag(SelectFlags.Final)
         // handle previously defined recursive definition
-        val (lhs, rAlias) = baseNode match
-          case RecursiveRelationOp(lhsAlias, query, ast) =>
-            (query, lhsAlias)
+        val (lhs, rAlias, finalQ) = baseNode match
+          case RecursiveRelationOp(lhsAlias, query, lhsFinalQ, ast) =>
+            (query, lhsAlias, lhsFinalQ)
           case _ =>
             QueryIRTree.idCount += 1
-            (baseNode, s"recursive${QueryIRTree.idCount}")
+            val newAlias = s"recursive${QueryIRTree.idCount}"
+            val lhsFinalQ = SelectAllQuery(Seq(RecursiveIRVar(newAlias, recursive.$query.$param)), Seq(), None, recursive.$from)
+            (baseNode, newAlias, lhsFinalQ)
 
         // assign variable ID to alias in symbol table
         val variable = RecursiveIRVar(rAlias, recursive.$query.$param)
@@ -204,7 +208,7 @@ object QueryIRTree:
         val recurNode = generateQuery(recursive.$query.$body, symbols + (varId -> variable)).appendFlag(SelectFlags.Final)
 
         val subquery = collapseNaryOp(lhs, recurNode, "UNION ALL", recursive).appendFlag(SelectFlags.Final)
-        RecursiveRelationOp(rAlias, subquery, recursive)
+        RecursiveRelationOp(rAlias, subquery, finalQ.appendFlag(SelectFlags.Final), recursive)
 
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
