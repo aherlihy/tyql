@@ -2,7 +2,7 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 
 inThisBuild(Seq(
   organization := "ch.epfl.lamp",
-  scalaVersion := "3.5.0-RC1-bin-SNAPSHOT",
+  scalaVersion := "3.5.1-RC1",
   version := "0.0.1",
 ))
 
