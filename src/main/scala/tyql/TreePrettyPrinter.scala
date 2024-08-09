@@ -125,15 +125,13 @@ object TreePrettyPrinter {
       case GroupBy(query, selectFn, groupingFn, havingFn) =>
         s"${indent(depth)}GroupBy(\n${query.prettyPrint(depth + 1)},\n${selectFn.prettyPrint(depth + 1)},\n${groupingFn.prettyPrint(depth + 1)},\n${havingFn.prettyPrint(depth + 1)}\n${indent(depth)})"
       case a: Aggregation[?] => a.prettyPrint(depth)
-      case Recursive(from, query) =>
-        s"${indent(depth)}Recursive(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case RecursiveV2(ref, query) =>
-        s"${indent(depth)}RecursiveV2(\n${ref.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case MultiRecursiveV2(refs, querys) =>
+      case Recursive(ref, query) =>
+        s"${indent(depth)}Recursive(\n${ref.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case MultiRecursive(refs, querys) =>
         val refStr = refs.toList.map(r => r.asInstanceOf[QueryRef[?]].prettyPrint(depth+1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?]].prettyPrint(depth + 2))
         val str = refStr.zip(qryStr).map((r, q) => s"\n$r =>\n$q").mkString(",\n")
-        s"${indent(depth)}MultiRecursiveV2($str\n${indent(depth)})"
+        s"${indent(depth)}MultiRecursive($str\n${indent(depth)})"
       case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?]].stringRef()})"
       case _ => throw new Exception(s"Unimplemented pretty print AST $ast")
     }
@@ -171,7 +169,7 @@ object TreePrettyPrinter {
       case MultiRecursiveRelationOp(alias, query, finalQ, ast) =>
         val qryStr = query.map(q => q.prettyPrintIR(depth + 1, false))
         val str = alias.zip(qryStr).map((r, q) => s"\n$r => $q").mkString(",\n")
-        s"${indent(depth)}MultiRecursiveV2($str\n${indent(depth)})"
+        s"${indent(depth)}MultiRecursive($str\n${indent(depth)})"
       case recursiveIRVar: RecursiveIRVar =>
         s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}"
       case _ => throw new Exception(s"Unimplemented pretty print RelationOp $relationOp")

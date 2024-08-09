@@ -1,7 +1,7 @@
 package test.query.recursive
 import test.{SQLStringQueryTest, TestDatabase}
 import tyql.*
-import Query.{fix, fixThree, fixUntupled, fixTwoSingle}
+import Query.*
 
 import language.experimental.namedTuples
 import NamedTuple.*
@@ -233,58 +233,62 @@ given CSPADBs: TestDatabase[CSPADB] with
     empty = Table[Location]("empty") // TODO: define singleton for empty table?
   )
 
-//class RecursiveTwoTest extends  SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "define 2 recursive relations"
-//
-//  def query() =
-//    val pathBase = testDB.tables.edges
-//    val pathToABase = testDB.tables.emptyEdges
-//    val (pathResult, pathToAResult) = fixTwo(pathBase, pathToABase)((path, pathToA) =>
-//      val P = path.flatMap(p =>
-//        testDB.tables.edges
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      )
-//      val PtoA = path.filter(e => e.x == "A")
-//      (P, PtoA)
-//    )
-//    pathToAResult
-//  def expectedQueryPattern: String =
-//    """
-//    WITH RECURSIVE
-//	    path AS (
-//        SELECT x, y FROM edges
-//        UNION ALL
-//        SELECT path.x, edges.y
-//        FROM path, edges
-//        WHERE path.y = edges.x),
-//      pathToA AS (SELECT * FROM path WHERE path.x = 1)
-//    SELECT * FROM pathToA
-//    """
-//}
-
-
-class RecursiveTwoSingleTest extends SQLStringQueryTest[TCDB, Edge] {
-  def testDescription: String = "define 2 recursive relations, with api that returns a single query"
+class RecursiveTwoTest extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "define 2 recursive relations"
 
   def query() =
     val pathBase = testDB.tables.edges
     val pathToABase = testDB.tables.emptyEdges
-    val (pathResult, pathToAResult) = fixTwoSingle(pathBase, pathToABase)((path, pathToA) =>
+    val (pathResult, pathToAResult) = fixTwo(pathBase, pathToABase)((path, pathToA) =>
       val P = path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
           .map(e => (x = p.x, y = e.y).toRow)
       )
-      val PtoA = P.filter(e => e.x == "A")
-      PtoA
+      val PtoA = path.filter(e => e.x == "A")
+      (P, PtoA)
     )
+
     pathToAResult
 
   def expectedQueryPattern: String =
     """
-      """
+    WITH RECURSIVE
+        recursive$P AS
+          (SELECT * FROM edges as edges$A
+              UNION ALL
+           SELECT recursive$P.x as x, edges$C.y as y
+           FROM recursive$P, edges as edges$C
+           WHERE recursive$P.y = edges$C.x),
+        recursive$A AS
+          (SELECT * FROM empty as empty$D
+              UNION ALL
+           SELECT * FROM recursive$P WHERE recursive$P.x = "A");
+    (SELECT * FROM recursive$A) as subquery$E
+    """
 }
+
+//class RecursiveTwoSingleTest extends SQLStringQueryTest[TCDB, Edge] {
+//  def testDescription: String = "define 2 recursive relations, with api that returns a single query"
+//
+//  def query() =
+//    val pathBase = testDB.tables.edges
+//    val pathToABase = testDB.tables.emptyEdges
+//    val (pathResult, pathToAResult) = fixTwoSingle(pathBase, pathToABase)((path, pathToA) =>
+//      val P = path.flatMap(p =>
+//        testDB.tables.edges
+//          .filter(e => p.y == e.x)
+//          .map(e => (x = p.x, y = e.y).toRow)
+//      )
+//      val PtoA = P.filter(e => e.x == "A")
+//      PtoA
+//    )
+//    pathToAResult
+//
+//  def expectedQueryPattern: String =
+//    """
+//      """
+//}
 class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
   def testDescription: String = "CSPA, example mutual recursion"
 
