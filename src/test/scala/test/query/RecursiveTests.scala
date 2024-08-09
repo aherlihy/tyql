@@ -268,6 +268,42 @@ class RecursiveTwoTest extends SQLStringQueryTest[TCDB, Edge] {
     """
 }
 
+class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "define 2 recursive relations, use multifix"
+
+  def query() =
+    val pathBase = testDB.tables.edges
+    val pathToABase = testDB.tables.emptyEdges
+    // TODO: can't call multiFix without the types?!
+    val (pathResult, pathToAResult) = multiFix[(Edge, Edge)](pathBase, pathToABase)((path, pathToA) =>
+      val P = path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+      val PtoA = path.filter(e => e.x == "A")
+      (P, PtoA)
+    )
+
+    pathToAResult
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+          recursive$P AS
+            (SELECT * FROM edges as edges$A
+                UNION ALL
+             SELECT recursive$P.x as x, edges$C.y as y
+             FROM recursive$P, edges as edges$C
+             WHERE recursive$P.y = edges$C.x),
+          recursive$A AS
+            (SELECT * FROM empty as empty$D
+                UNION ALL
+             SELECT * FROM recursive$P WHERE recursive$P.x = "A");
+      (SELECT * FROM recursive$A) as subquery$E
+      """
+}
+
 //class RecursiveTwoSingleTest extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "define 2 recursive relations, with api that returns a single query"
 //
