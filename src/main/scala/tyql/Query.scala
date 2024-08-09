@@ -145,11 +145,9 @@ object Query:
     val defs = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?]])
     val recurQueries = fns(refs)
 
-    var idx = 0
-    val unions = recurQueries.toList.map(query =>
-      Union(defs(idx).asInstanceOf[Query[Any]], query.asInstanceOf[Query[Any]], false)(using query.asInstanceOf[Query[Any]].tag)
-      idx += 1
-    )
+    val unions: List[Query[?]] = recurQueries.toList.lazyZip(defs).map:
+      case (query: Query[t], ddef) =>
+        Union(ddef.asInstanceOf[Query[t]], query, false)(using query.tag)
     val refList = refs.toList
     val listResult = unions.indices.permutations.map(indexes =>
       implicit val ct: ClassTag[Any] = ClassTag.Any
