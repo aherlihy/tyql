@@ -136,12 +136,24 @@ object Query:
                        (p: (QueryRef[P], QueryRef[Q], QueryRef[S]) => (Query[P], Query[Q], Query[S])): (Query[P], Query[Q], Query[S]) =
     ???
 
-  def multiFix[T <: Tuple](bases: Tuple.Map[T, Query])(fns: Tuple.Map[T, QueryRef] => Tuple.Map[T, Query]): Tuple.Map[T, Query] =
+
+  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(A, B, ...)` */
+  type Elems[QT <: Tuple] = Tuple.InverseMap[QT, Query]
+  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(Query[A], Query[B], ...)`
+   *
+   *  This isn't just the identity because the input might actually be a subtype e.g.
+   *  `(Table[A], Table[B], ...)`
+   */
+  type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], Query]
+  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(QueryRef[A], QueryRef[B], ...)` */
+  type ToQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], QueryRef]
+
+  def multiFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?])(fns: ToQueryRef[QT] => ToQuery[QT]): ToQuery[QT] =
     val baseRefsAndDefs = bases.toArray.map {
       case Recursive(param, query) => (param, query)
       case base => (QueryRef()(using base.asInstanceOf[Query[?]].tag), base)
     }
-    val refs = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[Tuple.Map[T, QueryRef]] // ??
+    val refs = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[ToQueryRef[QT]]
     val defs = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?]])
     val recurQueries = fns(refs)
 
@@ -154,14 +166,14 @@ object Query:
 //      implicit val ct: ClassTag[QueryRef[Any]] = ClassTag(classOf[QueryRef[Any]])
       val orderedRefs = indexes.map(refList).toArray
       val orderedQueries = indexes.map(unions)
-      val refTuple = Tuple.fromArray(orderedRefs).asInstanceOf[Tuple.Map[T, QueryRef]]
-      val queryTuple = Tuple.fromArray(indexes.map(unions).toArray).asInstanceOf[Tuple.Map[T, Query]]
-      MultiRecursive(
+      val refTuple = Tuple.fromArray(orderedRefs).asInstanceOf[ToQueryRef[QT]]
+      val queryTuple = Tuple.fromArray(indexes.map(unions).toArray).asInstanceOf[ToQuery[QT]]
+      MultiRecursive[Elems[QT]](
         refTuple,
         queryTuple
-      )(using orderedRefs.last.asInstanceOf[Query[Tuple.Last[T]]].tag)
+      )(using orderedRefs.last.asInstanceOf[Query[Tuple.Last[Elems[QT]]]].tag)
     )
-    Tuple.fromArray(listResult.toArray).asInstanceOf[Tuple.Map[T, Query]]
+    Tuple.fromArray(listResult.toArray).asInstanceOf[ToQuery[QT]]
 
   case class Recursive[R: ResultTag]($param: QueryRef[R], $query: Query[R]) extends Query[R]
 
