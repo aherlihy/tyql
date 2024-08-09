@@ -127,6 +127,13 @@ object TreePrettyPrinter {
       case a: Aggregation[?] => a.prettyPrint(depth)
       case Recursive(from, query) =>
         s"${indent(depth)}Recursive(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case RecursiveV2(ref, query) =>
+        s"${indent(depth)}RecursiveV2(\n${ref.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case MultiRecursiveV2(refs, querys) =>
+        val refStr = refs.toList.map(r => r.asInstanceOf[QueryRef[?]].prettyPrint(depth+1))
+        val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?]].prettyPrint(depth + 2))
+        val str = refStr.zip(qryStr).map((r, q) => s"\n$r =>\n$q").mkString(",\n")
+        s"${indent(depth)}MultiRecursiveV2($str\n${indent(depth)})"
       case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?]].stringRef()})"
       case _ => throw new Exception(s"Unimplemented pretty print AST $ast")
     }
@@ -161,6 +168,10 @@ object TreePrettyPrinter {
         s"${indent(depth)}BinRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
       case recursiveRelationOp: RecursiveRelationOp =>
         s"${indent(depth)}RecursiveOp{${recursiveRelationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth+1)}base=\n${recursiveRelationOp.finalQ.prettyPrintIR(depth+2, printAST)}\n${indent(depth + 1)}query=\n${recursiveRelationOp.query.prettyPrintIR(depth + 2, printAST)}"
+      case MultiRecursiveRelationOp(alias, query, finalQ, ast) =>
+        val qryStr = query.map(q => q.prettyPrintIR(depth + 1, false))
+        val str = alias.zip(qryStr).map((r, q) => s"\n$r => $q").mkString(",\n")
+        s"${indent(depth)}MultiRecursiveV2($str\n${indent(depth)})"
       case recursiveIRVar: RecursiveIRVar =>
         s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}"
       case _ => throw new Exception(s"Unimplemented pretty print RelationOp $relationOp")

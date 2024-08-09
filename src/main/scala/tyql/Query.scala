@@ -101,21 +101,44 @@ object Query:
   def fixUntupled[F, Args <: Tuple](f: F) (using tf: TupledFunction[F, Args => Args]) = tf.untupled(fix(tf.tupled(f)))
 
   /**
-   * Alternative approach, manually specify tuple length
+   * Alternative approach, manually specify tuple length.
+   *
+   * Construct dependencies using nested Recursive?
    */
-  def fixTwo[P, Q](baseP: Query[P], baseQ: Query[Q])(p: (QueryRef[P], QueryRef[Q]) => (Query[P], Query[Q])): (Query[P], Query[Q]) =
-//    val pRef = QueryRef[P]()
-//    Recursive(baseP, QueryFun(pRef, p(qRef)))
-    ???
+  def fixV2Two[P: ResultTag, Q: ResultTag](baseP: Query[P], baseQ: Query[Q])
+                  (p: (QueryRef[P], QueryRef[Q]) => (Query[P], Query[Q]))
+  : (Query[P], Query[Q]) =
+
+    // Unroll if lhs is already recursive to allow for gradual definitions e.g. relation.fix(..).fix(...)
+    val (qRef, flattenedBaseQ) = baseQ match
+      case RecursiveV2(param, query) => (param, query)
+      case _ => (QueryRef[Q](), baseQ)
+    val (pRef, flattenedBaseP) = baseP match
+      case RecursiveV2(param, query) => (param, query)
+      case _ => (QueryRef[P](), baseP)
+
+    val (pRecurQuery, qRecurQuery) = p(pRef, qRef)
+    val qDef = Union(flattenedBaseQ, qRecurQuery, false)
+    val pDef = Union(flattenedBaseP, pRecurQuery, false)
+
+    val qFinal = MultiRecursiveV2[(P, Q)]((pRef, qRef), (pDef, qDef))
+    val pFinal = MultiRecursiveV2[(Q, P)]((qRef, pRef), (qDef, pDef))
+
+    (pFinal, qFinal)
+
+  // Only return a single query, so assume the last defined relation is the goal
+  def fixTwoSingle[P: ResultTag, Q: ResultTag](baseP: Query[P], baseQ: Query[Q])
+                                        (p: (QueryRef[P], QueryRef[Q]) => Query[Q]) = ???
 
   def fixThree[P, Q, S](baseP: Query[P], baseQ: Query[Q], baseS: Query[S])
-                       (p: QueryRef[P] => QueryRef[Q] => QueryRef[S] => (Query[P], Query[Q], Query[S])): (Query[P], Query[Q], Query[S]) =
-    val pRef = QueryRef[P]
-    // TODO: start here, uncurry
-    val pRecursive = Recursive(baseP, QueryFun(pRef, p(qRef)))
-    Recursive(baseP)
+                       (p: (QueryRef[P], QueryRef[Q], QueryRef[S]) => (Query[P], Query[Q], Query[S])): (Query[P], Query[Q], Query[S]) =
+    ???
 
-  case class Recursive[A: ResultTag]($from: Query[A], $query: QueryFun[A, Query[A]]) extends Query[A]
+  case class Recursive[R: ResultTag, A]($from: Query[A], $query: QueryFun[A, Query[R]]) extends Query[R]
+
+  case class RecursiveV2[R: ResultTag]($param: QueryRef[R], $query: Query[R]) extends Query[R]
+
+  case class MultiRecursiveV2[T <: Tuple]($param: Tuple.Map[T, QueryRef], $query: Tuple.Map[T, Query])(using ResultTag[Tuple.Last[T]]) extends Query[Tuple.Last[T]]
 
   private var refCount = 0
   case class QueryRef[A: ResultTag]() extends Query[A]:
@@ -169,9 +192,13 @@ object Query:
     def fix(p: QueryRef[R] => Query[R]): Query[R] =
       val qRef = QueryRef[R]()
       Recursive(x, QueryFun(qRef, p(qRef)))
-//    def fix[S](p: QueryRef[R] => Query[R], result: Query[S]): Query[S] =
-//      val qRef = QueryRef[R]()
-//      Recursive(x, QueryFun(qRef, p(qRef)), result)
+
+    def fixV2(p: QueryRef[R] => Query[R]): Query[R] =
+      val (qRef, flattenedBase) = x match
+        case RecursiveV2(param, query) => (param, query)
+        case _ => (QueryRef[R](), x)
+
+      RecursiveV2(qRef, Union(flattenedBase, p(qRef), false))
 
     def withFilter(p: Ref[R] => Expr[Boolean]): Query[R] =
       val ref = Ref[R]()

@@ -367,6 +367,31 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
   override def toSQLString(): String =
     wrapString(children.map(_.toSQLString()).mkString(s" $op "))
 
+case class MultiRecursiveRelationOp(aliases: Seq[String], query: Seq[RelationOp], finalQ: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
+  val alias = finalQ.alias
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
+    MultiRecursiveRelationOp(
+      aliases, query, finalQ.appendWhere(w, astOther), ast
+    ).appendFlags(flags)
+
+  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
+    MultiRecursiveRelationOp(
+      aliases, query, finalQ.appendProject(p, astOther), ast
+    ).appendFlags(flags)
+
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    ???
+
+  override def appendFlag(f: SelectFlags): RelationOp =
+    flags = flags + f
+    this
+
+  override def toSQLString(): String =
+    // NOTE: no parens or alias needed, since already defined
+    val ctes = aliases.zip(query).map((a, q) => s"$a AS (${q.toSQLString()})").mkString(",\n")
+    s"WITH RECURSIVE $ctes; ${finalQ.toSQLString()}"
+
+
 case class RecursiveRelationOp(alias: String, query: RelationOp, finalQ: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     RecursiveRelationOp(
@@ -374,7 +399,6 @@ case class RecursiveRelationOp(alias: String, query: RelationOp, finalQ: Relatio
     ).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    println(s"appending project to recursive")
     RecursiveRelationOp(
       alias, query, finalQ.appendProject(p, astOther), ast
     ).appendFlags(flags)

@@ -12,8 +12,11 @@ scalacOptions ++= Seq(
   "-explain"
 )
 
+//resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+resolvers ++= Resolver.sonatypeOssRepos("snapshots")
+
 libraryDependencies ++= Seq(
-  "org.scalameta" %% "munit" % "1.0.0" % Test,
+  "org.scalameta" %% "munit" % "1.0.0+24-ee555b1d-SNAPSHOT" % Test,
 )
 
 lazy val root = (project in file("."))

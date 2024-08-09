@@ -1,7 +1,5 @@
 package tyql
 
-import tyql.Query.Filter
-
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
 import NamedTupleDecomposition.*
@@ -125,13 +123,7 @@ object QueryIRTree:
           generateFun(pred, tableIR, symbols) // NOTE: the parameters of all predicate functions are mapped to tableIR
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
-        println(s"appending where to class ${tableIR.getClass}")
         tableIR.appendWhere(where, filter)
-//        tableIR match
-//          case s: (SelectAllQuery | TableLeaf) =>
-//            s.appendWhere(where, filter)
-//          case _ => // cannot unnest because source had project, sort, etc. TODO: some ops like limit might be unnestable
-//            SelectAllQuery(Seq(tableIR), Seq(where), Some(tableIR.alias), filter)
       case flatMap: Query.FlatMap[?, ?] =>
         val sourceIR = generateQuery(flatMap.$from, symbols)
         val bodyAST = flatMap.$query
@@ -188,17 +180,52 @@ object QueryIRTree:
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
       case queryRef: Query.QueryRef[?] =>
         RecursiveIRVar(symbols(queryRef.stringRef()).alias, queryRef)
-      case recursive: Query.Recursive[?] =>
+      case multiRecursiveV2: Query.MultiRecursiveV2[?] =>
+        val params = multiRecursiveV2.$param.toList.map(_.asInstanceOf[Query.QueryRef[?]])
+        val queries = multiRecursiveV2.$query.toList.map(_.asInstanceOf[Query[?]])
+
+        val vars = params.map(p =>
+          QueryIRTree.idCount += 1
+          val newAlias = s"recursive${QueryIRTree.idCount}"
+
+          // assign variable ID to alias in symbol table
+          val variable = RecursiveIRVar(newAlias, p)
+          val varId = p.stringRef()
+          (varId, variable)
+        )
+        val allSymbols = symbols ++ vars
+        val aliases = vars.map(v => v._2.alias)
+        val subqueriesIR = queries.map(q => generateQuery(q, allSymbols).appendFlag(SelectFlags.Final))
+
+        val finalQ = SelectAllQuery(Seq(RecursiveIRVar(aliases.last, vars.last._2.ast)), Seq(), None, multiRecursiveV2)
+
+        MultiRecursiveRelationOp(aliases, subqueriesIR, finalQ, multiRecursiveV2)
+
+
+      case recursive2: Query.RecursiveV2[?] =>
+        QueryIRTree.idCount += 1
+        val newAlias = s"recursive${QueryIRTree.idCount}"
+        val finalQ = SelectAllQuery(Seq(RecursiveIRVar(newAlias, recursive2.$param)), Seq(), None, recursive2)
+
+        // assign variable ID to alias in symbol table
+        val variable = RecursiveIRVar(newAlias, recursive2.$param)
+        val varId = recursive2.$param.stringRef()
+        // generate subquery
+        val recurNode = generateQuery(recursive2.$query, symbols + (varId -> variable)).appendFlag(SelectFlags.Final)
+        RecursiveRelationOp(newAlias, recurNode, finalQ.appendFlag(SelectFlags.Final), recursive2)
+
+      case recursive: Query.Recursive[?, ?] =>
         // base case / existing definitions generated per usual:
         val baseNode = generateQuery(recursive.$from, symbols).appendFlag(SelectFlags.Final)
         // handle previously defined recursive definition
+        // TODO: could also handle this at the AST level? define fix for Recursive specifically.
         val (lhs, rAlias, finalQ) = baseNode match
           case RecursiveRelationOp(lhsAlias, query, lhsFinalQ, ast) =>
             (query, lhsAlias, lhsFinalQ)
           case _ =>
             QueryIRTree.idCount += 1
             val newAlias = s"recursive${QueryIRTree.idCount}"
-            val lhsFinalQ = SelectAllQuery(Seq(RecursiveIRVar(newAlias, recursive.$query.$param)), Seq(), None, recursive.$from)
+            val lhsFinalQ = SelectAllQuery(Seq(RecursiveIRVar(newAlias, recursive.$query.$param)), Seq(), None, recursive)
             (baseNode, newAlias, lhsFinalQ)
 
         // assign variable ID to alias in symbol table
