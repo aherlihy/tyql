@@ -95,53 +95,6 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
 object Query:
   import Expr.{Pred, Fun, Ref}
 
-  /**
-   * Option 1: N-ary argument signature for fix.
-   */
-  def fix[Args <: Tuple](f: Args => Args) : Args => Args =
-    ???
-  def fixUntupled[F, Args <: Tuple](f: F) (using tf: TupledFunction[F, Args => Args]) = tf.untupled(fix(tf.tupled(f)))
-
-  /**
-   * Alternative approach, manually specify tuple length.
-   *
-   * Construct dependencies using nested Recursive?
-   */
-//  def fixTwo[P: ResultTag, Q: ResultTag](baseP: Query[P], baseQ: Query[Q])
-//                  (p: (QueryRef[P], QueryRef[Q]) => (Query[P], Query[Q]))
-//  : (Query[P], Query[Q]) =
-//
-//    // Unroll if lhs is already recursive to allow for gradual definitions e.g. relation.fix(..).fix(...)
-//    val (qRef, flattenedBaseQ) = baseQ match
-//      case Recursive(param, query) => (param, query)
-//      case _ => (QueryRef[Q](), baseQ)
-//    val (pRef, flattenedBaseP) = baseP match
-//      case Recursive(param, query) => (param, query)
-//      case _ => (QueryRef[P](), baseP)
-//
-//    val (pRecurQuery, qRecurQuery) = p(pRef, qRef)
-//    val qDef = Union(flattenedBaseQ, qRecurQuery, false)
-//    val pDef = Union(flattenedBaseP, pRecurQuery, false)
-//
-//    val idArg = Ref()
-//    val selectAllQ = Map(qRef, Fun(idArg, idArg))
-//    val idArg2 = Ref()
-//    val selectAllP = Map(pRef, Fun(idArg2, idArg2))
-//
-//    val qFinal = MultiRecursive[(P, Q), P]((pRef, qRef), (pDef, qDef), qRef)
-//    val pFinal = MultiRecursive[(P, Q), Q]((pRef, qRef), (pDef, qDef), pRef)
-//
-//    (pFinal, qFinal)
-
-  // Only return a single query, so assume the last defined relation is the goal
-  def fixTwoSingle[P: ResultTag, Q: ResultTag](baseP: Query[P], baseQ: Query[Q])
-                                        (p: (QueryRef[P], QueryRef[Q]) => Query[Q]) = ???
-
-  def fixThree[P, Q, S](baseP: Query[P], baseQ: Query[Q], baseS: Query[S])
-                       (p: (QueryRef[P], QueryRef[Q], QueryRef[S]) => (Query[P], Query[Q], Query[S])): (Query[P], Query[Q], Query[S]) =
-    ???
-
-
   /** Given a Tuple `(Query[A], Query[B], ...)`, return `(A, B, ...)` */
   type Elems[QT <: Tuple] = Tuple.InverseMap[QT, Query]
   /** Given a Tuple `(Query[A], Query[B], ...)`, return `(Query[A], Query[B], ...)`
@@ -153,6 +106,15 @@ object Query:
   /** Given a Tuple `(Query[A], Query[B], ...)`, return `(QueryRef[A], QueryRef[B], ...)` */
   type ToQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], QueryRef]
 
+  def fixUntupled[F, Args <: Tuple](f: F) (using tf: TupledFunction[F, Args => Args]) = tf.untupled(fix(tf.tupled(f)))
+
+//  def multiFixUntupled[F, QT <: Tuple](bases: QT)(f: F)(using ev: Tuple.Union[QT] <:< Query[?], tf: TupledFunction[F, ToQueryRef[QT] => ToQuery[QT]]): ToQuery[QT] =
+//    tf.untupled(multiFix(bases)(ev, tf.tupled))
+  /**
+   * Fixed point computation.
+   */
+  def fix[Args <: Tuple](f: Args => Args) : Args => Args =
+    ???
   def multiFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?])(fns: ToQueryRef[QT] => ToQuery[QT]): ToQuery[QT] =
     val baseRefsAndDefs = bases.toArray.map {
       case Recursive(param, query) => (param, query)
@@ -168,18 +130,28 @@ object Query:
     val refList = refs.toList
     val unionsTuple = Tuple.fromArray(unions.toArray).asInstanceOf[ToQuery[QT]]
 
-    // TODO: need a tuple.zipWithIndex((t, I) => Tuple.Elem[I, Elems[QT]])
-    val listResult = unions.indices.map(finalIdx =>
-      val finalRef = refList(finalIdx).asInstanceOf[Query[Tuple.Last[Elems[QT]]]]
+    refs.map(finalRef =>
       val idArg = Ref()(using finalRef.tag)
       val selectAll = Map(finalRef, Fun(idArg, idArg))(using finalRef.tag)
-      MultiRecursive[Elems[QT], Tuple.Last[Elems[QT]]](
+      MultiRecursive(
         refs,
         unionsTuple,
         selectAll
       )(using finalRef.tag)
     )
-    Tuple.fromArray(listResult.toArray).asInstanceOf[ToQuery[QT]]
+//
+    // TODO: need a tuple.zipWithIndex((t, I) => Tuple.Elem[I, Elems[QT]])
+//    val listResult = refList.map(finalRef =>
+//      val finalRef = refList(finalIdx).asInstanceOf[Query[Tuple.Last[Elems[QT]]]]
+//      val idArg = Ref()(using finalRef.tag)
+//      val selectAll = Map(finalRef, Fun(idArg, idArg))(using finalRef.tag)
+//      MultiRecursive(
+//        refs,
+//        unionsTuple,
+//        selectAll
+//      )(using finalRef.tag)
+//    )
+//    Tuple.fromArray(listResult.toArray).asInstanceOf[ToQuery[QT]]
 
   case class Recursive[R: ResultTag]($param: QueryRef[R], $query: Query[R]) extends Query[R]
 

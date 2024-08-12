@@ -350,7 +350,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
           assign.map(a => (p1 = a.p2, p2 = a.p2))
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fixThree(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = multiFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
       (valueFlow, valueAlias, memoryAlias) =>
         val VF =
           // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
@@ -394,9 +394,44 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
           )
         (VF, MA, VA)
     )
-    ???
+    valueFlowFinal
+
   def expectedQueryPattern: String =
     """
+        WITH RECURSIVE
+            recursive55 AS
+                (SELECT * FROM assign as assign57
+                    UNION ALL
+                 SELECT assign59.p1 as p1, assign59.p1 as p2 FROM assign as assign59
+                    UNION ALL
+                 SELECT assign62.p2 as p1, assign62.p2 as p2 FROM assign as assign62
+                    UNION ALL
+                 SELECT assign65.p1 as p1, recursive57.p2 as p2 FROM assign as assign65, recursive57
+                 WHERE assign65.p2 = recursive57.p1
+                    UNION ALL
+                 SELECT recursive55.p1 as p1, recursive55.p2 as p2 FROM recursive55, recursive55
+                 WHERE recursive55.p2 = recursive55.p1),
+            recursive56 AS
+                (SELECT * FROM empty as empty72
+                    UNION ALL
+                 SELECT dereference74.p2 as p1, dereference75.p2 as p2
+                 FROM dereference as dereference74, recursive56, dereference as dereference75
+                 WHERE dereference74.p1 = recursive56.p1 AND recursive56.p2 = dereference75.p1),
+            recursive57 AS
+                (SELECT assign80.p2 as p1, assign80.p2 as p2
+                 FROM assign as assign80
+                    UNION ALL
+                 SELECT assign82.p1 as p1, assign82.p1 as p2
+                 FROM assign as assign82
+                    UNION ALL
+                 SELECT recursive55.p2 as p1, recursive55.p2 as p2
+                 FROM recursive55, recursive55
+                 WHERE recursive55.p1 = recursive55.p1
+                    UNION ALL
+                 SELECT recursive55.p2 as p1, recursive55.p2 as p2
+                 FROM recursive55, recursive57, recursive55
+                 WHERE recursive55.p1 = recursive57.p1 AND recursive55.p1 = recursive57.p2);
+        (SELECT recursive55 FROM recursive55) as subquery92
     """
 }
 
@@ -425,7 +460,7 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
           assign.map(a => (p1 = a.p2, p2 = a.p2))
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fixThree(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = multiFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
       (valueFlow, valueAlias, memoryAlias) =>
         // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
         val vfDef1 =
@@ -471,7 +506,7 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
 
         (VF, MA, VA)
     )
-    ???
+    valueFlowFinal
   def expectedQueryPattern: String =
     """
     """
