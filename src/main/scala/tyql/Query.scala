@@ -8,6 +8,8 @@ import scala.deriving.Mirror
 import java.time.LocalDate
 import scala.reflect.ClassTag
 
+import Utils.*
+
 enum ResultTag[T]:
   case IntTag extends ResultTag[Int]
   case DoubleTag extends ResultTag[Double]
@@ -130,17 +132,15 @@ object Query:
     val refList = refs.toList
     val unionsTuple = Tuple.fromArray(unions.toArray).asInstanceOf[ToQuery[QT]]
 
-    val res = refs.toArray.map(fr =>
-      val finalRef = fr.asInstanceOf[QueryRef[Any]]
-      val idArg = Ref()(using finalRef.tag)
-      val selectAll = Map(finalRef, Fun(idArg, idArg))(using finalRef.tag)
-      MultiRecursive(
+    refs.naturalMap([t] => finalRef =>
+      val idArg = Ref[t]()(using finalRef.tag)
+      val selectAll = Map[t, t](finalRef, Fun(idArg, idArg))(using finalRef.tag)
+      MultiRecursive[Elems[QT], t](
         refs,
         unionsTuple,
         selectAll
-      )(using finalRef.tag).asInstanceOf[Query[Any]]
+      )(using finalRef.tag)
     )
-    Tuple.fromArray(res).asInstanceOf[ToQuery[QT]]
 //
     // TODO: need a tuple.zipWithIndex((t, I) => Tuple.Elem[I, Elems[QT]])
 //    val listResult = refList.map(finalRef =>
