@@ -274,8 +274,8 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
   def query() =
     val pathBase = testDB.tables.edges
     val pathToABase = testDB.tables.emptyEdges
-    // TODO: can't call multiFix without the types?!
-    val (pathResult, pathToAResult) = multiFix[(Edge, Edge)](pathBase, pathToABase)((path, pathToA) =>
+
+    val (pathResult, pathToAResult) = multiFix(pathBase, pathToABase)((path, pathToA) =>
       val P = path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
