@@ -133,13 +133,14 @@ object Query:
     val unionsTuple = Tuple.fromArray(unions.toArray).asInstanceOf[ToQuery[QT]]
 
     refs.naturalMap([t] => finalRef =>
-      val idArg = Ref[t]()(using finalRef.tag)
-      val selectAll = Map[t, t](finalRef, Fun(idArg, idArg))(using finalRef.tag)
-      MultiRecursive[Elems[QT], t](
+      given ResultTag[t] = finalRef.tag
+      val idArg = Ref[t]()
+      val selectAll = Map[t, t](finalRef, Fun(idArg, idArg))
+      MultiRecursive(
         refs,
         unionsTuple,
         selectAll
-      )(using finalRef.tag)
+      )
     )
 //
     // TODO: need a tuple.zipWithIndex((t, I) => Tuple.Elem[I, Elems[QT]])
