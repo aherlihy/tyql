@@ -107,26 +107,31 @@ object Query:
    *
    * Construct dependencies using nested Recursive?
    */
-  def fixTwo[P: ResultTag, Q: ResultTag](baseP: Query[P], baseQ: Query[Q])
-                  (p: (QueryRef[P], QueryRef[Q]) => (Query[P], Query[Q]))
-  : (Query[P], Query[Q]) =
-
-    // Unroll if lhs is already recursive to allow for gradual definitions e.g. relation.fix(..).fix(...)
-    val (qRef, flattenedBaseQ) = baseQ match
-      case Recursive(param, query) => (param, query)
-      case _ => (QueryRef[Q](), baseQ)
-    val (pRef, flattenedBaseP) = baseP match
-      case Recursive(param, query) => (param, query)
-      case _ => (QueryRef[P](), baseP)
-
-    val (pRecurQuery, qRecurQuery) = p(pRef, qRef)
-    val qDef = Union(flattenedBaseQ, qRecurQuery, false)
-    val pDef = Union(flattenedBaseP, pRecurQuery, false)
-
-    val qFinal = MultiRecursive[(P, Q)]((pRef, qRef), (pDef, qDef))
-    val pFinal = MultiRecursive[(Q, P)]((qRef, pRef), (qDef, pDef))
-
-    (pFinal, qFinal)
+//  def fixTwo[P: ResultTag, Q: ResultTag](baseP: Query[P], baseQ: Query[Q])
+//                  (p: (QueryRef[P], QueryRef[Q]) => (Query[P], Query[Q]))
+//  : (Query[P], Query[Q]) =
+//
+//    // Unroll if lhs is already recursive to allow for gradual definitions e.g. relation.fix(..).fix(...)
+//    val (qRef, flattenedBaseQ) = baseQ match
+//      case Recursive(param, query) => (param, query)
+//      case _ => (QueryRef[Q](), baseQ)
+//    val (pRef, flattenedBaseP) = baseP match
+//      case Recursive(param, query) => (param, query)
+//      case _ => (QueryRef[P](), baseP)
+//
+//    val (pRecurQuery, qRecurQuery) = p(pRef, qRef)
+//    val qDef = Union(flattenedBaseQ, qRecurQuery, false)
+//    val pDef = Union(flattenedBaseP, pRecurQuery, false)
+//
+//    val idArg = Ref()
+//    val selectAllQ = Map(qRef, Fun(idArg, idArg))
+//    val idArg2 = Ref()
+//    val selectAllP = Map(pRef, Fun(idArg2, idArg2))
+//
+//    val qFinal = MultiRecursive[(P, Q), P]((pRef, qRef), (pDef, qDef), qRef)
+//    val pFinal = MultiRecursive[(P, Q), Q]((pRef, qRef), (pDef, qDef), pRef)
+//
+//    (pFinal, qFinal)
 
   // Only return a single query, so assume the last defined relation is the goal
   def fixTwoSingle[P: ResultTag, Q: ResultTag](baseP: Query[P], baseQ: Query[Q])
@@ -161,23 +166,26 @@ object Query:
       case (query: Query[t], ddef) =>
         Union(ddef.asInstanceOf[Query[t]], query, false)(using query.tag)
     val refList = refs.toList
-    val listResult = unions.indices.permutations.map(indexes =>
-      implicit val ct: ClassTag[Any] = ClassTag.Any
-//      implicit val ct: ClassTag[QueryRef[Any]] = ClassTag(classOf[QueryRef[Any]])
-      val orderedRefs = indexes.map(refList).toArray
-      val orderedQueries = indexes.map(unions)
-      val refTuple = Tuple.fromArray(orderedRefs).asInstanceOf[ToQueryRef[QT]]
-      val queryTuple = Tuple.fromArray(indexes.map(unions).toArray).asInstanceOf[ToQuery[QT]]
-      MultiRecursive[Elems[QT]](
-        refTuple,
-        queryTuple
-      )(using orderedRefs.last.asInstanceOf[Query[Tuple.Last[Elems[QT]]]].tag)
+    val unionsTuple = Tuple.fromArray(unions.toArray).asInstanceOf[ToQuery[QT]]
+
+    // TODO: need a tuple.zipWithIndex((t, I) => Tuple.Elem[I, Elems[QT]])
+    val listResult = unions.indices.map(finalIdx =>
+      val finalRef = refList(finalIdx).asInstanceOf[Query[Tuple.Last[Elems[QT]]]]
+      val idArg = Ref()(using finalRef.tag)
+      val selectAll = Map(finalRef, Fun(idArg, idArg))(using finalRef.tag)
+      MultiRecursive[Elems[QT], Tuple.Last[Elems[QT]]](
+        refs,
+        unionsTuple,
+        selectAll
+      )(using finalRef.tag)
     )
     Tuple.fromArray(listResult.toArray).asInstanceOf[ToQuery[QT]]
 
   case class Recursive[R: ResultTag]($param: QueryRef[R], $query: Query[R]) extends Query[R]
 
-  case class MultiRecursive[T <: Tuple]($param: Tuple.Map[T, QueryRef], $query: Tuple.Map[T, Query])(using ResultTag[Tuple.Last[T]]) extends Query[Tuple.Last[T]]
+  case class MultiRecursive[T <: Tuple, R]($param: Tuple.Map[T, QueryRef],
+                                           $subquery: Tuple.Map[T, Query],
+                                           $resultQuery: Query[R])(using ResultTag[R]) extends Query[R]
 
   private var refCount = 0
   case class QueryRef[A: ResultTag]() extends Query[A]:

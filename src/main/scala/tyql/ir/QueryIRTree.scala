@@ -180,9 +180,9 @@ object QueryIRTree:
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
       case queryRef: Query.QueryRef[?] =>
         RecursiveIRVar(symbols(queryRef.stringRef()).alias, queryRef)
-      case multiRecursive: Query.MultiRecursive[?] =>
+      case multiRecursive: Query.MultiRecursive[?, ?] =>
         val params = multiRecursive.$param.toList.map(_.asInstanceOf[Query.QueryRef[?]])
-        val queries = multiRecursive.$query.toList.map(_.asInstanceOf[Query[?]])
+        val queries = multiRecursive.$subquery.toList.map(_.asInstanceOf[Query[?]])
 
         val vars = params.map(p =>
           QueryIRTree.idCount += 1
@@ -196,8 +196,10 @@ object QueryIRTree:
         val allSymbols = symbols ++ vars
         val aliases = vars.map(v => v._2.alias)
         val subqueriesIR = queries.map(q => generateQuery(q, allSymbols).appendFlag(SelectFlags.Final))
+        val finalQ = generateQuery(multiRecursive.$resultQuery, allSymbols)
 
-        val finalQ = SelectAllQuery(Seq(RecursiveIRVar(aliases.last, vars.last._2.ast)), Seq(), None, multiRecursive)
+//        val finalQ = SelectAllQuery(Seq(RecursiveIRVar(aliases.last, vars.last._2.ast)), Seq(), None, multiRecursive)
+//        val finalQ = SelectAllQuery(Seq(multiRecursive.$resultQuery
 
         MultiRecursiveRelationOp(aliases, subqueriesIR, finalQ, multiRecursive)
 

@@ -19,7 +19,8 @@ trait TestQuery[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]](using val 
 
 trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extends munit.FunSuite with TestQuery[Rows, ReturnShape] {
 
-  def matchStrings(expectedQuery: String, actualQuery: String): Boolean = {
+  def matchStrings(expectedQuery: String, actualQuery: String): (Boolean, String) = {
+    var stringDebug = ""
     var placeholderMap = collection.mutable.Map.empty[Char, Int]
     val placeholderPattern: Regex = "\\$[A-Z]".r
 
@@ -36,6 +37,7 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
       // Find the position of the current part in stringB
       val posInB = actualQuery.indexOf(part, currentPosition)
       if (posInB == -1) {
+        stringDebug = s"'$part' not found within expected='${actualQuery.substring(currentPosition)}'"
         allMatches = false
       } else {
         // Update currentPosition to after the current part in stringB
@@ -51,6 +53,7 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
           numberMatch match {
             case Some(numString) =>
               val num = Try(numString.toInt).getOrElse {
+                stringDebug = s"Could not find $numberPattern"
                 allMatches = false
                 0 // Provide a default that indicates an issue, won't be used because of `allMatches`
               }
@@ -59,6 +62,7 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
                 placeholderMap.get(placeholder) match {
                   case Some(existingNum) =>
                     if (existingNum != num) {
+                      stringDebug = s"Expected $existingNum but got $num for placeholder $placeholder"
                       allMatches = false
                     }
                   case None =>
@@ -69,6 +73,7 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
             case None =>
               // Handle the case when no number is found, only if it's not the last part
               if (i != parts.length - 1) {
+                stringDebug = s"Did not find $numberPattern"
                 allMatches = false
               }
           }
@@ -77,11 +82,12 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
     }
 
     // Check if the remainder of stringB matches the remainder of stringA
-    if (currentPosition != actualQuery.length && actualQuery.substring(currentPosition) != parts.last) {
+    if (allMatches && currentPosition != actualQuery.length && actualQuery.substring(currentPosition) != parts.last) {
+      stringDebug = s"Leftover does not match, pos=$currentPosition, ${actualQuery.length}, restActual=${actualQuery.substring(currentPosition)}, restExpected=${parts.last}"
       allMatches = false
     }
 
-    allMatches
+    (allMatches, stringDebug)
   }
 
   import tyql.TreePrettyPrinter.*
@@ -89,16 +95,18 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
     val q = query()
     println(s"$testDescription:")
     val actualIR = q.toQueryIR
-    val actual = actualIR.toSQLString()
-    val stripped = expectedQueryPattern.trim().replace("\n", " ").replaceAll("\\s+", " ")
+    val actual = actualIR.toSQLString().trim().replace("\n", " ").replaceAll("\\s+", " ")
+    val strippedExpected = expectedQueryPattern.trim().replace("\n", " ").replaceAll("\\s+", " ")
     // Only print debugging trees if test fails
-    if (!matchStrings(stripped, actual))
+    val (success, debug) = matchStrings(strippedExpected, actual)
+    if (!success)
+      println(s"String match failed with: $debug")
       println(s"AST:\n${q.prettyPrint(0)}")
       println(s"IR: ${actualIR.prettyPrintIR(0, false)}") // set to true to print ASTs inline with IR
-      println(s"\texpected: $stripped") // because munit has annoying formatting
+      println(s"\texpected: $strippedExpected") // because munit has annoying formatting
       println(s"\tactual  : $actual")
 
-    assert(matchStrings(stripped, actual), s"expected '${stripped}' but got '$actual'")
+    assert(success, s"expected '${strippedExpected}' but got '$actual'")
   }
 }
 

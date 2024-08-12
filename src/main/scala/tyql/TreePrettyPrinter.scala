@@ -127,11 +127,12 @@ object TreePrettyPrinter {
       case a: Aggregation[?] => a.prettyPrint(depth)
       case Recursive(ref, query) =>
         s"${indent(depth)}Recursive(\n${ref.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case MultiRecursive(refs, querys) =>
+      case MultiRecursive(refs, querys, finalQ) =>
         val refStr = refs.toList.map(r => r.asInstanceOf[QueryRef[?]].prettyPrint(depth+1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?]].prettyPrint(depth + 2))
-        val str = refStr.zip(qryStr).map((r, q) => s"\n$r =>\n$q").mkString(",\n")
-        s"${indent(depth)}MultiRecursive($str\n${indent(depth)})"
+        val str = refStr.zip(qryStr).map((r, q) => s"\n$r :=\n$q").mkString(",\n")
+        val finalQStr = finalQ.prettyPrint(depth + 1)
+        s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth+1, "FINAL->", finalQStr)}\n${indent(depth)})"
       case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?]].stringRef()})"
       case _ => throw new Exception(s"Unimplemented pretty print AST $ast")
     }
