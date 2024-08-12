@@ -389,7 +389,7 @@ case class MultiRecursiveRelationOp(aliases: Seq[String], query: Seq[RelationOp]
   override def toSQLString(): String =
     // NOTE: no parens or alias needed, since already defined
     val ctes = aliases.zip(query).map((a, q) => s"$a AS (${q.toSQLString()})").mkString(",\n")
-    s"WITH RECURSIVE $ctes; ${finalQ.toSQLString()}"
+    s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
 
 
 case class RecursiveRelationOp(alias: String, query: RelationOp, finalQ: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
@@ -442,8 +442,8 @@ case class RecursiveRelationOp(alias: String, query: RelationOp, finalQ: Relatio
 /**
  * A recursive variable that points to a table or subquery.
  */
-case class RecursiveIRVar(alias: String, ast: DatabaseAST[?]) extends RelationOp:
-  override def toSQLString() = alias
+case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST[?]) extends RelationOp:
+  override def toSQLString() = s"$pointsToAlias as $alias"
   override def toString: String = s"Q-VAR($alias)"
 
   // TODO: for now reuse TableOp's methods

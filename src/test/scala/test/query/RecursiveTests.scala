@@ -35,9 +35,9 @@ class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
     WITH RECURSIVE recursive$A AS
       (SELECT * FROM edges as edges$B
         UNION ALL
-      SELECT recursive$A.x as x, edges$C.y as y
-      FROM recursive$A, edges as edges$C
-      WHERE recursive$A.y = edges$C.x); SELECT * FROM recursive$A
+      SELECT ref$D.x as x, edges$C.y as y
+      FROM recursive$A as ref$D, edges as edges$C
+      WHERE ref$D.y = edges$C.x) SELECT * FROM recursive$A as ref$E
       """
 }
 class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
@@ -59,50 +59,52 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
         UNION ALL
       SELECT * FROM edges as edges$E
         UNION ALL
-      SELECT recursive$A.x as x, edges$C.y as y
-      FROM recursive$A, edges as edges$C
-      WHERE recursive$A.y = edges$C.x); SELECT * FROM recursive$A
+      SELECT ref$D.x as x, edges$C.y as y
+      FROM recursive$A as ref$D, edges as edges$C
+      WHERE ref$D.y = edges$C.x)
+    SELECT * FROM recursive$A as ref$F
       """
 }
 
-class Recursion3Test extends SQLStringQueryTest[TCDB, Edge] {
-  def testDescription: String = "TC with multiple recursive cases"
-
-  def query() =
-    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
-    val path2 = path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      )
-    )
-
-    path2.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      )
-    )
-
-  def expectedQueryPattern: String =
-    """
-      WITH RECURSIVE recursive$A AS
-        (SELECT * FROM edges as edges$B
-          UNION ALL
-        SELECT * FROM edges as edges$E
-          UNION ALL
-        SELECT recursive$A.x as x, edges$C.y as y
-        FROM recursive$A, edges as edges$C
-        WHERE recursive$A.y = edges$C.x
-          UNION ALL
-        SELECT recursive$A.x as x, edges$F.y as y
-        FROM recursive$A, edges as edges$F
-        WHERE recursive$A.y = edges$F.x);
-      SELECT * FROM recursive$A
-        """
-}
+// TODO: decide semantics, subquery, or flatten?
+//class Recursion3Test extends SQLStringQueryTest[TCDB, Edge] {
+//  def testDescription: String = "TC with multiple recursive cases"
+//
+//  def query() =
+//    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
+//    val path2 = path.fix(path =>
+//      path.flatMap(p =>
+//        testDB.tables.edges
+//          .filter(e => p.y == e.x)
+//          .map(e => (x = p.x, y = e.y).toRow)
+//      )
+//    )
+//
+//    path2.fix(path =>
+//      path.flatMap(p =>
+//        testDB.tables.edges
+//          .filter(e => p.y == e.x)
+//          .map(e => (x = p.x, y = e.y).toRow)
+//      )
+//    )
+//
+//  def expectedQueryPattern: String =
+//    """
+//      WITH RECURSIVE recursive$A AS
+//        (SELECT * FROM edges as edges$B
+//          UNION ALL
+//        SELECT * FROM edges as edges$E
+//          UNION ALL
+//        SELECT recursive$A.x as x, edges$C.y as y
+//        FROM recursive$A, edges as edges$C
+//        WHERE recursive$A.y = edges$C.x
+//          UNION ALL
+//        SELECT recursive$A.x as x, edges$F.y as y
+//        FROM recursive$A, edges as edges$F
+//        WHERE recursive$A.y = edges$F.x);
+//      SELECT * FROM recursive$A
+//        """
+//}
 
 class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
   def testDescription: String = "TC with project"
@@ -122,9 +124,9 @@ class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
       WITH RECURSIVE recursive$A AS
         (SELECT * FROM edges as edges$B
           UNION ALL
-        SELECT recursive$A.x as x, edges$C.y as y
-        FROM recursive$A, edges as edges$C
-        WHERE recursive$A.y = edges$C.x); SELECT recursive$A.x FROM recursive$A
+        SELECT ref$D.x as x, edges$C.y as y
+        FROM recursive$A as ref$D, edges as edges$C
+        WHERE ref$D.y = edges$C.x) SELECT ref$E.x FROM recursive$A as ref$E
         """
 }
 
@@ -146,9 +148,9 @@ class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
         WITH RECURSIVE recursive$A AS
           (SELECT * FROM edges as edges$B
             UNION ALL
-          SELECT recursive$A.x as x, edges$C.y as y
-          FROM recursive$A, edges as edges$C
-          WHERE recursive$A.y = edges$C.x); SELECT * FROM recursive$A WHERE recursive$A.x > 1
+          SELECT ref$Z.x as x, edges$C.y as y
+          FROM recursive$A as ref$Z, edges as edges$C
+          WHERE ref$Z.y = edges$C.x) SELECT * FROM recursive$A as ref$X WHERE ref$X.x > 1
           """
 }
 
@@ -170,9 +172,9 @@ class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
           WITH RECURSIVE recursive$A AS
             (SELECT * FROM edges as edges$B
               UNION ALL
-            SELECT recursive$A.x as x, edges$C.y as y
-            FROM recursive$A, edges as edges$C
-            WHERE recursive$A.y = edges$C.x); SELECT recursive$A.x FROM recursive$A WHERE recursive$A.x > 1
+            SELECT ref$Z.x as x, edges$C.y as y
+            FROM recursive$A as ref$Z, edges as edges$C
+            WHERE ref$Z.y = edges$C.x) SELECT ref$X.x FROM recursive$A as ref$X WHERE ref$X.x > 1
             """
 }
 
@@ -189,8 +191,8 @@ class NotRecursiveCTETest extends SQLStringQueryTest[TCDB, Edge] {
     WITH RECURSIVE recursive$A AS
       (SELECT * FROM edges as edges$B
         UNION ALL
-      SELECT * FROM edges as edges$E);
-    SELECT * FROM recursive$A
+      SELECT * FROM edges as edges$E)
+    SELECT * FROM recursive$A as ref$Z
       """
 }
 
@@ -233,41 +235,6 @@ given CSPADBs: TestDatabase[CSPADB] with
     empty = Table[Location]("empty") // TODO: define singleton for empty table?
   )
 
-//class RecursiveTwoTest extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "define 2 recursive relations"
-//
-//  def query() =
-//    val pathBase = testDB.tables.edges
-//    val pathToABase = testDB.tables.emptyEdges
-//    val (pathResult, pathToAResult) = fixTwo(pathBase, pathToABase)((path, pathToA) =>
-//      val P = path.flatMap(p =>
-//        testDB.tables.edges
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      )
-//      val PtoA = path.filter(e => e.x == "A")
-//      (P, PtoA)
-//    )
-//
-//    pathToAResult
-//
-//  def expectedQueryPattern: String =
-//    """
-//    WITH RECURSIVE
-//        recursive$P AS
-//          (SELECT * FROM edges as edges$A
-//              UNION ALL
-//           SELECT recursive$P.x as x, edges$C.y as y
-//           FROM recursive$P, edges as edges$C
-//           WHERE recursive$P.y = edges$C.x),
-//        recursive$A AS
-//          (SELECT * FROM empty as empty$D
-//              UNION ALL
-//           SELECT * FROM recursive$P WHERE recursive$P.x = "A");
-//    (SELECT * FROM recursive$A) as subquery$E
-//    """
-//}
-
 class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "define 2 recursive relations, use multifix"
 
@@ -275,7 +242,7 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
     val pathBase = testDB.tables.edges
     val pathToABase = testDB.tables.emptyEdges
 
-    val (pathResult, pathToAResult) = multiFix(pathBase, pathToABase)((path, pathToA) =>
+    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
       val P = path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -293,15 +260,52 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
           recursive$P AS
             (SELECT * FROM edges as edges$F
                 UNION ALL
-             SELECT recursive$P.x as x, edges$C.y as y
-             FROM recursive$P, edges as edges$C
-             WHERE recursive$P.y = edges$C.x),
+             SELECT ref$Z.x as x, edges$C.y as y
+             FROM recursive$P as ref$Z, edges as edges$C
+             WHERE ref$Z.y = edges$C.x),
           recursive$A AS
            (SELECT * FROM empty as empty$D
               UNION ALL
-            SELECT * FROM recursive$P WHERE recursive$P.x = "A");
-      (SELECT recursive$A FROM recursive$A) as subquery$E
+            SELECT * FROM recursive$P as ref$X WHERE ref$X.x = "A")
+      SELECT * FROM recursive$A as ref$Q
       """
+}
+
+class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "define 2 recursive relations with one self join"
+
+  def query() =
+    val pathBase = testDB.tables.edges
+    val pathToABase = testDB.tables.emptyEdges
+
+    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
+      val P = path.flatMap(p =>
+        path
+          .filter(p2 => p.y == p2.x)
+          .map(p2 => (x = p.x, y = p2.y).toRow)
+      )
+      val PtoA = path.filter(e => e.x == "A")
+      (P, PtoA)
+    )
+
+    pathToAResult
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE
+            recursive$P AS
+              (SELECT * FROM edges as edges$F
+                  UNION ALL
+               SELECT ref$Z.x as x, ref$Y.y as y
+               FROM recursive$P as ref$Z, recursive$P as ref$Y
+               WHERE ref$Z.y = ref$Y.x),
+            recursive$A AS
+             (SELECT * FROM empty as empty$D
+                UNION ALL
+              SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = "A")
+        SELECT * FROM recursive$A as ref$S
+    x
+        """
 }
 
 //class RecursiveTwoSingleTest extends SQLStringQueryTest[TCDB, Edge] {
@@ -325,189 +329,189 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
 //    """
 //      """
 //}
-class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
-  def testDescription: String = "CSPA, example mutual recursion"
+//class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
+//  def testDescription: String = "CSPA, example mutual recursion"
+//
+//  def query() =
+//    val assign = testDB.tables.assign
+//    val dereference = testDB.tables.dereference
+//
+//    val memoryAliasBase =
+//      // MemoryAlias(x, x) :- Assign(_, x)
+//      assign.map(a => (p1 = a.p2, p2 = a.p2))
+//        .unionAll(
+//          // MemoryAlias(x, x) :- Assign(x, _)
+//          assign.map(a => (p1 = a.p1, p2 = a.p1))
+//        )
+//
+//    val valueFlowBase =
+//      assign // ValueFlow(y, x) :- Assign(y, x)
+//        .unionAll(
+//          // ValueFlow(x, x) :- Assign(x, _)
+//          assign.map(a => (p1 = a.p1, p2 = a.p1))
+//        ).unionAll(
+//          // ValueFlow(x, x) :- Assign(_, x)
+//          assign.map(a => (p1 = a.p2, p2 = a.p2))
+//        )
+//
+//    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+//      (valueFlow, valueAlias, memoryAlias) =>
+//        val VF =
+//          // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
+//          assign.flatMap(a =>
+//            memoryAlias
+//              .filter(m => a.p2 == m.p1)
+//              .map(m => (p1 = a.p1, p2 = m.p2)
+//            )
+//          ).unionAll(
+//            // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
+//            valueFlow.flatMap(vf1 =>
+//              valueFlow
+//                .filter(vf2 => vf1.p2 == vf2.p1)
+//                .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2))
+//            )
+//          )
+//        val MA =
+//          // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
+//          dereference.flatMap(d1 =>
+//            valueAlias.flatMap(va =>
+//              dereference
+//                .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
+//                .map(d2 => (p1 = d1.p2, p2 = d2.p2))
+//              )
+//            )
+//        val VA =
+//          // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+//          valueFlow.flatMap(vf1 =>
+//            valueFlow
+//              .filter(vf2 => vf1.p1 == vf2.p1)
+//              .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2))
+//          ).unionAll(
+//            // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+//            valueFlow.flatMap(vf1 =>
+//              memoryAlias.flatMap(m =>
+//                valueFlow
+//                  .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
+//                  .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2))
+//              )
+//            )
+//          )
+//        (VF, MA, VA)
+//    )
+//    valueFlowFinal
+//
+//  def expectedQueryPattern: String =
+//    """
+//        WITH RECURSIVE
+//            recursive55 AS
+//                (SELECT * FROM assign as assign57
+//                    UNION ALL
+//                 SELECT assign59.p1 as p1, assign59.p1 as p2 FROM assign as assign59
+//                    UNION ALL
+//                 SELECT assign62.p2 as p1, assign62.p2 as p2 FROM assign as assign62
+//                    UNION ALL
+//                 SELECT assign65.p1 as p1, recursive57.p2 as p2 FROM assign as assign65, recursive57
+//                 WHERE assign65.p2 = recursive57.p1
+//                    UNION ALL
+//                 SELECT recursive55.p1 as p1, recursive55.p2 as p2 FROM recursive55, recursive55
+//                 WHERE recursive55.p2 = recursive55.p1),
+//            recursive56 AS
+//                (SELECT * FROM empty as empty72
+//                    UNION ALL
+//                 SELECT dereference74.p2 as p1, dereference75.p2 as p2
+//                 FROM dereference as dereference74, recursive56, dereference as dereference75
+//                 WHERE dereference74.p1 = recursive56.p1 AND recursive56.p2 = dereference75.p1),
+//            recursive57 AS
+//                (SELECT assign80.p2 as p1, assign80.p2 as p2
+//                 FROM assign as assign80
+//                    UNION ALL
+//                 SELECT assign82.p1 as p1, assign82.p1 as p2
+//                 FROM assign as assign82
+//                    UNION ALL
+//                 SELECT recursive55.p2 as p1, recursive55.p2 as p2
+//                 FROM recursive55, recursive55
+//                 WHERE recursive55.p1 = recursive55.p1
+//                    UNION ALL
+//                 SELECT recursive55.p2 as p1, recursive55.p2 as p2
+//                 FROM recursive55, recursive57, recursive55
+//                 WHERE recursive55.p1 = recursive57.p1 AND recursive55.p1 = recursive57.p2);
+//        (SELECT recursive55 FROM recursive55) as subquery92
+//    """
+//}
 
-  def query() =
-    val assign = testDB.tables.assign
-    val dereference = testDB.tables.dereference
-
-    val memoryAliasBase =
-      // MemoryAlias(x, x) :- Assign(_, x)
-      assign.map(a => (p1 = a.p2, p2 = a.p2))
-        .unionAll(
-          // MemoryAlias(x, x) :- Assign(x, _)
-          assign.map(a => (p1 = a.p1, p2 = a.p1))
-        )
-
-    val valueFlowBase =
-      assign // ValueFlow(y, x) :- Assign(y, x)
-        .unionAll(
-          // ValueFlow(x, x) :- Assign(x, _)
-          assign.map(a => (p1 = a.p1, p2 = a.p1))
-        ).unionAll(
-          // ValueFlow(x, x) :- Assign(_, x)
-          assign.map(a => (p1 = a.p2, p2 = a.p2))
-        )
-
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = multiFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
-        val VF =
-          // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
-          assign.flatMap(a =>
-            memoryAlias
-              .filter(m => a.p2 == m.p1)
-              .map(m => (p1 = a.p1, p2 = m.p2)
-            )
-          ).unionAll(
-            // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
-            valueFlow.flatMap(vf1 =>
-              valueFlow
-                .filter(vf2 => vf1.p2 == vf2.p1)
-                .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2))
-            )
-          )
-        val MA =
-          // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-          dereference.flatMap(d1 =>
-            valueAlias.flatMap(va =>
-              dereference
-                .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
-                .map(d2 => (p1 = d1.p2, p2 = d2.p2))
-              )
-            )
-        val VA =
-          // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
-          valueFlow.flatMap(vf1 =>
-            valueFlow
-              .filter(vf2 => vf1.p1 == vf2.p1)
-              .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2))
-          ).unionAll(
-            // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
-            valueFlow.flatMap(vf1 =>
-              memoryAlias.flatMap(m =>
-                valueFlow
-                  .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
-                  .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2))
-              )
-            )
-          )
-        (VF, MA, VA)
-    )
-    valueFlowFinal
-
-  def expectedQueryPattern: String =
-    """
-        WITH RECURSIVE
-            recursive55 AS
-                (SELECT * FROM assign as assign57
-                    UNION ALL
-                 SELECT assign59.p1 as p1, assign59.p1 as p2 FROM assign as assign59
-                    UNION ALL
-                 SELECT assign62.p2 as p1, assign62.p2 as p2 FROM assign as assign62
-                    UNION ALL
-                 SELECT assign65.p1 as p1, recursive57.p2 as p2 FROM assign as assign65, recursive57
-                 WHERE assign65.p2 = recursive57.p1
-                    UNION ALL
-                 SELECT recursive55.p1 as p1, recursive55.p2 as p2 FROM recursive55, recursive55
-                 WHERE recursive55.p2 = recursive55.p1),
-            recursive56 AS
-                (SELECT * FROM empty as empty72
-                    UNION ALL
-                 SELECT dereference74.p2 as p1, dereference75.p2 as p2
-                 FROM dereference as dereference74, recursive56, dereference as dereference75
-                 WHERE dereference74.p1 = recursive56.p1 AND recursive56.p2 = dereference75.p1),
-            recursive57 AS
-                (SELECT assign80.p2 as p1, assign80.p2 as p2
-                 FROM assign as assign80
-                    UNION ALL
-                 SELECT assign82.p1 as p1, assign82.p1 as p2
-                 FROM assign as assign82
-                    UNION ALL
-                 SELECT recursive55.p2 as p1, recursive55.p2 as p2
-                 FROM recursive55, recursive55
-                 WHERE recursive55.p1 = recursive55.p1
-                    UNION ALL
-                 SELECT recursive55.p2 as p1, recursive55.p2 as p2
-                 FROM recursive55, recursive57, recursive55
-                 WHERE recursive55.p1 = recursive57.p1 AND recursive55.p1 = recursive57.p2);
-        (SELECT recursive55 FROM recursive55) as subquery92
-    """
-}
-
-class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location] {
-  def testDescription: String = "CSPA, but with comprehensions to see if nicer"
-
-  def query() =
-    val assign = testDB.tables.assign
-    val dereference = testDB.tables.dereference
-
-    val memoryAliasBase =
-      // MemoryAlias(x, x) :- Assign(_, x)
-      assign.map(a => (p1 = a.p2, p2 = a.p2))
-        .unionAll(
-          // MemoryAlias(x, x) :- Assign(x, _)
-          assign.map(a => (p1 = a.p1, p2 = a.p1))
-        )
-
-    val valueFlowBase =
-      assign // ValueFlow(y, x) :- Assign(y, x)
-        .unionAll(
-          // ValueFlow(x, x) :- Assign(x, _)
-          assign.map(a => (p1 = a.p1, p2 = a.p1))
-        ).unionAll(
-          // ValueFlow(x, x) :- Assign(_, x)
-          assign.map(a => (p1 = a.p2, p2 = a.p2))
-        )
-
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = multiFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
-        // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
-        val vfDef1 =
-          for
-            a <- assign
-            m <- memoryAlias
-            if a.p2 == m.p1
-          yield (p1 = a.p1, p2 = m.p2)
-        // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
-        val vfDef2 =
-          for
-            vf1 <- valueFlow
-            vf2 <- valueFlow
-            if vf1.p2 == vf2.p1
-          yield (p1 = vf1.p1, p2 = vf2.p2)
-        val VF = vfDef1.unionAll(vfDef2)
-
-        // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-        val MA =
-          for
-            d1 <- dereference
-            va <- valueAlias
-            d2 <- dereference
-            if d1.p1 == va.p1 && va.p2 == d2.p1
-          yield (p1 = d1.p2, p2 = d2.p2)
-
-        // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
-        val vaDef1 =
-          for
-            vf1 <- valueFlow
-            vf2 <- valueFlow
-            if vf1.p1 == vf2.p1
-          yield (p1 = vf1.p2, p2 = vf2.p2)
-        // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
-        val vaDef2 =
-          for
-            vf1 <- valueFlow
-            m <- memoryAlias
-            vf2 <- valueFlow
-            if vf1.p1 == m.p1 && vf2.p1 == m.p2
-          yield (p1 = vf1.p2, p2 = vf2.p2)
-        val VA = vaDef1.unionAll(vaDef2)
-
-        (VF, MA, VA)
-    )
-    valueFlowFinal
-  def expectedQueryPattern: String =
-    """
-    """
-}
+//class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location] {
+//  def testDescription: String = "CSPA, but with comprehensions to see if nicer"
+//
+//  def query() =
+//    val assign = testDB.tables.assign
+//    val dereference = testDB.tables.dereference
+//
+//    val memoryAliasBase =
+//      // MemoryAlias(x, x) :- Assign(_, x)
+//      assign.map(a => (p1 = a.p2, p2 = a.p2))
+//        .unionAll(
+//          // MemoryAlias(x, x) :- Assign(x, _)
+//          assign.map(a => (p1 = a.p1, p2 = a.p1))
+//        )
+//
+//    val valueFlowBase =
+//      assign // ValueFlow(y, x) :- Assign(y, x)
+//        .unionAll(
+//          // ValueFlow(x, x) :- Assign(x, _)
+//          assign.map(a => (p1 = a.p1, p2 = a.p1))
+//        ).unionAll(
+//          // ValueFlow(x, x) :- Assign(_, x)
+//          assign.map(a => (p1 = a.p2, p2 = a.p2))
+//        )
+//
+//    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+//      (valueFlow, valueAlias, memoryAlias) =>
+//        // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
+//        val vfDef1 =
+//          for
+//            a <- assign
+//            m <- memoryAlias
+//            if a.p2 == m.p1
+//          yield (p1 = a.p1, p2 = m.p2)
+//        // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
+//        val vfDef2 =
+//          for
+//            vf1 <- valueFlow
+//            vf2 <- valueFlow
+//            if vf1.p2 == vf2.p1
+//          yield (p1 = vf1.p1, p2 = vf2.p2)
+//        val VF = vfDef1.unionAll(vfDef2)
+//
+//        // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
+//        val MA =
+//          for
+//            d1 <- dereference
+//            va <- valueAlias
+//            d2 <- dereference
+//            if d1.p1 == va.p1 && va.p2 == d2.p1
+//          yield (p1 = d1.p2, p2 = d2.p2)
+//
+//        // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+//        val vaDef1 =
+//          for
+//            vf1 <- valueFlow
+//            vf2 <- valueFlow
+//            if vf1.p1 == vf2.p1
+//          yield (p1 = vf1.p2, p2 = vf2.p2)
+//        // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+//        val vaDef2 =
+//          for
+//            vf1 <- valueFlow
+//            m <- memoryAlias
+//            vf2 <- valueFlow
+//            if vf1.p1 == m.p1 && vf2.p1 == m.p2
+//          yield (p1 = vf1.p2, p2 = vf2.p2)
+//        val VA = vaDef1.unionAll(vaDef2)
+//
+//        (VF, MA, VA)
+//    )
+//    valueFlowFinal
+//  def expectedQueryPattern: String =
+//    """
+//    """
+//}

@@ -125,8 +125,6 @@ object TreePrettyPrinter {
       case GroupBy(query, selectFn, groupingFn, havingFn) =>
         s"${indent(depth)}GroupBy(\n${query.prettyPrint(depth + 1)},\n${selectFn.prettyPrint(depth + 1)},\n${groupingFn.prettyPrint(depth + 1)},\n${havingFn.prettyPrint(depth + 1)}\n${indent(depth)})"
       case a: Aggregation[?] => a.prettyPrint(depth)
-      case Recursive(ref, query) =>
-        s"${indent(depth)}Recursive(\n${ref.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
       case MultiRecursive(refs, querys, finalQ) =>
         val refStr = refs.toList.map(r => r.asInstanceOf[QueryRef[?]].prettyPrint(depth+1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?]].prettyPrint(depth + 2))
@@ -172,7 +170,7 @@ object TreePrettyPrinter {
         val str = alias.zip(qryStr).map((r, q) => s"\n$r => $q").mkString(",\n")
         s"${indent(depth)}MultiRecursive($str\n${indent(depth)})"
       case recursiveIRVar: RecursiveIRVar =>
-        s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}"
+        s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}->${recursiveIRVar.pointsToAlias}"
       case _ => throw new Exception(s"Unimplemented pretty print RelationOp $relationOp")
     }
   }
