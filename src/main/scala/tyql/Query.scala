@@ -135,7 +135,7 @@ object Query:
     refs.naturalMap([t] => finalRef =>
       given ResultTag[t] = finalRef.tag
       val idArg = Ref[t]()
-      val selectAll = Map[t, t](finalRef, Fun(idArg, idArg))
+      val selectAll = Map(finalRef, Fun(idArg, idArg))
       MultiRecursive(
         refs,
         unionsTuple,
