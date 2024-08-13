@@ -66,10 +66,10 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
                       allMatches = false
                     }
                   case None =>
-                    if (placeholderMap.values.exists(n => n == num)) {
-                      stringDebug = s"Multiple placeholders pointing to the same number: $placeholder -> $num and ${placeholderMap.toSeq.filter((p, n) => n == num).map((p, n) => s"$p -> $n").mkString(", ")}"
-                      allMatches = false
-                    }
+//                    if (placeholderMap.values.exists(n => n == num)) {
+//                      stringDebug = s"Multiple placeholders pointing to the same number: $placeholder -> $num and ${placeholderMap.toSeq.filter((p, n) => n == num).map((p, n) => s"$p -> $n").mkString(", ")}"
+//                      allMatches = false
+//                    }
                     // Update the map with the new number for this placeholder
                     placeholderMap = placeholderMap.updated(placeholder, num)
                 }

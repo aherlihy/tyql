@@ -11,7 +11,12 @@ enum SelectFlags:
 enum PositionFlag:
   case Project, Where, Subquery
 
-type SymbolTable = Map[String, RelationOp]
+class SymbolTable(val innerTable: Map[String, RelationOp] = Map.empty):
+  def bind(alias: String, pointsTo: RelationOp): SymbolTable =
+    SymbolTable(innerTable + (alias -> pointsTo))
+  def bind(aliases: Iterable[(String, RelationOp)]): SymbolTable =
+    SymbolTable(innerTable ++ aliases)
+  def apply(alias: String): RelationOp = innerTable(alias)
 
 /**
  * Relation-level operations, e.g. a table, union of tables, SELECT query, etc.
