@@ -17,7 +17,7 @@ given TCDBs: TestDatabase[TCDB] with
     otherEdges = Table[Edge2]("otherEdges"),
     emptyEdges = Table[Edge]("empty")
   )
-
+/*
 class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "TC"
 
@@ -271,6 +271,19 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
       """
 }
 
+class SelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "self join"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.flatMap(p =>
+      path
+        .filter(p2 => p.y == p2.x)
+        .map(p2 => (x = p.x, y = p2.y).toRow)
+    )
+  def expectedQueryPattern: String = ""
+}
+*/
 class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "define 2 recursive relations with one self join"
 

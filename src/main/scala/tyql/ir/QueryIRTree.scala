@@ -29,42 +29,49 @@ object QueryIRTree:
         collapseFilters(filters :+ filter.$pred, filter.$from, symbols)
       case _ => (filters, generateQuery(comprehension, symbols))
 
+  private def lookupRecursiveRef(fromNode: RelationOp, newRef: String): RelationOp =
+    fromNode match
+      case RecursiveIRVar(pointsToAlias, alias, ast) =>
+        RecursiveIRVar(pointsToAlias, newRef, ast)
+      case p => p
+
   /**
    * Convert n subsequent calls to flatMap into an n-way join.
    * e.g. table.flatMap(t1 => table2.flatMap(t2 => table3.map(t3 => (k1 = t1, k2 = t2, k3 = t3))) =>
    *    SELECT t1 as k1, t2 as k3, t3 as k3 FROM table1, table2, table3
    */
   private def collapseFlatMap(sources: Seq[RelationOp], symbols: SymbolTable, body: DatabaseAST[?] | Expr[?]): (Seq[RelationOp], QueryIRNode) =
+    println(s"collapseFlatMap, body=$body")
     body match
       case map: Query.Map[?, ?] =>
-        val srcIR = generateQuery(map.$from, symbols)
-        val bodyIR = generateFun(map.$query, srcIR, symbols)
-        (sources :+ srcIR, bodyIR)
+        val fromNode = generateQuery(map.$from, symbols)
+        val bodyIR = generateFun(map.$query, fromNode, symbols)
+        (sources :+ fromNode, bodyIR)
       case flatMap: Query.FlatMap[?, ?] => // found a flatMap to collapse
-        val srcIR = generateQuery(flatMap.$from, symbols)
+        val fromNode = generateQuery(flatMap.$from, symbols)
         val bodyAST = flatMap.$query
         collapseFlatMap(
-          sources :+ srcIR,
-          symbols + (bodyAST.$param.stringRef() -> srcIR),
+          sources :+ fromNode,
+          symbols + (bodyAST.$param.stringRef() -> fromNode),
           bodyAST.$body
         )
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
-        val srcIR = generateQuery(aggFlatMap.$from, symbols)
+        val fromNode = generateQuery(aggFlatMap.$from, symbols)
         val outerBodyAST = aggFlatMap.$query
         outerBodyAST.$body match
           case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
             collapseFlatMap(
-              sources :+ srcIR,
-              symbols + (outerBodyAST.$param.stringRef() -> srcIR),
+              sources :+ fromNode,
+              symbols + (outerBodyAST.$param.stringRef() -> fromNode),
               outerBodyAST.$body
             )
           case _ => // base case
-            val innerBodyIR = generateFun(outerBodyAST, srcIR, symbols)
-            (sources :+ srcIR, innerBodyIR)
+            val innerBodyIR = generateFun(outerBodyAST, fromNode, symbols)
+            (sources :+ fromNode, innerBodyIR)
       // Found an operation that cannot be collapsed
       case otherOp: DatabaseAST[?] =>
-        val srcIR = generateQuery(otherOp, symbols)
-        (sources :+ srcIR, ProjectClause(Seq(QueryIRVar(srcIR, srcIR.alias, null)), null))
+        val fromNode = generateQuery(otherOp, symbols)
+        (sources :+ fromNode, ProjectClause(Seq(QueryIRVar(fromNode, fromNode.alias, null)), null))
       case _ => // Expr
         throw Exception(s"""
             Unimplemented: collapsing flatMap on type $body.
@@ -97,8 +104,8 @@ object QueryIRTree:
 
     NaryRelationOp(flattened, op, ast)
 
-  private def unnest(tableIRs: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
-    tableIRs.reduce((q1, q2) =>
+  private def unnest(fromNodes: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
+    fromNodes.reduce((q1, q2) =>
       q1.mergeWith(q2, flatMap)
     ).appendProject(projectIR, flatMap)
 
@@ -120,39 +127,39 @@ object QueryIRTree:
         val attrNode = generateFun(map.$query, fromNode, symbols)
         fromNode.appendProject(attrNode, map)
       case filter: Query.Filter[?] =>
-        val (predicateASTs, tableIR) = collapseFilters(Seq(), filter, symbols)
+        val (predicateASTs, fromNode) = collapseFilters(Seq(), filter, symbols)
         val predicateExprs = predicateASTs.map(pred =>
-          generateFun(pred, tableIR, symbols) // NOTE: the parameters of all predicate functions are mapped to tableIR
+          generateFun(pred, fromNode, symbols) // NOTE: the parameters of all predicate functions are mapped to fromNode
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
-        tableIR.appendWhere(where, filter)
+        fromNode.appendWhere(where, filter)
       case flatMap: Query.FlatMap[?, ?] =>
-        val sourceIR = generateQuery(flatMap.$from, symbols)
+        val fromNode = generateQuery(flatMap.$from, symbols)
         val bodyAST = flatMap.$query
-        val (tableIRs, projectIR) = collapseFlatMap(
-          Seq(sourceIR),
-          symbols + (bodyAST.$param.stringRef() -> sourceIR),
+        val (fromNodes, projectIR) = collapseFlatMap(
+          Seq(fromNode),
+          symbols + (bodyAST.$param.stringRef() -> fromNode),
           bodyAST.$body
         )
         import TreePrettyPrinter.*
         /** TODO: this is where could create more complex join nodes,
          * for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
          */
-        unnest(tableIRs, projectIR, flatMap)
+        unnest(fromNodes, projectIR, flatMap)
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
-        val sourceIR = generateQuery(aggFlatMap.$from, symbols)
+        val fromNode = generateQuery(aggFlatMap.$from, symbols)
         val outerBodyAST = aggFlatMap.$query
-        val (tableIRs, projectIR) = outerBodyAST.$body match
+        val (fromNodes, projectIR) = outerBodyAST.$body match
          case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
            collapseFlatMap(
-             Seq(sourceIR),
-             symbols + (outerBodyAST.$param.stringRef() -> sourceIR),
+             Seq(fromNode),
+             symbols + (outerBodyAST.$param.stringRef() -> fromNode),
              outerBodyAST.$body
            )
          case _ => // base case
-            val innerBodyIR = generateFun(outerBodyAST, sourceIR, symbols)
-            (Seq(sourceIR), innerBodyIR)
-        unnest(tableIRs, projectIR, aggFlatMap)
+            val innerBodyIR = generateFun(outerBodyAST, fromNode, symbols)
+            (Seq(fromNode), innerBodyIR)
+        unnest(fromNodes, projectIR, aggFlatMap)
       case union: Query.Union[?] =>
         val lhs = generateQuery(union.$this, symbols).appendFlag(SelectFlags.Final)
         val rhs = generateQuery(union.$other, symbols).appendFlag(SelectFlags.Final)
@@ -167,11 +174,11 @@ object QueryIRTree:
         val rhs = generateQuery(except.$other, symbols).appendFlag(SelectFlags.Final)
         collapseNaryOp(lhs, rhs, "EXCEPT", except)
       case sort: Query.Sort[?, ?] =>
-        val (orderByASTs, tableIR) = collapseSort(Seq(), sort, symbols)
+        val (orderByASTs, fromNode) = collapseSort(Seq(), sort, symbols)
         val orderByExprs = orderByASTs.map(ord =>
-          (generateFun(ord._1, tableIR, symbols), ord._2)
+          (generateFun(ord._1, fromNode, symbols), ord._2)
         )
-        OrderedQuery(tableIR.appendFlag(SelectFlags.Final), orderByExprs, sort)
+        OrderedQuery(fromNode.appendFlag(SelectFlags.Final), orderByExprs, sort)
       case limit: Query.Limit[?] =>
         val from = generateQuery(limit.$from, symbols)
         collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, limit.$limit), "LIMIT", limit)

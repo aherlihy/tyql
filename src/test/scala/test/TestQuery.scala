@@ -27,7 +27,6 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
     // Split stringA on placeholders and also extract the placeholders
     val parts = placeholderPattern.split(expectedQuery.trim())
     val placeholders = placeholderPattern.findAllIn(expectedQuery).toList
-    println(placeholders)
 
     // Define initial position and result accumulator
     var currentPosition = 0
@@ -67,7 +66,6 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
                       allMatches = false
                     }
                   case None =>
-                    println(s"placeholder=$placeholder, num=$num")
                     if (placeholderMap.values.exists(n => n == num)) {
                       stringDebug = s"Multiple placeholders pointing to the same number: $placeholder -> $num and ${placeholderMap.toSeq.filter((p, n) => n == num).map((p, n) => s"$p -> $n").mkString(", ")}"
                       allMatches = false

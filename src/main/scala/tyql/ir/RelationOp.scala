@@ -444,7 +444,7 @@ case class RecursiveRelationOp(alias: String, query: RelationOp, finalQ: Relatio
  */
 case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST[?]) extends RelationOp:
   override def toSQLString() = s"$pointsToAlias as $alias"
-  override def toString: String = s"Q-VAR($alias)"
+  override def toString: String = s"RVAR($alias->$pointsToAlias)"
 
   // TODO: for now reuse TableOp's methods
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =

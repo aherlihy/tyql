@@ -144,7 +144,7 @@ object Query:
   case class QueryRef[A: ResultTag]() extends Query[A]:
     private val id = refCount
     refCount += 1
-    def stringRef() = s"ref$id"
+    def stringRef() = s"recref$id"
     override def toString: String = s"QueryRef[${stringRef()}]"
 
   case class QueryFun[A, B]($param: QueryRef[A], $body: B)
