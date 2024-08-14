@@ -10,7 +10,7 @@ import NamedTuple.*
 // import scala.language.implicitConversions
 
 import java.time.LocalDate
-/*
+
 class SortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeJoin"
   def query() =
@@ -1139,7 +1139,7 @@ class FlatmapFlat3Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
         buyers as buyers$452
       """
 }
-*/
+
 class FlatmapFlat4Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: flatmap with only row"
 
@@ -1179,7 +1179,7 @@ class FlatmapFlat5Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
             buyers as buyers$A
           """
 }
-/*
+
 class NestedJoinSubqueryLimit4Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and limit on both outer relations, one inner relation"
 
@@ -1199,13 +1199,13 @@ class NestedJoinSubqueryLimit4Test extends SQLStringQueryTest[AllCommerceDBs, Bu
       SELECT
         subquery$E
       FROM
+        (SELECT * FROM buyers as buyers$B LIMIT 3) as subquery$E,
         (SELECT
            product$D
          FROM
             purchase as purchase$C,
             product as product$D) as subquery$F,
-        shippingInfo as shippingInfo$G,
-        (SELECT * FROM buyers as buyers$B LIMIT 3) as subquery$E
+        shippingInfo as shippingInfo$G
       """
 }
 
@@ -1228,13 +1228,13 @@ class NestedJoinSubqueryLimit6Test extends SQLStringQueryTest[AllCommerceDBs, Bu
       SELECT
          subquery$Z
       FROM
+        (SELECT * FROM buyers as buyers$B LIMIT 3) as subquery$Z,
         (SELECT
            product$D
          FROM
             purchase as purchase$C,
-            product as product$D) as subquery$F
-        (SELECT * FROM shippingInfo as shippingInfo$E LIMIT 4) as subquery$X,
-        (SELECT * FROM buyers as buyers$B LIMIT 3) as subquery$Z
+            product as product$D) as subquery$F,
+        (SELECT * FROM shippingInfo as shippingInfo$E LIMIT 4) as subquery$X
       """
 }
 
@@ -1287,14 +1287,14 @@ class NestedJoinSubqueryLimit8Test extends SQLStringQueryTest[AllCommerceDBs, Bu
         SELECT
           subquery$I
         FROM
+            (SELECT * FROM buyers as buyers$B LIMIT 6) as subquery$I,
             (SELECT
                subquery$S
              FROM
                 (SELECT * FROM purchase as purchase$C LIMIT 1) as subquery$R,
                 (SELECT * FROM product as product$D LIMIT 2) as subquery$S
              LIMIT 3) as subquery$P,
-            (SELECT * FROM shippingInfo as shippingInfo$E LIMIT 5) as subquery$O,
-            (SELECT * FROM buyers as buyers$B LIMIT 6) as subquery$I
+            (SELECT * FROM shippingInfo as shippingInfo$E LIMIT 5) as subquery$O
         LIMIT 7
       """
 }
@@ -1755,4 +1755,3 @@ class UnionAllAggregateSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (
               product as product$C) as subquery$A
       """
 }
-*/
