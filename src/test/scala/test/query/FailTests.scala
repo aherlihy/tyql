@@ -1,13 +1,57 @@
-//package test.query.fail
+package test.query.fail
 //
 //import test.{SQLStringAggregationTest, SQLStringQueryTest}
 //import tyql.Expr.sum
 //
 //import java.time.LocalDate
 // TODO: tests that should fail to compile
+//
+class TestCompileError extends munit.FunSuite {
+  def testDescription: String = "map+map should fail with useful error message"
+  def expectedError: String = "Cannot return an Query from a map. Did you mean to use flatMap?"
 
+  test(testDescription) {
+    assert(
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.Table
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+
+           tables.buyers.map(b =>
+             tables.shipInfos.map(si =>
+               (name = b.name, shippingDate = si.shippingDate).toRow
+             )
+           )
+          """).contains(expectedError)
+    )
+  }
+}
 //class FlowMapTest extends SQLStringTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
-//  def testDescription = "Flow: project tuple, 2 nest, map+map should fail with useful error message"
+//  def testDescription = "Flow: project tuple, 2 nest,"
 //  def query() =
 //    testDB.tables.buyers.map(b =>
 //      testDB.tables.shipInfos.map(si =>
@@ -17,7 +61,7 @@
 //
 //  def sqlString = "SELECT r0.name, r1.shippingDate FROM buyers r0, shipInfos r1"
 //}
-//
+
 //class FlowMapAggregate3Test extends SQLStringTest[AllCommerceDBs, Int] {
 //  def testDescription = "Flow: project tuple, 2 nest, map+map should fail even with aggregation"
 //  def query() =

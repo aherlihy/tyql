@@ -95,6 +95,7 @@ object TestComparitor {
 
 }
 
+
 trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extends munit.FunSuite with TestQuery[Rows, ReturnShape] {
 
   import tyql.TreePrettyPrinter.*
