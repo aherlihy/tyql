@@ -39,6 +39,7 @@ object QueryIRTree:
    *    SELECT t1 as k1, t2 as k3, t3 as k3 FROM table1, table2, table3
    */
   private def collapseFlatMap(sources: Seq[RelationOp], symbols: SymbolTable, body: Any): (Seq[RelationOp], QueryIRNode) =
+    println(s"collapseFlatMap: sources=$sources, bodyToDo: $body")
     body match
       case map: Query.Map[?, ?] =>
         val actualParam = generateActualParam(map.$from, map.$query.$param, symbols)
@@ -101,7 +102,9 @@ object QueryIRTree:
 
   private def unnest(fromNodes: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
     fromNodes.reduce((q1, q2) =>
-      q1.mergeWith(q2, flatMap)
+      val res = q1.mergeWith(q2, flatMap)
+      println(s"${q1.getClass}+${q2.getClass}::merging '${q1.toSQLString()}' with ${q2.toSQLString()}' => ${res.toSQLString()}")
+      res
     ).appendProject(projectIR, flatMap)
 
   /**

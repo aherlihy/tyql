@@ -185,7 +185,7 @@ class AggregationSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Boolean
       )
 
   def expectedQueryPattern: String = """
-    SELECT product$P.price > (SELECT AVG(product$B.price) FROM product as product$B) FROM product as product$A
+    SELECT product$P.price > (SELECT AVG(product$B.price) FROM product as product$B) FROM product as product$P
       """
 }
 

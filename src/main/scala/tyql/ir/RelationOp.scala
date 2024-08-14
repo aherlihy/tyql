@@ -140,6 +140,9 @@ case class SelectAllQuery(from: Seq[RelationOp],
         val newF = from ++ q.from
         val newW = where ++ q.where
         SelectQuery(q.project, newF, newW, None, astOther)
+      case n: NaryRelationOp =>
+        n.mergeWith(this, astOther)
+
       case r: RelationOp =>
         // default to subquery, some ops may want to override
         SelectAllQuery(Seq(this, r), Seq(), None, astOther)

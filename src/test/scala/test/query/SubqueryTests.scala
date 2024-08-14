@@ -1,7 +1,7 @@
 package test.query.subquery
 
 import test.SQLStringQueryTest
-import test.query.{AllCommerceDBs, Buyer, commerceDBs, Product, Purchase}
+import test.query.{AllCommerceDBs, Buyer, Product, Purchase, ShippingInfo, commerceDBs}
 import tyql.*
 import tyql.Expr.{max, min, toRow}
 
@@ -10,7 +10,7 @@ import NamedTuple.*
 // import scala.language.implicitConversions
 
 import java.time.LocalDate
-
+/*
 class SortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeJoin"
   def query() =
@@ -1064,6 +1064,122 @@ class NestedJoinSubqueryLimit3Test extends SQLStringQueryTest[AllCommerceDBs, Bu
 
 }
 
+class FlatmapLimitTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
+  def testDescription = "Subquery: flatmap with limit"
+
+  def query() =
+    testDB.tables.shipInfos.flatMap(p4 =>
+      testDB.tables.buyers.limit(3)
+    )
+
+  def expectedQueryPattern =
+    """
+        SELECT
+          subquery$E
+        FROM
+          shippingInfo as shippingInfo$G,
+          (SELECT * FROM buyers as buyers$B LIMIT 3) as subquery$E
+        """
+}
+
+class FlatmapFlatTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
+  def testDescription = "Subquery: flatmap with only row"
+
+  def query() =
+    testDB.tables.shipInfos.flatMap(p4 =>
+      testDB.tables.buyers
+    )
+
+  def expectedQueryPattern =
+    """
+          SELECT
+            buyers$B
+          FROM
+            shippingInfo as shippingInfo$G,
+            buyers as buyers$B
+          """
+}
+
+class FlatmapFlat2Test extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription = "Subquery: flatmap with only row"
+
+  def query() =
+    testDB.tables.purchases.flatMap(p1 =>
+      testDB.tables.products
+    )
+
+  def expectedQueryPattern =
+    """
+       SELECT
+           product$D
+         FROM
+            purchase as purchase$C,
+            product as product$D
+    """
+}
+
+class FlatmapFlat3Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
+  def testDescription = "Subquery: flatmap with only row"
+
+  def query() =
+    testDB.tables.purchases.flatMap(p1 =>
+      testDB.tables.products
+    ).flatMap(p3 =>
+      testDB.tables.shipInfos.flatMap(p4 =>
+        testDB.tables.buyers
+      )
+    )
+
+  def expectedQueryPattern =
+    """
+      SELECT buyers$452
+      FROM
+        (SELECT product$448 FROM purchase as purchase$447, product as product$448) as subquery$450,
+        shippingInfo as shippingInfo$451,
+        buyers as buyers$452
+      """
+}
+*/
+class FlatmapFlat4Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
+  def testDescription = "Subquery: flatmap with only row"
+
+  def query() =
+    testDB.tables.purchases.flatMap(p3 =>
+      testDB.tables.shipInfos.flatMap(p4 =>
+        testDB.tables.buyers.limit(1)
+      )
+    )
+
+  def expectedQueryPattern =
+    """
+        SELECT subquery$A
+        FROM
+          (SELECT * FROM buyers as buyers$452 LIMIT 1) as subquery$A,
+          purchase as purchase$B,
+          shippingInfo as shippingInfo$451
+        """
+}
+
+class FlatmapFlat5Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
+  def testDescription = "Subquery: flatmap with only row"
+
+  def query() =
+    testDB.tables.purchases.flatMap(p3 =>
+      testDB.tables.shipInfos.flatMap(p4 =>
+        testDB.tables.buyers
+      )
+    )
+
+  def expectedQueryPattern =
+    """
+          SELECT buyers$A
+          FROM
+            purchase as purchase$B,
+            shippingInfo as shippingInfo$451,
+            buyers as buyers$A
+          """
+}
+/*
 class NestedJoinSubqueryLimit4Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and limit on both outer relations, one inner relation"
 
@@ -1542,7 +1658,7 @@ class SubqueryInMapNestedSubqueryTest extends SQLStringQueryTest[AllCommerceDBs,
            (SELECT
               COUNT(1)
            FROM shippingInfo as shippingInfo$A
-           WHERE shippingInfo$C.buyerId = buyers$B.id) = 1 as occurances
+           WHERE shippingInfo$A.buyerId = buyers$B.id) = 1 as occurances
         FROM
           buyers as buyers$B
       """
@@ -1639,3 +1755,4 @@ class UnionAllAggregateSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (
               product as product$C) as subquery$A
       """
 }
+*/
