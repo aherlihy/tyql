@@ -99,14 +99,14 @@ class FlowFlatMapTest2 extends SQLStringQueryTest[AllCommerceDBs, (name: String,
 }
 
 
-class FlowFlatMapTest3 extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate1: LocalDate, shippingDate2: LocalDate)] {
+class FlowFlatMapTest3 extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDateA: LocalDate, shippingDateB: LocalDate)] {
   def testDescription = "Flow: project tuple, 3 nest, flatMap + flatmap+map"
 
   def query() =
     testDB.tables.shipInfos.flatMap(si1 =>
       testDB.tables.buyers.flatMap(b =>
         testDB.tables.shipInfos.map(si2 =>
-          (name = b.name, shippingDate1 = si1.shippingDate, shippingDate2 = si2.shippingDate).toRow
+          (name = b.name, shippingDateA = si1.shippingDate, shippingDateB = si2.shippingDate).toRow
         )
       )
     )
@@ -114,8 +114,8 @@ class FlowFlatMapTest3 extends SQLStringQueryTest[AllCommerceDBs, (name: String,
   def expectedQueryPattern = """
      SELECT
         buyers$A.name as name,
-        shippingInfo$B.shippingDate as shippingDate1,
-        shippingInfo$C.shippingDate as shippingDate2
+        shippingInfo$B.shippingDate as shippingDateA,
+        shippingInfo$C.shippingDate as shippingDateB
      FROM
         shippingInfo as shippingInfo$B,
         buyers as buyers$A,

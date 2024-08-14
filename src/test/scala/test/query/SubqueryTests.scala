@@ -61,7 +61,7 @@ class SortTakeFromSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double
       )
     )
   def expectedQueryPattern = """
-        SELECT purchase$A.total
+        SELECT purchase$D.total
         FROM
         (SELECT *
           FROM product as product$B
@@ -83,12 +83,12 @@ class SortTakeFromSubquery2Test extends SQLStringQueryTest[AllCommerceDBs, Doubl
   def expectedQueryPattern = """
         SELECT purchase$A.total
         FROM
-        purchase as purchase$D,
+        purchase as purchase$A,
         (SELECT *
           FROM product as product$B
           ORDER BY price DESC
           LIMIT 1) as subquery$C
-        WHERE subquery$C.id = purchase$D.productId
+        WHERE subquery$C.id = purchase$A.productId
       """
 }
 
@@ -343,7 +343,7 @@ class SortTakeFromSubquery4Test extends SQLStringQueryTest[AllCommerceDBs, Doubl
 
   def expectedQueryPattern =
     """
-        SELECT purchase$A.total
+        SELECT purchase$D.total
         FROM
         (SELECT *
           FROM product as product$B
@@ -997,7 +997,7 @@ class NestedJoinSubqueryLimit1Test extends SQLStringQueryTest[AllCommerceDBs, Bu
            subquery$A
          FROM
             purchase as purchase$C,
-            (SELECT * FROM product as product$D LIMIT 1) as subquery$A,
+            (SELECT * FROM product as product$D LIMIT 1) as subquery$A) as subquery$Z,
         shippingInfo as shippingInfo$E,
         buyers as buyers$B
       """
