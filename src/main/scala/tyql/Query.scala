@@ -50,28 +50,60 @@ trait DatabaseAST[Result](using val tag: ResultTag[Result]):
 
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   /**
-   * Top-level queries:
-   * map + aggregation => Aggregation[Result]
-   * flatMap + aggregation => Aggregation[Result]
-   * map + query => Query[Result], e.g. iterable with length n
-   * flatMap + query = compilation error
+   * Classic flatMap with an inner Query that will likely be flattened into a join.
+   *
+   * @param f    a function that returns a Query (so no aggregations in the subtree)
+   * @tparam B   the result type of the query.
+   * @return     Query[B], e.g. an iterable of results of type B
    */
   def flatMap[B: ResultTag](f: Expr.Ref[A] => Query[B]): Query[B] =
     val ref = Expr.Ref[A]()
     Query.FlatMap(this, Expr.Fun(ref, f(ref)))
 
+  /**
+   * Equivalent to aggregate(f: Ref => Aggregation). Override to allow this so that aggregations will still work
+   * with the for-comprehension syntax. TODO: is this really necessary?
+   *
+   * @param f   a function that returns an Aggregation (guaranteed agg in subtree)
+   * @tparam B  the result type of the aggregation.
+   * @return    Aggregation[B], a scalar result, e.g. a single value of type B.
+   */
   def flatMap[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
     val ref = Expr.Ref[A]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
-  // TODO: cover common cases so that user doesn't see implementation-specific typing error, e.g.
+
+  /**
+   * Selectively override to cover common mistakes, so error message is more useful (and not implementation-specific).
+   * This is for when a user uses flatMap where they should be using map.
+   *
+   * @param f   a function that returns an Expr, which should be an error, since that only makes sense for map/agg.
+   * TODO: Since Aggregation extends Expr, need to ensure that aggregations don't trigger this.
+   */
   inline def flatMap[B: ResultTag](f: Expr.Ref[A] => Expr[B]): Expr[B] = // inline so error points to use site
     error("Cannot return an Expr from a flatMap. Did you mean to use map?")
 
+  /**
+   * Equivalent version of flatMap(f: Ref => Aggregation).
+   * Requires f to call toRow on the final result before returning.
+   * Sometimes the implicit conversion kicks in and converts a named-tuple-of-Agg into a Agg-of-named-tuple,
+   * but not always. As an alternative, can use the aggregate defined below that explicitly calls toRow on the result of f.
+   *
+   * @param f   a function that returns an Aggregation (guaranteed agg in subtree)
+   * @tparam B  the result type of the aggregation.
+   * @return    Aggregation[B], a scalar result, e.g. single value of type B.
+   */
   def aggregate[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] =
     val ref = Expr.Ref[A]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
+  /**
+   * A version of the above-defined aggregate that allows users to skip calling toRow on the result in f.
+   *
+   * @param f    a function that returns a named-tuple-of-Aggregation.
+   * @tparam B   the named-tuple-of-Aggregation that will be converted to an Aggregation-of-named-tuple
+   * @return     Aggregation of B.toRow, e.g. a scalar result of type B.toRow
+   */
   def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Aggregation.StripAgg]])(f: Expr.Ref[A] => B): Aggregation[ NamedTuple.Map[B, Aggregation.StripAgg] ] =
     import Aggregation.toRow
     val ref = Expr.Ref[A]()
@@ -80,17 +112,43 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
 
   // TODO: bug? if commented out, then agg test cannot find aggregate ^
   inline def aggregate[B: ResultTag](f: Expr.Ref[A] => Query[B]): Nothing =
-    error("Cannot return an Query from a aggregate. Did you mean to use flatMap?")
+    error("No aggregation function found in f. Did you mean to use flatMap?")
 
+  /**
+   * Classic map with an inner expression to transform the row.
+   * Requires f to call toRow on the final result before returning.
+   * Sometimes the implicit conversion kicks in and converts a named-tuple-of-Expr into a Expr-of-named-tuple,
+   * but not always. As an alternative, can use the map defined below that explicitly calls toRow on the result of f.
+   *
+   * @param f     a function that returns a Expression.
+   * @tparam B    the result type of the Expression, and resulting query.
+   * @return      Query[B], an iterable of type B.
+   *
+   * TODO: ensure that this isn't callable with Aggregation expression.
+   */
   def map[B: ResultTag](f: Expr.Ref[A] => Expr[B]): Query[B] =
     val ref = Expr.Ref[A]()
     Query.Map(this, Expr.Fun(ref, f(ref)))
 
+  /**
+   * A version of the above-defined map that allows users to skip calling toRow on the result in f.
+   *
+   * @param f    a function that returns a named-tuple-of-Expr.
+   * @tparam B   the named-tuple-of-Expr that will be converted to an Expr-of-named-tuple
+   * @return     Expr of B.toRow, e.g. an iterable of type B.toRow
+   */
   def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A] => B): Query[ NamedTuple.Map[B, Expr.StripExpr] ] =
     import Expr.toRow
     val ref = Expr.Ref[A]()
     Query.Map(this, Expr.Fun(ref, f(ref).toRow))
 
+  /**
+   * Selectively override to cover common mistakes, so error message is more useful (and not implementation-specific).
+   * This is for when a user uses map where they should be using flatMap.
+   *
+   * @param f   a function that returns an Query, which should be an error, since that only makes sense for flatMap.
+   * TODO: Since Aggregation extends Expr, need to ensure that aggregations don't trigger this.
+   */
   inline def map[B: ResultTag](f: Expr.Ref[A] => Query[B]): Nothing =
     error("Cannot return an Query from a map. Did you mean to use flatMap?")
 
@@ -146,6 +204,18 @@ object Query:
     refCount += 1
     def stringRef() = s"recref$id"
     override def toString: String = s"QueryRef[${stringRef()}]"
+
+    override def aggregate[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] = ???
+//    override inline def aggregate[B: ResultTag](f: Expr.Ref[A] => Query[B]): Aggregation[B] = error("Cannot apply aggregation across strata")
+
+//    override def aggregate[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] = reportError()
+//
+//    override def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg]
+//    (using ResultTag[NamedTuple.Map[B, Aggregation.StripAgg]])
+//    (f: Expr.Ref[A] => B): Aggregation[NamedTuple.Map[B, Aggregation.StripAgg]] = reportError()
+
+//    inline def flatMap[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Nothing =
+
 
   case class QueryFun[A, B]($param: QueryRef[A], $body: B)
 
