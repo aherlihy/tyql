@@ -1,8 +1,13 @@
 package test.query.fail
 
+import test.SQLStringAggregationTest
+import tyql.*
+import test.query.{commerceDBs, AllCommerceDBs}
+import language.experimental.namedTuples
+
 class MapMapCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map+map should fail with useful error message"
-  def expectedError: String = "Cannot return an Query from a map. Did you mean to use flatMap?"
+  def expectedError: String = "Cannot return a Query from a map. Did you mean to use flatMap?"
 
   test(testDescription) {
     val error: String =
@@ -44,9 +49,10 @@ class MapMapCompileErrorTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
+
 class MapMapTRCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map+map with toRow should fail with useful error message"
-  def expectedError: String = "Cannot return an Query from a map. Did you mean to use flatMap?"
+  def expectedError: String = "Cannot return a Query from a map. Did you mean to use flatMap?"
 
   test(testDescription) {
     val error: String =
@@ -91,7 +97,7 @@ class MapMapTRCompileErrorTest extends munit.FunSuite {
 
 class MapMapAggregateCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map+map with aggregate should fail with useful error message"
-  def expectedError: String = "Cannot return an Query from a map. Did you mean to use flatMap?"
+  def expectedError: String = "Cannot return a Query from a map. Did you mean to use flatMap?"
 
   test(testDescription) {
     val error: String =
@@ -175,7 +181,7 @@ class MapAfterAggregateCompileErrorTest extends munit.FunSuite {
   }
 }
 
-class FlatmapOnlyCompileErrorTest extends munit.FunSuite {
+class FlatmapExprCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "flatMap without inner map fails"
   def expectedError: String = "Cannot return an Expr from a flatMap. Did you mean to use map?"
 
@@ -308,7 +314,7 @@ class MapFlatmapCompileErrorTest extends munit.FunSuite {
   }
 }
 
-class AggregateCompileErrorTest extends munit.FunSuite {
+class AggregateWithoutAggregationCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "aggregate that returns scalar expr should fail"
   def expectedError: String = "None of the overloaded alternatives of method aggregate" // TODO: can we force a better error message?
 
@@ -350,8 +356,8 @@ class AggregateCompileErrorTest extends munit.FunSuite {
   }
 }
 
-class AggregateSubqueryCompileErrorTest extends munit.FunSuite {
-  def testDescription: String = "aggregate with aggregate subquery as source should fail"
+class AggregateFluentCompileErrorTest extends munit.FunSuite {
+  def testDescription: String = "aggregate with further chaining of query methods shoudl fail"
   def expectedError: String = "map is not a member of tyql.Aggregation"
 
   test(testDescription) {
@@ -389,4 +395,14 @@ class AggregateSubqueryCompileErrorTest extends munit.FunSuite {
           """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
+}
+
+class FlatmapAggregateTest4 extends SQLStringAggregationTest[AllCommerceDBs, Int] {
+  def testDescription = "Flow: 2 nest, flatMap+flatMap should not fail because aggregation is Expr"
+  def query() =
+    testDB.tables.shipInfos.flatMap(si => // silly but correct syntax, equivalent to map + flatMap
+      Expr.sum(si.buyerId)
+    )
+
+  def expectedQueryPattern = ""
 }

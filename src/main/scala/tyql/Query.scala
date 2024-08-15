@@ -84,7 +84,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
     error("Cannot return an Expr from a flatMap. Did you mean to use map?")
 
   /**
-   * Equivalent version of flatMap(f: Ref => Aggregation).
+   * Equivalent version of map(f: Ref => Aggregation).
    * Requires f to call toRow on the final result before returning.
    * Sometimes the implicit conversion kicks in and converts a named-tuple-of-Agg into a Agg-of-named-tuple,
    * but not always. As an alternative, can use the aggregate defined below that explicitly calls toRow on the result of f.
@@ -150,7 +150,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * TODO: Since Aggregation extends Expr, need to ensure that aggregations don't trigger this.
    */
   inline def map[B: ResultTag](f: Expr.Ref[A] => Query[B]): Nothing =
-    error("Cannot return an Query from a map. Did you mean to use flatMap?")
+    error("Cannot return a Query from a map. Did you mean to use flatMap?")
 
 object Query:
   import Expr.{Pred, Fun, Ref}

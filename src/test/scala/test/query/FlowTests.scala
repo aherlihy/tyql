@@ -70,9 +70,9 @@ class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: St
   def query() =
     for
       p <- testDB.tables.products
-    yield (pName = p.name, sumP = sum(p.price))
+    yield ((pName = p.name, sumP = p.price).toRow)
 
-  def expectedQueryPattern = "SELECT product$A.name as pName, SUM(product$A.price) as sumP FROM product as product$A"
+  def expectedQueryPattern = "xSELECT product$A.name as pName, SUM(product$A.price) as sumP FROM product as product$A"
 }
 
 class FlowMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
