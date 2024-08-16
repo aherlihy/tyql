@@ -252,10 +252,10 @@ object QueryIRTree:
     finishGeneratingFun(body, boundSymbols)
 
 
-  private def generateProjection(p: Expr.Project[?] | Aggregation.AggProject[?], symbols: SymbolTable): QueryIRNode =
+  private def generateProjection(p: Expr.Project[?] | AggregationExpr.AggProject[?], symbols: SymbolTable): QueryIRNode =
     val inner = p match
       case e: Expr.Project[?] => e.$a
-      case a: Aggregation.AggProject[?] => a.$a
+      case a: AggregationExpr.AggProject[?] => a.$a
     val a = NamedTuple.toTuple(inner.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
     val namedTupleNames = p.tag match
       case ResultTag.NamedTupleTag(names, types) => names.lift
@@ -299,17 +299,17 @@ object QueryIRTree:
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
-      case a: Aggregation[?] => generateAggregation(a, symbols)
+      case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
-  private def generateAggregation(ast: Aggregation[?], symbols: SymbolTable): QueryIRNode =
+  private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable): QueryIRNode =
     ast match
-      case s: Aggregation.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
-      case s: Aggregation.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
-      case s: Aggregation.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
-      case s: Aggregation.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
-      case c: Aggregation.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT(1)", c)
-      case p: Aggregation.AggProject[?] => generateProjection(p, symbols)
+      case s: AggregationExpr.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
+      case s: AggregationExpr.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
+      case s: AggregationExpr.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
+      case s: AggregationExpr.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
+      case c: AggregationExpr.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT(1)", c)
+      case p: AggregationExpr.AggProject[?] => generateProjection(p, symbols)
       case sub: Aggregation.AggFlatMap[?, ?] =>
         val subg = generateQuery(sub, symbols)
         subg.appendFlag(SelectFlags.ExprLevel) // special case, remove alias

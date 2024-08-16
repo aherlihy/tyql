@@ -18,23 +18,21 @@ import NamedTuple.{AnyNamedTuple, NamedTuple}
  **/
 import Expr.{Fun, Pred}
 
-trait Aggregation[Result](using override val tag: ResultTag[Result]) extends Expr[Result, ScalarExpr] with DatabaseAST[Result]
-object Aggregation {
-  case class AggFlatMap[A, B: ResultTag]($from: Query[A], $query: Fun[A, Expr[B, ?], ?]) extends Aggregation[B]
-  case class AggFilter[A: ResultTag]($from: Query[A], $pred: Pred[A, ScalarExpr]) extends Aggregation[A]
+trait AggregationExpr[Result](using override val tag: ResultTag[Result]) extends Expr[Result, ScalarExpr]
+object AggregationExpr {
 
-  case class Sum[A: ResultTag]($a: Expr[A, ?]) extends Aggregation[A]
+  case class Sum[A: ResultTag]($a: Expr[A, ?]) extends AggregationExpr[A]
 
-  case class Avg[A: ResultTag]($a: Expr[A, ?]) extends Aggregation[A]
+  case class Avg[A: ResultTag]($a: Expr[A, ?]) extends AggregationExpr[A]
 
-  case class Max[A: ResultTag]($a: Expr[A, ?]) extends Aggregation[A]
+  case class Max[A: ResultTag]($a: Expr[A, ?]) extends AggregationExpr[A]
 
-  case class Min[A: ResultTag]($a: Expr[A, ?]) extends Aggregation[A]
+  case class Min[A: ResultTag]($a: Expr[A, ?]) extends AggregationExpr[A]
 
-  case class Count[A]($a: Expr[A, ?]) extends Aggregation[Int]
+  case class Count[A]($a: Expr[A, ?]) extends AggregationExpr[Int]
 
   // Needed because project can be a top-level result for aggregation but not query??
-  case class AggProject[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends Aggregation[NamedTuple.Map[A, StripExpr]]
+  case class AggProject[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends AggregationExpr[NamedTuple.Map[A, StripExpr]]
 
   //type StripAgg[E] = E match
   //  case Aggregation[b] => b

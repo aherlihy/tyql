@@ -8,6 +8,7 @@ import scala.deriving.Mirror
 import java.time.LocalDate
 import scala.reflect.ClassTag
 import Utils.*
+import tyql.Aggregation.AggFilter
 
 type CalculateResult[S, R] <: DatabaseAST[R] = S match
   case ScalarExpr => Aggregation[R]
@@ -52,6 +53,11 @@ trait DatabaseAST[Result](using val tag: ResultTag[Result]):
   def toQueryIR: QueryIRNode =
     QueryIRTree.generateFullQuery(this, SymbolTable())
 
+trait Aggregation[Result](using override val tag: ResultTag[Result]) extends DatabaseAST[Result] with Expr[Result, NExpr]
+object Aggregation:
+  case class AggFlatMap[A, B: ResultTag]($from: Query[A], $query: Expr.Fun[A, Expr[B, ?], ?]) extends Aggregation[B]
+  case class AggFilter[A: ResultTag]($from: Query[A], $pred: Expr.Pred[A, ScalarExpr]) extends Aggregation[A]
+
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   /**
    * Classic flatMap with an inner Query that will likely be flattened into a join.
@@ -72,7 +78,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. a single value of type B.
    */
-  def flatMap[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] =
+  def flatMap[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] =
     val ref = Expr.Ref[A, ScalarExpr]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
@@ -84,8 +90,8 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @param f a function that returns an Expr, which should be an error, since that only makes sense for map/agg.
    *          TODO: Since Aggregation extends Expr, need to ensure that aggregations don't trigger this.
    */
-  inline def flatMap[B: ResultTag](f: Expr.Ref[A, ?] => Expr[B, ?]): Nothing = // inline so error points to use site
-    error("Cannot return an Expr from a flatMap. Did you mean to use map?")
+//  inline def flatMap[B: ResultTag](f: Expr.Ref[A, ?] => Expr[B, ?]): Nothing = // inline so error points to use site
+//    error("Cannot return an Expr from a flatMap. Did you mean to use map?")
 
   /**
    * Equivalent version of map(f: Ref => Aggregation).
@@ -97,7 +103,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. single value of type B.
    */
-  def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] =
+  def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] =
     val ref = Expr.Ref[A, ScalarExpr]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
@@ -108,8 +114,8 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B   the named-tuple-of-Aggregation that will be converted to an Aggregation-of-named-tuple
    * @return     Aggregation of B.toRow, e.g. a scalar result of type B.toRow
    */
-  def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, ScalarExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
-    import Aggregation.toRow
+  def aggregate[B <: AnyNamedTuple : AggregationExpr.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, ScalarExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
+    import AggregationExpr.toRow
     val ref = Expr.Ref[A, ScalarExpr]()
     val row = f(ref).toRow
     Aggregation.AggFlatMap(this, Expr.Fun(ref, row))
@@ -209,7 +215,7 @@ object Query:
     def stringRef() = s"recref$id"
     override def toString: String = s"QueryRef[${stringRef()}]"
 
-    override def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] = ???
+    override def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] = ???
 //    override inline def aggregate[B: ResultTag](f: Expr.Ref[A] => Query[B]): Aggregation[B] = error("Cannot apply aggregation across strata")
 
 //    override def aggregate[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] = reportError()
@@ -261,7 +267,7 @@ object Query:
 
     def filter(p: Ref[R, ScalarExpr] => Expr[Boolean, ScalarExpr]): Aggregation[R] =
       val ref = Ref[R, ScalarExpr]()
-      Aggregation.AggFilter(x, Fun(ref, p(ref)))
+       Aggregation.AggFilter(x, Fun(ref, p(ref)))
 
     def sort[B](f: Ref[R, NExpr] => Expr[B, NExpr], ord: Ord): Query[R] =
       val ref = Ref[R, NExpr]()
@@ -277,7 +283,7 @@ object Query:
 
     def sum[B: ResultTag](f: Ref[R, ScalarExpr] => Expr[B, ScalarExpr]): Aggregation[B] =
       val ref = Ref[R, ScalarExpr]()
-      Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Sum(f(ref))))
+       Aggregation.AggFlatMap(x, Expr.Fun(ref, AggregationExpr.Sum(f(ref))))
 
 //    def avg[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
 //      val ref = Ref[R]()

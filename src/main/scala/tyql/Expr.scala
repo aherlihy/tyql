@@ -52,12 +52,12 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
 //trait ScalarExpr[Result](using override val tag: ResultTag[Result]) extends Expr[Result]
 
 object Expr:
-  def sum(x: Expr[Int, ?]): Aggregation[Int] = Aggregation.Sum(x) // TODO: require summable type?
+  def sum(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
   @targetName("doubleSum")
-  def sum(x: Expr[Double, ?]): Aggregation[Double] = Aggregation.Sum(x) // TODO: require summable type?
-  def avg[T: ResultTag](x: Expr[T, ?]): Aggregation[T] = Aggregation.Avg(x)
-  def max[T: ResultTag](x: Expr[T, ?]): Aggregation[T] = Aggregation.Max(x)
-  def min[T: ResultTag](x: Expr[T,  ?]): Aggregation[T] = Aggregation.Min(x)
+  def sum(x: Expr[Double, ?]): AggregationExpr[Double] = AggregationExpr.Sum(x) // TODO: require summable type?
+  def avg[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
+  def max[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
+  def min[T: ResultTag](x: Expr[T,  ?]): AggregationExpr[T] = AggregationExpr.Min(x)
 
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape](x: Expr[Int, S1])

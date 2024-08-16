@@ -9,7 +9,7 @@ import NamedTuple.NamedTuple
 object TreePrettyPrinter {
   import Query.*
   import Expr.*
-  import Aggregation.*
+  import AggregationExpr.*
 
   private def indent(level: Int): String = "  " * level
   private def indentWithKey(level: Int, key: String, value: String): String = s"${indent(level)}$key=${value.stripLeading()}"
@@ -67,19 +67,17 @@ object TreePrettyPrinter {
             s"${indent(depth+1)}$namedStr${e.prettyPrint(0)}"
           )
         s"${indent(depth)}Project(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
-      case a: Aggregation[?] => a.prettyPrint(depth)
+      case a: AggregationExpr[?] => a.prettyPrint(depth)
       case _ => throw new Exception(s"Unimplemented pretty print EXPR $expr")
     }
   }
-  extension(agg: Aggregation[?]) {
+  extension(agg: AggregationExpr[?]) {
     def prettyPrint(depth: Int): String = agg match {
       case Min(x) => s"${indent(depth)}Min(${x.prettyPrint(depth + 1).stripLeading()})"
       case Max(x) => s"${indent(depth)}Max(${x.prettyPrint(depth + 1).stripLeading()})"
       case Sum(x) => s"${indent(depth)}Sum(${x.prettyPrint(depth + 1).stripLeading()})"
       case Avg(x) => s"${indent(depth)}Avg(${x.prettyPrint(depth + 1).stripLeading()})"
       case Count(x) => s"${indent(depth)}Count(${x.prettyPrint(depth + 1).stripLeading()})"
-      case AggFlatMap(from, query) =>
-        s"${indent(depth)}AggFlatMap(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
       case AggProject(inner) =>
         val a = NamedTuple.toTuple(inner.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
         val namedTupleNames = agg.tag match
@@ -124,7 +122,8 @@ object TreePrettyPrinter {
         s"${indent(depth)}Except(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
 //      case GroupBy(query, selectFn, groupingFn, havingFn) =>
 //        s"${indent(depth)}GroupBy(\n${query.prettyPrint(depth + 1)},\n${selectFn.prettyPrint(depth + 1)},\n${groupingFn.prettyPrint(depth + 1)},\n${havingFn.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case a: Aggregation[?] => a.prettyPrint(depth)
+      case Aggregation.AggFlatMap(from, query) =>
+        s"${indent(depth)}AggFlatMap(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
       case MultiRecursive(refs, querys, finalQ) =>
         val refStr = refs.toList.map(r => r.asInstanceOf[QueryRef[?]].prettyPrint(depth+1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?]].prettyPrint(depth + 2))
