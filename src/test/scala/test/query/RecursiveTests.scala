@@ -1,240 +1,240 @@
-//package test.query.recursive
-//import test.{SQLStringQueryTest, TestDatabase}
-//import tyql.*
-//import Query.*
-//
-//import language.experimental.namedTuples
-//import NamedTuple.*
-//import scala.language.implicitConversions
-//
-//type Edge = (x: Int, y: Int)
-//type Edge2 = (z: Int, q: Int)
-//type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
-//
-//given TCDBs: TestDatabase[TCDB] with
-//  override def tables = (
-//    edges = Table[Edge]("edges"),
-//    otherEdges = Table[Edge2]("otherEdges"),
-//    emptyEdges = Table[Edge]("empty")
-//  )
-//
-//class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "TC"
-//
-//  def query() =
-//    val path = testDB.tables.edges
-//    path.fix(path =>
-//      path.flatMap(p =>
-//        testDB.tables.edges
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      )
-//    )
-//  def expectedQueryPattern: String =
-//    """
-//    WITH RECURSIVE recursive$A AS
-//      (SELECT * FROM edges as edges$B
-//        UNION ALL
-//      SELECT ref$D.x as x, edges$C.y as y
-//      FROM recursive$A as ref$D, edges as edges$C
-//      WHERE ref$D.y = edges$C.x) SELECT * FROM recursive$A as recref$E
-//      """
-//}
-//class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "TC with multiple base cases"
+package test.query.recursive
+import test.{SQLStringQueryTest, TestDatabase}
+import tyql.*
+import Query.*
+
+import language.experimental.namedTuples
+import NamedTuple.*
+import scala.language.implicitConversions
+
+type Edge = (x: Int, y: Int)
+type Edge2 = (z: Int, q: Int)
+type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
+
+given TCDBs: TestDatabase[TCDB] with
+  override def tables = (
+    edges = Table[Edge]("edges"),
+    otherEdges = Table[Edge2]("otherEdges"),
+    emptyEdges = Table[Edge]("empty")
+  )
+
+class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "TC"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+    )
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE recursive$A AS
+      (SELECT * FROM edges as edges$B
+        UNION ALL
+      SELECT ref$D.x as x, edges$C.y as y
+      FROM recursive$A as ref$D, edges as edges$C
+      WHERE ref$D.y = edges$C.x) SELECT * FROM recursive$A as recref$E
+      """
+}
+class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "TC with multiple base cases"
+
+  def query() =
+    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
+    path.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+    )
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE recursive$A AS
+      (SELECT * FROM edges as edges$B
+        UNION ALL
+      SELECT * FROM edges as edges$E
+        UNION ALL
+      SELECT ref$D.x as x, edges$C.y as y
+      FROM recursive$A as ref$D, edges as edges$C
+      WHERE ref$D.y = edges$C.x)
+    SELECT * FROM recursive$A as recref$F
+      """
+}
+
+// TODO: decide semantics, subquery, or flatten?
+//class Recursion3Test extends SQLStringQueryTest[TCDB, Edge] {
+//  def testDescription: String = "TC with multiple recursive cases"
 //
 //  def query() =
 //    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
-//    path.fix(path =>
+//    val path2 = path.fix(path =>
 //      path.flatMap(p =>
 //        testDB.tables.edges
 //          .filter(e => p.y == e.x)
 //          .map(e => (x = p.x, y = e.y).toRow)
 //      )
 //    )
-//  def expectedQueryPattern: String =
-//    """
-//    WITH RECURSIVE recursive$A AS
-//      (SELECT * FROM edges as edges$B
-//        UNION ALL
-//      SELECT * FROM edges as edges$E
-//        UNION ALL
-//      SELECT ref$D.x as x, edges$C.y as y
-//      FROM recursive$A as ref$D, edges as edges$C
-//      WHERE ref$D.y = edges$C.x)
-//    SELECT * FROM recursive$A as recref$F
-//      """
-//}
 //
-//// TODO: decide semantics, subquery, or flatten?
-////class Recursion3Test extends SQLStringQueryTest[TCDB, Edge] {
-////  def testDescription: String = "TC with multiple recursive cases"
-////
-////  def query() =
-////    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
-////    val path2 = path.fix(path =>
-////      path.flatMap(p =>
-////        testDB.tables.edges
-////          .filter(e => p.y == e.x)
-////          .map(e => (x = p.x, y = e.y).toRow)
-////      )
-////    )
-////
-////    path2.fix(path =>
-////      path.flatMap(p =>
-////        testDB.tables.edges
-////          .filter(e => p.y == e.x)
-////          .map(e => (x = p.x, y = e.y).toRow)
-////      )
-////    )
-////
-////  def expectedQueryPattern: String =
-////    """
-////      WITH RECURSIVE recursive$A AS
-////        (SELECT * FROM edges as edges$B
-////          UNION ALL
-////        SELECT * FROM edges as edges$E
-////          UNION ALL
-////        SELECT recursive$A.x as x, edges$C.y as y
-////        FROM recursive$A, edges as edges$C
-////        WHERE recursive$A.y = edges$C.x
-////          UNION ALL
-////        SELECT recursive$A.x as x, edges$F.y as y
-////        FROM recursive$A, edges as edges$F
-////        WHERE recursive$A.y = edges$F.x);
-////      SELECT * FROM recursive$A
-////        """
-////}
-//
-//class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
-//  def testDescription: String = "TC with project"
-//
-//  def query() =
-//    val path = testDB.tables.edges
-//    path.fix(path =>
+//    path2.fix(path =>
 //      path.flatMap(p =>
 //        testDB.tables.edges
 //          .filter(e => p.y == e.x)
 //          .map(e => (x = p.x, y = e.y).toRow)
 //      )
-//    ).map(p => p.x)
+//    )
 //
 //  def expectedQueryPattern: String =
 //    """
 //      WITH RECURSIVE recursive$A AS
 //        (SELECT * FROM edges as edges$B
 //          UNION ALL
-//        SELECT ref$D.x as x, edges$C.y as y
-//        FROM recursive$A as ref$D, edges as edges$C
-//        WHERE ref$D.y = edges$C.x) SELECT recref$E.x FROM recursive$A as recref$E
+//        SELECT * FROM edges as edges$E
+//          UNION ALL
+//        SELECT recursive$A.x as x, edges$C.y as y
+//        FROM recursive$A, edges as edges$C
+//        WHERE recursive$A.y = edges$C.x
+//          UNION ALL
+//        SELECT recursive$A.x as x, edges$F.y as y
+//        FROM recursive$A, edges as edges$F
+//        WHERE recursive$A.y = edges$F.x);
+//      SELECT * FROM recursive$A
 //        """
 //}
-//
-//class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "TC with filter"
+
+class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
+  def testDescription: String = "TC with project"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+    ).map(p => p.x)
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE recursive$A AS
+        (SELECT * FROM edges as edges$B
+          UNION ALL
+        SELECT ref$D.x as x, edges$C.y as y
+        FROM recursive$A as ref$D, edges as edges$C
+        WHERE ref$D.y = edges$C.x) SELECT recref$E.x FROM recursive$A as recref$E
+        """
+}
+
+class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "TC with filter"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+    ).filter(p => p.x > 1)
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE recursive$A AS
+          (SELECT * FROM edges as edges$B
+            UNION ALL
+          SELECT ref$Z.x as x, edges$C.y as y
+          FROM recursive$A as ref$Z, edges as edges$C
+          WHERE ref$Z.y = edges$C.x) SELECT * FROM recursive$A as recref$X WHERE recref$X.x > 1
+          """
+}
+
+class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
+  def testDescription: String = "TC with filter + map"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+    ).filter(p => p.x > 1).map(p => p.x)
+
+  def expectedQueryPattern: String =
+    """
+          WITH RECURSIVE recursive$A AS
+            (SELECT * FROM edges as edges$B
+              UNION ALL
+            SELECT ref$Z.x as x, edges$C.y as y
+            FROM recursive$A as ref$Z, edges as edges$C
+            WHERE ref$Z.y = edges$C.x) SELECT recref$X.x FROM recursive$A as recref$X WHERE recref$X.x > 1
+            """
+}
+
+class NotRecursiveCTETest extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "No recursion"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.fix(path =>
+      testDB.tables.edges
+    )
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE recursive$A AS
+      (SELECT * FROM edges as edges$B
+        UNION ALL
+      SELECT * FROM edges as edges$E)
+    SELECT * FROM recursive$A as recref$Z
+      """
+}
+
+//class RecursiveSCCTest extends SQLStringQueryTest[TCDB, Edge2] {
+//  def testDescription: String = "Multi-relation recursion"
 //
 //  def query() =
-//    val path = testDB.tables.edges
-//    path.fix(path =>
-//      path.flatMap(p =>
-//        testDB.tables.edges
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      )
-//    ).filter(p => p.x > 1)
+//    val path1 = testDB.tables.edges
+//    val path2 = testDB.tables.otherEdges
 //
-//  def expectedQueryPattern: String =
-//    """
-//        WITH RECURSIVE recursive$A AS
-//          (SELECT * FROM edges as edges$B
-//            UNION ALL
-//          SELECT ref$Z.x as x, edges$C.y as y
-//          FROM recursive$A as ref$Z, edges as edges$C
-//          WHERE ref$Z.y = edges$C.x) SELECT * FROM recursive$A as recref$X WHERE recref$X.x > 1
-//          """
-//}
+//    // Option 1: untupled
+//    val (fullPath1, fullPath2) = fixUntupled((p: Query[Edge], q: Query[Edge2]) =>
+//      (p, q)
+//    )(path1, path2)
 //
-//class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
-//  def testDescription: String = "TC with filter + map"
+//    // Option 2: tupled
+//    val (fullPath1a, fullPath2a) = fix((t: (Query[Edge], Query[Edge2])) =>
+//      (t._1, t._2)
+//    )((path1, path2))
 //
-//  def query() =
-//    val path = testDB.tables.edges
-//    path.fix(path =>
-//      path.flatMap(p =>
-//        testDB.tables.edges
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      )
-//    ).filter(p => p.x > 1).map(p => p.x)
-//
-//  def expectedQueryPattern: String =
-//    """
-//          WITH RECURSIVE recursive$A AS
-//            (SELECT * FROM edges as edges$B
-//              UNION ALL
-//            SELECT ref$Z.x as x, edges$C.y as y
-//            FROM recursive$A as ref$Z, edges as edges$C
-//            WHERE ref$Z.y = edges$C.x) SELECT recref$X.x FROM recursive$A as recref$X WHERE recref$X.x > 1
-//            """
-//}
-//
-//class NotRecursiveCTETest extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "No recursion"
-//
-//  def query() =
-//    val path = testDB.tables.edges
-//    path.fix(path =>
-//      testDB.tables.edges
+//    // Option 3: static tuple length
+//    val (fullPath1b, fullPath2b) = fixTwo(path1, path2)((p, q) =>
+//      (p, q)
 //    )
+//
+//    fullPath2
 //  def expectedQueryPattern: String =
 //    """
-//    WITH RECURSIVE recursive$A AS
-//      (SELECT * FROM edges as edges$B
-//        UNION ALL
-//      SELECT * FROM edges as edges$E)
-//    SELECT * FROM recursive$A as recref$Z
-//      """
+//    """
 //}
-//
-////class RecursiveSCCTest extends SQLStringQueryTest[TCDB, Edge2] {
-////  def testDescription: String = "Multi-relation recursion"
-////
-////  def query() =
-////    val path1 = testDB.tables.edges
-////    val path2 = testDB.tables.otherEdges
-////
-////    // Option 1: untupled
-////    val (fullPath1, fullPath2) = fixUntupled((p: Query[Edge], q: Query[Edge2]) =>
-////      (p, q)
-////    )(path1, path2)
-////
-////    // Option 2: tupled
-////    val (fullPath1a, fullPath2a) = fix((t: (Query[Edge], Query[Edge2])) =>
-////      (t._1, t._2)
-////    )((path1, path2))
-////
-////    // Option 3: static tuple length
-////    val (fullPath1b, fullPath2b) = fixTwo(path1, path2)((p, q) =>
-////      (p, q)
-////    )
-////
-////    fullPath2
-////  def expectedQueryPattern: String =
-////    """
-////    """
-////}
-//
-//
-//type Location = (p1: Int, p2: Int)
-//type CSPADB = (assign: Location, dereference: Location, empty: Location)
-//
-//given CSPADBs: TestDatabase[CSPADB] with
-//  override def tables = (
-//    assign = Table[Location]("assign"),
-//    dereference = Table[Location]("dereference"),
-//    empty = Table[Location]("empty") // TODO: define singleton for empty table?
-//  )
-//
+
+
+type Location = (p1: Int, p2: Int)
+type CSPADB = (assign: Location, dereference: Location, empty: Location)
+
+given CSPADBs: TestDatabase[CSPADB] with
+  override def tables = (
+    assign = Table[Location]("assign"),
+    dereference = Table[Location]("dereference"),
+    empty = Table[Location]("empty") // TODO: define singleton for empty table?
+  )
+
 //class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "define 2 recursive relations, use multifix"
 //
@@ -270,7 +270,7 @@
 //      SELECT * FROM recursive$A as recref$Q
 //      """
 //}
-//
+
 //class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "define 2 recursive relations with one self join"
 //
