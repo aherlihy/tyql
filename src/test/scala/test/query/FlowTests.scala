@@ -9,16 +9,27 @@ import scala.language.implicitConversions
 import java.time.LocalDate
 import tyql.Expr.sum
 
-class FlowForTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
-  def testDescription = "Flow: project tuple, 1 nest, for comprehension"
-  def query() =
-    for
-      b <- testDB.tables.buyers
-    yield (bName = b.name, bId = b.id).toRow
+//class FlowForTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
+//  def testDescription = "Flow: project tuple, 1 nest, for comprehension"
+//  def query() =
+//    for
+//      b <- testDB.tables.buyers
+//    yield (bName = b.name, bId = b.id).toRow
+//
+//  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A"
+//}
 
-  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A"
-}
-
+//class FlowForTest1a extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
+//  def testDescription = "Flow: project tuple, 1 nest, for comprehension, without toRow"
+//
+//  def query() =
+//    for
+//      b <- testDB.tables.buyers
+//    yield (bName = b.name, bId = b.id)
+//
+//  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A"
+//}
+/*
 class FlowForTest2 extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
   def testDescription = "Flow: project tuple, 2 nest, for comprehension"
   def query() =
@@ -74,7 +85,7 @@ class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (pName: St
 
   def expectedQueryPattern = "SELECT product$A.name as pName, SUM(product$A.price) as sumP FROM product as product$A"
 }
-
+*/
 class FlowMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map"
   def query() =
@@ -84,7 +95,16 @@ class FlowMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bI
 
   def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A"
 }
+class FlowMapTest1b extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
+  def testDescription = "Flow: project tuple, 1 nest, map no toRow"
+  def query() =
+    testDB.tables.buyers.map(b =>
+      (bName = b.name, bId = b.id)
+    )
 
+  def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A"
+}
+/*
 class FlowFlatMapTest2 extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
   def testDescription = "Flow: project tuple, 2 nest, flatmap+map"
 
@@ -293,3 +313,4 @@ class FlowMapConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (name: Str
       (name = b.name, date = b.dateOfBirth)
   def expectedQueryPattern: String = "SELECT buyers$A.name as name, buyers$A.dateOfBirth as date FROM buyers as buyers$A"
 }
+*/

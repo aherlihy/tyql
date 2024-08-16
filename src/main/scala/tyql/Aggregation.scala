@@ -16,36 +16,38 @@ import NamedTuple.{AnyNamedTuple, NamedTuple}
  * Currently support ASTs of Map[Aggregation] as well as Aggregation[Aggregation] depending on user code
  *
  **/
-import Expr.Fun
+import Expr.{Fun, Pred}
 
-trait Aggregation[Result](using override val tag: ResultTag[Result]) extends Expr[Result] with DatabaseAST[Result]
+trait Aggregation[Result](using override val tag: ResultTag[Result]) extends Expr[Result, ScalarExpr] with DatabaseAST[Result]
 object Aggregation {
-  case class AggFlatMap[A, B: ResultTag]($from: Query[A], $query: Fun[A, Expr[B]]) extends Aggregation[B]
+  case class AggFlatMap[A, B: ResultTag]($from: Query[A], $query: Fun[A, Expr[B, ?], ?]) extends Aggregation[B]
+  case class AggFilter[A: ResultTag]($from: Query[A], $pred: Pred[A, ScalarExpr]) extends Aggregation[A]
 
-  case class Sum[A: ResultTag]($a: Expr[A]) extends Aggregation[A]
+  case class Sum[A: ResultTag]($a: Expr[A, ?]) extends Aggregation[A]
 
-  case class Avg[A: ResultTag]($a: Expr[A]) extends Aggregation[A]
+  case class Avg[A: ResultTag]($a: Expr[A, ?]) extends Aggregation[A]
 
-  case class Max[A: ResultTag]($a: Expr[A]) extends Aggregation[A]
+  case class Max[A: ResultTag]($a: Expr[A, ?]) extends Aggregation[A]
 
-  case class Min[A: ResultTag]($a: Expr[A]) extends Aggregation[A]
+  case class Min[A: ResultTag]($a: Expr[A, ?]) extends Aggregation[A]
 
-  case class Count[A]($a: Expr[A]) extends Aggregation[Int]
+  case class Count[A]($a: Expr[A, ?]) extends Aggregation[Int]
 
   // Needed because project can be a top-level result for aggregation but not query??
-  case class AggProject[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripAgg]]) extends Aggregation[NamedTuple.Map[A, StripAgg]]
+  case class AggProject[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends Aggregation[NamedTuple.Map[A, StripExpr]]
 
-  type StripAgg[E] = E match
-    case Aggregation[b] => b
+  //type StripAgg[E] = E match
+  //  case Aggregation[b] => b
 
 //   TODO: Should indicate if *any* single element is an aggregation, even if some elements are exprs. Tuple of ONLY expr's should be Expr.toRow
-  type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Aggregation[?]
+  //type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Aggregation[?]
+  type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ScalarExpr]
 
   extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
-    def toRow(using ResultTag[NamedTuple.Map[A, StripAgg]]): AggProject[A] = AggProject(x)
+    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): AggProject[A] = AggProject(x)
 
   /** Same as _.toRow, as an implicit conversion */
-  given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripAgg]]): Conversion[A, AggProject[A]] = AggProject(_)
+  given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, AggProject[A]] = AggProject(_)
 
   /**
    * NOTE: For group by, require that the result is a named tuple so that it can be referred to in the next clause?

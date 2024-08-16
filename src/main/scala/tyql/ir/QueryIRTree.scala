@@ -21,10 +21,12 @@ object QueryIRTree:
    * Convert table.filter(p1).filter(p2) => table.filter(p1 && p2).
    * Example of a heuristic tree transformation/optimization
    */
-  private def collapseFilters(filters: Seq[Expr.Fun[?, ?]], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[Expr.Fun[?, ?]], DatabaseAST[?]) =
+  private def collapseFilters(filters: Seq[Expr.Fun[?, ?, ?]], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[Expr.Fun[?, ?, ?]], DatabaseAST[?]) =
     comprehension match
       case filter: Query.Filter[?] =>
         collapseFilters(filters :+ filter.$pred, filter.$from, symbols)
+      case aggFilter: tyql.Aggregation.AggFilter[?] =>
+        collapseFilters(filters :+ aggFilter.$pred, aggFilter.$from, symbols)
       case _ => (filters, comprehension)
 
   private def lookupRecursiveRef(actualParam: RelationOp, newRef: String): RelationOp =
@@ -78,7 +80,7 @@ object QueryIRTree:
 
 
   // TODO: probably should parametrize collapse so it works with different nodes
-  private def collapseSort(sorts: Seq[(Expr.Fun[?, ?], Ord)], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[(Expr.Fun[?, ?], Ord)], DatabaseAST[?]) =
+  private def collapseSort(sorts: Seq[(Expr.Fun[?, ?, ?], Ord)], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[(Expr.Fun[?, ?, ?], Ord)], DatabaseAST[?]) =
     comprehension match
       case sort: Query.Sort[?, ?] =>
         collapseSort(sorts :+ (sort.$body, sort.$ord), sort.$from, symbols)
@@ -130,6 +132,14 @@ object QueryIRTree:
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         actualParam.appendWhere(where, filter)
+      case filter: Aggregation.AggFilter[?] =>
+        val (predicateASTs, fromNodeAST) = collapseFilters(Seq(), filter, symbols)
+        val actualParam = generateActualParam(fromNodeAST, filter.$pred.$param, symbols)
+        val predicateExprs = predicateASTs.map(pred =>
+          generateFun(pred, actualParam, symbols)
+        )
+        val where = WhereClause(predicateExprs, filter.$pred.$body)
+        actualParam.appendWhere(where, filter)  
       case sort: Query.Sort[?, ?] =>
         val (orderByASTs, fromNodeAST) = collapseSort(Seq(), sort, symbols)
         val actualParam = generateActualParam(fromNodeAST, sort.$body.$param, symbols)
@@ -212,13 +222,13 @@ object QueryIRTree:
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
 
-  private def generateActualParam(from: DatabaseAST[?], formalParam: Expr.Ref[?], symbols: SymbolTable): RelationOp =
+  private def generateActualParam(from: DatabaseAST[?], formalParam: Expr.Ref[?, ?], symbols: SymbolTable): RelationOp =
     lookupRecursiveRef(generateQuery(from, symbols), formalParam.stringRef())
   /**
    * Generate the actual parameter expression and bind it to the formal parameter in the symbol table, but
    * leave the function body uncompiled.
    */
-  private def partiallyGenerateFun(fun: Expr.Fun[?, ?], actualParam: RelationOp, symbols: SymbolTable): (Any, SymbolTable) =
+  private def partiallyGenerateFun(fun: Expr.Fun[?, ?, ?], actualParam: RelationOp, symbols: SymbolTable): (Any, SymbolTable) =
     val boundST = symbols.bind(fun.$param.stringRef(), actualParam)
     (fun.$body, boundST)
 
@@ -228,7 +238,7 @@ object QueryIRTree:
   private def finishGeneratingFun(funBody: Any, boundST: SymbolTable): QueryIRNode =
     funBody match
       //      case r: Expr.Ref[?] if r.stringRef() == fun.$param.stringRef() => SelectAllExpr() // special case identity function
-      case e: Expr[?] => generateExpr(e, boundST)
+      case e: Expr[?, ?] => generateExpr(e, boundST)
       case d: DatabaseAST[?] => generateQuery(d, boundST)
       case _ => ??? // TODO: find better way to differentiate
 
@@ -237,7 +247,7 @@ object QueryIRTree:
    * Sometimes, want to split this function into separate steps, for the cases where you want to collate multiple
    * function bodies within a single expression.
    */
-  private def generateFun(fun: Expr.Fun[?, ?], appliedTo: RelationOp, symbols: SymbolTable): QueryIRNode =
+  private def generateFun(fun: Expr.Fun[?, ?, ?], appliedTo: RelationOp, symbols: SymbolTable): QueryIRNode =
     val (body, boundSymbols) = partiallyGenerateFun(fun, appliedTo, symbols)
     finishGeneratingFun(body, boundSymbols)
 
@@ -252,25 +262,25 @@ object QueryIRTree:
       case _ => Seq()
     val children = a.toList.zipWithIndex
       .map((expr, idx) =>
-        val e = expr.asInstanceOf[Expr[?]]
+        val e = expr.asInstanceOf[Expr[?, ?]]
         AttrExpr(generateExpr(e, symbols), namedTupleNames(idx), e)
       )
     ProjectClause(children, p)
 
-  private def generateExpr(ast: Expr[?], symbols: SymbolTable): QueryIRNode =
+  private def generateExpr(ast: Expr[?, ?], symbols: SymbolTable): QueryIRNode =
     ast match
-      case ref: Expr.Ref[?] =>
+      case ref: Expr.Ref[?, ?] =>
         val name = ref.stringRef()
         val sub = symbols(name)
         QueryIRVar(sub, name, ref) // TODO: singleton?
       case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
       case p: Expr.Project[?] => generateProjection(p, symbols)
-      case g: Expr.Gt => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
-      case g: Expr.GtDouble => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
-      case a: Expr.And => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
-      case a: Expr.Eq => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
-      case a: Expr.Ne => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "<>", a)
-      case a: Expr.Concat[?, ?] =>
+      case g: Expr.Gt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
+      case g: Expr.GtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
+      case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
+      case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
+      case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "<>", a)
+      case a: Expr.Concat[?, ?, ?, ?] =>
         val lhsIR = generateExpr(a.$x, symbols) match
           case p: ProjectClause => p
           case v: QueryIRVar => SelectExpr("*", v, a.$x)
@@ -288,7 +298,7 @@ object QueryIRTree:
         )
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
-      case l: Expr.Lower => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
+      case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case a: Aggregation[?] => generateAggregation(a, symbols)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 

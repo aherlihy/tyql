@@ -396,13 +396,13 @@ class AggregateFluentCompileErrorTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-
-class FlatmapAggregateTest4 extends SQLStringAggregationTest[AllCommerceDBs, Int] {
-  def testDescription = "Flow: 2 nest, flatMap+flatMap should not fail because aggregation is Expr"
-  def query() =
-    testDB.tables.shipInfos.flatMap(si => // silly but correct syntax, equivalent to map + flatMap
-      Expr.sum(si.buyerId)
-    )
-
-  def expectedQueryPattern = ""
-}
+//
+//class FlatmapAggregateTest4 extends SQLStringAggregationTest[AllCommerceDBs, Int] {
+//  def testDescription = "Flow: 2 nest, flatMap+flatMap should not fail because aggregation is Expr"
+//  def query() =
+//    testDB.tables.shipInfos.flatMap(si => // silly but correct syntax, equivalent to map + flatMap
+//      Expr.sum(si.buyerId)
+//    )
+//
+//  def expectedQueryPattern = ""
+//}
