@@ -68,7 +68,16 @@ object TreePrettyPrinter {
           )
         s"${indent(depth)}Project(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
       case a: AggregationExpr[?] => a.prettyPrint(depth)
+      case a: Aggregation[?] => a.prettyPrint(depth)
       case _ => throw new Exception(s"Unimplemented pretty print EXPR $expr")
+    }
+  }
+  extension(agg: Aggregation[?]) {
+    def prettyPrint(depth: Int): String = agg match {
+      case Aggregation.AggFlatMap(from, query) =>
+        s"${indent(depth)}AggFlatMap(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Aggregation.AggFilter(from, query) =>
+        s"${indent(depth)}AggFilter(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
     }
   }
   extension(agg: AggregationExpr[?]) {
@@ -122,8 +131,6 @@ object TreePrettyPrinter {
         s"${indent(depth)}Except(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
 //      case GroupBy(query, selectFn, groupingFn, havingFn) =>
 //        s"${indent(depth)}GroupBy(\n${query.prettyPrint(depth + 1)},\n${selectFn.prettyPrint(depth + 1)},\n${groupingFn.prettyPrint(depth + 1)},\n${havingFn.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Aggregation.AggFlatMap(from, query) =>
-        s"${indent(depth)}AggFlatMap(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
       case MultiRecursive(refs, querys, finalQ) =>
         val refStr = refs.toList.map(r => r.asInstanceOf[QueryRef[?]].prettyPrint(depth+1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?]].prettyPrint(depth + 2))
@@ -131,6 +138,7 @@ object TreePrettyPrinter {
         val finalQStr = finalQ.prettyPrint(depth + 1)
         s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth+1, "FINAL->", finalQStr)}\n${indent(depth)})"
       case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?]].stringRef()})"
+      case a: Aggregation[?] => a.prettyPrint(depth)
       case _ => throw new Exception(s"Unimplemented pretty print AST $ast")
     }
   }

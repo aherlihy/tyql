@@ -300,6 +300,7 @@ object QueryIRTree:
       case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
+      case a: Aggregation[?] => generateQuery(a, symbols)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
   private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable): QueryIRNode =

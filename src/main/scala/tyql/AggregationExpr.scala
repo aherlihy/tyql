@@ -34,18 +34,20 @@ object AggregationExpr {
   // Needed because project can be a top-level result for aggregation but not query??
   case class AggProject[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends AggregationExpr[NamedTuple.Map[A, StripExpr]]
 
-  //type StripAgg[E] = E match
-  //  case Aggregation[b] => b
-
-//   TODO: Should indicate if *any* single element is an aggregation, even if some elements are exprs. Tuple of ONLY expr's should be Expr.toRow
-  //type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Aggregation[?]
+//  type IsTupleOfAgg[A <: AnyNamedTuple] <: Boolean = A match {
+//    case EmptyTuple => false
+//    case h *: t => h match {
+//      case Expr[?, ScalarExpr] => true
+//      case _ => IsTupleOfAgg[t]
+//    }
+//  }
   type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ScalarExpr]
 
-  extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
+  extension [A <: AnyNamedTuple: IsTupleOfAgg]/*(using ev: IsTupleOfAgg[A] =:= true)*/(x: A)
     def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): AggProject[A] = AggProject(x)
 
   /** Same as _.toRow, as an implicit conversion */
-  given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, AggProject[A]] = AggProject(_)
+//  given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, AggProject[A]] = AggProject(_)
 
   /**
    * NOTE: For group by, require that the result is a named tuple so that it can be referred to in the next clause?

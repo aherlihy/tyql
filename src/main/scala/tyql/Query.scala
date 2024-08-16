@@ -78,7 +78,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. a single value of type B.
    */
-  def flatMap[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] =
+  def flatMap[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] =
     val ref = Expr.Ref[A, ScalarExpr]()
     Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
 
@@ -114,15 +114,14 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B   the named-tuple-of-Aggregation that will be converted to an Aggregation-of-named-tuple
    * @return     Aggregation of B.toRow, e.g. a scalar result of type B.toRow
    */
-  def aggregate[B <: AnyNamedTuple : AggregationExpr.IsTupleOfAgg](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, ScalarExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
+  def aggregate[B <: AnyNamedTuple: AggregationExpr.IsTupleOfAgg]/*(using ev: AggregationExpr.IsTupleOfAgg[B] =:= true)*/(using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, ScalarExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
     import AggregationExpr.toRow
     val ref = Expr.Ref[A, ScalarExpr]()
     val row = f(ref).toRow
     Aggregation.AggFlatMap(this, Expr.Fun(ref, row))
 
-  // TODO: bug? if commented out, then agg test cannot find aggregate ^
-  inline def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => Query[B]): Nothing =
-    error("No aggregation function found in f. Did you mean to use flatMap?")
+//  inline def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => Query[B]): Nothing =
+//    error("No aggregation function found in f. Did you mean to use flatMap?")
 
   /**
    * Classic map with an inner expression to transform the row.
@@ -265,9 +264,10 @@ object Query:
 
     def filter(p: Ref[R, NExpr] => Expr[Boolean, NExpr]): Query[R] = withFilter(p)
 
-    def filter(p: Ref[R, ScalarExpr] => Expr[Boolean, ScalarExpr]): Aggregation[R] =
-      val ref = Ref[R, ScalarExpr]()
-       Aggregation.AggFilter(x, Fun(ref, p(ref)))
+    // TODO: filter + agg should be technically 'having' but probably don't want to force users to write table.having(...)?
+//    def filter(p: Ref[R, ScalarExpr] => Expr[Boolean, ScalarExpr]): Aggregation[R] =
+//      val ref = Ref[R, ScalarExpr]()
+//       Aggregation.AggFilter(x, Fun(ref, p(ref)))
 
     def sort[B](f: Ref[R, NExpr] => Expr[B, NExpr], ord: Ord): Query[R] =
       val ref = Ref[R, NExpr]()
@@ -281,8 +281,8 @@ object Query:
 
     def distinct: Query[R] = Distinct(x)
 
-    def sum[B: ResultTag](f: Ref[R, ScalarExpr] => Expr[B, ScalarExpr]): Aggregation[B] =
-      val ref = Ref[R, ScalarExpr]()
+    def sum[B: ResultTag](f: Ref[R, NExpr] => Expr[B, NExpr]): Aggregation[B] =
+      val ref = Ref[R, NExpr]()
        Aggregation.AggFlatMap(x, Expr.Fun(ref, AggregationExpr.Sum(f(ref))))
 
 //    def avg[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
