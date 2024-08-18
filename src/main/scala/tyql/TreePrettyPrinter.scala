@@ -132,7 +132,7 @@ object TreePrettyPrinter {
 //      case GroupBy(query, selectFn, groupingFn, havingFn) =>
 //        s"${indent(depth)}GroupBy(\n${query.prettyPrint(depth + 1)},\n${selectFn.prettyPrint(depth + 1)},\n${groupingFn.prettyPrint(depth + 1)},\n${havingFn.prettyPrint(depth + 1)}\n${indent(depth)})"
       case MultiRecursive(refs, querys, finalQ) =>
-        val refStr = refs.toList.map(r => r.asInstanceOf[QueryRef[?]].prettyPrint(depth+1))
+        val refStr = refs.toList.map(r => r.toQuery.prettyPrint(depth+1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?]].prettyPrint(depth + 2))
         val str = refStr.zip(qryStr).map((r, q) => s"\n$r :=\n$q").mkString(",\n")
         val finalQStr = finalQ.prettyPrint(depth + 1)

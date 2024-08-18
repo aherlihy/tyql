@@ -199,7 +199,8 @@ object QueryIRTree:
       case queryRef: Query.QueryRef[?] =>
         symbols(queryRef.stringRef())
       case multiRecursive: Query.MultiRecursive[?] =>
-        val vars = multiRecursive.$param.map(p =>
+        val vars = multiRecursive.$param.map(rP =>
+          val p = rP.toQueryRef
           QueryIRTree.idCount += 1
           val newAlias = s"recursive${QueryIRTree.idCount}"
 

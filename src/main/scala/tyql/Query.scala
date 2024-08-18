@@ -5,6 +5,7 @@ import scala.util.TupledFunction
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.compiletime.*
 import scala.deriving.Mirror
+import scala.annotation.targetName
 import java.time.LocalDate
 import scala.reflect.ClassTag
 import Utils.*
@@ -58,7 +59,42 @@ object Aggregation:
   case class AggFlatMap[A, B: ResultTag]($from: Query[A], $query: Expr.Fun[A, Expr[B, ?], ?]) extends Aggregation[B]
   case class AggFilter[A: ResultTag]($from: Query[A], $pred: Expr.Pred[A, ScalarExpr]) extends Aggregation[A]
 
+/**
+ * A restricted reference to a query that disallows aggregation.
+ * Explicitly do not export aggregate, or any aggregation helpers, exists, etc.
+ *
+ * Methods can accept RestrictedQuery[A] or Query[A]
+ * NOTE: Query[?] indicates no aggregation, but could turn into aggregation, RestrictedQuery[?] means none present and none addable
+ */
+class RestrictedQuery[A](using ResultTag[A])(protected val wrapped: Query[A]) extends DatabaseAST[A]:
+  def toQuery: Query[A] = wrapped
+
+  @targetName("restrictedQueryFlatMap")
+  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => Query[B]): RestrictedQuery[B] = RestrictedQuery(wrapped.flatMap(f))
+  @targetName("restrictedQueryFlatMapRestricted")
+  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => RestrictedQuery[B]): RestrictedQuery[B] =
+    val toR: Expr.Ref[A, NExpr] => Query[B] = arg => f(arg).toQuery
+    RestrictedQuery(wrapped.flatMap(toR))
+  def map[B: ResultTag](f: Expr.Ref[A, NExpr] => Expr[B, NExpr]): RestrictedQuery[B] = RestrictedQuery(wrapped.map(f))
+  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NExpr] => B): RestrictedQuery[NamedTuple.Map[B, Expr.StripExpr]] = RestrictedQuery(wrapped.map(f))
+  def withFilter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A] = RestrictedQuery(wrapped.withFilter(p))
+  def filter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A] = RestrictedQuery(wrapped.filter(p))
+  def union(that: RestrictedQuery[A]): RestrictedQuery[A] =
+    RestrictedQuery(Query.Union(wrapped, that.toQuery, true))
+
+  def unionAll(that: RestrictedQuery[A]): RestrictedQuery[A] =
+    RestrictedQuery(Query.Union(wrapped, that.toQuery, false))
+
+  @targetName("unionQuery")
+  def union(that: Query[A]): RestrictedQuery[A] =
+    RestrictedQuery(Query.Union(wrapped, that, true))
+  @targetName("unionAllQuery")
+  def unionAll(that: Query[A]): RestrictedQuery[A] =
+    RestrictedQuery(Query.Union(wrapped, that, false))
+
+
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
+  import Expr.{Pred, Fun, Ref}
   /**
    * Classic flatMap with an inner Query that will likely be flattened into a join.
    *
@@ -66,10 +102,21 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B   the result type of the query.
    * @return     Query[B], e.g. an iterable of results of type B
    */
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => Query[B]): Query[B] =
-    val ref = Expr.Ref[A, NExpr]()
-    Query.FlatMap(this, Expr.Fun(ref, f(ref)))
+  def flatMap[B: ResultTag](f: Ref[A, NExpr] => Query[B]): Query[B] =
+    val ref = Ref[A, NExpr]()
+    Query.FlatMap(this, Fun(ref, f(ref)))
 
+  /**
+   * Classic flatMap with an inner query that is a RestrictedQuery.
+   * This turns the result query into a RestrictedQuery.
+   * Exists to support doing <query>.flatMap(...) within a fix
+   * @param f   a function that returns a RestrictedQuery, meaning it has used a recursive definition from fix.
+   * @tparam B  the result type of the query.
+   * @return    RestrictedQuery[B]
+   */
+  def flatMap[B: ResultTag](f: Ref[A, NExpr] => RestrictedQuery[B]): RestrictedQuery[B] =
+    val ref = Ref[A, NExpr]()
+    RestrictedQuery(Query.FlatMap(this, Fun(ref, f(ref).toQuery)))
   /**
    * Equivalent to aggregate(f: Ref => Aggregation). Override to allow this so that aggregations will still work
    * with the for-comprehension syntax. TODO: is this really necessary?
@@ -78,9 +125,9 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. a single value of type B.
    */
-  def flatMap[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] =
-    val ref = Expr.Ref[A, ScalarExpr]()
-    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
+  def flatMap[B: ResultTag](f: Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] =
+    val ref = Ref[A, ScalarExpr]()
+    Aggregation.AggFlatMap(this, Fun(ref, f(ref)))
 
 
   /**
@@ -90,7 +137,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @param f a function that returns an Expr, which should be an error, since that only makes sense for map/agg.
    *          TODO: Since Aggregation extends Expr, need to ensure that aggregations don't trigger this.
    */
-//  inline def flatMap[B: ResultTag](f: Expr.Ref[A, ?] => Expr[B, ?]): Nothing = // inline so error points to use site
+//  inline def flatMap[B: ResultTag](f: Ref[A, ?] => Expr[B, ?]): Nothing = // inline so error points to use site
 //    error("Cannot return an Expr from a flatMap. Did you mean to use map?")
 
   /**
@@ -103,9 +150,9 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. single value of type B.
    */
-  def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] =
-    val ref = Expr.Ref[A, ScalarExpr]()
-    Aggregation.AggFlatMap(this, Expr.Fun(ref, f(ref)))
+  def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] =
+    val ref = Ref[A, ScalarExpr]()
+    Aggregation.AggFlatMap(this, Fun(ref, f(ref)))
 
   /**
    * A version of the above-defined aggregate that allows users to skip calling toRow on the result in f.
@@ -114,13 +161,13 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B   the named-tuple-of-Aggregation that will be converted to an Aggregation-of-named-tuple
    * @return     Aggregation of B.toRow, e.g. a scalar result of type B.toRow
    */
-  def aggregate[B <: AnyNamedTuple: AggregationExpr.IsTupleOfAgg]/*(using ev: AggregationExpr.IsTupleOfAgg[B] =:= true)*/(using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, ScalarExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
+  def aggregate[B <: AnyNamedTuple: AggregationExpr.IsTupleOfAgg]/*(using ev: AggregationExpr.IsTupleOfAgg[B] =:= true)*/(using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, ScalarExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
     import AggregationExpr.toRow
-    val ref = Expr.Ref[A, ScalarExpr]()
+    val ref = Ref[A, ScalarExpr]()
     val row = f(ref).toRow
-    Aggregation.AggFlatMap(this, Expr.Fun(ref, row))
+    Aggregation.AggFlatMap(this, Fun(ref, row))
 
-//  inline def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => Query[B]): Nothing =
+//  inline def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Query[B]): Nothing =
 //    error("No aggregation function found in f. Did you mean to use flatMap?")
 
   /**
@@ -135,9 +182,9 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    *
    * TODO: ensure that this isn't callable with Aggregation expression.
    */
-  def map[B: ResultTag](f: Expr.Ref[A, NExpr] => Expr[B, NExpr]): Query[B] =
-    val ref = Expr.Ref[A, NExpr]()
-    Query.Map(this, Expr.Fun(ref, f(ref)))
+  def map[B: ResultTag](f: Ref[A, NExpr] => Expr[B, NExpr]): Query[B] =
+    val ref = Ref[A, NExpr]()
+    Query.Map(this, Fun(ref, f(ref)))
 
 /**
    * A version of the above-defined map that allows users to skip calling toRow on the result in f.
@@ -146,10 +193,10 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B   the named-tuple-of-Expr that will be converted to an Expr-of-named-tuple
    * @return     Expr of B.toRow, e.g. an iterable of type B.toRow
    */
-  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NExpr] => B): Query[ NamedTuple.Map[B, Expr.StripExpr] ] =
+  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, NExpr] => B): Query[ NamedTuple.Map[B, Expr.StripExpr] ] =
     import Expr.toRow
-    val ref = Expr.Ref[A, NExpr]()
-    Query.Map(this, Expr.Fun(ref, f(ref).toRow))
+    val ref = Ref[A, NExpr]()
+    Query.Map(this, Fun(ref, f(ref).toRow))
 
   /**
    * Selectively override to cover common mistakes, so error message is more useful (and not implementation-specific).
@@ -172,25 +219,27 @@ object Query:
    *  `(Table[A], Table[B], ...)`
    */
   type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], Query]
-  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(QueryRef[A], QueryRef[B], ...)` */
-  type ToQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], QueryRef]
 
-//  def fixUntupled[F, QT <: Tuple](bases: QT)(f: F)(using ev: Tuple.Union[QT] <:< Query[?], tf: TupledFunction[F, ToQueryRef[QT] => ToQuery[QT]]): ToQuery[QT] =
+  type ToRestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], RestrictedQuery]
+  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(RestrictedQueryRef[A], RestrictedQueryRef[B], ...)` */
+  type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], RestrictedQueryRef]
+
+//  def fixUntupled[F, QT <: Tuple](bases: QT)(f: F)(using ev: Tuple.Union[QT] <:< Query[?], tf: TupledFunction[F, ToRestrictedQueryRef[QT] => ToQuery[QT]]): ToQuery[QT] =
 //    tf.untupled(multiFix(bases)(ev, tf.tupled))
   /**
    * Fixed point computation.
    */
-  def fix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?])(fns: ToQueryRef[QT] => ToQuery[QT]): ToQuery[QT] =
+  def fix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?])(fns: ToRestrictedQueryRef[QT] => ToRestrictedQuery[QT]): ToQuery[QT] =
     val baseRefsAndDefs = bases.toArray.map {
       case MultiRecursive(params, querys, resultQ) => ???//(param, query)
-      case base: Query[t] => (QueryRef()(using base.tag), base)
+      case base: Query[t] => (RestrictedQueryRef()(using base.tag), base)
     }
-    val refsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[ToQueryRef[QT]]
+    val refsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[ToRestrictedQueryRef[QT]]
     val refsList = baseRefsAndDefs.map(_._1).toList
     val recurQueries = fns(refsTuple)
 
-    val defsList = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?]])
-    val unionsList: List[Query[?]] = recurQueries.toList.lazyZip(defsList).map:
+    val baseCaseDefsList = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?]])
+    val recursiveDefsList: List[Query[?]] = recurQueries.toList.map(_.asInstanceOf[RestrictedQuery[?]].toQuery).lazyZip(baseCaseDefsList).map:
       case (query: Query[t], ddef) =>
         Union(ddef.asInstanceOf[Query[t]], query, false)(using query.tag)
 
@@ -198,12 +247,12 @@ object Query:
       given ResultTag[t] = finalRef.tag
       MultiRecursive(
         refsList,
-        unionsList,
-        finalRef
+        recursiveDefsList,
+        finalRef.toQueryRef
       )
     )
 
-  case class MultiRecursive[R]($param: List[QueryRef[?]],
+  case class MultiRecursive[R]($param: List[RestrictedQueryRef[?]],
                                $subquery: List[Query[?]],
                                $resultQuery: Query[R])(using ResultTag[R]) extends Query[R]
 
@@ -214,17 +263,8 @@ object Query:
     def stringRef() = s"recref$id"
     override def toString: String = s"QueryRef[${stringRef()}]"
 
-    override def aggregate[B: ResultTag](f: Expr.Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] = ???
-//    override inline def aggregate[B: ResultTag](f: Expr.Ref[A] => Query[B]): Aggregation[B] = error("Cannot apply aggregation across strata")
-
-//    override def aggregate[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Aggregation[B] = reportError()
-//
-//    override def aggregate[B <: AnyNamedTuple : Aggregation.IsTupleOfAgg]
-//    (using ResultTag[NamedTuple.Map[B, Aggregation.StripAgg]])
-//    (f: Expr.Ref[A] => B): Aggregation[NamedTuple.Map[B, Aggregation.StripAgg]] = reportError()
-
-//    inline def flatMap[B: ResultTag](f: Expr.Ref[A] => Aggregation[B]): Nothing =
-
+  case class RestrictedQueryRef[A: ResultTag]() extends RestrictedQuery[A](QueryRef[A]()):
+    def toQueryRef: QueryRef[A] = wrapped.asInstanceOf[QueryRef[A]]
 
   case class QueryFun[A, B]($param: QueryRef[A], $body: B)
 
@@ -254,8 +294,8 @@ object Query:
     /**
      * When there is only one relation to be defined recursively.
      */
-    def fix(p: QueryRef[R] => Query[R]): Query[R] =
-      val fn: Tuple1[QueryRef[R]] => Tuple1[Query[R]] = r => Tuple1(p(r._1))
+    def fix(p: RestrictedQueryRef[R] => RestrictedQuery[R]): Query[R] =
+      val fn: Tuple1[RestrictedQueryRef[R]] => Tuple1[RestrictedQuery[R]] = r => Tuple1(p(r._1))
       Query.fix(Tuple1(x))(fn)._1
 
     def withFilter(p: Ref[R, NExpr] => Expr[Boolean, NExpr]): Query[R] =
@@ -283,19 +323,19 @@ object Query:
 
     def sum[B: ResultTag](f: Ref[R, NExpr] => Expr[B, NExpr]): Aggregation[B] =
       val ref = Ref[R, NExpr]()
-       Aggregation.AggFlatMap(x, Expr.Fun(ref, AggregationExpr.Sum(f(ref))))
+       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Sum(f(ref))))
 
 //    def avg[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
 //      val ref = Ref[R]()
-//       Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Avg(f(ref))))
+//       Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Avg(f(ref))))
 //
 //    def max[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
 //      val ref = Ref[R]()
-//       Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Max(f(ref))))
+//       Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Max(f(ref))))
 //
 //    def min[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
 //      val ref = Ref[R]()
-//       Aggregation.AggFlatMap(x, Expr.Fun(ref, Aggregation.Min(f(ref))))
+//       Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Min(f(ref))))
 //
 //    def size: Aggregation[Int] = // TODO: can potentially avoid identity
 //      val ref = Ref[R]()
