@@ -13,8 +13,8 @@ class ToRowTest extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: 
 
   def query() =
     testDB.tables.buyers.map(b =>
-      (bName = b.name, bId = b.id).toRow
-//      (bName = b.name, bId = b.id) // this is what I want to work
+//      (bName = b.name, bId = b.id).toRow
+      (bName = b.name, bId = b.id) // this is what I want to work
     )
 
   def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A"
