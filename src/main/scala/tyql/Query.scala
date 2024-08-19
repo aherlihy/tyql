@@ -118,27 +118,15 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
     val ref = Ref[A, NExpr]()
     RestrictedQuery(Query.FlatMap(this, Fun(ref, f(ref).toQuery)))
   /**
-   * Equivalent to aggregate(f: Ref => Aggregation). Override to allow this so that aggregations will still work
-   * with the for-comprehension syntax. TODO: is this really necessary?
+   * Equivalent to aggregate(f: Ref => Aggregation).
    *
    * @param f   a function that returns an Aggregation (guaranteed agg in subtree)
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. a single value of type B.
    */
-  def flatMap[B: ResultTag](f: Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] =
+  def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] =
     val ref = Ref[A, ScalarExpr]()
     Aggregation.AggFlatMap(this, Fun(ref, f(ref)))
-
-
-  /**
-   * Selectively override to cover common mistakes, so error message is more useful (and not implementation-specific).
-   * This is for when a user uses flatMap where they should be using map.
-   *
-   * @param f a function that returns an Expr, which should be an error, since that only makes sense for map/agg.
-   *          TODO: Since Aggregation extends Expr, need to ensure that aggregations don't trigger this.
-   */
-//  inline def flatMap[B: ResultTag](f: Ref[A, ?] => Expr[B, ?]): Nothing = // inline so error points to use site
-//    error("Cannot return an Expr from a flatMap. Did you mean to use map?")
 
   /**
    * Equivalent version of map(f: Ref => Aggregation).
@@ -150,6 +138,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. single value of type B.
    */
+  @targetName("AggregateExpr")
   def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] =
     val ref = Ref[A, ScalarExpr]()
     Aggregation.AggFlatMap(this, Fun(ref, f(ref)))
@@ -337,9 +326,9 @@ object Query:
 //      val ref = Ref[R]()
 //       Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Min(f(ref))))
 //
-//    def size: Aggregation[Int] = // TODO: can potentially avoid identity
-//      val ref = Ref[R]()
-//      Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Count(ref)))
+    def size: Aggregation[Int] =
+      val ref = Ref[R, ScalarExpr]()
+      Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Count(ref)))
 
     def union(that: Query[R]): Query[R] =
       Union(x, that, true)

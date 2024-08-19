@@ -76,18 +76,6 @@ class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, 
   def expectedQueryPattern = "SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A WHERE buyers$A.id > 1"
 }
 
-// TODO: potentially turn off using for comprehensions with aggregations to avoid overloading map even more
-//class FlowForAggregateTest extends SQLStringQueryTest[AllCommerceDBs, (sumP: Double)] {
-//  def testDescription = "Flow: for comprehension with agg"
-//
-//  def query() =
-//    for
-//      p <- testDB.tables.products
-//    yield ((sumP = sum(p.price)).toRow)
-//
-//  def expectedQueryPattern = "SELECT product$A.name as pName, SUM(product$A.price) as sumP FROM product as product$A"
-//}
-
 class FlowFlatmapMapTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, pId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, map"
 
@@ -126,14 +114,13 @@ class FlowAggTest1b extends SQLStringAggregationTest[AllCommerceDBs, (bIdSum: In
       (bIdSum = sum(b.id), bIdMax = max(b.id)).toRow
     )
 
-
   def expectedQueryPattern = "SELECT SUM(buyers$0.id) as bIdSum, MAX(buyers$0.id) as bIdMax FROM buyers as buyers$0"
 }
 
 class FlowFlatmapAggTest1b extends SQLStringAggregationTest[AllCommerceDBs, (bIdSum: Int, pIdMax: Int)] {
   def testDescription = "Flow: aggregate with aggregate nested in flatMap"
   def query() =
-    testDB.tables.products.flatMap(p =>
+    testDB.tables.products.aggregate(p =>
       testDB.tables.buyers.aggregate(b =>
         (bIdSum = sum(b.id), pIdMax = max(p.id)).toRow
       )
@@ -265,20 +252,19 @@ class FlowMapFilterTest2 extends SQLStringQueryTest[AllCommerceDBs, (bName: Stri
   def expectedQueryPattern = "SELECT * FROM (SELECT buyers$A.name as bName, buyers$A.id as bId FROM buyers as buyers$A) as subquery$B WHERE subquery$B.bId > 1"
 }
 
-// TODO: map with aggregate
-//class FlowMapAggregateTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
-//  def testDescription = "Flow: map on aggregate"
-//
-//  def query() =
-//      testDB.tables.shipInfos.map(si =>
-//        sum(si.buyerId)
-//      )
-//
-//  def expectedQueryPattern = "SELECT SUM(shippingInfo$A.buyerId) FROM shippingInfo as shippingInfo$A"
-//}
+class FlowMapAggregateTest extends SQLStringAggregationTest[AllCommerceDBs, Int] {
+  def testDescription = "Flow: aggregate with single sum"
+
+  def query() =
+      testDB.tables.shipInfos.aggregate(si =>
+        sum(si.buyerId)
+      )
+
+  def expectedQueryPattern = "SELECT SUM(shippingInfo$A.buyerId) FROM shippingInfo as shippingInfo$A"
+}
 
 class FlowMapAggregateTest7 extends SQLStringAggregationTest[AllCommerceDBs, (sum: Int)] {
-  def testDescription = "Flow: project + flatMap on aggregate"
+  def testDescription = "Flow: project + aggregate"
 
   def query() =
     testDB.tables.shipInfos.aggregate(si =>
@@ -287,16 +273,6 @@ class FlowMapAggregateTest7 extends SQLStringAggregationTest[AllCommerceDBs, (su
 
   def expectedQueryPattern = "SELECT SUM(shippingInfo$30.buyerId) as sum FROM shippingInfo as shippingInfo$30"
 }
-
-// TODO: map w agg
-//class FlowMapAggregateTest6 extends SQLStringQueryTest[AllCommerceDBs, (sum: Int)] {
-//  def testDescription = "Flow: project + map on aggregate"
-//  def query() =
-//    testDB.tables.shipInfos.map(si =>
-//      (sum = sum(si.buyerId)).toRow
-//    )
-//  def expectedQueryPattern = "SELECT SUM(shippingInfo$A.buyerId) as sum FROM shippingInfo as shippingInfo$A"
-//}
 
 // TODO: toRow
 //class FlowMapAggregateConvertedTest extends SQLStringQueryTest[AllCommerceDBs, (sum: Int)] {

@@ -301,7 +301,7 @@ object QueryIRTree:
       case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
-      case a: Aggregation[?] => generateQuery(a, symbols)
+      case a: Aggregation[?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
   private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable): QueryIRNode =
@@ -312,7 +312,4 @@ object QueryIRTree:
       case s: AggregationExpr.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
       case c: AggregationExpr.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT(1)", c)
       case p: AggregationExpr.AggProject[?] => generateProjection(p, symbols)
-      case sub: Aggregation.AggFlatMap[?, ?] =>
-        val subg = generateQuery(sub, symbols)
-        subg.appendFlag(SelectFlags.ExprLevel) // special case, remove alias
       case _ => throw new Exception(s"Unimplemented aggregation op: $ast")

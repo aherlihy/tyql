@@ -388,14 +388,14 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
           )
         val MA =
           // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-          // TODO: when multiple base cases form multiple outer flatMap, the compiler doesn't know which flatMap to use.
-          val fn: Expr.Ref[Location, NExpr] => RestrictedQuery[Location] = d1 =>
+          dereference.flatMap(d1 =>
             valueAlias.flatMap(va =>
               dereference
                 .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
                 .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
             )
-          dereference.flatMap(fn)
+          )
+
         val VA =
           // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
           valueFlow.flatMap(vf1 =>
@@ -455,125 +455,113 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
     """
 }
 
-//class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location] {
-//  def testDescription: String = "CSPA, but with comprehensions to see if nicer"
-//
-//  def query() =
-//    val assign = testDB.tables.assign
-//    val dereference = testDB.tables.dereference
-//
-//    val memoryAliasBase =
-//      // MemoryAlias(x, x) :- Assign(_, x)
-//      assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
-//        .unionAll(
-//          // MemoryAlias(x, x) :- Assign(x, _)
-//          assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
-//        )
-//
-//    val valueFlowBase =
-//      assign // ValueFlow(y, x) :- Assign(y, x)
-//        .unionAll(
-//          // ValueFlow(x, x) :- Assign(x, _)
-//          assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
-//        ).unionAll(
-//          // ValueFlow(x, x) :- Assign(_, x)
-//          assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
-//        )
-//
-//    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-//      (valueFlow, valueAlias, memoryAlias) =>
-//        // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
-//        val vfDef1 =
-//          for
-//            m <- memoryAlias // TODO: cannot put a first or get ambiguous overload. Solution1: give compiler hints, 2: require function passed to fix to only use relations defined as arguments, so would require the base caess to also be passed as args like the recursive defs.
-//            a <- assign
-//            if a.p2 == m.p1
-//          yield (p1 = a.p1, p2 = m.p2).toRow
-//        // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
-//        val vfDef2 =
-//          for
-//            vf1 <- valueFlow
-//            vf2 <- valueFlow
-//            if vf1.p2 == vf2.p1
-//          yield (p1 = vf1.p1, p2 = vf2.p2).toRow
-//        val VF = vfDef1.unionAll(vfDef2)
-//
-//        // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-////        val drf: Query[(d1_p1: Int, d1_p2: Int, d2_p1: Int, d2_p2: Int)] =
-////          for
-////            d1 <- dereference
-////            d2 <- dereference
-////          yield (d1_p1 = d1.p1, d1_p2 = d1.p2, d2_p1 = d2.p1, d2_p2 = d2.p2).toRow
-////        val MA =
-////          for
-////            va <- valueAlias
-////            d <- drf
-////            if d.d1_p1 == va.p1 && va.p2 == d.d2_p1
-////          yield (p1 = d.d1_p2, p2 = d.d2_p2).toRow
-//        // TODO: when multiple base cases form multiple outer flatMap, the compiler doesn't know which flatMap to use.
-//        val fn: Expr.Ref[Location, NExpr] => RestrictedQuery[Location] = d1 =>
-//          valueAlias.flatMap(va =>
-//            dereference
-//              .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
-//              .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
-//          )
-//        val MA = dereference.flatMap(fn)
-//
-//        // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
-//        val vaDef1 =
-//          for
-//            vf1 <- valueFlow
-//            vf2 <- valueFlow
-//            if vf1.p1 == vf2.p1
-//          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
-//        // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
-//        val vaDef2 =
-//          for
-//            m <- memoryAlias
-//            vf1 <- valueFlow
-//            vf2 <- valueFlow
-//            if vf1.p1 == m.p1 && vf2.p1 == m.p2
-//          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
-//        val VA = vaDef1.unionAll(vaDef2)
-//
-//        (VF, MA, VA)
-//    )
-//    valueFlowFinal
-//  def expectedQueryPattern: String =
-//    """
-//    WITH RECURSIVE
-//      recursive$A AS
-//        (SELECT * FROM assign as assign$D
-//				  UNION ALL
-//			  SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E
-//					UNION ALL
-//				SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F
-//					UNION ALL
-//				SELECT assign$G.p1 as p1, ref$J.p2 as p2
-//				FROM assign as assign$G, recursive$C as ref$J
-//				WHERE assign$G.p2 = ref$J.p1
-//					UNION ALL
-//				SELECT ref$K.p1 as p1, ref$L.p2 as p2
-//				FROM recursive$A as ref$K, recursive$A as ref$L
-//				WHERE ref$K.p2 = ref$L.p1),
-//		  recursive$B AS
-//		    (SELECT * FROM empty as empty$M
-//					UNION ALL
-//				SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
-//				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-//				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1),
-//			recursive$C AS
-//			  (SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H
-//					UNION ALL
-//				SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I
-//					UNION ALL
-//				SELECT ref$Q.p2 as p1, ref$R.p2 as p2
-//				FROM recursive$A as ref$Q, recursive$A as ref$R
-//				WHERE ref$Q.p1 = ref$R.p1
-//					UNION ALL
-//				SELECT ref$S.p2 as p1, ref$T.p2 as p2
-//				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-//				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)
-//		SELECT * FROM recursive$A as recref$V
-//    """
-//}
+class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location] {
+  def testDescription: String = "CSPA, but with comprehensions to see if nicer"
+
+  def query() =
+    val assign = testDB.tables.assign
+    val dereference = testDB.tables.dereference
+
+    val memoryAliasBase =
+      // MemoryAlias(x, x) :- Assign(_, x)
+      assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+        .unionAll(
+          // MemoryAlias(x, x) :- Assign(x, _)
+          assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
+        )
+
+    val valueFlowBase =
+      assign // ValueFlow(y, x) :- Assign(y, x)
+        .unionAll(
+          // ValueFlow(x, x) :- Assign(x, _)
+          assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
+        ).unionAll(
+          // ValueFlow(x, x) :- Assign(_, x)
+          assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+        )
+
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+      (valueFlow, valueAlias, memoryAlias) =>
+        // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
+        val vfDef1 =
+          for
+            a <- assign
+            m <- memoryAlias
+            if a.p2 == m.p1
+          yield (p1 = a.p1, p2 = m.p2).toRow
+        // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
+        val vfDef2 =
+          for
+            vf1 <- valueFlow
+            vf2 <- valueFlow
+            if vf1.p2 == vf2.p1
+          yield (p1 = vf1.p1, p2 = vf2.p2).toRow
+        val VF = vfDef1.unionAll(vfDef2)
+
+        // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
+        val MA =
+          for
+            d1 <- dereference
+            va <- valueAlias
+            d2 <- dereference
+            if d1.p1 == va.p1 && va.p2 == d2.p1
+          yield (p1 = d1.p2, p2 = d2.p2).toRow
+
+        // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+        val vaDef1 =
+          for
+            vf1 <- valueFlow
+            vf2 <- valueFlow
+            if vf1.p1 == vf2.p1
+          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
+        // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+        val vaDef2 =
+          for
+            vf1 <- valueFlow
+            m <- memoryAlias
+            vf2 <- valueFlow
+            if vf1.p1 == m.p1 && vf2.p1 == m.p2
+          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
+        val VA = vaDef1.unionAll(vaDef2)
+
+        (VF, MA, VA)
+    )
+    valueFlowFinal
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE
+      recursive$A AS
+        (SELECT * FROM assign as assign$D
+				  UNION ALL
+			  SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E
+					UNION ALL
+				SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F
+					UNION ALL
+				SELECT assign$G.p1 as p1, ref$J.p2 as p2
+				FROM assign as assign$G, recursive$C as ref$J
+				WHERE assign$G.p2 = ref$J.p1
+					UNION ALL
+				SELECT ref$K.p1 as p1, ref$L.p2 as p2
+				FROM recursive$A as ref$K, recursive$A as ref$L
+				WHERE ref$K.p2 = ref$L.p1),
+		  recursive$B AS
+		    (SELECT * FROM empty as empty$M
+					UNION ALL
+				SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
+				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1),
+			recursive$C AS
+			  (SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H
+					UNION ALL
+				SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I
+					UNION ALL
+				SELECT ref$Q.p2 as p1, ref$R.p2 as p2
+				FROM recursive$A as ref$Q, recursive$A as ref$R
+				WHERE ref$Q.p1 = ref$R.p1
+					UNION ALL
+				SELECT ref$S.p2 as p1, ref$T.p2 as p2
+				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
+				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)
+		SELECT * FROM recursive$A as recref$V
+    """
+}

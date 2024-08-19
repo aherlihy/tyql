@@ -45,28 +45,6 @@ class AggregateProjectAggregationExprTest extends SQLStringAggregationTest[AllCo
 //  def expectedQueryPattern: String = "SELECT SUM(product$A.price) as s FROM product as product$A"
 //}
 
-// TODO: map with agg
-//class MapAggregationExprTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
-//  def testDescription: String = "Aggregation: map + expr.sum, return query"
-//
-//  def query() =
-//    testDB.tables.products
-//      .map(p => sum(p.price))
-//
-//  def expectedQueryPattern: String = "SELECT SUM(product$A.price) FROM product as product$A"
-//}
-//
-//class MapProjectAggregationExprTest extends SQLStringQueryTest[AllCommerceDBs, (sum: Double)] {
-//  def testDescription: String = "Aggregation: map + expr.sum with named tuple"
-//
-//  def query() =
-//    testDB.tables.products
-//      .map(p => (sum = sum(p.price)).toRow)
-//
-//  def expectedQueryPattern: String = "SELECT SUM(product$A.price) as sum FROM product as product$A"
-//}
-//
-
 class AggregateMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Double, avg: Double)] {
   def testDescription: String = "Aggregation: filter then aggregate with named tuple, no subquery"
 
@@ -82,22 +60,7 @@ class AggregateMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDB
       """
 }
 
-// TODO: map w agg
-//class MapFilterAggregationExprTest extends SQLStringQueryTest[AllCommerceDBs, (sum: Double)] {
-//  def testDescription: String = "Aggregation: filter then map with named tuple"
-//  def query() =
-//    testDB.tables.products
-//      .withFilter(p =>
-//        p.price != 0
-//      )
-//      .map(p => (sum = sum(p.price)).toRow)
-//
-//  def expectedQueryPattern: String =
-//    """SELECT SUM(product$A.price) as sum FROM product as product$A WHERE product$A.price <> 0
-//      """
-//}
-//
-//// Query helper-method based aggregation:
+// Query helper-method based aggregation:
 class AggregationQueryTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum on query"
   def query() =
@@ -119,7 +82,6 @@ class FilterAggregationQueryTest extends SQLStringAggregationTest[AllCommerceDBs
       """
 }
 
-// TODO
 class FilterAggregationProjectQueryTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Double)] {
   def testDescription: String = "Aggregation: sum on query with tuple"
   def query() =
@@ -128,7 +90,6 @@ class FilterAggregationProjectQueryTest extends SQLStringAggregationTest[AllComm
         p.price != 0
       )
       .sum(p =>
-
         (sum = p.price).toRow
       )
 
@@ -159,32 +120,6 @@ class AggregationSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Boolean
       )
 
   def expectedQueryPattern: String = """
-    SELECT product$P.price > (SELECT SUM(product$B.price) FROM product as product$B) as subquery$D FROM product as product$P
+    SELECT product$P.price > (SELECT SUM(product$B.price) FROM product as product$B) FROM product as product$P
       """
 }
-
-// TODO: map with agg
-//class AggregationSubqueryTest4 extends SQLStringQueryTest[AllCommerceDBs, Boolean] {
-//  def testDescription: String = "Aggregation: regular query with aggregate subquery as source (returns query)"
-//  def query() =
-//    testDB.tables.products.map(p =>
-//      (avgPrice = avg(p.price))
-//    ).map(r => r.avgPrice == 10)
-//
-//  def expectedQueryPattern: String = """
-//        SELECT subquery$A.avgPrice = 10 FROM (SELECT AVG(product$B.price) as avgPrice FROM product as product$B) as subquery$A
-//      """
-//}
-//
-//class AggregationSubqueryTest5 extends SQLStringQueryTest[AllCommerceDBs, Double] {
-//  def testDescription: String = "Aggregation: aggregation with aggregate subquery as source (returns aggregation)"
-//  def query() =
-//    testDB.tables.products.map(p =>
-//      (avgPrice = avg(p.price))
-//    ).map(r => max(r.avgPrice))
-//
-//  def expectedQueryPattern: String = """
-//        SELECT MAX(subquery$A.avgPrice) FROM (SELECT AVG(product$B.price) as avgPrice FROM product as product$B) as subquery$A
-//      """
-//}
-
