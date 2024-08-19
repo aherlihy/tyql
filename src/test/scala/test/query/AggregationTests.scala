@@ -60,6 +60,37 @@ class AggregateMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDB
       """
 }
 
+class AggregateMultiSubexpressionAggregateTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Boolean, avg: Boolean)] {
+  def testDescription: String = "Aggregation: put aggregation in subexpression, stays as aggregation type"
+
+  def query() =
+    import AggregationExpr.toRow
+    testDB.tables.products
+      .aggregate(p =>
+        (sum = sum(p.price)==1 , avg = avg(p.price) > p.price).toRow
+      )
+
+  def expectedQueryPattern: String =
+    """SELECT SUM(product$A.price) = 1 as sum, AVG(product$A.price) > product$A.price as avg FROM product as product$A
+        """
+}
+
+// TODO: multi-level expressions
+//class AggregateMultiSubexpression2AggregateTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Boolean, avg: Boolean)] {
+//  def testDescription: String = "Aggregation: put aggregation in subexpression, stays as aggregation type"
+//
+//  def query() =
+//    import AggregationExpr.toRow
+//    testDB.tables.products
+//      .aggregate(p =>
+//        (sum = (sum(p.price) == 1), avg = (avg(p.price) > p.price) != true).toRow
+//      )
+//
+//  def expectedQueryPattern: String =
+//    """SELECT SUM(product$A.price) = 1 as sum, AVG(product$A.price) > product$A.price as avg FROM product as product$A
+//          """
+//}
+
 // Query helper-method based aggregation:
 class AggregationQueryTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum on query"

@@ -5,9 +5,9 @@ import tyql.*
 import test.query.{commerceDBs, AllCommerceDBs}
 import language.experimental.namedTuples
 
-class MapMapCompileErrorTest extends munit.FunSuite {
+class MapMapProjectCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map+map should fail with useful error message"
-  def expectedError: String = ""//Cannot return a Query from a map. Did you mean to use flatMap?"
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -50,9 +50,9 @@ class MapMapCompileErrorTest extends munit.FunSuite {
   }
 }
 
-class MapMapTRCompileErrorTest extends munit.FunSuite {
+class MapMapToRowCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map+map with toRow should fail with useful error message"
-  def expectedError: String = ""//Cannot return a Query from a map. Did you mean to use flatMap?"
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -97,7 +97,7 @@ class MapMapTRCompileErrorTest extends munit.FunSuite {
 
 class MapMapAggregateCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map+map with aggregate should fail with useful error message"
-  def expectedError: String = ""//Cannot return a Query from a map. Did you mean to use flatMap?"
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -140,9 +140,54 @@ class MapMapAggregateCompileErrorTest extends munit.FunSuite {
   }
 }
 
-class MapAfterAggregateCompileErrorTest extends munit.FunSuite {
+class MapMapAggregateProjectCompileErrorTest extends munit.FunSuite {
+  def testDescription: String = "map+map with aggregate should fail with useful error message"
+  def expectedError: String = "None of the overloaded alternatives"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          tables.buyers.map(b =>
+            tables.shipInfos.map(si =>
+              (e = Expr.sum(si.buyerId)).toRow
+            )
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class AggregateFluentMapCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map after aggregate should fail with useful error message"
-  def expectedError: String = ""//value map is not a member of tyql.Aggregation"
+  def expectedError: String = "value map is not a member of tyql.Aggregation"
 
   test(testDescription) {
     val error: String =
@@ -183,7 +228,7 @@ class MapAfterAggregateCompileErrorTest extends munit.FunSuite {
 
 class FlatmapExprCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "flatMap without inner map fails"
-  def expectedError: String = ""//Cannot return an Expr from a flatMap. Did you mean to use map?"
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -226,7 +271,7 @@ class FlatmapExprCompileErrorTest extends munit.FunSuite {
 
 class FlatmapFlatmapCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "flatMap without inner map fails"
-  def expectedError: String = ""//Cannot return an Expr from a flatMap. Did you mean to use map?"
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -271,7 +316,7 @@ class FlatmapFlatmapCompileErrorTest extends munit.FunSuite {
 
 class MapFlatmapCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map with inner flatMap fails"
-  def expectedError: String = ""//Cannot return an Expr from a flatMap. Did you mean to use map?"
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -316,7 +361,7 @@ class MapFlatmapCompileErrorTest extends munit.FunSuite {
 
 class AggregateWithoutAggregationCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "aggregate that returns scalar expr should fail"
-  def expectedError: String = ""//None of the overloaded alternatives of method aggregate" // TODO: can we force a better error message?
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -356,9 +401,9 @@ class AggregateWithoutAggregationCompileErrorTest extends munit.FunSuite {
   }
 }
 
-class AggregateFluentCompileErrorTest extends munit.FunSuite {
-  def testDescription: String = "aggregate with further chaining of query methods shoudl fail"
-  def expectedError: String = ""//map is not a member of tyql.Aggregation"
+class AggregateWithoutAggregationProjectCompileErrorTest extends munit.FunSuite {
+  def testDescription: String = "aggregate that returns a projected scalar expr should fail"
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -391,7 +436,180 @@ class AggregateFluentCompileErrorTest extends munit.FunSuite {
            )
 
           // TEST
-          tables.products.aggregate(p => (avgPrice = Expr.avg(p.price))).map(r => r == 10)
+          import AggregationExpr.toRow
+          tables.products
+            .aggregate(p => (pr = p.price, pid = p.id).toRow)
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class AggregateFluentFilterCompileErrorTest extends munit.FunSuite {
+  def testDescription: String = "aggregate with further chaining of query methods should fail"
+  def expectedError: String = "filter is not a member of tyql.Aggregation"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          tables.products.aggregate(p => (avgPrice = Expr.avg(p.price))).filter(r => r == 10)
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class AggregateInMapErrorTest extends munit.FunSuite {
+  def testDescription: String = "aggregation inside map should fail"
+  def expectedError: String = "None of the overloaded alternatives"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          tables.shipInfos.map(si =>
+            Expr.sum(si.buyerId)
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class AggregateInMapProjectErrorTest extends munit.FunSuite {
+  def testDescription: String = "aggregation inside map should fail"
+  def expectedError: String = "None of the overloaded alternatives"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          tables.shipInfos.map(si =>
+            (s = Expr.sum(si.buyerId)).toRow
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class AggregateInMapSubexpressionErrorTest extends munit.FunSuite {
+  def testDescription: String = "aggregation inside map should fail, even inside expression with non-agg"
+  def expectedError: String = "None of the overloaded alternatives"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          import AggregationExpr.toRow
+          tables.shipInfos.map(si =>
+            (s = si.id == Expr.sum(si.buyerId)).toRow
+          )
           """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
@@ -399,7 +617,7 @@ class AggregateFluentCompileErrorTest extends munit.FunSuite {
 
 class AggregateInFlatmapErrorTest extends munit.FunSuite {
   def testDescription: String = "aggregation inside flatmap should fail"
-  def expectedError: String = ""
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -432,16 +650,17 @@ class AggregateInFlatmapErrorTest extends munit.FunSuite {
            )
 
           // TEST
-          testDB.tables.shipInfos.flatMap(si =>
-            sum(si.buyerId)
+          tables.shipInfos.flatMap(si =>
+            Expr.sum(si.buyerId)
           )
           """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-class AggregateInNestedFlatmapErrorTest extends munit.FunSuite {
-  def testDescription: String = "aggregation inside flatmap inside flatMap should fail"
-  def expectedError: String = ""
+
+class AggregateInFlatmapProjectErrorTest extends munit.FunSuite {
+  def testDescription: String = "aggregation inside flatmap should fail"
+  def expectedError: String = "None of the overloaded alternatives"
 
   test(testDescription) {
     val error: String =
@@ -474,10 +693,263 @@ class AggregateInNestedFlatmapErrorTest extends munit.FunSuite {
            )
 
           // TEST
-          testDB.tables.buyers.flatMap(b =>
-            testDB.tables.shipInfos.flatMap(si =>
-              sum(si.buyerId)
+          tables.shipInfos.flatMap(si =>
+            (e = Expr.sum(si.buyerId)).toRow
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class AggregateInNestedFlatmapErrorTest extends munit.FunSuite {
+  def testDescription: String = "aggregation nested inside flatmap should fail"
+  def expectedError: String = "None of the overloaded alternatives"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          tables.buyers.flatMap(b =>
+            tables.shipInfos.aggregate(si =>
+              Expr.sum(si.buyerId)
             )
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class MapInNestedAggregateErrorTest extends munit.FunSuite {
+  def testDescription: String = "map nested inside aggregate should fail"
+  def expectedError: String = "None of the overloaded alternatives"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          import AggregationExpr.toRow
+          import Expr.toRow
+          tables.buyers.aggregate(b =>
+            tables.shipInfos.map(si =>
+              (newId = si.id, bId = b.id).toRow
+            )
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class MixedProjectAggregateErrorTest extends munit.FunSuite {
+  def testDescription: String = "should not be able to project aggregates + non-aggregate fields in aggregate result"
+  def expectedError: String = "value toRow is not a member of"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          import tyql.AggregationExpr.toRow
+          import tyql.Expr.toRow
+          tables.buyers.aggregate(b =>
+            (maxbId=Expr.max(b.id), bId = b.id).toRow
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class MixedProjectMapErrorTest extends munit.FunSuite {
+  def testDescription: String = "should not be able to project aggregates + non-aggregate fields in map result"
+  def expectedError: String = "value toRow is not a member of"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+          // TEST
+          tables.buyers.map(b =>
+            (maxbId=Expr.max(b.id), bId = b.id).toRow
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class InlineFixRecursionErrorTest extends munit.FunSuite {
+  def testDescription: String = "inline fix cannot have recursion"
+  def expectedError: String = "value aggregate is not a member of tyql.Query.RestrictedQueryRef"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr}
+
+           type Edge = (x: Int, y: Int)
+           type Edge2 = (z: Int, q: Int)
+           type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
+
+           val tables = (
+             edges = Table[Edge]("edges"),
+             otherEdges = Table[Edge2]("otherEdges"),
+             emptyEdges = Table[Edge]("empty")
+           )
+
+          // TEST
+          val path = tables.edges
+          path.fix(path =>
+            path.aggregate(p =>
+              tables.edges
+                .filter(e => p.y == e.x)
+                .aggregate(e => (x = Expr.avg(p.x), y = Expr.sum(e.y)).toRow)
+            )
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class FixRecursionErrorTest extends munit.FunSuite {
+  def testDescription: String = "2-query fix cannot have recursion"
+  def expectedError: String = "value aggregate is not a member of tyql.Query.RestrictedQueryRef"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr, Query}
+
+           type Edge = (x: Int, y: Int)
+           type Edge2 = (z: Int, q: Int)
+           type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
+
+           val tables = (
+             edges = Table[Edge]("edges"),
+             otherEdges = Table[Edge2]("otherEdges"),
+             emptyEdges = Table[Edge]("empty")
+           )
+
+          // TEST
+          val pathBase = tables.edges
+          val pathToABase = tables.emptyEdges
+          val (pathResult, pathToAResult) = Query.fix(pathBase, pathToABase)((path, pathToA) =>
+            val P = path.flatMap(p =>
+              tables.edges
+                .filter(e => p.y == e.x)
+                .map(e => (x = p.x, y = e.y).toRow)
+            )
+            val PtoA = path.aggregate(e => Expr.Avg(e.x) == "A")
+            (P, PtoA)
           )
           """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")

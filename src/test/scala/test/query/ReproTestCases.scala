@@ -21,5 +21,5 @@ class ToRowTest extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: 
 }
 
 object Repro {
-  
+
 }

@@ -119,13 +119,14 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
     RestrictedQuery(Query.FlatMap(this, Fun(ref, f(ref).toQuery)))
   /**
    * Equivalent to aggregate(f: Ref => Aggregation).
+   * NOTE: make Ref of type NExpr so that relation.id is counted as NExpr, not ScalarExpr
    *
    * @param f   a function that returns an Aggregation (guaranteed agg in subtree)
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. a single value of type B.
    */
-  def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Aggregation[B]): Aggregation[B] =
-    val ref = Ref[A, ScalarExpr]()
+  def aggregate[B: ResultTag](f: Ref[A, NExpr] => Aggregation[B]): Aggregation[B] =
+    val ref = Ref[A, NExpr]()
     Aggregation.AggFlatMap(this, Fun(ref, f(ref)))
 
   /**
@@ -139,8 +140,8 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @return    Aggregation[B], a scalar result, e.g. single value of type B.
    */
   @targetName("AggregateExpr")
-  def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => AggregationExpr[B]): Aggregation[B] =
-    val ref = Ref[A, ScalarExpr]()
+  def aggregate[B: ResultTag](f: Ref[A, NExpr] => AggregationExpr[B]): Aggregation[B] =
+    val ref = Ref[A, NExpr]()
     Aggregation.AggFlatMap(this, Fun(ref, f(ref)))
 
   /**
@@ -150,9 +151,9 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B   the named-tuple-of-Aggregation that will be converted to an Aggregation-of-named-tuple
    * @return     Aggregation of B.toRow, e.g. a scalar result of type B.toRow
    */
-  def aggregate[B <: AnyNamedTuple: AggregationExpr.IsTupleOfAgg]/*(using ev: AggregationExpr.IsTupleOfAgg[B] =:= true)*/(using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, ScalarExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
+  def aggregate[B <: AnyNamedTuple: AggregationExpr.IsTupleOfAgg]/*(using ev: AggregationExpr.IsTupleOfAgg[B] =:= true)*/(using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, NExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
     import AggregationExpr.toRow
-    val ref = Ref[A, ScalarExpr]()
+    val ref = Ref[A, NExpr]()
     val row = f(ref).toRow
     Aggregation.AggFlatMap(this, Fun(ref, row))
 

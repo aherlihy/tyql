@@ -20,8 +20,7 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   /** This type is used to support selection with any of the field names
    *  defined by Fields.
    */
-  type Fields = //NamedTuple.Map[NamedTuple.From[Result], Expr]
-                NamedTuple.Map[NamedTuple.From[Result], [T] =>> Expr[T, Shape]]
+  type Fields = NamedTuple.Map[NamedTuple.From[Result], [T] =>> Expr[T, Shape]]
 
  /** A selection of a field name defined by Fields is implemented by `selectDynamic`.
    *  The implementation will add a cast to the right Expr type corresponding
@@ -42,14 +41,6 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
 
   def == (other: String): Expr[Boolean, CalculatedShape[Shape, NExpr]] = Expr.Eq(this, Expr.StringLit(other))
   def == (other: Int): Expr[Boolean, CalculatedShape[Shape, NExpr]] = Expr.Eq(this, Expr.IntLit(other))
-
-/**
- * Necessary to distinguish expressions that are NOT aggregations. Scalar expressions
- * produce one element per input row, as opposed to aggregate expressions produce one
- * element for the entire table.
- * @tparam Result
- */
-//trait ScalarExpr[Result](using override val tag: ResultTag[Result]) extends Expr[Result]
 
 object Expr:
   def sum(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
