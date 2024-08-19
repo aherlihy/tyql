@@ -55,6 +55,7 @@ object TreePrettyPrinter {
       case IntLit(value) => s"${indent(depth)}IntLit($value)"
       case StringLit(value) => s"${indent(depth)}StringLit($value)"
       case DoubleLit(value) => s"${indent(depth)}DoubleLit($value)"
+      case BooleanLit(value) => s"${indent(depth)}BooleanLit($value)"
       case Project(inner) =>
         val a = NamedTuple.toTuple(inner.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
         val namedTupleNames = expr.tag match

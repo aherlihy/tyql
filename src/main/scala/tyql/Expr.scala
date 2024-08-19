@@ -8,11 +8,9 @@ trait ExprShape
 class ScalarExpr extends ExprShape
 class NExpr extends ExprShape
 
-type CalculatedShape[S1, S2] <: ExprShape = S1 match
-  case ScalarExpr => ScalarExpr
-  case NExpr => S2 match
-    case ScalarExpr => ScalarExpr
-    case NExpr => NExpr
+type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
+  case ScalarExpr => S2
+  case NExpr => S1
 
 
 /** The type of expressions in the query language */
@@ -30,17 +28,18 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
 
   /** Member methods to implement universal equality on Expr level. */
   @targetName("eqNonScalar")
-  def ==(other: Expr[?, NExpr]): Expr[Boolean, CalculatedShape[Shape, NExpr]] = Expr.Eq[Shape, NExpr](this, other)
+  def ==(other: Expr[?, NExpr]): Expr[Boolean, Shape] = Expr.Eq[Shape, NExpr](this, other)
   @targetName("eqScalar")
-  def ==(other: Expr[?, ScalarExpr]): Expr[Boolean, CalculatedShape[Shape, ScalarExpr]] = Expr.Eq[Shape, ScalarExpr](this, other)
+  def ==(other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Eq[Shape, ScalarExpr](this, other)
+//  def == [S <: ScalarExpr](other: Expr[?, S]): Expr[Boolean, CalculatedShape[Shape, S]] = Expr.Eq(this, other)
+  def ==(other: String): Expr[Boolean, Shape] = Expr.Eq(this, Expr.StringLit(other))
+  def ==(other: Int): Expr[Boolean, Shape] = Expr.Eq(this, Expr.IntLit(other))
+  def ==(other: Boolean): Expr[Boolean, Shape] = Expr.Eq(this, Expr.BooleanLit(other))
 
   @targetName("neqNonScalar")
-  def != (other: Expr[?, NExpr]): Expr[Boolean, CalculatedShape[Shape, NExpr]] = Expr.Ne[Shape, NExpr](this, other)
+  def != (other: Expr[?, NExpr]): Expr[Boolean, Shape] = Expr.Ne[Shape, NExpr](this, other)
   @targetName("neqScalar")
-  def != (other: Expr[?, ScalarExpr]): Expr[Boolean, CalculatedShape[Shape, ScalarExpr]] = Expr.Ne[Shape, ScalarExpr](this, other)
-
-  def == (other: String): Expr[Boolean, CalculatedShape[Shape, NExpr]] = Expr.Eq(this, Expr.StringLit(other))
-  def == (other: Int): Expr[Boolean, CalculatedShape[Shape, NExpr]] = Expr.Eq(this, Expr.IntLit(other))
+  def != (other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
 
 object Expr:
   def sum(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
@@ -53,22 +52,24 @@ object Expr:
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape](x: Expr[Int, S1])
     def >[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
-    def >(y: Int): Expr[Boolean, CalculatedShape[S1, NExpr]] = Gt(x, IntLit(y))
+    def >(y: Int): Expr[Boolean, S1] = Gt[S1, NExpr](x, IntLit(y))
 
   // TODO: write for numerical
   extension [S1 <: ExprShape](x: Expr[Double, S1])
     @targetName("gtDoubleExpr")
-    def >[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = GtDouble(x, y)
+    def >[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Boolean, CalculatedShape[S1, S2]] =
+      GtDouble(x, y)
     @targetName("gtDoubleLit")
-    def >(y: Double): Expr[Boolean, CalculatedShape[S1, NExpr]] = GtDouble(x, DoubleLit(y))
+    def >(y: Double): Expr[Boolean, S1] =
+      GtDouble[S1, NExpr](x, DoubleLit(y))
 
   extension [S1 <: ExprShape](x: Expr[Boolean, S1])
     def &&[S2 <: ExprShape] (y: Expr[Boolean, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = And(x, y)
     def ||[S2 <: ExprShape] (y: Expr[Boolean, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Or(x, y)
 
   extension [S1 <: ExprShape](x: Expr[String, S1])
-    def toLowerCase: Expr[String, CalculatedShape[S1, NExpr]] = Expr.Lower(x)
-    def toUpperCase: Expr[String, CalculatedShape[S1, NExpr]] = Expr.Upper(x)
+    def toLowerCase: Expr[String, S1] = Expr.Lower(x)
+    def toUpperCase: Expr[String, S1] = Expr.Upper(x)
 
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
@@ -82,8 +83,8 @@ object Expr:
   case class And[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Or[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
 
-  case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, CalculatedShape[S, NExpr]]
-  case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, CalculatedShape[S, NExpr]]
+  case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
+  case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // Todo: Make it strongly typed like the other cases
@@ -127,6 +128,9 @@ object Expr:
 
   case class DoubleLit($value: Double) extends Expr[Double, NExpr]
   given Conversion[Double, DoubleLit] = DoubleLit(_)
+
+  case class BooleanLit($value: Boolean) extends Expr[Boolean, NExpr]
+//  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
 
   /** The internal representation of a function `A => B`
    *  Query languages are ususally first-order, so Fun is not an Expr
