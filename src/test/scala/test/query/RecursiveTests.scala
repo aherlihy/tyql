@@ -35,9 +35,9 @@ class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
     WITH RECURSIVE recursive$A AS
       (SELECT * FROM edges as edges$B
         UNION ALL
-      SELECT ref$D.x as x, edges$C.y as y
+      (SELECT ref$D.x as x, edges$C.y as y
       FROM recursive$A as ref$D, edges as edges$C
-      WHERE ref$D.y = edges$C.x) SELECT * FROM recursive$A as recref$E
+      WHERE ref$D.y = edges$C.x)) SELECT * FROM recursive$A as recref$E
       """
 }
 class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
@@ -57,11 +57,11 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
     WITH RECURSIVE recursive$A AS
       (SELECT * FROM edges as edges$B
         UNION ALL
-      SELECT * FROM edges as edges$E
+      (SELECT * FROM edges as edges$E
         UNION ALL
       SELECT ref$D.x as x, edges$C.y as y
       FROM recursive$A as ref$D, edges as edges$C
-      WHERE ref$D.y = edges$C.x)
+      WHERE ref$D.y = edges$C.x))
     SELECT * FROM recursive$A as recref$F
       """
 }
@@ -124,9 +124,9 @@ class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
       WITH RECURSIVE recursive$A AS
         (SELECT * FROM edges as edges$B
           UNION ALL
-        SELECT ref$D.x as x, edges$C.y as y
+        (SELECT ref$D.x as x, edges$C.y as y
         FROM recursive$A as ref$D, edges as edges$C
-        WHERE ref$D.y = edges$C.x) SELECT recref$E.x FROM recursive$A as recref$E
+        WHERE ref$D.y = edges$C.x)) SELECT recref$E.x FROM recursive$A as recref$E
         """
 }
 
@@ -148,9 +148,9 @@ class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
         WITH RECURSIVE recursive$A AS
           (SELECT * FROM edges as edges$B
             UNION ALL
-          SELECT ref$Z.x as x, edges$C.y as y
+          (SELECT ref$Z.x as x, edges$C.y as y
           FROM recursive$A as ref$Z, edges as edges$C
-          WHERE ref$Z.y = edges$C.x) SELECT * FROM recursive$A as recref$X WHERE recref$X.x > 1
+          WHERE ref$Z.y = edges$C.x)) SELECT * FROM recursive$A as recref$X WHERE recref$X.x > 1
           """
 }
 
@@ -172,9 +172,9 @@ class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
           WITH RECURSIVE recursive$A AS
             (SELECT * FROM edges as edges$B
               UNION ALL
-            SELECT ref$Z.x as x, edges$C.y as y
+            (SELECT ref$Z.x as x, edges$C.y as y
             FROM recursive$A as ref$Z, edges as edges$C
-            WHERE ref$Z.y = edges$C.x) SELECT recref$X.x FROM recursive$A as recref$X WHERE recref$X.x > 1
+            WHERE ref$Z.y = edges$C.x)) SELECT recref$X.x FROM recursive$A as recref$X WHERE recref$X.x > 1
             """
 }
 
@@ -248,7 +248,7 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
           .filter(e => p.y == e.x)
           .map(e => (x = p.x, y = e.y).toRow)
       )
-      val PtoA = path.filter(e => e.x == "A")
+      val PtoA = path.filter(e => e.x == 1)
       (P, PtoA)
     )
 
@@ -260,13 +260,13 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
           recursive$P AS
             (SELECT * FROM edges as edges$F
                 UNION ALL
-             SELECT ref$Z.x as x, edges$C.y as y
+             (SELECT ref$Z.x as x, edges$C.y as y
              FROM recursive$P as ref$Z, edges as edges$C
-             WHERE ref$Z.y = edges$C.x),
+             WHERE ref$Z.y = edges$C.x)),
           recursive$A AS
            (SELECT * FROM empty as empty$D
               UNION ALL
-            SELECT * FROM recursive$P as ref$X WHERE ref$X.x = "A")
+            (SELECT * FROM recursive$P as ref$X WHERE ref$X.x = 1))
       SELECT * FROM recursive$A as recref$Q
       """
 }
@@ -284,7 +284,7 @@ class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
           .filter(p2 => p.y == p2.x)
           .map(p2 => (x = p.x, y = p2.y).toRow)
       )
-      val PtoA = path.filter(e => e.x == "A")
+      val PtoA = path.filter(e => e.x == 9)
       (P, PtoA)
     )
 
@@ -296,13 +296,13 @@ class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
             recursive$P AS
               (SELECT * FROM edges as edges$F
                   UNION ALL
-               SELECT ref$Z.x as x, ref$Y.y as y
+               (SELECT ref$Z.x as x, ref$Y.y as y
                FROM recursive$P as ref$Z, recursive$P as ref$Y
-               WHERE ref$Z.y = ref$Y.x),
+               WHERE ref$Z.y = ref$Y.x)),
             recursive$A AS
              (SELECT * FROM empty as empty$D
                 UNION ALL
-              SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = "A")
+              (SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = 9))
         SELECT * FROM recursive$A as recref$S
         """
 }
@@ -321,7 +321,7 @@ class RecursiveSelfJoin2Test extends SQLStringQueryTest[TCDB, Edge] {
           .filter(p2 => p.x != p2.y) // ignore it makes no sense
           .map(p2 => (x = p.x, y = p2.y).toRow)
       )
-      val PtoA = path.filter(e => e.x == "A")
+      val PtoA = path.filter(e => e.x == 8)
       (P, PtoA)
     )
 
@@ -333,13 +333,13 @@ class RecursiveSelfJoin2Test extends SQLStringQueryTest[TCDB, Edge] {
             recursive$P AS
               (SELECT * FROM edges as edges$F
                   UNION ALL
-               SELECT ref$Z.x as x, ref$Y.y as y
+               (SELECT ref$Z.x as x, ref$Y.y as y
                FROM recursive$P as ref$Z, recursive$P as ref$Y
-               WHERE ref$Z.x <> ref$Y.y AND ref$Z.y = ref$Y.x),
+               WHERE ref$Z.x <> ref$Y.y AND ref$Z.y = ref$Y.x)),
             recursive$A AS
              (SELECT * FROM empty as empty$D
                 UNION ALL
-              SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = "A")
+              (SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = 8))
         SELECT * FROM recursive$A as recref$S
         """
 }
@@ -422,7 +422,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
       recursive$A AS
         (SELECT * FROM assign as assign$D
 				  UNION ALL
-			  SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E
+			  (SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E
 					UNION ALL
 				SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F
 					UNION ALL
@@ -432,17 +432,17 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
 					UNION ALL
 				SELECT ref$K.p1 as p1, ref$L.p2 as p2
 				FROM recursive$A as ref$K, recursive$A as ref$L
-				WHERE ref$K.p2 = ref$L.p1),
+				WHERE ref$K.p2 = ref$L.p1)),
 		  recursive$B AS
 		    (SELECT * FROM empty as empty$M
 					UNION ALL
-				SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+				(SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
 				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1),
+				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1)),
 			recursive$C AS
 			  (SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H
 					UNION ALL
-				SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I
+				(SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I
 					UNION ALL
 				SELECT ref$Q.p2 as p1, ref$R.p2 as p2
 				FROM recursive$A as ref$Q, recursive$A as ref$R
@@ -450,7 +450,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
 					UNION ALL
 				SELECT ref$S.p2 as p1, ref$T.p2 as p2
 				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)
+				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))
 		SELECT * FROM recursive$A as recref$V
     """
 }
@@ -533,7 +533,7 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
       recursive$A AS
         (SELECT * FROM assign as assign$D
 				  UNION ALL
-			  SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E
+			  (SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E
 					UNION ALL
 				SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F
 					UNION ALL
@@ -543,17 +543,17 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
 					UNION ALL
 				SELECT ref$K.p1 as p1, ref$L.p2 as p2
 				FROM recursive$A as ref$K, recursive$A as ref$L
-				WHERE ref$K.p2 = ref$L.p1),
+				WHERE ref$K.p2 = ref$L.p1)),
 		  recursive$B AS
 		    (SELECT * FROM empty as empty$M
 					UNION ALL
-				SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+				(SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
 				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1),
+				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1)),
 			recursive$C AS
 			  (SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H
 					UNION ALL
-				SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I
+				(SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I
 					UNION ALL
 				SELECT ref$Q.p2 as p1, ref$R.p2 as p2
 				FROM recursive$A as ref$Q, recursive$A as ref$R
@@ -561,7 +561,7 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
 					UNION ALL
 				SELECT ref$S.p2 as p1, ref$T.p2 as p2
 				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)
+				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))
 		SELECT * FROM recursive$A as recref$V
     """
 }

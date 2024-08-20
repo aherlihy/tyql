@@ -30,7 +30,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   /**
    * Classic flatMap with an inner query that is a RestrictedQuery.
    * This turns the result query into a RestrictedQuery.
-   * Exists to support doing <query>.flatMap(...) within a fix
+   * Exists to support doing BaseCaseRelation.flatMap(...) within a fix
    * @param f   a function that returns a RestrictedQuery, meaning it has used a recursive definition from fix.
    * @tparam B  the result type of the query.
    * @return    RestrictedQuery[B]
@@ -142,7 +142,7 @@ object Query:
    */
   def fix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?])(fns: ToRestrictedQueryRef[QT] => ToRestrictedQuery[QT]): ToQuery[QT] =
     val baseRefsAndDefs = bases.toArray.map {
-      case MultiRecursive(params, querys, resultQ) => ???//(param, query)
+      case MultiRecursive(params, querys, resultQ) => ???// TODO: decide on multiple fix definition semantics. (param, query)
       case base: Query[t] => (RestrictedQueryRef()(using base.tag), base)
     }
     val refsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[ToRestrictedQueryRef[QT]]

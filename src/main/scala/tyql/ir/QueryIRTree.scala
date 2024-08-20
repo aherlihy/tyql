@@ -212,13 +212,23 @@ object QueryIRTree:
         val allSymbols = symbols.bind(vars)
         val aliases = vars.map(v => v._2.pointsToAlias)
         val subqueriesIR = multiRecursive.$subquery.map(q => generateQuery(q, allSymbols).appendFlag(SelectFlags.Final))
+        // Special case to enforce parens around recursive definitions
+        val separatedSQ = subqueriesIR.map {
+          case union: NaryRelationOp =>
+            val base = union.children.head
+            val recur = union.children.tail
+            val recurIR = NaryRelationOp(recur, union.op, union.ast).appendFlag(SelectFlags.ExprLevel)
+            NaryRelationOp(Seq(base, recurIR), union.op, union.ast).appendFlags(union.flags)
+          case _ => throw new Exception("Unexpected non-union subtree of recursive query")
+        }
+
         val finalQ = multiRecursive.$resultQuery match
           case ref: QueryRef[?] =>
             val v = vars.find((id, _) => id == ref.stringRef()).get._2
             SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery)
           case q => ??? //generateQuery(q, allSymbols, multiRecursive.$resultQuery)
 
-        MultiRecursiveRelationOp(aliases, subqueriesIR, finalQ.appendFlag(SelectFlags.Final), multiRecursive)
+        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), multiRecursive)
 
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
