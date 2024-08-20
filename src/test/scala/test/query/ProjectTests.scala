@@ -142,7 +142,7 @@ class Project4Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: St
   //        s.concat(c)
 
   def expectedQueryPattern: String ="""
-    SELECT subquery$A.* , subquery$B.* FROM
+    SELECT subquery$A.*, subquery$B.* FROM
        (SELECT product$C.id as id, product$C.name as name, product$C.price as price FROM product as product$C) as subquery$A,
        (SELECT shippingInfo$D.buyerId as buyerId, shippingInfo$D.shippingDate as shippingDate FROM shippingInfo as shippingInfo$D) as subquery$B
         """

@@ -695,3 +695,97 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
       SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = "Oasis"
       """
 }
+
+type Path = (startNode: Int, endNode: Int, path: List[Int])
+type ReachabilityDB = (edge: Edge)
+
+given ReachabilityDBs: TestDatabase[ReachabilityDB] with
+  override def tables = (
+    edge = Table[Edge]("edge")
+  )
+class RecursionReachabilityTest extends SQLStringQueryTest[ReachabilityDB, Path] {
+  def testDescription: String = "Enumerate all paths from a node example from duckdb docs"
+  def dbSetup: String =
+    """
+    CREATE TABLE edge (x INTEGER, y INTEGER);
+    INSERT INTO edge
+      VALUES
+        (1, 3), (1, 5), (2, 4), (2, 5), (2, 10), (3, 1), (3, 5), (3, 8), (3, 10),
+        (5, 3), (5, 4), (5, 8), (6, 3), (6, 4), (7, 4), (8, 1), (9, 4);
+    """
+
+  def query() =
+    val pathBase = testDB.tables.edge
+      .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
+      .filter(p => p.startNode == 1) // Filter after map means subquery
+
+    pathBase.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edge
+          .filter(e => e.x == p.endNode && !p.path.contains(e.y))
+          .map(e =>
+            (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
+          )
+        )
+      ).sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+        recursive$150 AS
+          (SELECT * FROM (SELECT edge$150.x as startNode, edge$150.y as endNode, [edge$150.x, edge$150.y] as path
+           FROM edge as edge$150) as subquery$151
+          WHERE subquery$151.startNode = 1
+            UNION ALL
+          (SELECT ref$70.startNode as startNode, edge$152.y as endNode, list_append(ref$70.path, edge$152.y) as path
+           FROM recursive$150 as ref$70, edge as edge$152
+           WHERE edge$152.x = ref$70.endNode AND NOT list_contains(ref$70.path, edge$152.y)))
+      SELECT * FROM recursive$150 as recref$13 ORDER BY length(recref$13.path) ASC, path ASC
+      """
+}
+class RecursionShortestPathTest extends SQLStringQueryTest[ReachabilityDB, Path] {
+  def testDescription: String = "Shortest path example from duckdb docs"
+  def dbSetup: String =
+    """
+    CREATE TABLE edge (x INTEGER, y INTEGER);
+    INSERT INTO edge
+      VALUES
+        (1, 3), (1, 5), (2, 4), (2, 5), (2, 10), (3, 1), (3, 5), (3, 8), (3, 10),
+        (5, 3), (5, 4), (5, 8), (6, 3), (6, 4), (7, 4), (8, 1), (9, 4);
+    """
+
+  def query() =
+    val pathBase = testDB.tables.edge
+      .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
+      .filter(p => p.startNode == 1) // Filter after map means subquery
+
+    pathBase.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edge
+          .filter(e =>
+            e.x == p.endNode && path.filter(p2 => p2.path.contains(e.y)).isEmpty
+          )
+          .map(e =>
+            (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
+          )
+      )
+    ).sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+          recursive$116 AS
+            (SELECT * FROM
+              (SELECT edge$116.x as startNode, edge$116.y as endNode, [edge$116.x, edge$116.y] as path
+               FROM edge as edge$116) as subquery$117
+             WHERE subquery$117.startNode = 1
+                UNION ALL
+            (SELECT
+                ref$58.startNode as startNode, edge$118.y as endNode, list_append(ref$58.path, edge$118.y) as path
+             FROM recursive$116 as ref$58, edge as edge$118
+             WHERE edge$118.x = ref$58.endNode
+                AND
+             NOT EXISTS (SELECT * FROM recursive$116 as ref$60 WHERE list_contains(ref$60.path, edge$118.y))))
+      SELECT * FROM recursive$116 as recref$9 ORDER BY length(recref$9.path) ASC, path ASC
+      """
+}

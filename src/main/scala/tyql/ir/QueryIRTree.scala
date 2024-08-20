@@ -286,13 +286,14 @@ object QueryIRTree:
         QueryIRVar(sub, name, ref) // TODO: singleton?
       case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
       case p: Expr.Project[?] => generateProjection(p, symbols)
-      case g: Expr.Gt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
-      case g: Expr.Lt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), "<", g)
-      case g: Expr.GtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
-      case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
-      case a: Expr.Plus[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "+", a)
-      case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
-      case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "<>", a)
+      case g: Expr.Gt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
+      case g: Expr.Lt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
+      case g: Expr.GtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
+      case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", a)
+      case n: Expr.Not[?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", n)
+      case a: Expr.Plus[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", a)
+      case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", a)
+      case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", a)
       case a: Expr.Concat[?, ?, ?, ?] =>
         val lhsIR = generateExpr(a.$x, symbols) match
           case p: ProjectClause => p
@@ -306,7 +307,7 @@ object QueryIRTree:
         BinExprOp(
           lhsIR,
           rhsIR,
-          ",",
+          (l, r) => s"$l, $r",
           a
         )
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
@@ -316,7 +317,12 @@ object QueryIRTree:
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
-      case p: Expr.Prepend[?] => BinExprFnOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), "list_prepend", p)
+      case p: Expr.ListPrepend[?] => BinExprOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), (l, r) => s"list_prepend($l, $r)", p)
+      case p: Expr.ListAppend[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_append($l, $r)", p)
+      case p: Expr.ListContains[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_contains($l, $r)", p)
+      case p: Expr.ListLength[?] => UnaryExprOp(generateExpr(p.$list, symbols), s => s"length($s)", p)
+      case p: Expr.NonEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"EXISTS ($s)", p)
+      case p: Expr.IsEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"NOT EXISTS ($s)", p)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
   private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable): QueryIRNode =

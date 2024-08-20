@@ -39,4 +39,11 @@ class RestrictedQuery[A](using ResultTag[A])(protected val wrapped: Query[A]) ex
   def unionAll(that: Query[A]): RestrictedQuery[A] =
     RestrictedQuery(Query.Union(wrapped, that, false))
 
+  // TODO: Does nonEmpty count as non-monotone?
+  def nonEmpty: Expr[Boolean, NExpr] =
+    Expr.NonEmpty(wrapped)
+
+  def isEmpty: Expr[Boolean, NExpr] =
+    Expr.IsEmpty(wrapped)
+
 

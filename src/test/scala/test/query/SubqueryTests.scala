@@ -1672,7 +1672,7 @@ class SubqueryInMapNestedConcatSubqueryTest extends SQLStringQueryTest[AllCommer
     )
   def expectedQueryPattern = """
         SELECT
-          buyers$B.id as id, buyers$B.name as name, buyers$B.dateOfBirth as dateOfBirth , (SELECT
+          buyers$B.id as id, buyers$B.name as name, buyers$B.dateOfBirth as dateOfBirth, (SELECT
             COUNT(1)
             FROM shippingInfo as shippingInfo$C
             WHERE shippingInfo$C.buyerId = buyers$B.id) as occurances

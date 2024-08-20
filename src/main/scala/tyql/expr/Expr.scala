@@ -72,13 +72,17 @@ object Expr:
   extension [S1 <: ExprShape](x: Expr[Boolean, S1])
     def &&[S2 <: ExprShape] (y: Expr[Boolean, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = And(x, y)
     def ||[S2 <: ExprShape] (y: Expr[Boolean, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Or(x, y)
+    def unary_! = Not(x)
 
   extension [S1 <: ExprShape](x: Expr[String, S1])
     def toLowerCase: Expr[String, S1] = Expr.Lower(x)
     def toUpperCase: Expr[String, S1] = Expr.Upper(x)
 
   extension [A](x: Expr[List[A], NExpr])(using ResultTag[List[A]])
-    def prepend(elem: Expr[A, NExpr]): Expr[List[A], NExpr] = Prepend(elem, x)
+    def prepend(elem: Expr[A, NExpr]): Expr[List[A], NExpr] = ListPrepend(elem, x)
+    def append(elem: Expr[A, NExpr]): Expr[List[A], NExpr] = ListAppend(x, elem)
+    def contains(elem: Expr[A, NExpr]): Expr[Boolean, NExpr] = ListContains(x, elem)
+    def length: Expr[Int, NExpr] = ListLength(x)
 
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
@@ -92,6 +96,7 @@ object Expr:
   case class Plus[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Int, CalculatedShape[S1, S2]]
   case class And[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Or[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class Not[S1 <: ExprShape]($x: Expr[Boolean, S1]) extends Expr[Boolean, S1]
 
   case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
   case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
@@ -102,7 +107,10 @@ object Expr:
     def toExpr(using ResultTag[List[A]]): ListExpr[A] = ListExpr(x)
   //  given Conversion[List[A], ListExpr[A]] = ListExpr(_)
 
-  case class Prepend[A]($x: Expr[A, NExpr], $list: Expr[List[A], NExpr])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
+  case class ListPrepend[A]($x: Expr[A, NExpr], $list: Expr[List[A], NExpr])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
+  case class ListAppend[A]($list: Expr[List[A], NExpr], $x: Expr[A, NExpr])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
+  case class ListContains[A]($list: Expr[List[A], NExpr], $x: Expr[A, NExpr])(using ResultTag[Boolean]) extends Expr[Boolean, NExpr]
+  case class ListLength[A]($list: Expr[List[A], NExpr])(using ResultTag[Int]) extends Expr[Int, NExpr]
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // Todo: Make it strongly typed like the other cases
@@ -121,11 +129,11 @@ object Expr:
   case class Eq[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Ne[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
 
-  case class Contains[A]($this: Query[A], $other: Expr[A, ?]) extends Expr[Boolean, ScalarExpr]
-
-  case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean, ScalarExpr]
-
-  case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean, ScalarExpr]
+  // Expressions resulting from queries
+  // Cannot use Contains with an aggregation
+  case class Contains[A]($this: Query[A], $other: Expr[A, NExpr]) extends Expr[Boolean, NExpr]
+  case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean, NExpr]
+  case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean, NExpr]
 
   /** References are placeholders for parameters */
   private var refCount = 0 // TODO: do we want to recount from 0 for each query?
@@ -154,7 +162,6 @@ object Expr:
    *  Query languages are ususally first-order, so Fun is not an Expr
    */
   case class Fun[A, B, S <: ExprShape]($param: Ref[A, S], $body: B)
-//  case class AggFun[A, B]($param: Ref[A], $f: B)
 
   type Pred[A, S <: ExprShape] = Fun[A, Expr[Boolean, S], S]
 

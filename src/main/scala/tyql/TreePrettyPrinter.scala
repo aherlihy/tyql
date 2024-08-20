@@ -47,11 +47,22 @@ object TreePrettyPrinter {
       case Lt(x, y) => s"${indent(depth)}Lt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case ListExpr(elements) =>
         s"${indent(depth)}ListExpr(\n${elements.map(_.prettyPrint(depth + 1)).mkString("\n")}\n${indent(depth)}"
-      case Prepend(x, list) =>
-        s"${indent(depth)}Prepend(\n${x.prettyPrint(depth + 1)},\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case ListPrepend(x, list) =>
+        s"${indent(depth)}ListPrepend(\n${x.prettyPrint(depth + 1)},\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case ListAppend(list, x) =>
+        s"${indent(depth)}ListAppend(\n${x.prettyPrint(depth + 1)},\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case ListContains(list, x) =>
+        s"${indent(depth)}ListContains(\n${x.prettyPrint(depth + 1)},\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case ListLength(list) =>
+        s"${indent(depth)}ListLength(\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case NonEmpty(list) =>
+        s"${indent(depth)}NonEmpty(\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case IsEmpty(list) =>
+        s"${indent(depth)}IsEmpty(\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
       case GtDouble(x, y) => s"${indent(depth)}GtDouble(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case And(x, y) => s"${indent(depth)}And(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Or(x, y) => s"${indent(depth)}Or(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Not(x) => s"${indent(depth)}Not(${x.prettyPrint(depth + 1)})"
       case Plus(x, y) => s"${indent(depth)}Plus(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Upper(x) => s"${indent(depth)}Upper(${x.prettyPrint(depth + 1)})"
       case Lower(x) => s"${indent(depth)}Lower(${x.prettyPrint(depth + 1)})"
@@ -189,22 +200,17 @@ object TreePrettyPrinter {
   }
 
   extension (node: QueryIRNode) {
-    def prettyPrintIR(depth: Int, printAST: Boolean): String = node match {      case unaryOp: UnaryExprOp =>
+    def prettyPrintIR(depth: Int, printAST: Boolean): String = node match {
+      case unaryOp: UnaryExprOp =>
         val childPrint = unaryOp.child.prettyPrintIR(depth + 1, printAST)
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", unaryOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}UnaryExprOp(\n${indent(depth + 1)}op='${unaryOp.op("...")}',\n$childPrint$astPrint\n${indent(depth)})"
       case binOp: BinExprOp =>
         val lhsPrint = binOp.lhs.prettyPrintIR(depth + 1, printAST)
         val rhsPrint = binOp.rhs.prettyPrintIR(depth + 1, printAST)
-        val opPrint = binOp.op
+        val opPrint = binOp.op("'..1'", "'..2'")
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", binOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}BinExprOp(\n${indent(depth + 1)}op='$opPrint',\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
-      case binOp: BinExprFnOp =>
-        val lhsPrint = binOp.lhs.prettyPrintIR(depth + 1, printAST)
-        val rhsPrint = binOp.rhs.prettyPrintIR(depth + 1, printAST)
-        val opPrint = binOp.op
-        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", binOp.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}BinExprFnOp(\n${indent(depth + 1)}op='$opPrint',\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
       case listType: ListTypeExpr =>
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", listType.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}ListTypeExpr(\n${listType.elements.map(_.prettyPrintIR(depth + 1, printAST)).mkString("\n,")}$astPrint\n${indent(depth)})"

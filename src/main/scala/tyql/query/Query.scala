@@ -236,18 +236,18 @@ object Query:
       val ref = Ref[R, NExpr]()
        Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Sum(f(ref))))
 
-//    def avg[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
-//      val ref = Ref[R]()
-//       Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Avg(f(ref))))
-//
-//    def max[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
-//      val ref = Ref[R]()
-//       Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Max(f(ref))))
-//
-//    def min[B: ResultTag](f: Ref[R] => Expr[B]): Aggregation[B] =
-//      val ref = Ref[R]()
-//       Aggregation.AggFlatMap(x, Fun(ref, Aggregation.Min(f(ref))))
-//
+    def avg[B: ResultTag](f: Ref[R, NExpr] => Expr[B, NExpr]): Aggregation[B] =
+      val ref = Ref[R, NExpr]()
+       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Avg(f(ref))))
+
+    def max[B: ResultTag](f: Ref[R, NExpr] => Expr[B, NExpr]): Aggregation[B] =
+      val ref = Ref[R, NExpr]()
+       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Max(f(ref))))
+
+    def min[B: ResultTag](f: Ref[R, NExpr] => Expr[B, NExpr]): Aggregation[B] =
+      val ref = Ref[R, NExpr]()
+       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Min(f(ref))))
+
     def size: Aggregation[Int] =
       val ref = Ref[R, ScalarExpr]()
       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Count(ref)))
@@ -265,14 +265,14 @@ object Query:
       Except(x, that)
 
     // Does not work for subsets, need to match types exactly
-//    def contains[S <: ScalarExpr](that: Expr[R, S]): Expr[Boolean, S] =
-//      Expr.Contains(x, that)
+    def contains(that: Expr[R, NExpr]): Expr[Boolean, NExpr] =
+      Expr.Contains(x, that)
 
-//    def nonEmpty(): Expr[Boolean] =
-//      Expr.NonEmpty(x)
-//
-//    def isEmpty(): Expr[Boolean] =
-//      Expr.IsEmpty(x)
+    def nonEmpty(): Expr[Boolean, NExpr] =
+      Expr.NonEmpty(x)
+
+    def isEmpty(): Expr[Boolean, NExpr] =
+      Expr.IsEmpty(x)
 //
 //    def groupBy[B, C: ResultTag](
 //     selectFn: Expr.Ref[R] => Expr[C],

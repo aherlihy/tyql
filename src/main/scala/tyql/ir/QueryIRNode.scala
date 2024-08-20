@@ -20,11 +20,8 @@ case class WhereClause(children: Seq[QueryIRNode], ast: Expr[?, ?]) extends Quer
  * Binary expression-level operation.
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
  */
-case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
-
-case class BinExprFnOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = s"$op(${lhs.toSQLString()}, ${rhs.toSQLString()})"
+case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: (String, String) => String, ast: Expr[?, ?]) extends QueryIRNode:
+  override def toSQLString(): String = op(lhs.toSQLString(), rhs.toSQLString())
 
 /**
  * Unary expression-level operation.
