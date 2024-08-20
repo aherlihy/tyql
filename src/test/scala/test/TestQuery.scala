@@ -5,6 +5,7 @@ import language.experimental.namedTuples
 import NamedTuple.AnyNamedTuple
 import scala.util.Try
 import scala.util.matching.Regex
+import scala.util.boundary
 
 class TestDatabase[Rows <: AnyNamedTuple] {
   def tables: NamedTuple.Map[Rows, Table] = ???
@@ -18,7 +19,8 @@ trait TestQuery[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]](using val 
 }
 
 object TestComparitor {
-  def matchStrings(expectedQuery: String, actualQuery: String): (Boolean, String) = {
+
+  def matchStrings(expectedQuery: String, actualQuery: String): (Boolean, String) = boundary {
     val placeholderPattern = "(\\w+)\\$(\\w+)".r
 
     // Step 1: Split the expected string by placeholders and get the list of placeholders
@@ -51,13 +53,13 @@ object TestComparitor {
             // If it has, ensure the same number is used
             if (mappedNumber != actualNumber) {
               val debugMessage = s"Expected $mappedNumber for $placeholder but found $actualNumber in actual query."
-              return (false, debugMessage)
+              boundary.break((false, debugMessage)) // Use boundary.break to return early
             }
           case None =>
             // If it's the first time seeing this placeholder, store the mapping
             if (mappings(variableName).values.exists(_ == actualNumber)) {
               val debugMessage = s"Multiple placeholders pointing to the same number: $actualNumber."
-              return (false, debugMessage)
+              boundary.break((false, debugMessage)) // Use boundary.break to return early
             }
             mappings(variableName).addOne(placeholder, actualNumber)
         }

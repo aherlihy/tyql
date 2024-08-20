@@ -262,40 +262,22 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
           astOther
         )
       case o: OrderedQuery =>
-        // hoist where, TODO: fix unreachable cases
-        (query, o.query) match
-          case q: (SelectAllQuery, SelectAllQuery) =>
-            SelectAllQuery(
-              Seq(
-                OrderedQuery(SelectAllQuery(q._1.from, Seq(), Some(q._1.alias), q._1.ast).appendFlag(SelectFlags.Final), sortFn, ast),
-                OrderedQuery(SelectAllQuery(q._2.from, Seq(), Some(q._2.alias), q._2.ast).appendFlag(SelectFlags.Final), o.sortFn, o.ast)
-              ),
-              q._1.where ++ q._2.where,
-              None,
-              astOther
+        // hoist where
+        val (newQ1, whereQ1) = query match
+          case q1: SelectAllQuery =>
+            (
+              OrderedQuery(SelectAllQuery(q1.from, Seq(), Some(q1.alias), q1.ast).appendFlag(SelectFlags.Final), sortFn, ast),
+              q1.where
             )
-          case q: (RelationOp, SelectAllQuery) =>
-            SelectAllQuery(
-              Seq(
-                this,
-                OrderedQuery(SelectAllQuery(q._2.from, Seq(), Some(q._2.alias), q._2.ast).appendFlag(SelectFlags.Final), o.sortFn, o.ast)
-              ),
-              q._2.where,
-              None,
-              astOther
+          case _ => (this, Seq())
+        val (newQ2, whereQ2) = o.query match
+          case q2: SelectAllQuery =>
+            (
+              OrderedQuery(SelectAllQuery(q2.from, Seq(), Some(q2.alias), q2.ast).appendFlag(SelectFlags.Final), o.sortFn, o.ast),
+              q2.where
             )
-          case q: (SelectAllQuery, RelationOp) =>
-            SelectAllQuery(
-              Seq(
-                OrderedQuery(SelectAllQuery(q._1.from, Seq(), Some(q._1.alias), q._1.ast).appendFlag(SelectFlags.Final), sortFn, ast),
-                o
-              ),
-              q._1.where,
-              None,
-              astOther
-            )
-          case _ =>
-            SelectAllQuery(Seq(this, o), Seq(), None, astOther)
+          case _ => (this, Seq())
+        SelectAllQuery(Seq(newQ1, newQ2), whereQ1 ++ whereQ2, None, astOther)
       case r: RelationOp =>
         // default to subquery, some ops may want to override
         SelectAllQuery(Seq(this, r), Seq(), None, astOther)

@@ -1,13 +1,13 @@
-package test.query.repro
-
-import test.SQLStringQueryTest
-import tyql.{Expr, NExpr, Query, RestrictedQuery}
-
-import language.experimental.namedTuples
-import test.query.{AllCommerceDBs, commerceDBs}
-import test.query.recursive.{Location, CSPADB, CSPADBs}
-import tyql.Query.fix
-
+//package test.query.repro
+//
+//import test.SQLStringQueryTest
+//import tyql.{Expr, NExpr, Query, RestrictedQuery}
+//
+//import language.experimental.namedTuples
+//import test.query.{AllCommerceDBs, commerceDBs}
+//import test.query.recursive.{Location, CSPADB, CSPADBs}
+//import tyql.Query.fix
+//
 //class ToRowTest extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
 //  def testDescription = "The definition of map that takes in a tuple-of-expr does not work"
 //

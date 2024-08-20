@@ -190,10 +190,10 @@ object QueryIRTree:
         collapseNaryOp(lhs, rhs, "EXCEPT", except)
       case limit: Query.Limit[?] =>
         val from = generateQuery(limit.$from, symbols)
-        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, limit.$limit), "LIMIT", limit)
+        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, Expr.IntLit(limit.$limit)), "LIMIT", limit)
       case offset: Query.Offset[?] =>
         val from = generateQuery(offset.$from, symbols)
-        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, offset.$offset), "OFFSET", offset)
+        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, Expr.IntLit(offset.$offset)), "OFFSET", offset)
       case distinct: Query.Distinct[?] =>
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
       case queryRef: Query.QueryRef[?] =>

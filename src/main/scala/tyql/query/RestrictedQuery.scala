@@ -13,6 +13,7 @@ import scala.annotation.targetName
  * NOTE: Query[?] indicates no aggregation, but could turn into aggregation, RestrictedQuery[?] means none present and none addable
  */
 class RestrictedQuery[A](using ResultTag[A])(protected val wrapped: Query[A]) extends DatabaseAST[A]:
+  val tag: ResultTag[A] = qTag
   def toQuery: Query[A] = wrapped
 
   @targetName("restrictedQueryFlatMap")

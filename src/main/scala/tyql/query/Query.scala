@@ -15,6 +15,7 @@ type CalculateResult[S, R] <: DatabaseAST[R] = S match
 
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   import Expr.{Pred, Fun, Ref}
+  val tag: ResultTag[A] = qTag
   /**
    * Classic flatMap with an inner Query that will likely be flattened into a join.
    *

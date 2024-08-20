@@ -10,7 +10,7 @@ import Expr.{Fun, Pred}
 /**
  * A scalar operation, e.g. an expression that returns a single result, instead of a collection.
  */
-trait AggregationExpr[Result](using override val tag: ResultTag[Result]) extends Expr[Result, ScalarExpr]
+trait AggregationExpr[Result](using ResultTag[Result]) extends Expr[Result, ScalarExpr]
 object AggregationExpr {
 
   case class Sum[A: ResultTag]($a: Expr[A, ?]) extends AggregationExpr[A]

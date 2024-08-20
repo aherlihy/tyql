@@ -12,7 +12,6 @@ type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
   case ScalarExpr => S2
   case NExpr => S1
 
-
 /** The type of expressions in the query language */
 trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends Selectable:
   /** This type is used to support selection with any of the field names
