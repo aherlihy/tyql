@@ -287,8 +287,10 @@ object QueryIRTree:
       case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
       case p: Expr.Project[?] => generateProjection(p, symbols)
       case g: Expr.Gt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
+      case g: Expr.Lt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), "<", g)
       case g: Expr.GtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), ">", g)
       case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "AND", a)
+      case a: Expr.Plus[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "+", a)
       case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "=", a)
       case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), "<>", a)
       case a: Expr.Concat[?, ?, ?, ?] =>
@@ -313,6 +315,8 @@ object QueryIRTree:
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
+      case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
+      case p: Expr.Prepend[?] => BinExprFnOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), "list_prepend", p)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
   private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable): QueryIRNode =

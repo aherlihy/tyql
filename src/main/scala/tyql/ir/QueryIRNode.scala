@@ -23,6 +23,9 @@ case class WhereClause(children: Seq[QueryIRNode], ast: Expr[?, ?]) extends Quer
 case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?, ?]) extends QueryIRNode:
   override def toSQLString(): String = s"${lhs.toSQLString()} $op ${rhs.toSQLString()}"
 
+case class BinExprFnOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: Expr[?, ?]) extends QueryIRNode:
+  override def toSQLString(): String = s"$op(${lhs.toSQLString()}, ${rhs.toSQLString()})"
+
 /**
  * Unary expression-level operation.
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
@@ -70,6 +73,9 @@ case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?]) exte
  */
 case class Literal(stringRep: String, ast: Expr[?, ?]) extends QueryIRLeaf:
   override def toSQLString(): String = stringRep
+
+case class ListTypeExpr(elements: List[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
+  override def toSQLString(): String = elements.map(_.toSQLString()).mkString("[", ", ", "]")
 
 /**
  * Empty leaf node, to avoid Options everywhere.

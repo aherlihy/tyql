@@ -1,8 +1,10 @@
 package tyql
 
+import tyql.Expr.ListExpr
+
 import scala.annotation.targetName
 import language.experimental.namedTuples
-import NamedTuple.{NamedTuple, AnyNamedTuple}
+import NamedTuple.{AnyNamedTuple, NamedTuple}
 
 trait ExprShape
 class ScalarExpr extends ExprShape
@@ -52,6 +54,11 @@ object Expr:
   extension [S1 <: ExprShape](x: Expr[Int, S1])
     def >[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
     def >(y: Int): Expr[Boolean, S1] = Gt[S1, NExpr](x, IntLit(y))
+    def <[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lt(x, y)
+    def <(y: Int): Expr[Boolean, S1] = Lt[S1, NExpr](x, IntLit(y))
+
+    def +[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Int, CalculatedShape[S1, S2]] = Plus(x, y)
+    def +(y: Int): Expr[Int, S1] = Plus[S1, NExpr](x, IntLit(y))
 
   // TODO: write for numerical
   extension [S1 <: ExprShape](x: Expr[Double, S1])
@@ -70,11 +77,15 @@ object Expr:
     def toLowerCase: Expr[String, S1] = Expr.Lower(x)
     def toUpperCase: Expr[String, S1] = Expr.Upper(x)
 
+  extension [A](x: Expr[List[A], NExpr])(using ResultTag[List[A]])
+    def prepend(elem: Expr[A, NExpr]): Expr[List[A], NExpr] = Prepend(elem, x)
+
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
   // a name in the domain model instead.
 
   // Some sample constructors for Exprs
+  case class Lt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Gt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class GtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
 
@@ -84,6 +95,14 @@ object Expr:
 
   case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
   case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
+
+
+  case class ListExpr[A]($elements: List[Expr[A, NExpr]])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
+  extension [A, E <: Expr[A, NExpr]](x: List[E])
+    def toExpr(using ResultTag[List[A]]): ListExpr[A] = ListExpr(x)
+  //  given Conversion[List[A], ListExpr[A]] = ListExpr(_)
+
+  case class Prepend[A]($x: Expr[A, NExpr], $list: Expr[List[A], NExpr])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // Todo: Make it strongly typed like the other cases

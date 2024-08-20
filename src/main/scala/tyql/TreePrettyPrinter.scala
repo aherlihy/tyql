@@ -44,6 +44,11 @@ object TreePrettyPrinter {
       case Eq(x, y) => s"${indent(depth)}Eq(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Ne(x, y) => s"${indent(depth)}Ne(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Gt(x, y) => s"${indent(depth)}Gt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Lt(x, y) => s"${indent(depth)}Lt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case ListExpr(elements) =>
+        s"${indent(depth)}ListExpr(\n${elements.map(_.prettyPrint(depth + 1)).mkString("\n")}\n${indent(depth)}"
+      case Prepend(x, list) =>
+        s"${indent(depth)}Prepend(\n${x.prettyPrint(depth + 1)},\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
       case GtDouble(x, y) => s"${indent(depth)}GtDouble(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case And(x, y) => s"${indent(depth)}And(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Or(x, y) => s"${indent(depth)}Or(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
@@ -64,8 +69,8 @@ object TreePrettyPrinter {
         val children = a.toList.zipWithIndex
           .map((expr, idx) =>
             val e = expr.asInstanceOf[Expr[?, ?]]
-            val namedStr = namedTupleNames(idx).fold("")(n => s"$n=")
-            s"${indent(depth+1)}$namedStr${e.prettyPrint(0)}"
+            val namedStr = namedTupleNames(idx).fold("")(n => s"$n")
+            indentWithKey(depth + 1, namedStr, e.prettyPrint(depth + 1))
           )
         s"${indent(depth)}Project(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
       case a: AggregationExpr[?] => a.prettyPrint(depth)
@@ -194,6 +199,15 @@ object TreePrettyPrinter {
         val opPrint = binOp.op
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", binOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}BinExprOp(\n${indent(depth + 1)}op='$opPrint',\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
+      case binOp: BinExprFnOp =>
+        val lhsPrint = binOp.lhs.prettyPrintIR(depth + 1, printAST)
+        val rhsPrint = binOp.rhs.prettyPrintIR(depth + 1, printAST)
+        val opPrint = binOp.op
+        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", binOp.ast.prettyPrint(depth + 1))}" else ""
+        s"${indent(depth)}BinExprFnOp(\n${indent(depth + 1)}op='$opPrint',\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
+      case listType: ListTypeExpr =>
+        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", listType.ast.prettyPrint(depth + 1))}" else ""
+        s"${indent(depth)}ListTypeExpr(\n${listType.elements.map(_.prettyPrintIR(depth + 1, printAST)).mkString("\n,")}$astPrint\n${indent(depth)})"
       case where: WhereClause =>
         val childrenPrint = where.children.map(_.prettyPrintIR(depth + 2, printAST)).mkString("[\n", ",\n", s"\n${indent(depth+1)}]")
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", where.ast.prettyPrint(depth + 1))}" else ""

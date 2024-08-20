@@ -13,6 +13,7 @@ enum ResultTag[T]:
   case LocalDateTag extends ResultTag[LocalDate]
   case NamedTupleTag[N <: Tuple, V <: Tuple](names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
   case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]]) extends ResultTag[T]
+  case ListTag[T](elementType: ResultTag[T]) extends ResultTag[List[T]]
   case AnyTag extends ResultTag[Any]
 // TODO: Add more types, specialize for DB backend
 object ResultTag:
@@ -26,9 +27,11 @@ object ResultTag:
     val tpes = summonAll[Tuple.Map[V, ResultTag]]
     NamedTupleTag(names.toList.asInstanceOf[List[String]], tpes.toList.asInstanceOf[List[ResultTag[?]]])
 
-// We don't really need `fields` and could use `m` for everything, but maybe we can share a cached
-// version of `fields`.
-// Alternatively if we don't care about the case class name we could use only `fields`.
+  // We don't really need `fields` and could use `m` for everything, but maybe we can share a cached
+  // version of `fields`.
+  // Alternatively if we don't care about the case class name we could use only `fields`.
   inline given [T](using m: Mirror.ProductOf[T], fields: ResultTag[NamedTuple.From[T]]): ResultTag[T] =
     val productName = constValue[m.MirroredLabel]
     ProductTag(productName, fields)
+
+  inline given [T](using elementType: ResultTag[T]): ResultTag[List[T]] = ResultTag.ListTag(elementType)

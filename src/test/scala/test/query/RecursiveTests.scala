@@ -21,6 +21,24 @@ given TCDBs: TestDatabase[TCDB] with
 class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "TC"
 
+  def dbSetup: String = """
+    CREATE TABLE edges (
+      x INT,
+      y INT
+    );
+
+    CREATE TABLE empty (
+        x INT,
+        y INT
+    );
+
+    INSERT INTO edges (x, y) VALUES (1, 2);
+    INSERT INTO edges (x, y) VALUES (2, 3);
+    INSERT INTO edges (x, y) VALUES (3, 4);
+    INSERT INTO edges (x, y) VALUES (4, 5);
+    INSERT INTO edges (x, y) VALUES (5, 6);
+  """
+
   def query() =
     val path = testDB.tables.edges
     path.fix(path =>
@@ -457,6 +475,16 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
 
 class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location] {
   def testDescription: String = "CSPA, but with comprehensions to see if nicer"
+  def dbSetup: String = """
+    CREATE TABLE assign (
+      p1 INT,
+      p2 INT
+    );
+    CREATE TABLE dereference (
+      p1 INT,
+      p2 INT
+    );
+  """
 
   def query() =
     val assign = testDB.tables.assign
@@ -564,4 +592,106 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
 				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))
 		SELECT * FROM recursive$A as recref$V
     """
+}
+type FibNum = (recursionDepth: Int, fibonacciNumber: Int, nextNumber: Int)
+type FibNumDB = (base: FibNum, result: FibNum)
+
+given FibNumDBs: TestDatabase[FibNumDB] with
+  override def tables = (
+    base = Table[FibNum]("base"),
+    result = Table[FibNum]("result")
+  )
+class RecursionFibTest extends SQLStringQueryTest[FibNumDB, (FibonacciNumberIndex: Int, FibonacciNumber: Int)] {
+  def testDescription: String = "Fibonacci example from duckdb docs"
+
+  def dbSetup: String = """
+    CREATE TABLE base (
+      recursionDepth INT,
+      fibonacciNumber INT,
+      nextNumber INT
+    );
+    INSERT INTO base (recursionDepth, fibonacciNumber, nextNumber) VALUES (0, 0, 1);
+  """
+  def query() =
+    val fib = testDB.tables.base
+    fib.fix(fib =>
+      fib
+        .filter(f => (f.recursionDepth + 1) < 10)
+        .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
+    ).map(f => (FibonacciNumberIndex = f.recursionDepth, FibonacciNumber = f.fibonacciNumber).toRow)
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE
+      recursive$1 AS
+        (SELECT * FROM base as base$1
+            UNION ALL
+        (SELECT
+            ref$0.recursionDepth + 1 as recursionDepth, ref$0.nextNumber as fibonacciNumber, ref$0.fibonacciNumber + ref$0.nextNumber as nextNumber
+         FROM recursive$1 as ref$0
+         WHERE ref$0.recursionDepth + 1 < 10))
+    SELECT recref$0.recursionDepth as FibonacciNumberIndex, recref$0.fibonacciNumber as FibonacciNumber FROM recursive$1 as recref$0
+      """
+}
+
+type Tag = (id: Int, name: String, subclassof: Int)
+type TagHierarchy = (id: Int, source: String, path: List[String])
+type TagDB = (tag: Tag, hierarchy: TagHierarchy)
+
+given TagDBs: TestDatabase[TagDB] with
+  override def tables = (
+    tag = Table[Tag]("tag"),
+    hierarchy = Table[TagHierarchy]("hierarchy")
+  )
+
+class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
+  def testDescription: String = "Tag tree example from duckdb docs"
+  def dbSetup: String =
+    """
+    CREATE TABLE tag (id INTEGER, name VARCHAR, subclassof INTEGER);
+    INSERT INTO tag VALUES
+      (1, 'U2',     5),
+      (2, 'Blur',   5),
+      (3, 'Oasis',  5),
+      (4, '2Pac',   6),
+      (5, 'Rock',   7),
+      (6, 'Rap',    7),
+      (7, 'Music',  9),
+      (8, 'Movies', 9),
+      (9, 'Art', -1);
+    """
+
+  def query() =
+    // For now encode NULL as -1, TODO: implement nulls
+    import Expr.{toRow, toExpr}
+    val tagHierarchy0 = testDB.tables.tag
+      .filter(t => t.subclassof == -1)
+      .map(t =>
+        val initListPath: Expr.ListExpr[String] = List(t.name).toExpr
+        (id = t.id, source = t.name, path = initListPath).toRow
+      )
+    tagHierarchy0.fix(tagHierarchy1 =>
+      tagHierarchy1.flatMap(hier =>
+        testDB.tables.tag
+          .filter(t => t.subclassof == hier.id)
+          .map(t =>
+            val listPath = hier.path.prepend(t.name)
+            (id = t.id, source = t.name, path = listPath).toRow
+          )
+      )
+    ).filter(h => h.source == "Oasis").map(h => h.path)
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+        recursive$62 AS
+          (SELECT
+              tag$62.id as id, tag$62.name as source, [tag$62.name] as path
+           FROM tag as tag$62
+           WHERE tag$62.subclassof = -1
+                UNION ALL
+           (SELECT
+              tag$64.id as id, tag$64.name as source, list_prepend(tag$64.name, ref$30.path) as path
+            FROM recursive$62 as ref$30, tag as tag$64
+            WHERE tag$64.subclassof = ref$30.id))
+      SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = "Oasis"
+      """
 }
