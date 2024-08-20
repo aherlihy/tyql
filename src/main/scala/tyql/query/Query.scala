@@ -3,8 +3,6 @@ package tyql
 import language.experimental.namedTuples
 import scala.util.TupledFunction
 import NamedTuple.{AnyNamedTuple, NamedTuple}
-import scala.compiletime.*
-import scala.deriving.Mirror
 import scala.annotation.targetName
 import java.time.LocalDate
 import scala.reflect.ClassTag
@@ -14,84 +12,6 @@ import tyql.Aggregation.AggFilter
 type CalculateResult[S, R] <: DatabaseAST[R] = S match
   case ScalarExpr => Aggregation[R]
   case NExpr => Query[R]
-
-
-enum ResultTag[T]:
-  case IntTag extends ResultTag[Int]
-  case DoubleTag extends ResultTag[Double]
-  case StringTag extends ResultTag[String]
-  case BoolTag extends ResultTag[Boolean]
-  case LocalDateTag extends ResultTag[LocalDate]
-  case NamedTupleTag[N <: Tuple, V <: Tuple](names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
-  case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]]) extends ResultTag[T]
-  case AnyTag extends ResultTag[Any]
-  // TODO: Add more types, specialize for DB backend
-object ResultTag:
-  given ResultTag[Int] = ResultTag.IntTag
-  given ResultTag[String] = ResultTag.StringTag
-  given ResultTag[Boolean] = ResultTag.BoolTag
-  given ResultTag[Double] = ResultTag.DoubleTag
-  given ResultTag[LocalDate] = ResultTag.LocalDateTag
-  inline given [N <: Tuple, V <: Tuple]: ResultTag[NamedTuple[N, V]] =
-    val names = constValueTuple[N]
-    val tpes = summonAll[Tuple.Map[V, ResultTag]]
-    NamedTupleTag(names.toList.asInstanceOf[List[String]], tpes.toList.asInstanceOf[List[ResultTag[?]]])
-
-  // We don't really need `fields` and could use `m` for everything, but maybe we can share a cached
-  // version of `fields`.
-  // Alternatively if we don't care about the case class name we could use only `fields`.
-  inline given [T](using m: Mirror.ProductOf[T], fields: ResultTag[NamedTuple.From[T]]): ResultTag[T] =
-    val productName = constValue[m.MirroredLabel]
-    ProductTag(productName, fields)
-
-/**
- * Shared supertype of query and aggregation
- * @tparam Result
- */
-trait DatabaseAST[Result](using val tag: ResultTag[Result]):
-  def toSQLString: String = toQueryIR.toSQLString()
-
-  def toQueryIR: QueryIRNode =
-    QueryIRTree.generateFullQuery(this, SymbolTable())
-
-trait Aggregation[Result](using override val tag: ResultTag[Result]) extends DatabaseAST[Result] with Expr[Result, NExpr]
-object Aggregation:
-  case class AggFlatMap[A, B: ResultTag]($from: Query[A], $query: Expr.Fun[A, Expr[B, ?], ?]) extends Aggregation[B]
-  case class AggFilter[A: ResultTag]($from: Query[A], $pred: Expr.Pred[A, ScalarExpr]) extends Aggregation[A]
-
-/**
- * A restricted reference to a query that disallows aggregation.
- * Explicitly do not export aggregate, or any aggregation helpers, exists, etc.
- *
- * Methods can accept RestrictedQuery[A] or Query[A]
- * NOTE: Query[?] indicates no aggregation, but could turn into aggregation, RestrictedQuery[?] means none present and none addable
- */
-class RestrictedQuery[A](using ResultTag[A])(protected val wrapped: Query[A]) extends DatabaseAST[A]:
-  def toQuery: Query[A] = wrapped
-
-  @targetName("restrictedQueryFlatMap")
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => Query[B]): RestrictedQuery[B] = RestrictedQuery(wrapped.flatMap(f))
-  @targetName("restrictedQueryFlatMapRestricted")
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => RestrictedQuery[B]): RestrictedQuery[B] =
-    val toR: Expr.Ref[A, NExpr] => Query[B] = arg => f(arg).toQuery
-    RestrictedQuery(wrapped.flatMap(toR))
-  def map[B: ResultTag](f: Expr.Ref[A, NExpr] => Expr[B, NExpr]): RestrictedQuery[B] = RestrictedQuery(wrapped.map(f))
-  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NExpr] => B): RestrictedQuery[NamedTuple.Map[B, Expr.StripExpr]] = RestrictedQuery(wrapped.map(f))
-  def withFilter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A] = RestrictedQuery(wrapped.withFilter(p))
-  def filter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A] = RestrictedQuery(wrapped.filter(p))
-  def union(that: RestrictedQuery[A]): RestrictedQuery[A] =
-    RestrictedQuery(Query.Union(wrapped, that.toQuery, true))
-
-  def unionAll(that: RestrictedQuery[A]): RestrictedQuery[A] =
-    RestrictedQuery(Query.Union(wrapped, that.toQuery, false))
-
-  @targetName("unionQuery")
-  def union(that: Query[A]): RestrictedQuery[A] =
-    RestrictedQuery(Query.Union(wrapped, that, true))
-  @targetName("unionAllQuery")
-  def unionAll(that: Query[A]): RestrictedQuery[A] =
-    RestrictedQuery(Query.Union(wrapped, that, false))
-
 
 trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
   import Expr.{Pred, Fun, Ref}

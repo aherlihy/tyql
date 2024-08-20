@@ -1,10 +1,11 @@
 package tyql
 
+import scala.Tuple.*
 import scala.annotation.implicitNotFound
-import Tuple.*
 
-object Test:
-  /** Check if all the element types of X are also element types of Y
+object Subset:
+  /** NOTE: not currently used
+   * Check if all the element types of X are also element types of Y
    *  /!\ Compile-time will be proportial to Length[X] * Length[Y].
    *
    * This is useful if we want to specify sort orders (or other query metadata)
