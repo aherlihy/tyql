@@ -5,12 +5,9 @@ import scala.language.implicitConversions
 import NamedTuple.{NamedTuple, AnyNamedTuple}
 
 // Repros for bugs or questions
-class Query2[A]()
-
-object Query2:
-  extension [R](x: Query2[R])
-    def map[B](f: Expr2.Ref[R, NExpr] => Expr2[B, NExpr]): Query2[B] = ???
-    def map[B <: AnyNamedTuple : Expr2.IsTupleOfExpr](f: Expr2.Ref[R, NExpr] => B): Query2[ NamedTuple.Map[B, Expr2.StripExpr2] ] = ???
+class Query2[A]():
+  def map[B](f: Expr2.Ref[A, NExpr] => Expr2[B, NExpr]): Query2[B] = ???
+  def map[B <: AnyNamedTuple : Expr2.IsTupleOfExpr](f: Expr2.Ref[A, NExpr] => B): Query2[ NamedTuple.Map[B, Expr2.StripExpr2] ] = ???
 
 trait ExprShape
 class ScalarExpr extends ExprShape
