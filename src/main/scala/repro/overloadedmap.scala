@@ -55,3 +55,6 @@ case class T2(id: Int, name: String)
 
   // error unless we comment out the first `map`
   // val q2: Query2[(newId: Int, newName: String)] = t1.map(r => (newId = r.id, newName = r.name))
+
+  val q2a = t1.map(r => (newId = r.id, newName = r.name))
+  val q2a1: Query2[(newId: Int, newName: String)] = q2a
