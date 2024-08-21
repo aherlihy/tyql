@@ -40,7 +40,13 @@ object Expr2:
   extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
     def toRow: AggProject[A] = ???
 
+  given [A <: AnyNamedTuple : IsTupleOfExpr]: RowConversion[A, Project[A]] = ???
+  given [A <: AnyNamedTuple : IsTupleOfAgg]: RowConversion[A, AggProject[A]] = ???
 //  given [A <: AnyNamedTuple]: Conversion[A, Expr2.Project[A]] = Expr2.Project(_)
+
+
+trait RowConversion[From, To]:
+  extension (x: From) def toRow: To
 
 // General test classes:
 case class T2(id: Int, name: String)
@@ -48,8 +54,7 @@ case class T2(id: Int, name: String)
 @main def main() =
   import Expr2.*
   val t1 = Query2[T2]()
-  // error unless we comment out the second `toRow`
-  // val q1: Query2[(newId: Int, newName: String)] = t1.map(r => (newId = r.id, newName = r.name).toRow)
+  val q1: Query2[(newId: Int, newName: String)] = t1.map(r => (newId = r.id, newName = r.name).toRow)
 
   // error unless we comment out the first `map`
   // val q2: Query2[(newId: Int, newName: String)] = t1.map(r => (newId = r.id, newName = r.name))
