@@ -73,9 +73,8 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @return     Aggregation of B.toRow, e.g. a scalar result of type B.toRow
    */
   def aggregate[B <: AnyNamedTuple: AggregationExpr.IsTupleOfAgg]/*(using ev: AggregationExpr.IsTupleOfAgg[B] =:= true)*/(using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, NExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
-    import AggregationExpr.toRow
     val ref = Ref[A, NExpr]()
-    val row = f(ref).toRow
+    val row = AggregationExpr.AggProject(f(ref))
     Aggregation.AggFlatMap(this, Fun(ref, row))
 
 //  inline def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Query[B]): Nothing =
@@ -105,9 +104,8 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @return     Expr of B.toRow, e.g. an iterable of type B.toRow
    */
   def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, NExpr] => B): Query[ NamedTuple.Map[B, Expr.StripExpr] ] =
-    import Expr.toRow
     val ref = Ref[A, NExpr]()
-    Query.Map(this, Fun(ref, f(ref).toRow))
+    Query.Map(this, Fun(ref, Expr.Project(f(ref))))
 
   /**
    * Selectively override to cover common mistakes, so error message is more useful (and not implementation-specific).

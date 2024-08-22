@@ -14,6 +14,11 @@ type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
   case ScalarExpr => S2
   case NExpr => S1
 
+trait RowConversion[From, To]:
+  extension (x: From) def toRow: To
+
+given [A <: AnyNamedTuple : AggregationExpr.IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, Expr.StripExpr]]): RowConversion[A, AggregationExpr.AggProject[A]] = AggregationExpr.AggProject(_)
+given [A <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[A, Expr.StripExpr]]): RowConversion[A, Expr.Project[A]] = Expr.Project(_)
 /** The type of expressions in the query language */
 trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends Selectable:
   /** This type is used to support selection with any of the field names
@@ -172,8 +177,8 @@ object Expr:
    *  to
    *      Expr[(name_1: T_1, ..., name_n: T_n)]
    */
-  extension [A <: AnyNamedTuple : IsTupleOfExpr](x: A)
-    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): Project[A] = Project(x)
+//  extension [A <: AnyNamedTuple : IsTupleOfExpr](x: A)
+//    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): Project[A] = Project(x)
 
 // TODO: use NamedTuple.from to convert case classes to named tuples before using concat
   extension [A <: AnyNamedTuple, S <: ExprShape](x: Expr[A, S])

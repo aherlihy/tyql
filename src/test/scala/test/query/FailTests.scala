@@ -436,7 +436,6 @@ class AggregateWithoutAggregationProjectCompileErrorTest extends munit.FunSuite 
            )
 
           // TEST
-          import AggregationExpr.toRow
           tables.products
             .aggregate(p => (pr = p.price, pid = p.id).toRow)
           """)
@@ -606,7 +605,6 @@ class AggregateInMapSubexpressionErrorTest extends munit.FunSuite {
            )
 
           // TEST
-          import AggregationExpr.toRow
           tables.shipInfos.map(si =>
             (s = si.id == Expr.sum(si.buyerId)).toRow
           )
@@ -781,8 +779,6 @@ class MapInNestedAggregateErrorTest extends munit.FunSuite {
            )
 
           // TEST
-          import AggregationExpr.toRow
-          import Expr.toRow
           tables.buyers.aggregate(b =>
             tables.shipInfos.map(si =>
               (newId = si.id, bId = b.id).toRow
@@ -828,8 +824,6 @@ class MixedProjectAggregateErrorTest extends munit.FunSuite {
            )
 
           // TEST
-          import tyql.AggregationExpr.toRow
-          import tyql.Expr.toRow
           tables.buyers.aggregate(b =>
             (maxbId=Expr.max(b.id), bId = b.id).toRow
           )

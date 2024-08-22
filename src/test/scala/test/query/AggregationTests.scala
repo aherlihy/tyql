@@ -64,7 +64,7 @@ class AggregateMultiSubexpressionAggregateTest extends SQLStringAggregationTest[
   def testDescription: String = "Aggregation: put aggregation in subexpression, stays as aggregation type"
 
   def query() =
-    import AggregationExpr.toRow
+//    import AggregationExpr.toRow
     testDB.tables.products
       .aggregate(p =>
         (sum = sum(p.price)==1 , avg = avg(p.price) > p.price).toRow
@@ -80,7 +80,7 @@ class AggregateMultiSubexpression2AggregateTest extends SQLStringAggregationTest
   def testDescription: String = "Aggregation: put aggregation in subexpression, stays as aggregation type"
 
   def query() =
-    import AggregationExpr.toRow
+//    import AggregationExpr.toRow
     testDB.tables.products
       .aggregate(p =>
         (avg = (avg(p.price) > p.price) == true).toRow

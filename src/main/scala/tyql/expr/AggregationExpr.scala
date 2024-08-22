@@ -36,8 +36,9 @@ object AggregationExpr {
 // For now restrict all elements to be agg instead of allowing a mix.
   type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ScalarExpr]
 
-  extension [A <: AnyNamedTuple: IsTupleOfAgg](x: A)
-    def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): AggProject[A] = AggProject(x)
+//  extension [A <: AnyNamedTuple: IsTupleOfAgg](x: A)
+//    def toRowAgg(using ResultTag[NamedTuple.Map[A, StripExpr]]): AggProject[A] = AggProject(x)
+
 
   /** Same as _.toRow, as an implicit conversion */
 //  given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, AggProject[A]] = AggProject(_)

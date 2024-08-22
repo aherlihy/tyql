@@ -30,15 +30,15 @@ object Expr2:
     case Expr2[b, s] => b
 
   type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr2[?, NExpr]
-  extension [A <: AnyNamedTuple : IsTupleOfExpr](x: A)
-    def toRow: Project[A] = ???
+//  extension [A <: AnyNamedTuple : IsTupleOfExpr](x: A)
+//    def toRow: Project[A] = ???
 
   type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr2[?, ScalarExpr]
-  extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
-    def toRow: AggProject[A] = ???
+//  extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
+//    def toRow: AggProject[A] = ???
 
-  given [A <: AnyNamedTuple : IsTupleOfExpr]: RowConversion[A, Project[A]] = ???
-  given [A <: AnyNamedTuple : IsTupleOfAgg]: RowConversion[A, AggProject[A]] = ???
+  given [A <: AnyNamedTuple : IsTupleOfExpr]: RowConversion[A, Project[A]] = Project(_)
+  given [A <: AnyNamedTuple : IsTupleOfAgg]: RowConversion[A, AggProject[A]] = AggProject(_)
 //  given [A <: AnyNamedTuple]: Conversion[A, Expr2.Project[A]] = Expr2.Project(_)
 
 

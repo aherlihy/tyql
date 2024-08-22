@@ -3,7 +3,6 @@ import test.SQLStringQueryTest
 import test.query.{commerceDBs,  AllCommerceDBs, Product}
 
 import tyql.*
-import tyql.Expr.toRow
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions

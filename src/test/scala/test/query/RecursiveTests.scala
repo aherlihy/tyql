@@ -662,7 +662,7 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
 
   def query() =
     // For now encode NULL as -1, TODO: implement nulls
-    import Expr.{toRow, toExpr}
+    import Expr.toExpr
     val tagHierarchy0 = testDB.tables.tag
       .filter(t => t.subclassof == -1)
       .map(t =>

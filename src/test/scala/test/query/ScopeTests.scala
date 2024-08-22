@@ -3,7 +3,7 @@ package test.query.scope
 import test.SQLStringQueryTest
 import test.query.{AllCommerceDBs, Buyer, commerceDBs, Product, Purchase}
 import tyql.*
-import tyql.Expr.{max, min, toRow}
+import tyql.Expr.{max, min}
 
 import language.experimental.namedTuples
 import NamedTuple.*
