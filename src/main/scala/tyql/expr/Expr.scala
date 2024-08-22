@@ -43,13 +43,6 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def != (other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
 
 object Expr:
-  def sum(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
-  @targetName("doubleSum")
-  def sum(x: Expr[Double, ?]): AggregationExpr[Double] = AggregationExpr.Sum(x) // TODO: require summable type?
-  def avg[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
-  def max[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
-  def min[T: ResultTag](x: Expr[T,  ?]): AggregationExpr[T] = AggregationExpr.Min(x)
-
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape](x: Expr[Int, S1])
     def >[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
@@ -84,6 +77,18 @@ object Expr:
     def contains(elem: Expr[A, NExpr]): Expr[Boolean, NExpr] = ListContains(x, elem)
     def length: Expr[Int, NExpr] = ListLength(x)
 
+  // Aggregations
+  def sum(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
+
+  @targetName("doubleSum")
+  def sum(x: Expr[Double, ?]): AggregationExpr[Double] = AggregationExpr.Sum(x) // TODO: require summable type?
+
+  def avg[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
+
+  def max[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
+
+  def min[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
+
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
   // a name in the domain model instead.
@@ -100,7 +105,6 @@ object Expr:
 
   case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
   case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
-
 
   case class ListExpr[A]($elements: List[Expr[A, NExpr]])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
   extension [A, E <: Expr[A, NExpr]](x: List[E])

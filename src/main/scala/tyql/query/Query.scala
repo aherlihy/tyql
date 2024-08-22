@@ -91,7 +91,6 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B    the result type of the Expression, and resulting query.
    * @return      Query[B], an iterable of type B.
    *
-   * TODO: ensure that this isn't callable with Aggregation expression.
    */
   def map[B: ResultTag](f: Ref[A, NExpr] => Expr[B, NExpr]): Query[B] =
     val ref = Ref[A, NExpr]()
@@ -109,15 +108,21 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
     val ref = Ref[A, NExpr]()
     Query.Map(this, Fun(ref, f(ref).toRow))
 
-  /**
-   * Selectively override to cover common mistakes, so error message is more useful (and not implementation-specific).
-   * This is for when a user uses map where they should be using flatMap.
-   *
-   * @param f   a function that returns an Query, which should be an error, since that only makes sense for flatMap.
-   * TODO: Since Aggregation extends Expr, need to ensure that aggregations don't trigger this.
-   */
- // inline def map[B: ResultTag](f: Expr.Ref[A, NExpr] => Query[B]): Nothing =
- //   error("Cannot return a Query from a map. Did you mean to use flatMap?")
+  def fix(p: Query.RestrictedQueryRef[A] => RestrictedQuery[A]): Query[A] =
+    val fn: Tuple1[Query.RestrictedQueryRef[A]] => Tuple1[RestrictedQuery[A]] = r => Tuple1(p(r._1))
+    Query.fix(Tuple1(this))(fn)._1
+
+  def withFilter(p: Ref[A, NExpr] => Expr[Boolean, NExpr]): Query[A] =
+    val ref = Ref[A, NExpr]()
+    Query.Filter(this, Fun(ref, p(ref)))
+
+  def filter(p: Ref[A, NExpr] => Expr[Boolean, NExpr]): Query[A] = withFilter(p)
+
+// TODO: filter + agg should be technically 'having' but probably don't want to force users to write table.having(...)?
+//    def filter(p: Ref[R, ScalarExpr] => Expr[Boolean, ScalarExpr]): Aggregation[R] =
+//      val ref = Ref[R, ScalarExpr]()
+//       Aggregation.AggFilter(x, Fun(ref, p(ref)))
+
 
 object Query:
   import Expr.{Pred, Fun, Ref}
@@ -200,26 +205,11 @@ object Query:
 //                           $groupingFn: Fun[A, Expr[C]],
 //                           $havingFn: Fun[B, Expr[Boolean]]) extends Query[B]
 
-  // Extension methods to support for-expression syntax for queries
+  // Extensions. TODO: Any reason not to move these into Query methods?
   extension [R: ResultTag](x: Query[R])
     /**
      * When there is only one relation to be defined recursively.
      */
-    def fix(p: RestrictedQueryRef[R] => RestrictedQuery[R]): Query[R] =
-      val fn: Tuple1[RestrictedQueryRef[R]] => Tuple1[RestrictedQuery[R]] = r => Tuple1(p(r._1))
-      Query.fix(Tuple1(x))(fn)._1
-
-    def withFilter(p: Ref[R, NExpr] => Expr[Boolean, NExpr]): Query[R] =
-      val ref = Ref[R, NExpr]()
-      Filter(x, Fun(ref, p(ref)))
-
-    def filter(p: Ref[R, NExpr] => Expr[Boolean, NExpr]): Query[R] = withFilter(p)
-
-    // TODO: filter + agg should be technically 'having' but probably don't want to force users to write table.having(...)?
-//    def filter(p: Ref[R, ScalarExpr] => Expr[Boolean, ScalarExpr]): Aggregation[R] =
-//      val ref = Ref[R, ScalarExpr]()
-//       Aggregation.AggFilter(x, Fun(ref, p(ref)))
-
     def sort[B](f: Ref[R, NExpr] => Expr[B, NExpr], ord: Ord): Query[R] =
       val ref = Ref[R, NExpr]()
       Sort(x, Fun(ref, f(ref)), ord)
