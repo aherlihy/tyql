@@ -9,11 +9,11 @@ import NamedTuple.{AnyNamedTuple, NamedTuple}
 // TODO: probably seal
 trait ExprShape
 class ScalarExpr extends ExprShape
-class NExpr extends ExprShape
+class NonScalarExpr extends ExprShape
 
 type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
   case ScalarExpr => S2
-  case NExpr => S1
+  case NonScalarExpr => S1
 
 /** The type of expressions in the query language */
 trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends Selectable:
@@ -30,7 +30,7 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
 
   /** Member methods to implement universal equality on Expr level. */
   @targetName("eqNonScalar")
-  def ==(other: Expr[?, NExpr]): Expr[Boolean, Shape] = Expr.Eq[Shape, NExpr](this, other)
+  def ==(other: Expr[?, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Eq[Shape, NonScalarExpr](this, other)
   @targetName("eqScalar")
   def ==(other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Eq[Shape, ScalarExpr](this, other)
 //  def == [S <: ScalarExpr](other: Expr[?, S]): Expr[Boolean, CalculatedShape[Shape, S]] = Expr.Eq(this, other)
@@ -39,7 +39,7 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def ==(other: Boolean): Expr[Boolean, Shape] = Expr.Eq(this, Expr.BooleanLit(other))
 
   @targetName("neqNonScalar")
-  def != (other: Expr[?, NExpr]): Expr[Boolean, Shape] = Expr.Ne[Shape, NExpr](this, other)
+  def != (other: Expr[?, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Ne[Shape, NonScalarExpr](this, other)
   @targetName("neqScalar")
   def != (other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
 
@@ -47,12 +47,12 @@ object Expr:
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape](x: Expr[Int, S1])
     def >[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
-    def >(y: Int): Expr[Boolean, S1] = Gt[S1, NExpr](x, IntLit(y))
+    def >(y: Int): Expr[Boolean, S1] = Gt[S1, NonScalarExpr](x, IntLit(y))
     def <[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lt(x, y)
-    def <(y: Int): Expr[Boolean, S1] = Lt[S1, NExpr](x, IntLit(y))
+    def <(y: Int): Expr[Boolean, S1] = Lt[S1, NonScalarExpr](x, IntLit(y))
 
     def +[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Int, CalculatedShape[S1, S2]] = Plus(x, y)
-    def +(y: Int): Expr[Int, S1] = Plus[S1, NExpr](x, IntLit(y))
+    def +(y: Int): Expr[Int, S1] = Plus[S1, NonScalarExpr](x, IntLit(y))
 
   // TODO: write for numerical
   extension [S1 <: ExprShape](x: Expr[Double, S1])
@@ -61,7 +61,7 @@ object Expr:
       GtDouble(x, y)
     @targetName("gtDoubleLit")
     def >(y: Double): Expr[Boolean, S1] =
-      GtDouble[S1, NExpr](x, DoubleLit(y))
+      GtDouble[S1, NonScalarExpr](x, DoubleLit(y))
 
   extension [S1 <: ExprShape](x: Expr[Boolean, S1])
     def &&[S2 <: ExprShape] (y: Expr[Boolean, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = And(x, y)
@@ -72,11 +72,11 @@ object Expr:
     def toLowerCase: Expr[String, S1] = Expr.Lower(x)
     def toUpperCase: Expr[String, S1] = Expr.Upper(x)
 
-  extension [A](x: Expr[List[A], NExpr])(using ResultTag[List[A]])
-    def prepend(elem: Expr[A, NExpr]): Expr[List[A], NExpr] = ListPrepend(elem, x)
-    def append(elem: Expr[A, NExpr]): Expr[List[A], NExpr] = ListAppend(x, elem)
-    def contains(elem: Expr[A, NExpr]): Expr[Boolean, NExpr] = ListContains(x, elem)
-    def length: Expr[Int, NExpr] = ListLength(x)
+  extension [A](x: Expr[List[A], NonScalarExpr])(using ResultTag[List[A]])
+    def prepend(elem: Expr[A, NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListPrepend(elem, x)
+    def append(elem: Expr[A, NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListAppend(x, elem)
+    def contains(elem: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] = ListContains(x, elem)
+    def length: Expr[Int, NonScalarExpr] = ListLength(x)
 
   // Aggregations
   def sum(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
@@ -107,25 +107,25 @@ object Expr:
   case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
   case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
 
-  case class ListExpr[A]($elements: List[Expr[A, NExpr]])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
-  extension [A, E <: Expr[A, NExpr]](x: List[E])
+  case class ListExpr[A]($elements: List[Expr[A, NonScalarExpr]])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr]
+  extension [A, E <: Expr[A, NonScalarExpr]](x: List[E])
     def toExpr(using ResultTag[List[A]]): ListExpr[A] = ListExpr(x)
   //  given Conversion[List[A], ListExpr[A]] = ListExpr(_)
 
-  case class ListPrepend[A]($x: Expr[A, NExpr], $list: Expr[List[A], NExpr])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
-  case class ListAppend[A]($list: Expr[List[A], NExpr], $x: Expr[A, NExpr])(using ResultTag[List[A]]) extends Expr[List[A], NExpr]
-  case class ListContains[A]($list: Expr[List[A], NExpr], $x: Expr[A, NExpr])(using ResultTag[Boolean]) extends Expr[Boolean, NExpr]
-  case class ListLength[A]($list: Expr[List[A], NExpr])(using ResultTag[Int]) extends Expr[Int, NExpr]
+  case class ListPrepend[A]($x: Expr[A, NonScalarExpr], $list: Expr[List[A], NonScalarExpr])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr]
+  case class ListAppend[A]($list: Expr[List[A], NonScalarExpr], $x: Expr[A, NonScalarExpr])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr]
+  case class ListContains[A]($list: Expr[List[A], NonScalarExpr], $x: Expr[A, NonScalarExpr])(using ResultTag[Boolean]) extends Expr[Boolean, NonScalarExpr]
+  case class ListLength[A]($list: Expr[List[A], NonScalarExpr])(using ResultTag[Int]) extends Expr[Int, NonScalarExpr]
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // Todo: Make it strongly typed like the other cases
-  case class Select[A: ResultTag]($x: Expr[A, ?], $name: String) extends Expr[A, NExpr]
+  case class Select[A: ResultTag]($x: Expr[A, ?], $name: String) extends Expr[A, NonScalarExpr]
 
 //  case class Single[S <: String, A]($x: Expr[A])(using ResultTag[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]) extends Expr[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]
 
   case class Concat[A <: AnyNamedTuple, B <: AnyNamedTuple, S1 <: ExprShape, S2 <: ExprShape]($x: Expr[A, S1], $y: Expr[B, S2])(using ResultTag[NamedTuple.Concat[A, B]]) extends Expr[NamedTuple.Concat[A, B], CalculatedShape[S1, S2]]
 
-  case class Project[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends Expr[NamedTuple.Map[A, StripExpr], NExpr]
+  case class Project[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends Expr[NamedTuple.Map[A, StripExpr], NonScalarExpr]
 
   type StripExpr[E] = E match
     case Expr[b, s] => b
@@ -136,9 +136,9 @@ object Expr:
 
   // Expressions resulting from queries
   // Cannot use Contains with an aggregation
-  case class Contains[A]($this: Query[A, ?], $other: Expr[A, NExpr]) extends Expr[Boolean, NExpr]
-  case class IsEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NExpr]
-  case class NonEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NExpr]
+  case class Contains[A]($this: Query[A, ?], $other: Expr[A, NonScalarExpr]) extends Expr[Boolean, NonScalarExpr]
+  case class IsEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NonScalarExpr]
+  case class NonEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NonScalarExpr]
 
   /** References are placeholders for parameters */
   private var refCount = 0 // TODO: do we want to recount from 0 for each query?
@@ -150,17 +150,17 @@ object Expr:
     override def toString: String = s"Ref[${stringRef()}]"
 
   /** Literals are type-specific, tailored to the types that the DB supports */
-  case class IntLit($value: Int) extends Expr[Int, NExpr]
+  case class IntLit($value: Int) extends Expr[Int, NonScalarExpr]
   /** Scala values can be lifted into literals by conversions */
   given Conversion[Int, IntLit] = IntLit(_)
 
-  case class StringLit($value: String) extends Expr[String, NExpr]
+  case class StringLit($value: String) extends Expr[String, NonScalarExpr]
   given Conversion[String, StringLit] = StringLit(_)
 
-  case class DoubleLit($value: Double) extends Expr[Double, NExpr]
+  case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr]
   given Conversion[Double, DoubleLit] = DoubleLit(_)
 
-  case class BooleanLit($value: Boolean) extends Expr[Boolean, NExpr]
+  case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr]
 //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
 
   /** The internal representation of a function `A => B`
@@ -170,7 +170,7 @@ object Expr:
 
   type Pred[A, S <: ExprShape] = Fun[A, Expr[Boolean, S], S]
 
-  type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, NExpr]
+  type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, NonScalarExpr]
 
   /** Explicit conversion from
    *      (name_1: Expr[T_1], ..., name_n: Expr[T_n])

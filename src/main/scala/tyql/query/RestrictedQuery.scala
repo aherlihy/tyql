@@ -1,6 +1,6 @@
 package tyql
 
-import tyql.{DatabaseAST, Expr, NExpr, Query, ResultTag}
+import tyql.{DatabaseAST, Expr, NonScalarExpr, Query, ResultTag}
 
 import scala.NamedTuple.AnyNamedTuple
 import scala.annotation.targetName
@@ -17,15 +17,15 @@ class RestrictedQuery[A, C <: ResultCategory](using ResultTag[A])(protected val 
   def toQuery: Query[A, C] = wrapped
 
   @targetName("restrictedQueryFlatMap")
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => Query[B, ?]): RestrictedQuery[B, BagResult] = RestrictedQuery(wrapped.flatMap(f))
+  def flatMap[B: ResultTag](f: Expr.Ref[A, NonScalarExpr] => Query[B, ?]): RestrictedQuery[B, BagResult] = RestrictedQuery(wrapped.flatMap(f))
   @targetName("restrictedQueryFlatMapRestricted")
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => RestrictedQuery[B, ?]): RestrictedQuery[B, BagResult] =
-    val toR: Expr.Ref[A, NExpr] => Query[B, ?] = arg => f(arg).toQuery
+  def flatMap[B: ResultTag](f: Expr.Ref[A, NonScalarExpr] => RestrictedQuery[B, ?]): RestrictedQuery[B, BagResult] =
+    val toR: Expr.Ref[A, NonScalarExpr] => Query[B, ?] = arg => f(arg).toQuery
     RestrictedQuery(wrapped.flatMap(toR))
-  def map[B: ResultTag](f: Expr.Ref[A, NExpr] => Expr[B, NExpr]): RestrictedQuery[B, BagResult] = RestrictedQuery(wrapped.map(f))
-  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NExpr] => B): RestrictedQuery[NamedTuple.Map[B, Expr.StripExpr], BagResult] = RestrictedQuery(wrapped.map(f))
-  def withFilter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A, C] = RestrictedQuery(wrapped.withFilter(p))
-  def filter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A, C] = RestrictedQuery(wrapped.filter(p))
+  def map[B: ResultTag](f: Expr.Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr]): RestrictedQuery[B, BagResult] = RestrictedQuery(wrapped.map(f))
+  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NonScalarExpr] => B): RestrictedQuery[NamedTuple.Map[B, Expr.StripExpr], BagResult] = RestrictedQuery(wrapped.map(f))
+  def withFilter(p: Expr.Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): RestrictedQuery[A, C] = RestrictedQuery(wrapped.withFilter(p))
+  def filter(p: Expr.Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): RestrictedQuery[A, C] = RestrictedQuery(wrapped.filter(p))
 
   def distinct: RestrictedQuery[A, SetResult] = RestrictedQuery(wrapped.distinct)
 
@@ -43,10 +43,10 @@ class RestrictedQuery[A, C <: ResultCategory](using ResultTag[A])(protected val 
     RestrictedQuery(Query.UnionAll(wrapped, that))
 
   // TODO: Does nonEmpty count as non-monotone?
-  def nonEmpty: Expr[Boolean, NExpr] =
+  def nonEmpty: Expr[Boolean, NonScalarExpr] =
     Expr.NonEmpty(wrapped)
 
-  def isEmpty: Expr[Boolean, NExpr] =
+  def isEmpty: Expr[Boolean, NonScalarExpr] =
     Expr.IsEmpty(wrapped)
 
 
