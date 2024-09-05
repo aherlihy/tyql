@@ -12,32 +12,35 @@ import scala.annotation.targetName
  * Methods can accept RestrictedQuery[A] or Query[A]
  * NOTE: Query[?] indicates no aggregation, but could turn into aggregation, RestrictedQuery[?] means none present and none addable
  */
-class RestrictedQuery[A](using ResultTag[A])(protected val wrapped: Query[A]) extends DatabaseAST[A]:
+class RestrictedQuery[A, C <: ResultCategory](using ResultTag[A])(protected val wrapped: Query[A, C]) extends DatabaseAST[A]:
   val tag: ResultTag[A] = qTag
-  def toQuery: Query[A] = wrapped
+  def toQuery: Query[A, C] = wrapped
 
   @targetName("restrictedQueryFlatMap")
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => Query[B]): RestrictedQuery[B] = RestrictedQuery(wrapped.flatMap(f))
+  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => Query[B, ?]): RestrictedQuery[B, BagResult] = RestrictedQuery(wrapped.flatMap(f))
   @targetName("restrictedQueryFlatMapRestricted")
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => RestrictedQuery[B]): RestrictedQuery[B] =
-    val toR: Expr.Ref[A, NExpr] => Query[B] = arg => f(arg).toQuery
+  def flatMap[B: ResultTag](f: Expr.Ref[A, NExpr] => RestrictedQuery[B, ?]): RestrictedQuery[B, BagResult] =
+    val toR: Expr.Ref[A, NExpr] => Query[B, ?] = arg => f(arg).toQuery
     RestrictedQuery(wrapped.flatMap(toR))
-  def map[B: ResultTag](f: Expr.Ref[A, NExpr] => Expr[B, NExpr]): RestrictedQuery[B] = RestrictedQuery(wrapped.map(f))
-  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NExpr] => B): RestrictedQuery[NamedTuple.Map[B, Expr.StripExpr]] = RestrictedQuery(wrapped.map(f))
-  def withFilter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A] = RestrictedQuery(wrapped.withFilter(p))
-  def filter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A] = RestrictedQuery(wrapped.filter(p))
-  def union(that: RestrictedQuery[A]): RestrictedQuery[A] =
-    RestrictedQuery(Query.Union(wrapped, that.toQuery, true))
+  def map[B: ResultTag](f: Expr.Ref[A, NExpr] => Expr[B, NExpr]): RestrictedQuery[B, BagResult] = RestrictedQuery(wrapped.map(f))
+  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NExpr] => B): RestrictedQuery[NamedTuple.Map[B, Expr.StripExpr], BagResult] = RestrictedQuery(wrapped.map(f))
+  def withFilter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A, C] = RestrictedQuery(wrapped.withFilter(p))
+  def filter(p: Expr.Ref[A, NExpr] => Expr[Boolean, NExpr]): RestrictedQuery[A, C] = RestrictedQuery(wrapped.filter(p))
 
-  def unionAll(that: RestrictedQuery[A]): RestrictedQuery[A] =
-    RestrictedQuery(Query.Union(wrapped, that.toQuery, false))
+  def distinct: RestrictedQuery[A, SetResult] = RestrictedQuery(wrapped.distinct)
+
+  def union(that: RestrictedQuery[A, ?]): RestrictedQuery[A, SetResult] =
+    RestrictedQuery(Query.Union(wrapped, that.toQuery))
+
+  def unionAll(that: RestrictedQuery[A, ?]): RestrictedQuery[A, BagResult] =
+    RestrictedQuery(Query.UnionAll(wrapped, that.toQuery))
 
   @targetName("unionQuery")
-  def union(that: Query[A]): RestrictedQuery[A] =
-    RestrictedQuery(Query.Union(wrapped, that, true))
+  def union(that: Query[A, ?]): RestrictedQuery[A, SetResult] =
+    RestrictedQuery(Query.Union(wrapped, that))
   @targetName("unionAllQuery")
-  def unionAll(that: Query[A]): RestrictedQuery[A] =
-    RestrictedQuery(Query.Union(wrapped, that, false))
+  def unionAll(that: Query[A, ?]): RestrictedQuery[A, BagResult] =
+    RestrictedQuery(Query.UnionAll(wrapped, that))
 
   // TODO: Does nonEmpty count as non-monotone?
   def nonEmpty: Expr[Boolean, NExpr] =

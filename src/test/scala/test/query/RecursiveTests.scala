@@ -46,40 +46,41 @@ class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
         testDB.tables.edges
           .filter(e => p.y == e.x)
           .map(e => (x = p.x, y = e.y).toRow)
-      )
+      ).distinct
     )
   def expectedQueryPattern: String =
     """
     WITH RECURSIVE recursive$A AS
-      (SELECT * FROM edges as edges$B
-        UNION ALL
-      (SELECT ref$D.x as x, edges$C.y as y
+      ((SELECT * FROM edges as edges$B)
+        UNION
+      ((SELECT ref$D.x as x, edges$C.y as y
       FROM recursive$A as ref$D, edges as edges$C
-      WHERE ref$D.y = edges$C.x)) SELECT * FROM recursive$A as recref$E
+      WHERE ref$D.y = edges$C.x))) SELECT * FROM recursive$A as recref$E
       """
 }
+
 class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "TC with multiple base cases"
 
   def query() =
-    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
+    val path = testDB.tables.edges.union(testDB.tables.edges)
     path.fix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
           .map(e => (x = p.x, y = e.y).toRow)
-      )
+      ).distinct
     )
   def expectedQueryPattern: String =
     """
     WITH RECURSIVE recursive$A AS
-      (SELECT * FROM edges as edges$B
-        UNION ALL
-      (SELECT * FROM edges as edges$E
-        UNION ALL
-      SELECT ref$D.x as x, edges$C.y as y
+      ((SELECT * FROM edges as edges$B)
+        UNION
+      ((SELECT * FROM edges as edges$E)
+        UNION
+      (SELECT ref$D.x as x, edges$C.y as y
       FROM recursive$A as ref$D, edges as edges$C
-      WHERE ref$D.y = edges$C.x))
+      WHERE ref$D.y = edges$C.x)))
     SELECT * FROM recursive$A as recref$F
       """
 }
@@ -89,7 +90,7 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "TC with multiple recursive cases"
 //
 //  def query() =
-//    val path = testDB.tables.edges.unionAll(testDB.tables.edges)
+//    val path = testDB.tables.edges.union(testDB.tables.edges)
 //    val path2 = path.fix(path =>
 //      path.flatMap(p =>
 //        testDB.tables.edges
@@ -110,19 +111,20 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 //    """
 //      WITH RECURSIVE recursive$A AS
 //        (SELECT * FROM edges as edges$B
-//          UNION ALL
+//          UNION
 //        SELECT * FROM edges as edges$E
-//          UNION ALL
+//          UNION
 //        SELECT recursive$A.x as x, edges$C.y as y
 //        FROM recursive$A, edges as edges$C
 //        WHERE recursive$A.y = edges$C.x
-//          UNION ALL
+//          UNION
 //        SELECT recursive$A.x as x, edges$F.y as y
 //        FROM recursive$A, edges as edges$F
 //        WHERE recursive$A.y = edges$F.x);
 //      SELECT * FROM recursive$A
 //        """
 //}
+
 
 class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
   def testDescription: String = "TC with project"
@@ -134,17 +136,17 @@ class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
         testDB.tables.edges
           .filter(e => p.y == e.x)
           .map(e => (x = p.x, y = e.y).toRow)
-      )
+      ).distinct
     ).map(p => p.x)
 
   def expectedQueryPattern: String =
     """
       WITH RECURSIVE recursive$A AS
-        (SELECT * FROM edges as edges$B
-          UNION ALL
-        (SELECT ref$D.x as x, edges$C.y as y
+        ((SELECT * FROM edges as edges$B)
+          UNION
+        ((SELECT ref$D.x as x, edges$C.y as y
         FROM recursive$A as ref$D, edges as edges$C
-        WHERE ref$D.y = edges$C.x)) SELECT recref$E.x FROM recursive$A as recref$E
+        WHERE ref$D.y = edges$C.x))) SELECT recref$E.x FROM recursive$A as recref$E
         """
 }
 
@@ -158,19 +160,20 @@ class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
         testDB.tables.edges
           .filter(e => p.y == e.x)
           .map(e => (x = p.x, y = e.y).toRow)
-      )
+      ).distinct
     ).filter(p => p.x > 1)
 
   def expectedQueryPattern: String =
     """
         WITH RECURSIVE recursive$A AS
-          (SELECT * FROM edges as edges$B
-            UNION ALL
-          (SELECT ref$Z.x as x, edges$C.y as y
+          ((SELECT * FROM edges as edges$B)
+            UNION
+          ((SELECT ref$Z.x as x, edges$C.y as y
           FROM recursive$A as ref$Z, edges as edges$C
-          WHERE ref$Z.y = edges$C.x)) SELECT * FROM recursive$A as recref$X WHERE recref$X.x > 1
+          WHERE ref$Z.y = edges$C.x))) SELECT * FROM recursive$A as recref$X WHERE recref$X.x > 1
           """
 }
+
 
 class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
   def testDescription: String = "TC with filter + map"
@@ -182,17 +185,17 @@ class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
         testDB.tables.edges
           .filter(e => p.y == e.x)
           .map(e => (x = p.x, y = e.y).toRow)
-      )
+      ).distinct
     ).filter(p => p.x > 1).map(p => p.x)
 
   def expectedQueryPattern: String =
     """
           WITH RECURSIVE recursive$A AS
-            (SELECT * FROM edges as edges$B
-              UNION ALL
-            (SELECT ref$Z.x as x, edges$C.y as y
+            ((SELECT * FROM edges as edges$B)
+              UNION
+            ((SELECT ref$Z.x as x, edges$C.y as y
             FROM recursive$A as ref$Z, edges as edges$C
-            WHERE ref$Z.y = edges$C.x)) SELECT recref$X.x FROM recursive$A as recref$X WHERE recref$X.x > 1
+            WHERE ref$Z.y = edges$C.x))) SELECT recref$X.x FROM recursive$A as recref$X WHERE recref$X.x > 1
             """
 }
 
@@ -209,7 +212,7 @@ class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
 //    """
 //    WITH RECURSIVE recursive$A AS
 //      (SELECT * FROM edges as edges$B
-//        UNION ALL
+//        UNION
 //      SELECT * FROM edges as edges$E)
 //    SELECT * FROM recursive$A as recref$Z
 //      """
@@ -267,7 +270,7 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
           .map(e => (x = p.x, y = e.y).toRow)
       )
       val PtoA = path.filter(e => e.x == 1)
-      (P, PtoA)
+      (P.distinct, PtoA.distinct)
     )
 
     pathToAResult
@@ -276,15 +279,15 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
     """
       WITH RECURSIVE
           recursive$P AS
-            (SELECT * FROM edges as edges$F
-                UNION ALL
-             (SELECT ref$Z.x as x, edges$C.y as y
+            ((SELECT * FROM edges as edges$F)
+                UNION
+             ((SELECT ref$Z.x as x, edges$C.y as y
              FROM recursive$P as ref$Z, edges as edges$C
-             WHERE ref$Z.y = edges$C.x)),
+             WHERE ref$Z.y = edges$C.x))),
           recursive$A AS
-           (SELECT * FROM empty as empty$D
-              UNION ALL
-            (SELECT * FROM recursive$P as ref$X WHERE ref$X.x = 1))
+           ((SELECT * FROM empty as empty$D)
+              UNION
+            ((SELECT * FROM recursive$P as ref$X WHERE ref$X.x = 1)))
       SELECT * FROM recursive$A as recref$Q
       """
 }
@@ -303,7 +306,7 @@ class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
           .map(p2 => (x = p.x, y = p2.y).toRow)
       )
       val PtoA = path.filter(e => e.x == 9)
-      (P, PtoA)
+      (P.distinct, PtoA.distinct)
     )
 
     pathToAResult
@@ -312,15 +315,15 @@ class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
     """
         WITH RECURSIVE
             recursive$P AS
-              (SELECT * FROM edges as edges$F
-                  UNION ALL
-               (SELECT ref$Z.x as x, ref$Y.y as y
+              ((SELECT * FROM edges as edges$F)
+                  UNION
+               ((SELECT ref$Z.x as x, ref$Y.y as y
                FROM recursive$P as ref$Z, recursive$P as ref$Y
-               WHERE ref$Z.y = ref$Y.x)),
+               WHERE ref$Z.y = ref$Y.x))),
             recursive$A AS
-             (SELECT * FROM empty as empty$D
-                UNION ALL
-              (SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = 9))
+             ((SELECT * FROM empty as empty$D)
+                UNION
+              ((SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = 9)))
         SELECT * FROM recursive$A as recref$S
         """
 }
@@ -340,7 +343,7 @@ class RecursiveSelfJoin2Test extends SQLStringQueryTest[TCDB, Edge] {
           .map(p2 => (x = p.x, y = p2.y).toRow)
       )
       val PtoA = path.filter(e => e.x == 8)
-      (P, PtoA)
+      (P.distinct, PtoA.distinct)
     )
 
     pathToAResult
@@ -349,20 +352,20 @@ class RecursiveSelfJoin2Test extends SQLStringQueryTest[TCDB, Edge] {
     """
         WITH RECURSIVE
             recursive$P AS
-              (SELECT * FROM edges as edges$F
-                  UNION ALL
-               (SELECT ref$Z.x as x, ref$Y.y as y
+              ((SELECT * FROM edges as edges$F)
+                  UNION
+               ((SELECT ref$Z.x as x, ref$Y.y as y
                FROM recursive$P as ref$Z, recursive$P as ref$Y
-               WHERE ref$Z.x <> ref$Y.y AND ref$Z.y = ref$Y.x)),
+               WHERE ref$Z.x <> ref$Y.y AND ref$Z.y = ref$Y.x))),
             recursive$A AS
-             (SELECT * FROM empty as empty$D
-                UNION ALL
-              (SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = 8))
+             ((SELECT * FROM empty as empty$D)
+                UNION
+              ((SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = 8)))
         SELECT * FROM recursive$A as recref$S
         """
 }
 
-class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
+class RecursiveCSPADistinctTest extends SQLStringQueryTest[CSPADB, Location] {
   def testDescription: String = "CSPA, example mutual recursion"
 
   def query() =
@@ -375,7 +378,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
         .unionAll(
           // MemoryAlias(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
-        )
+        ).distinct
 
     val valueFlowBase =
       assign // ValueFlow(y, x) :- Assign(y, x)
@@ -383,6 +386,117 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
           // ValueFlow(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
         ).unionAll(
+          // ValueFlow(x, x) :- Assign(_, x)
+          assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+        ).distinct
+
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+      (valueFlow, valueAlias, memoryAlias) =>
+        val VF =
+          // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
+          assign.flatMap(a =>
+            memoryAlias
+              .filter(m => a.p2 == m.p1)
+              .map(m => (p1 = a.p1, p2 = m.p2).toRow
+              )
+          ).unionAll(
+            // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
+            valueFlow.flatMap(vf1 =>
+              valueFlow
+                .filter(vf2 => vf1.p2 == vf2.p1)
+                .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
+            )
+          ).distinct
+        val MA =
+          // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
+          dereference.flatMap(d1 =>
+            valueAlias.flatMap(va =>
+              dereference
+                .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
+                .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
+            )
+          ).distinct
+
+        val VA =
+          // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+          valueFlow.flatMap(vf1 =>
+            valueFlow
+              .filter(vf2 => vf1.p1 == vf2.p1)
+              .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+          ).unionAll(
+            // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+            valueFlow.flatMap(vf1 =>
+              memoryAlias.flatMap(m =>
+                valueFlow
+                  .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
+                  .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+              )
+            )
+          ).distinct
+        (VF, MA, VA)
+    )
+    valueFlowFinal
+
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE
+      recursive$A AS
+        (((SELECT * FROM assign as assign$D)
+				  UNION ALL
+			  (SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
+					UNION ALL
+				(SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F))
+					UNION
+				(((SELECT assign$G.p1 as p1, ref$J.p2 as p2
+				FROM assign as assign$G, recursive$C as ref$J
+				WHERE assign$G.p2 = ref$J.p1)
+					UNION ALL
+				(SELECT ref$K.p1 as p1, ref$L.p2 as p2
+				FROM recursive$A as ref$K, recursive$A as ref$L
+				WHERE ref$K.p2 = ref$L.p1)))),
+		  recursive$B AS
+		    ((SELECT * FROM empty as empty$M)
+					UNION
+				((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
+				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
+			recursive$C AS
+			  (((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
+					UNION ALL
+				(SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I))
+					UNION
+				(((SELECT ref$Q.p2 as p1, ref$R.p2 as p2
+				FROM recursive$A as ref$Q, recursive$A as ref$R
+				WHERE ref$Q.p1 = ref$R.p1)
+					UNION ALL
+				(SELECT ref$S.p2 as p1, ref$T.p2 as p2
+				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
+				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))))
+		SELECT * FROM recursive$A as recref$V
+    """
+}
+
+class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
+  def testDescription: String = "CSPA, example mutual recursion"
+
+  def query() =
+    val assign = testDB.tables.assign
+    val dereference = testDB.tables.dereference
+
+    val memoryAliasBase =
+      // MemoryAlias(x, x) :- Assign(_, x)
+      assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+        .union(
+          // MemoryAlias(x, x) :- Assign(x, _)
+          assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
+        )
+
+    val valueFlowBase =
+      assign // ValueFlow(y, x) :- Assign(y, x)
+        .union(
+          // ValueFlow(x, x) :- Assign(x, _)
+          assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
+        ).union(
           // ValueFlow(x, x) :- Assign(_, x)
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
@@ -396,7 +510,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
               .filter(m => a.p2 == m.p1)
               .map(m => (p1 = a.p1, p2 = m.p2).toRow
             )
-          ).unionAll(
+          ).union(
             // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
             valueFlow.flatMap(vf1 =>
               valueFlow
@@ -412,7 +526,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
                 .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
                 .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
             )
-          )
+          ).distinct
 
         val VA =
           // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
@@ -420,7 +534,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
             valueFlow
               .filter(vf2 => vf1.p1 == vf2.p1)
               .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
-          ).unionAll(
+          ).union(
             // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
             valueFlow.flatMap(vf1 =>
               memoryAlias.flatMap(m =>
@@ -438,37 +552,37 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
     """
     WITH RECURSIVE
       recursive$A AS
-        (SELECT * FROM assign as assign$D
-				  UNION ALL
-			  (SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E
-					UNION ALL
-				SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F
-					UNION ALL
-				SELECT assign$G.p1 as p1, ref$J.p2 as p2
+        ((SELECT * FROM assign as assign$D)
+				  UNION
+			  ((SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
+					UNION
+				(SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F)
+					UNION
+				(SELECT assign$G.p1 as p1, ref$J.p2 as p2
 				FROM assign as assign$G, recursive$C as ref$J
-				WHERE assign$G.p2 = ref$J.p1
-					UNION ALL
-				SELECT ref$K.p1 as p1, ref$L.p2 as p2
+				WHERE assign$G.p2 = ref$J.p1)
+					UNION
+				(SELECT ref$K.p1 as p1, ref$L.p2 as p2
 				FROM recursive$A as ref$K, recursive$A as ref$L
-				WHERE ref$K.p2 = ref$L.p1)),
+				WHERE ref$K.p2 = ref$L.p1))),
 		  recursive$B AS
-		    (SELECT * FROM empty as empty$M
-					UNION ALL
-				(SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+		    ((SELECT * FROM empty as empty$M)
+					UNION
+				((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
 				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1)),
+				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
 			recursive$C AS
-			  (SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H
-					UNION ALL
-				(SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I
-					UNION ALL
-				SELECT ref$Q.p2 as p1, ref$R.p2 as p2
+			  ((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
+					UNION
+				((SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I)
+					UNION
+				(SELECT ref$Q.p2 as p1, ref$R.p2 as p2
 				FROM recursive$A as ref$Q, recursive$A as ref$R
-				WHERE ref$Q.p1 = ref$R.p1
-					UNION ALL
-				SELECT ref$S.p2 as p1, ref$T.p2 as p2
+				WHERE ref$Q.p1 = ref$R.p1)
+					UNION
+				(SELECT ref$S.p2 as p1, ref$T.p2 as p2
 				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))
+				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)))
 		SELECT * FROM recursive$A as recref$V
     """
 }
@@ -493,17 +607,17 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
     val memoryAliasBase =
       // MemoryAlias(x, x) :- Assign(_, x)
       assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
-        .unionAll(
+        .union(
           // MemoryAlias(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
         )
 
     val valueFlowBase =
       assign // ValueFlow(y, x) :- Assign(y, x)
-        .unionAll(
+        .union(
           // ValueFlow(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
-        ).unionAll(
+        ).union(
           // ValueFlow(x, x) :- Assign(_, x)
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
@@ -524,7 +638,7 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
             vf2 <- valueFlow
             if vf1.p2 == vf2.p1
           yield (p1 = vf1.p1, p2 = vf2.p2).toRow
-        val VF = vfDef1.unionAll(vfDef2)
+        val VF = vfDef1.union(vfDef2)
 
         // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
         val MA =
@@ -550,49 +664,50 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
             vf2 <- valueFlow
             if vf1.p1 == m.p1 && vf2.p1 == m.p2
           yield (p1 = vf1.p2, p2 = vf2.p2).toRow
-        val VA = vaDef1.unionAll(vaDef2)
+        val VA = vaDef1.union(vaDef2)
 
-        (VF, MA, VA)
+        (VF, MA.distinct, VA)
     )
     valueFlowFinal
   def expectedQueryPattern: String =
     """
-        WITH RECURSIVE
+    WITH RECURSIVE
       recursive$A AS
-        (SELECT * FROM assign as assign$D
-				  UNION ALL
-			  (SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E
-					UNION ALL
-				SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F
-					UNION ALL
-				SELECT assign$G.p1 as p1, ref$J.p2 as p2
+        ((SELECT * FROM assign as assign$D)
+				  UNION
+			  ((SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
+					UNION
+				(SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F)
+					UNION
+				(SELECT assign$G.p1 as p1, ref$J.p2 as p2
 				FROM assign as assign$G, recursive$C as ref$J
-				WHERE assign$G.p2 = ref$J.p1
-					UNION ALL
-				SELECT ref$K.p1 as p1, ref$L.p2 as p2
+				WHERE assign$G.p2 = ref$J.p1)
+					UNION
+				(SELECT ref$K.p1 as p1, ref$L.p2 as p2
 				FROM recursive$A as ref$K, recursive$A as ref$L
-				WHERE ref$K.p2 = ref$L.p1)),
+				WHERE ref$K.p2 = ref$L.p1))),
 		  recursive$B AS
-		    (SELECT * FROM empty as empty$M
-					UNION ALL
-				(SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+		    ((SELECT * FROM empty as empty$M)
+					UNION
+				((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
 				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1)),
+				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
 			recursive$C AS
-			  (SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H
-					UNION ALL
-				(SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I
-					UNION ALL
-				SELECT ref$Q.p2 as p1, ref$R.p2 as p2
+			  ((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
+					UNION
+				((SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I)
+					UNION
+				(SELECT ref$Q.p2 as p1, ref$R.p2 as p2
 				FROM recursive$A as ref$Q, recursive$A as ref$R
-				WHERE ref$Q.p1 = ref$R.p1
-					UNION ALL
-				SELECT ref$S.p2 as p1, ref$T.p2 as p2
+				WHERE ref$Q.p1 = ref$R.p1)
+					UNION
+				(SELECT ref$S.p2 as p1, ref$T.p2 as p2
 				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))
+				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)))
 		SELECT * FROM recursive$A as recref$V
     """
 }
+
 type FibNum = (recursionDepth: Int, fibonacciNumber: Int, nextNumber: Int)
 type FibNumDB = (base: FibNum, result: FibNum)
 
@@ -618,17 +733,18 @@ class RecursionFibTest extends SQLStringQueryTest[FibNumDB, (FibonacciNumberInde
       fib
         .filter(f => (f.recursionDepth + 1) < 10)
         .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
+        .distinct
     ).map(f => (FibonacciNumberIndex = f.recursionDepth, FibonacciNumber = f.fibonacciNumber).toRow)
   def expectedQueryPattern: String =
     """
     WITH RECURSIVE
       recursive$1 AS
-        (SELECT * FROM base as base$1
-            UNION ALL
-        (SELECT
+        ((SELECT * FROM base as base$1)
+            UNION
+        ((SELECT
             ref$0.recursionDepth + 1 as recursionDepth, ref$0.nextNumber as fibonacciNumber, ref$0.fibonacciNumber + ref$0.nextNumber as nextNumber
          FROM recursive$1 as ref$0
-         WHERE ref$0.recursionDepth + 1 < 10))
+         WHERE ref$0.recursionDepth + 1 < 10)))
     SELECT recref$0.recursionDepth as FibonacciNumberIndex, recref$0.fibonacciNumber as FibonacciNumber FROM recursive$1 as recref$0
       """
 }
@@ -677,21 +793,21 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
             val listPath = hier.path.prepend(t.name)
             (id = t.id, source = t.name, path = listPath).toRow
           )
-      )
+      ).distinct
     ).filter(h => h.source == "Oasis").map(h => h.path)
   def expectedQueryPattern: String =
     """
       WITH RECURSIVE
         recursive$62 AS
-          (SELECT
+          ((SELECT
               tag$62.id as id, tag$62.name as source, [tag$62.name] as path
            FROM tag as tag$62
-           WHERE tag$62.subclassof = -1
-                UNION ALL
-           (SELECT
+           WHERE tag$62.subclassof = -1)
+                UNION
+           ((SELECT
               tag$64.id as id, tag$64.name as source, list_prepend(tag$64.name, ref$30.path) as path
             FROM recursive$62 as ref$30, tag as tag$64
-            WHERE tag$64.subclassof = ref$30.id))
+            WHERE tag$64.subclassof = ref$30.id)))
       SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = "Oasis"
       """
 }
@@ -726,20 +842,20 @@ class RecursionReachabilityTest extends SQLStringQueryTest[ReachabilityDB, Path]
           .map(e =>
             (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
           )
-        )
+        ).distinct
       ).sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
 
   def expectedQueryPattern: String =
     """
       WITH RECURSIVE
         recursive$150 AS
-          (SELECT * FROM (SELECT edge$150.x as startNode, edge$150.y as endNode, [edge$150.x, edge$150.y] as path
+          ((SELECT * FROM (SELECT edge$150.x as startNode, edge$150.y as endNode, [edge$150.x, edge$150.y] as path
            FROM edge as edge$150) as subquery$151
-          WHERE subquery$151.startNode = 1
-            UNION ALL
-          (SELECT ref$70.startNode as startNode, edge$152.y as endNode, list_append(ref$70.path, edge$152.y) as path
+          WHERE subquery$151.startNode = 1)
+            UNION
+          ((SELECT ref$70.startNode as startNode, edge$152.y as endNode, list_append(ref$70.path, edge$152.y) as path
            FROM recursive$150 as ref$70, edge as edge$152
-           WHERE edge$152.x = ref$70.endNode AND NOT list_contains(ref$70.path, edge$152.y)))
+           WHERE edge$152.x = ref$70.endNode AND NOT list_contains(ref$70.path, edge$152.y))))
       SELECT * FROM recursive$150 as recref$13 ORDER BY length(recref$13.path) ASC, path ASC
       """
 }
@@ -768,24 +884,24 @@ class RecursionShortestPathTest extends SQLStringQueryTest[ReachabilityDB, Path]
           .map(e =>
             (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
           )
-      )
+      ).distinct
     ).sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
 
   def expectedQueryPattern: String =
     """
       WITH RECURSIVE
           recursive$116 AS
-            (SELECT * FROM
+            ((SELECT * FROM
               (SELECT edge$116.x as startNode, edge$116.y as endNode, [edge$116.x, edge$116.y] as path
                FROM edge as edge$116) as subquery$117
-             WHERE subquery$117.startNode = 1
-                UNION ALL
-            (SELECT
+             WHERE subquery$117.startNode = 1)
+                UNION
+            ((SELECT
                 ref$58.startNode as startNode, edge$118.y as endNode, list_append(ref$58.path, edge$118.y) as path
              FROM recursive$116 as ref$58, edge as edge$118
              WHERE edge$118.x = ref$58.endNode
                 AND
-             NOT EXISTS (SELECT * FROM recursive$116 as ref$60 WHERE list_contains(ref$60.path, edge$118.y))))
+             NOT EXISTS (SELECT * FROM recursive$116 as ref$60 WHERE list_contains(ref$60.path, edge$118.y)))))
       SELECT * FROM recursive$116 as recref$9 ORDER BY length(recref$9.path) ASC, path ASC
       """
 }

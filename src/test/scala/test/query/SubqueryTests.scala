@@ -1692,9 +1692,9 @@ class SubqueryLimitUnionSelectSubqueryTest extends SQLStringQueryTest[AllCommerc
           .map(_.name.toLowerCase)
       )
   def expectedQueryPattern = """
-        SELECT LOWER(buyers$A.name) FROM buyers as buyers$A LIMIT 2
+        (SELECT LOWER(buyers$A.name) FROM buyers as buyers$A LIMIT 2)
         UNION ALL
-        SELECT LOWER(product$B.name) FROM product as product$B
+        (SELECT LOWER(product$B.name) FROM product as product$B)
       """
 }
 
@@ -1708,9 +1708,9 @@ class SubqueryUnionSelectLimitSubqueryTest extends SQLStringQueryTest[AllCommerc
           .map(_.name.toLowerCase)
           .take(2))
   def expectedQueryPattern = """
-        SELECT LOWER(buyers$A.name) FROM buyers as buyers$A
+        (SELECT LOWER(buyers$A.name) FROM buyers as buyers$A)
         UNION ALL
-        SELECT LOWER(product$B.name) FROM product as product$B LIMIT 2
+        (SELECT LOWER(product$B.name) FROM product as product$B LIMIT 2)
       """
 }
 
@@ -1726,9 +1726,9 @@ class ExceptAggregateSubqueryTest extends SQLStringAggregationTest[AllCommerceDB
       .aggregate(ps => (max = max(ps.price), min = min(ps.price)).toRow)
   def expectedQueryPattern = """
      SELECT MAX(subquery$E.price) as max, MIN(subquery$E.price) as min FROM
-        (SELECT LOWER(product$A.name) as name, product$A.price as price FROM product as product$A
+        ((SELECT LOWER(product$A.name) as name, product$A.price as price FROM product as product$A)
         EXCEPT
-        SELECT LOWER(product$B.name) as name, product$B.price as price FROM product as product$B) as subquery$E
+        (SELECT LOWER(product$B.name) as name, product$B.price as price FROM product as product$B)) as subquery$E
       """
 }
 
@@ -1746,14 +1746,14 @@ class UnionAllAggregateSubqueryTest extends SQLStringAggregationTest[AllCommerce
           MAX(subquery$A.price) as max,
           MIN(subquery$A.price) as min
         FROM
-          (SELECT
+          ((SELECT
               LOWER(product$B.name) as name, product$B.price as price
            FROM
-              product as product$B
+              product as product$B)
            UNION ALL
-            SELECT
+            (SELECT
               LOWER(product$C.name) as name, product$C.price as price
             FROM
-              product as product$C) as subquery$A
+              product as product$C)) as subquery$A
       """
 }

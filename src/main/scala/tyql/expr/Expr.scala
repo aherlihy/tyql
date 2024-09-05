@@ -6,6 +6,7 @@ import scala.annotation.targetName
 import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 
+// TODO: probably seal
 trait ExprShape
 class ScalarExpr extends ExprShape
 class NExpr extends ExprShape
@@ -135,9 +136,9 @@ object Expr:
 
   // Expressions resulting from queries
   // Cannot use Contains with an aggregation
-  case class Contains[A]($this: Query[A], $other: Expr[A, NExpr]) extends Expr[Boolean, NExpr]
-  case class IsEmpty[A]($this: Query[A]) extends Expr[Boolean, NExpr]
-  case class NonEmpty[A]($this: Query[A]) extends Expr[Boolean, NExpr]
+  case class Contains[A]($this: Query[A, ?], $other: Expr[A, NExpr]) extends Expr[Boolean, NExpr]
+  case class IsEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NExpr]
+  case class NonEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NExpr]
 
   /** References are placeholders for parameters */
   private var refCount = 0 // TODO: do we want to recount from 0 for each query?

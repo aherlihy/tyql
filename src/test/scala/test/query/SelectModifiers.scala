@@ -77,16 +77,6 @@ class SelectModifiersSort1cTest extends SQLStringQueryTest[AllCommerceDBs, Produ
 }
 
 
-class SelectModifiersDistinct1cTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
-  def testDescription: String = "SelectModifiers: distinct on table"
-
-  def query() =
-    testDB.tables.products
-      .distinct
-
-  def expectedQueryPattern: String = "SELECT DISTINCT * FROM product as product$A"
-}
-
 class SelectModifiersLimit1cTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "SelectModifiers: limit on table"
 
@@ -168,8 +158,18 @@ class SelectModifiersSortLimit2Test extends SQLStringQueryTest[AllCommerceDBs, (
   def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY name ASC OFFSET 2 LIMIT 4"
 }
 
-class SelectModifiersDistinctTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
-  def testDescription: String = "SelectModifiers: distinct"
+class SelectModifiersDistinctTableTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription: String = "SelectModifiers: distinct on Table"
+
+  def query() =
+    testDB.tables.products
+      .distinct
+
+  def expectedQueryPattern: String = "SELECT DISTINCT * FROM product as product$A"
+}
+
+class SelectModifiersDistinctOrderbyTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+  def testDescription: String = "SelectModifiers: distinct on OrderBy"
   def query() =
     testDB.tables.products
       .map: prod =>
@@ -177,4 +177,31 @@ class SelectModifiersDistinctTest extends SQLStringQueryTest[AllCommerceDBs, (na
       .sort(_.name, Ord.ASC)
       .distinct
   def expectedQueryPattern: String =  "SELECT DISTINCT product$A.name as name FROM product as product$A ORDER BY name ASC"
+}
+class SelectModifiersDistinctSelectAllTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
+  def testDescription: String = "SelectModifiers: distinct on SelectAll"
+  def query() =
+    testDB.tables.products.filter(p => p.id > 1)
+      .distinct
+  def expectedQueryPattern: String =  "SELECT DISTINCT * FROM product as product$A WHERE product$A.id > 1"
+}
+class SelectModifiersDistinctSelectTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+  def testDescription: String = "SelectModifiers: distinct on Select"
+  def query() =
+    testDB.tables.products
+      .map: prod =>
+        (name = prod.name).toRow
+      .distinct
+  def expectedQueryPattern: String =  "SELECT DISTINCT product$A.name as name FROM product as product$A"
+}
+
+class SelectModifiersDistinctNaryTest extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
+  def testDescription: String = "SelectModifiers: distinct on Nary"
+  def query() =
+    testDB.tables.products
+      .map: prod =>
+        (name = prod.name).toRow
+      .unionAll(testDB.tables.buyers.map(b => (name = b.name).toRow))
+      .distinct
+  def expectedQueryPattern: String =  "SELECT DISTINCT * FROM ((SELECT product$A.name as name FROM product as product$A) UNION ALL (SELECT buyers$B.name as name FROM buyers as buyers$B)) as subquery$C"
 }

@@ -140,21 +140,27 @@ object TreePrettyPrinter {
         s"${indent(depth)}Drop(\n${from.prettyPrint(depth + 1)}, $offset\n${indent(depth)})"
       case Distinct(from) =>
         s"${indent(depth)}Distinct(\n${from.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Union(thisQuery, other, dedup) =>
-        s"${indent(depth)}Union(dedup=$dedup\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Union(thisQuery, other) =>
+        s"${indent(depth)}Union(${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Intersect(thisQuery, other) =>
         s"${indent(depth)}Intersect(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Except(thisQuery, other) =>
         s"${indent(depth)}Except(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case UnionAll(thisQuery, other) =>
+        s"${indent(depth)}UnionAll(${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case IntersectAll(thisQuery, other) =>
+        s"${indent(depth)}IntersectAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case ExceptAll(thisQuery, other) =>
+        s"${indent(depth)}ExceptAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
 //      case GroupBy(query, selectFn, groupingFn, havingFn) =>
 //        s"${indent(depth)}GroupBy(\n${query.prettyPrint(depth + 1)},\n${selectFn.prettyPrint(depth + 1)},\n${groupingFn.prettyPrint(depth + 1)},\n${havingFn.prettyPrint(depth + 1)}\n${indent(depth)})"
       case MultiRecursive(refs, querys, finalQ) =>
         val refStr = refs.toList.map(r => r.toQuery.prettyPrint(depth+1))
-        val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?]].prettyPrint(depth + 2))
+        val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?, ?]].prettyPrint(depth + 2))
         val str = refStr.zip(qryStr).map((r, q) => s"\n$r :=\n$q").mkString(",\n")
         val finalQStr = finalQ.prettyPrint(depth + 1)
         s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth+1, "FINAL->", finalQStr)}\n${indent(depth)})"
-      case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?]].stringRef()})"
+      case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?, ?]].stringRef()})"
       case a: Aggregation[?] => a.prettyPrint(depth)
       case _ => throw new Exception(s"Unimplemented pretty print AST $ast")
     }
@@ -187,8 +193,6 @@ object TreePrettyPrinter {
         val childrenPrint = naryRelationOp.children.map(_.prettyPrintIR(depth + 1, printAST))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", naryRelationOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}N-aryRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
-      case recursiveRelationOp: RecursiveRelationOp =>
-        s"${indent(depth)}RecursiveOp{${recursiveRelationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth+1)}base=\n${recursiveRelationOp.finalQ.prettyPrintIR(depth+2, printAST)}\n${indent(depth + 1)}query=\n${recursiveRelationOp.query.prettyPrintIR(depth + 2, printAST)}"
       case MultiRecursiveRelationOp(alias, query, finalQ, ast) =>
         val qryStr = query.map(q => q.prettyPrintIR(depth + 1, false))
         val str = alias.zip(qryStr).map((r, q) => s"\n$r => $q").mkString(",\n")

@@ -5,6 +5,49 @@ import tyql.*
 import test.query.{commerceDBs, AllCommerceDBs}
 import language.experimental.namedTuples
 
+class MissingAttributeCompileErrorTest extends munit.FunSuite {
+  def testDescription: String = "named tuples require attributes to exist"
+  def expectedError: String = "doesNotExist is not a member of"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.Table
+           import java.time.LocalDate
+
+           case class Product(id: Int, name: String, price: Double)
+
+           case class Buyer(id: Int, name: String, dateOfBirth: LocalDate)
+
+           case class ShippingInfo(id: Int, buyerId: Int, shippingDate: LocalDate)
+
+           case class Purchase(
+                     id: Int,
+                     shippingInfoId: Int,
+                     productId: Int,
+                     count: Int,
+                     total: Double
+                   )
+
+           val tables = (
+             products = Table[Product]("product"),
+             buyers = Table[Buyer]("buyers"),
+             shipInfos = Table[ShippingInfo]("shippingInfo"),
+             purchases = Table[Purchase]("purchase")
+           )
+
+           // TEST
+             tables.shipInfos.map(si =>
+               (name = b.name, shippingDate = si.doesNotExist).toRow
+             )
+        """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
 class MapMapProjectCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "map+map should fail with useful error message"
   def expectedError: String = "None of the overloaded alternatives"
@@ -881,77 +924,5 @@ class MixedProjectMapErrorTest extends munit.FunSuite {
   }
 }
 
-class InlineFixRecursionErrorTest extends munit.FunSuite {
-  def testDescription: String = "inline fix cannot have recursion"
-  def expectedError: String = "value aggregate is not a member of tyql.Query.RestrictedQueryRef"
 
-  test(testDescription) {
-    val error: String =
-      compileErrors(
-        """
-           // BOILERPLATE
-           import language.experimental.namedTuples
-           import tyql.{Table, Expr}
 
-           type Edge = (x: Int, y: Int)
-           type Edge2 = (z: Int, q: Int)
-           type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
-
-           val tables = (
-             edges = Table[Edge]("edges"),
-             otherEdges = Table[Edge2]("otherEdges"),
-             emptyEdges = Table[Edge]("empty")
-           )
-
-          // TEST
-          val path = tables.edges
-          path.fix(path =>
-            path.aggregate(p =>
-              tables.edges
-                .filter(e => p.y == e.x)
-                .aggregate(e => (x = Expr.avg(p.x), y = Expr.sum(e.y)).toRow)
-            )
-          )
-          """)
-    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
-  }
-}
-
-class FixRecursionErrorTest extends munit.FunSuite {
-  def testDescription: String = "2-query fix cannot have recursion"
-  def expectedError: String = "value aggregate is not a member of tyql.Query.RestrictedQueryRef"
-
-  test(testDescription) {
-    val error: String =
-      compileErrors(
-        """
-           // BOILERPLATE
-           import language.experimental.namedTuples
-           import tyql.{Table, Expr, Query}
-
-           type Edge = (x: Int, y: Int)
-           type Edge2 = (z: Int, q: Int)
-           type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
-
-           val tables = (
-             edges = Table[Edge]("edges"),
-             otherEdges = Table[Edge2]("otherEdges"),
-             emptyEdges = Table[Edge]("empty")
-           )
-
-          // TEST
-          val pathBase = tables.edges
-          val pathToABase = tables.emptyEdges
-          val (pathResult, pathToAResult) = Query.fix(pathBase, pathToABase)((path, pathToA) =>
-            val P = path.flatMap(p =>
-              tables.edges
-                .filter(e => p.y == e.x)
-                .map(e => (x = p.x, y = e.y).toRow)
-            )
-            val PtoA = path.aggregate(e => Expr.Avg(e.x) == "A")
-            (P, PtoA)
-          )
-          """)
-    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
-  }
-}

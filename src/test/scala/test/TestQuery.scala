@@ -1,5 +1,5 @@
 package test // test package so that it can be imported by bench. Use subpackages so that SBT test reporting is easier to read.
-import tyql.{DatabaseAST, Table, Query, Aggregation}
+import tyql.{Aggregation, DatabaseAST, Query, ResultCategory, Table}
 
 import language.experimental.namedTuples
 import NamedTuple.AnyNamedTuple
@@ -196,6 +196,6 @@ class TestSuiteTest extends munit.FunSuite {
 }
 
 abstract class SQLStringQueryTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
-  extends TestSQLString[Rows, Query[Return]] with TestQuery[Rows, Query[Return]]
+  extends TestSQLString[Rows, Query[Return, ?]] with TestQuery[Rows, Query[Return, ?]]
 abstract class SQLStringAggregationTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
   extends TestSQLString[Rows, Aggregation[Return]] with TestQuery[Rows, Aggregation[Return]]

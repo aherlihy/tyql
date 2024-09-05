@@ -9,11 +9,11 @@ import scala.reflect.ClassTag
 import Utils.*
 import tyql.Aggregation.AggFilter
 
-type CalculateResult[S, R] <: DatabaseAST[R] = S match
-  case ScalarExpr => Aggregation[R]
-  case NExpr => Query[R]
+trait ResultCategory
+class SetResult extends ResultCategory
+class BagResult extends ResultCategory
 
-trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
+trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseAST[A]:
   import Expr.{Pred, Fun, Ref}
   val tag: ResultTag[A] = qTag
   /**
@@ -23,7 +23,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B   the result type of the query.
    * @return     Query[B], e.g. an iterable of results of type B
    */
-  def flatMap[B: ResultTag](f: Ref[A, NExpr] => Query[B]): Query[B] =
+  def flatMap[B: ResultTag](f: Ref[A, NExpr] => Query[B, ?]): Query[B, BagResult] =
     val ref = Ref[A, NExpr]()
     Query.FlatMap(this, Fun(ref, f(ref)))
 
@@ -35,7 +35,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B  the result type of the query.
    * @return    RestrictedQuery[B]
    */
-  def flatMap[B: ResultTag](f: Ref[A, NExpr] => RestrictedQuery[B]): RestrictedQuery[B] =
+  def flatMap[B: ResultTag](f: Ref[A, NExpr] => RestrictedQuery[B, ?]): RestrictedQuery[B, BagResult] =
     val ref = Ref[A, NExpr]()
     RestrictedQuery(Query.FlatMap(this, Fun(ref, f(ref).toQuery)))
   /**
@@ -92,7 +92,7 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @return      Query[B], an iterable of type B.
    *
    */
-  def map[B: ResultTag](f: Ref[A, NExpr] => Expr[B, NExpr]): Query[B] =
+  def map[B: ResultTag](f: Ref[A, NExpr] => Expr[B, NExpr]): Query[B, BagResult] =
     val ref = Ref[A, NExpr]()
     Query.Map(this, Fun(ref, f(ref)))
 
@@ -103,20 +103,20 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
    * @tparam B   the named-tuple-of-Expr that will be converted to an Expr-of-named-tuple
    * @return     Expr of B.toRow, e.g. an iterable of type B.toRow
    */
-  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, NExpr] => B): Query[ NamedTuple.Map[B, Expr.StripExpr] ] =
+  def map[B <: AnyNamedTuple : Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, NExpr] => B): Query[ NamedTuple.Map[B, Expr.StripExpr], BagResult ] =
     import Expr.toRow
     val ref = Ref[A, NExpr]()
     Query.Map(this, Fun(ref, f(ref).toRow))
 
-  def fix(p: Query.RestrictedQueryRef[A] => RestrictedQuery[A]): Query[A] =
-    val fn: Tuple1[Query.RestrictedQueryRef[A]] => Tuple1[RestrictedQuery[A]] = r => Tuple1(p(r._1))
+  def fix(p: Query.RestrictedQueryRef[A, ?] => RestrictedQuery[A, SetResult]): Query[A, SetResult] =
+    val fn: Tuple1[Query.RestrictedQueryRef[A, ?]] => Tuple1[RestrictedQuery[A, SetResult]] = r => Tuple1(p(r._1))
     Query.fix(Tuple1(this))(fn)._1
 
-  def withFilter(p: Ref[A, NExpr] => Expr[Boolean, NExpr]): Query[A] =
+  def withFilter(p: Ref[A, NExpr] => Expr[Boolean, NExpr]): Query[A, Category] =
     val ref = Ref[A, NExpr]()
     Query.Filter(this, Fun(ref, p(ref)))
 
-  def filter(p: Ref[A, NExpr] => Expr[Boolean, NExpr]): Query[A] = withFilter(p)
+  def filter(p: Ref[A, NExpr] => Expr[Boolean, NExpr]): Query[A, Category] = withFilter(p)
 
 // TODO: filter + agg should be technically 'having' but probably don't want to force users to write table.having(...)?
 //    def filter(p: Ref[R, ScalarExpr] => Expr[Boolean, ScalarExpr]): Aggregation[R] =
@@ -127,100 +127,126 @@ trait Query[A](using ResultTag[A]) extends DatabaseAST[A]:
 object Query:
   import Expr.{Pred, Fun, Ref}
 
+//  /** Converts a tuple `(F[T1], ..., F[Tn])` to `(T1,  ... Tn)` */
+//  type InverseMap[X <: Tuple, F[_]] <: Tuple = X match {
+//    case F[x] *: t => x *: InverseMap[t, F]
+//    case EmptyTuple => EmptyTuple
+//  }
+
   /** Given a Tuple `(Query[A], Query[B], ...)`, return `(A, B, ...)` */
-  type Elems[QT <: Tuple] = Tuple.InverseMap[QT, Query]
-  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(Query[A], Query[B], ...)`
+  type Elems[QT <: Tuple] = Tuple.InverseMap[QT, [T] =>> Query[T, ?]]
+
+  /**
+   * Given a Tuple `(Query[A], Query[B], ...)`, return `(Query[A], Query[B], ...)`
    *
    *  This isn't just the identity because the input might actually be a subtype e.g.
    *  `(Table[A], Table[B], ...)`
    */
-  type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], Query]
+  type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, SetResult]]
 
-  type ToRestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], RestrictedQuery]
+  type ToRestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, SetResult]]
+
   /** Given a Tuple `(Query[A], Query[B], ...)`, return `(RestrictedQueryRef[A], RestrictedQueryRef[B], ...)` */
-  type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], RestrictedQueryRef]
+  type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, SetResult]]
 
 //  def fixUntupled[F, QT <: Tuple](bases: QT)(f: F)(using ev: Tuple.Union[QT] <:< Query[?], tf: TupledFunction[F, ToRestrictedQueryRef[QT] => ToQuery[QT]]): ToQuery[QT] =
 //    tf.untupled(multiFix(bases)(ev, tf.tupled))
   /**
    * Fixed point computation.
+   *
+   * @param bases Tuple of the base case queries. NOTE: bases do not have to be sets since they will be directly fed into an union.
+   * TODO: in theory, the results could be assumed to be sets due to the outermost UNION(base, recur), but better to enforce .distinct (also bc we flatten the unions)
+   * @param fns A function from a tuple of restricted query refs to a tuple of *SET* restricted queries.
    */
-  def fix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?])(fns: ToRestrictedQueryRef[QT] => ToRestrictedQuery[QT]): ToQuery[QT] =
+  def fix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToRestrictedQueryRef[QT] => ToRestrictedQuery[QT]): ToQuery[QT] =
+    // If base cases are themselves recursive definitions.
     val baseRefsAndDefs = bases.toArray.map {
-      case MultiRecursive(params, querys, resultQ) => ???// TODO: decide on multiple fix definition semantics. (param, query)
-      case base: Query[t] => (RestrictedQueryRef()(using base.tag), base)
+      case MultiRecursive(params, querys, resultQ) => ???// TODO: decide on semantics for multiple fix definitions. (param, query)
+      case base: Query[?, ?] => (RestrictedQueryRef()(using base.tag), base)
     }
     val refsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[ToRestrictedQueryRef[QT]]
     val refsList = baseRefsAndDefs.map(_._1).toList
     val recurQueries = fns(refsTuple)
 
-    val baseCaseDefsList = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?]])
-    val recursiveDefsList: List[Query[?]] = recurQueries.toList.map(_.asInstanceOf[RestrictedQuery[?]].toQuery).lazyZip(baseCaseDefsList).map:
-      case (query: Query[t], ddef) =>
-        Union(ddef.asInstanceOf[Query[t]], query, false)(using query.tag)
+    val baseCaseDefsList = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?, ?]])
+    val recursiveDefsList: List[Query[?, ?]] = recurQueries.toList.map(_.asInstanceOf[RestrictedQuery[?, ?]].toQuery).lazyZip(baseCaseDefsList).map:
+      case (query: Query[t, c], ddef) =>
+        // Optimization: remove any extra .distinct calls that are getting fed into a union anyway
+        val lhs = ddef match
+          case Distinct(from) => from
+          case t => t
+        val rhs = query match
+          case Distinct(from) => from
+          case t => t
+        Union(lhs.asInstanceOf[Query[t, c]], rhs.asInstanceOf[Query[t, c]])(using query.tag)
 
     refsTuple.naturalMap([t] => finalRef =>
-      given ResultTag[t] = finalRef.tag
+      val fr = finalRef.asInstanceOf[RestrictedQueryRef[t, ?]]
+      given ResultTag[t] = fr.tag
       MultiRecursive(
         refsList,
         recursiveDefsList,
-        finalRef.toQueryRef
+        fr.toQueryRef
       )
     )
 
-  case class MultiRecursive[R]($param: List[RestrictedQueryRef[?]],
-                               $subquery: List[Query[?]],
-                               $resultQuery: Query[R])(using ResultTag[R]) extends Query[R]
+  case class MultiRecursive[R]($param: List[RestrictedQueryRef[?, ?]],
+                               $subquery: List[Query[?, ?]],
+                               $resultQuery: Query[R, ?])(using ResultTag[R]) extends Query[R, SetResult]
 
   private var refCount = 0
-  case class QueryRef[A: ResultTag]() extends Query[A]:
+  case class QueryRef[A: ResultTag, C <: ResultCategory]() extends Query[A, C]:
     private val id = refCount
     refCount += 1
     def stringRef() = s"recref$id"
     override def toString: String = s"QueryRef[${stringRef()}]"
 
-  case class RestrictedQueryRef[A: ResultTag]() extends RestrictedQuery[A](QueryRef[A]()):
-    def toQueryRef: QueryRef[A] = wrapped.asInstanceOf[QueryRef[A]]
+  case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory]() extends RestrictedQuery[A, C](QueryRef[A, C]()):
+    def toQueryRef: QueryRef[A, C] = wrapped.asInstanceOf[QueryRef[A, C]]
 
-  case class QueryFun[A, B]($param: QueryRef[A], $body: B)
+  case class QueryFun[A, B]($param: QueryRef[A, ?], $body: B)
 
-  case class Filter[A: ResultTag]($from: Query[A], $pred: Pred[A, NExpr]) extends Query[A]
-  case class Map[A, B: ResultTag]($from: Query[A], $query: Fun[A, Expr[B, ?], ?]) extends Query[B]
-  case class FlatMap[A, B: ResultTag]($from: Query[A], $query: Fun[A, Query[B], NExpr]) extends Query[B]
+  case class Filter[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $pred: Pred[A, NExpr]) extends Query[A, C]
+  case class Map[A, B: ResultTag]($from: Query[A, ?], $query: Fun[A, Expr[B, ?], ?]) extends Query[B, BagResult]
+  case class FlatMap[A, B: ResultTag]($from: Query[A, ?], $query: Fun[A, Query[B, ?], NExpr]) extends Query[B, BagResult]
   // case class Sort[A]($q: Query[A], $o: Ordering[A]) extends Query[A] // alternative syntax to avoid chaining .sort for multi-key sort
-  case class Sort[A: ResultTag, B]($from: Query[A], $body: Fun[A, Expr[B, NExpr], NExpr], $ord: Ord) extends Query[A]
-  case class Limit[A: ResultTag]($from: Query[A], $limit: Int) extends Query[A]
-  case class Offset[A: ResultTag]($from: Query[A], $offset: Int) extends Query[A]
-  case class Drop[A: ResultTag]($from: Query[A], $offset: Int) extends Query[A]
-  case class Distinct[A: ResultTag]($from: Query[A]) extends Query[A]
+  case class Sort[A: ResultTag, B, C <: ResultCategory]($from: Query[A, C], $body: Fun[A, Expr[B, NExpr], NExpr], $ord: Ord) extends Query[A, C]
+  case class Limit[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $limit: Int) extends Query[A, C]
+  case class Offset[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $offset: Int) extends Query[A, C]
+  case class Drop[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $offset: Int) extends Query[A, C]
+  case class Distinct[A: ResultTag]($from: Query[A, ?]) extends Query[A, SetResult]
 
-  case class Union[A: ResultTag]($this: Query[A], $other: Query[A], $dedup: Boolean) extends Query[A]
-  case class Intersect[A: ResultTag]($this: Query[A], $other: Query[A]) extends Query[A]
-  case class Except[A: ResultTag]($this: Query[A], $other: Query[A]) extends Query[A]
+  case class Union[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
+  case class UnionAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
+  case class Intersect[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
+  case class IntersectAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
+  case class Except[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
+  case class ExceptAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
 
   // TODO: also support spark-style groupBy or only SQL groupBy that requires an aggregate operation?
   // TODO: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
-//  case class GroupBy[A, B: ResultTag, C]($q: Query[A],
+  // all attributes in the SELECT clause that are NOT in the scope of an  aggregate function MUST appear in the GROUP BY clause.
+  //  case class GroupBy[A, B: ResultTag, C]($q: Query[A],
 //                           $selectFn: Fun[A, Expr[B]],
 //                           $groupingFn: Fun[A, Expr[C]],
 //                           $havingFn: Fun[B, Expr[Boolean]]) extends Query[B]
 
   // Extensions. TODO: Any reason not to move these into Query methods?
-  extension [R: ResultTag](x: Query[R])
+  extension [R: ResultTag, C <: ResultCategory](x: Query[R, C])
     /**
      * When there is only one relation to be defined recursively.
      */
-    def sort[B](f: Ref[R, NExpr] => Expr[B, NExpr], ord: Ord): Query[R] =
+    def sort[B](f: Ref[R, NExpr] => Expr[B, NExpr], ord: Ord): Query[R, C] =
       val ref = Ref[R, NExpr]()
       Sort(x, Fun(ref, f(ref)), ord)
 
-    def limit(lim: Int): Query[R] = Limit(x, lim)
-    def take(lim: Int): Query[R] = limit(lim)
+    def limit(lim: Int): Query[R, C] = Limit(x, lim)
+    def take(lim: Int): Query[R, C] = limit(lim)
 
-    def offset(lim: Int): Query[R] = Offset(x, lim)
-    def drop(lim: Int): Query[R] = offset(lim)
+    def offset(lim: Int): Query[R, C] = Offset(x, lim)
+    def drop(lim: Int): Query[R, C] = offset(lim)
 
-    def distinct: Query[R] = Distinct(x)
+    def distinct: Query[R, SetResult] = Distinct(x)
 
     def sum[B: ResultTag](f: Ref[R, NExpr] => Expr[B, NExpr]): Aggregation[B] =
       val ref = Ref[R, NExpr]()
@@ -242,17 +268,23 @@ object Query:
       val ref = Ref[R, ScalarExpr]()
       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Count(ref)))
 
-    def union(that: Query[R]): Query[R] =
-      Union(x, that, true)
+    def union(that: Query[R, ?]): Query[R, SetResult] =
+      Union(x, that)
 
-    def unionAll(that: Query[R]): Query[R] =
-      Union(x, that, false)
+    def unionAll(that: Query[R, ?]): Query[R, BagResult] =
+      UnionAll(x, that)
 
-    def intersect(that: Query[R]): Query[R] =
+    def intersect(that: Query[R, ?]): Query[R, SetResult] =
       Intersect(x, that)
 
-    def except(that: Query[R]): Query[R] =
+    def intersectAll(that: Query[R, ?]): Query[R, BagResult] =
+      IntersectAll(x, that)
+
+    def except(that: Query[R, ?]): Query[R, SetResult] =
       Except(x, that)
+
+    def exceptAll(that: Query[R, ?]): Query[R, BagResult] =
+      ExceptAll(x, that)
 
     // Does not work for subsets, need to match types exactly
     def contains(that: Expr[R, NExpr]): Expr[Boolean, NExpr] =

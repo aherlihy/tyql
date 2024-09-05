@@ -1,6 +1,6 @@
 package tyql
 
-import tyql.Query.QueryRef
+import tyql.Query.{Intersect, QueryRef}
 
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
@@ -23,7 +23,7 @@ object QueryIRTree:
    */
   private def collapseFilters(filters: Seq[Expr.Fun[?, ?, ?]], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[Expr.Fun[?, ?, ?]], DatabaseAST[?]) =
     comprehension match
-      case filter: Query.Filter[?] =>
+      case filter: Query.Filter[?, ?] =>
         collapseFilters(filters :+ filter.$pred, filter.$from, symbols)
       case aggFilter: tyql.Aggregation.AggFilter[?] =>
         collapseFilters(filters :+ aggFilter.$pred, aggFilter.$from, symbols)
@@ -79,13 +79,13 @@ object QueryIRTree:
             """)
 
 
-  // TODO: probably should parametrize collapse so it works with different nodes
   private def collapseSort(sorts: Seq[(Expr.Fun[?, ?, ?], Ord)], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[(Expr.Fun[?, ?, ?], Ord)], DatabaseAST[?]) =
     comprehension match
-      case sort: Query.Sort[?, ?] =>
+      case sort: Query.Sort[?, ?, ?] =>
         collapseSort(sorts :+ (sort.$body, sort.$ord), sort.$from, symbols)
       case _ => (sorts, comprehension)
 
+  // TODO: verify set vs. bag operator precendence is preserved in the generated queries
   private def collapseNaryOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: DatabaseAST[?]): NaryRelationOp =
     val flattened = (
       lhs match
@@ -124,7 +124,7 @@ object QueryIRTree:
         val actualParam = generateActualParam(map.$from, map.$query.$param, symbols)
         val attrNode = generateFun(map.$query, actualParam, symbols)
         actualParam.appendProject(attrNode, map)
-      case filter: Query.Filter[?] =>
+      case filter: Query.Filter[?, ?] =>
         val (predicateASTs, fromNodeAST) = collapseFilters(Seq(), filter, symbols)
         val actualParam = generateActualParam(fromNodeAST, filter.$pred.$param, symbols)
         val predicateExprs = predicateASTs.map(pred =>
@@ -140,7 +140,7 @@ object QueryIRTree:
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         actualParam.appendWhere(where, filter)  
-      case sort: Query.Sort[?, ?] =>
+      case sort: Query.Sort[?, ?, ?] =>
         val (orderByASTs, fromNodeAST) = collapseSort(Seq(), sort, symbols)
         val actualParam = generateActualParam(fromNodeAST, sort.$body.$param, symbols)
         val orderByExprs = orderByASTs.map(ord =>
@@ -175,28 +175,26 @@ object QueryIRTree:
             val innerBodyIR = finishGeneratingFun(unevaluated, boundST)
             (Seq(actualParam), innerBodyIR)
         unnest(fromNodes, projectIR, aggFlatMap)
-      case union: Query.Union[?] =>
-        val lhs = generateQuery(union.$this, symbols).appendFlag(SelectFlags.Final)
-        val rhs = generateQuery(union.$other, symbols).appendFlag(SelectFlags.Final)
-        val op = if union.$dedup then "UNION" else "UNION ALL"
-        collapseNaryOp(lhs, rhs, op, union)
-      case intersect: Query.Intersect[?] =>
-        val lhs = generateQuery(intersect.$this, symbols).appendFlag(SelectFlags.Final)
-        val rhs = generateQuery(intersect.$other, symbols).appendFlag(SelectFlags.Final)
-        collapseNaryOp(lhs, rhs, "INTERSECT", intersect)
-      case except: Query.Except[?] =>
-        val lhs = generateQuery(except.$this, symbols).appendFlag(SelectFlags.Final)
-        val rhs = generateQuery(except.$other, symbols).appendFlag(SelectFlags.Final)
-        collapseNaryOp(lhs, rhs, "EXCEPT", except)
-      case limit: Query.Limit[?] =>
+      case relOp: (Query.Union[?] | Query.UnionAll[?] | Query.Intersect[?] | Query.IntersectAll[?] | Query.Except[?] | Query.ExceptAll[?]) =>
+        val (thisN, thatN, category, op) = relOp match
+          case set: Query.Union[?] => (set.$this, set.$other, "", "UNION")
+          case bag: Query.UnionAll[?] => (bag.$this, bag.$other, " ALL", "UNION")
+          case set: Query.Intersect[?] => (set.$this, set.$other, "", "INTERSECT")
+          case bag: Query.IntersectAll[?] => (bag.$this, bag.$other, " ALL", "INTERSECT")
+          case set: Query.Except[?] => (set.$this, set.$other, "", "EXCEPT")
+          case bag: Query.ExceptAll[?] => (bag.$this, bag.$other, " ALL", "EXCEPT")
+        val lhs = generateQuery(thisN, symbols).appendFlag(SelectFlags.ExprLevel)
+        val rhs = generateQuery(thatN, symbols).appendFlag(SelectFlags.ExprLevel)
+        collapseNaryOp(lhs, rhs, s"$op$category", relOp)
+      case limit: Query.Limit[?, ?] =>
         val from = generateQuery(limit.$from, symbols)
         collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, Expr.IntLit(limit.$limit)), "LIMIT", limit)
-      case offset: Query.Offset[?] =>
+      case offset: Query.Offset[?, ?] =>
         val from = generateQuery(offset.$from, symbols)
         collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, Expr.IntLit(offset.$offset)), "OFFSET", offset)
       case distinct: Query.Distinct[?] =>
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
-      case queryRef: Query.QueryRef[?] =>
+      case queryRef: Query.QueryRef[?, ?] =>
         symbols(queryRef.stringRef())
       case multiRecursive: Query.MultiRecursive[?] =>
         val vars = multiRecursive.$param.map(rP =>
@@ -223,7 +221,7 @@ object QueryIRTree:
         }
 
         val finalQ = multiRecursive.$resultQuery match
-          case ref: QueryRef[?] =>
+          case ref: QueryRef[?, ?] =>
             val v = vars.find((id, _) => id == ref.stringRef()).get._2
             SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery)
           case q => ??? //generateQuery(q, allSymbols, multiRecursive.$resultQuery)

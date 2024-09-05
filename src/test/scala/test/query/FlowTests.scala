@@ -64,6 +64,28 @@ class FlowForTest4 extends SQLStringQueryTest[AllCommerceDBs, String] {
   def expectedQueryPattern = "SELECT buyers$A.name FROM buyers as buyers$A, shippingInfo as shippingInfo$B"
 }
 
+class FlowForTest4Test extends SQLStringQueryTest[AllCommerceDBs, (name: String, id: Int, sd: LocalDate)] {
+  def testDescription = "Flow: 3 nest, for comprehension"
+
+  def query() =
+    for
+      purch <- testDB.tables.purchases
+      prod <- testDB.tables.products
+      si <- testDB.tables.shipInfos
+      if purch.id == prod.id && prod.id == si.id
+    yield (name = prod.name, id = purch.id, sd = si.shippingDate).toRow
+
+  def expectedQueryPattern =
+    """
+        SELECT product$A.name as name, purchase$B.id as id, shippingInfo$C.shippingDate as sd
+        FROM
+          purchase as purchase$B,
+          product as product$A,
+          shippingInfo as shippingInfo$C
+        WHERE purchase$B.id = product$A.id AND product$A.id = shippingInfo$C.id
+      """
+}
+
 class FlowForIfTest5 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, for comprehension + if"
 

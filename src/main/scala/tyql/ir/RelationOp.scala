@@ -351,8 +351,12 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
         SelectAllQuery(Seq(this, r), Seq(), None, astOther)
 
   override def appendFlag(f: SelectFlags): RelationOp =
-    flags = flags + f
-    this
+    f match
+      case SelectFlags.Distinct =>
+        SelectAllQuery(Seq(this), Seq(), Some(alias), ast).appendFlag(f)
+      case _ =>
+        flags = flags + f
+        this
 
   override def toSQLString(): String =
     wrapString(children.map(_.toSQLString()).mkString(s" $op "))
@@ -373,61 +377,17 @@ case class MultiRecursiveRelationOp(aliases: Seq[String], query: Seq[RelationOp]
     ???
 
   override def appendFlag(f: SelectFlags): RelationOp =
-    flags = flags + f
-    this
+    f match
+      case SelectFlags.Distinct =>
+        SelectAllQuery(Seq(this), Seq(), Some(alias), ast).appendFlag(f)
+      case _ =>
+        flags = flags + f
+        this
 
   override def toSQLString(): String =
     // NOTE: no parens or alias needed, since already defined
     val ctes = aliases.zip(query).map((a, q) => s"$a AS (${q.toSQLString()})").mkString(",\n")
     s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
-
-
-case class RecursiveRelationOp(alias: String, query: RelationOp, finalQ: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
-  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
-    RecursiveRelationOp(
-      alias, query, finalQ.appendWhere(w, astOther), ast
-    ).appendFlags(flags)
-
-  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    RecursiveRelationOp(
-      alias, query, finalQ.appendProject(p, astOther), ast
-    ).appendFlags(flags)
-
-  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
-    r match
-      case t: TableLeaf =>
-        SelectAllQuery(
-          Seq(this, t),
-          Seq(),
-          Some(alias),
-          astOther
-        )
-      case q: SelectAllQuery =>
-        SelectAllQuery(
-          this +: q.from,
-          q.where,
-          Some(q.alias),
-          astOther
-        )
-      case q: SelectQuery =>
-        SelectQuery(
-          q.project,
-          this +: q.from,
-          q.where,
-          Some(q.alias),
-          astOther
-        )
-      case r: RelationOp =>
-        // default to subquery, some ops may want to override
-        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
-
-  override def appendFlag(f: SelectFlags): RelationOp =
-    flags = flags + f
-    this
-
-  override def toSQLString(): String =
-    // NOTE: no parens or alias needed, since already defined
-    s"WITH RECURSIVE $alias AS (${query.toSQLString()}); ${finalQ.toSQLString()}"
 
 /**
  * A recursive variable that points to a table or subquery.
@@ -464,7 +424,7 @@ case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST
   override def appendFlag(f: SelectFlags): RelationOp =
     val q = f match
       case SelectFlags.Distinct => // Distinct is special case because needs to be "hoisted" to enclosing SELECT, so alias is kept
-        SelectAllQuery(Seq(this), Seq(), Some(alias), ast)
+        SelectAllQuery(Seq(this), Seq(), Some(alias), ast).appendFlag(f)
       case _ =>
         SelectAllQuery(Seq(this), Seq(), None, ast)
 
