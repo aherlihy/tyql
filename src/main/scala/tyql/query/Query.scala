@@ -35,7 +35,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
    * @tparam B  the result type of the query.
    * @return    RestrictedQuery[B]
    */
-  def flatMap[B: ResultTag](f: Ref[A, NonScalarExpr] => RestrictedQuery[B, ?]): RestrictedQuery[B, BagResult] =
+  def flatMap[B: ResultTag, D <: Tuple](f: Ref[A, NonScalarExpr] => RestrictedQuery[B, ?, D]): RestrictedQuery[B, BagResult, D] =
     val ref = Ref[A, NonScalarExpr]()
     RestrictedQuery(Query.FlatMap(this, Fun(ref, f(ref).toQuery)))
   /**
@@ -108,8 +108,8 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val ref = Ref[A, NonScalarExpr]()
     Query.Map(this, Fun(ref, f(ref).toRow))
 
-  def fix(p: Query.RestrictedQueryRef[A, ?] => RestrictedQuery[A, SetResult]): Query[A, SetResult] =
-    val fn: Tuple1[Query.RestrictedQueryRef[A, ?]] => Tuple1[RestrictedQuery[A, SetResult]] = r => Tuple1(p(r._1))
+  def fix(p: RestrictedQueryRef[A, ?, ?] => RestrictedQuery[A, SetResult, ?]): Query[A, SetResult] =
+    val fn: Tuple1[RestrictedQueryRef[A, ?, 0]] => Tuple1[RestrictedQuery[A, SetResult, ?]] = r => Tuple1(p(r._1))
     Query.fix(Tuple1(this))(fn)._1
 
   def withFilter(p: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] =
@@ -127,12 +127,6 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 object Query:
   import Expr.{Pred, Fun, Ref}
 
-//  /** Converts a tuple `(F[T1], ..., F[Tn])` to `(T1,  ... Tn)` */
-//  type InverseMap[X <: Tuple, F[_]] <: Tuple = X match {
-//    case F[x] *: t => x *: InverseMap[t, F]
-//    case EmptyTuple => EmptyTuple
-//  }
-
   /** Given a Tuple `(Query[A], Query[B], ...)`, return `(A, B, ...)` */
   type Elems[QT <: Tuple] = Tuple.InverseMap[QT, [T] =>> Query[T, ?]]
 
@@ -144,10 +138,11 @@ object Query:
    */
   type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, SetResult]]
 
-  type ToRestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, SetResult]]
+  type ToRestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, SetResult, ?]]
 
-  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(RestrictedQueryRef[A], RestrictedQueryRef[B], ...)` */
-  type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, SetResult]]
+  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(RestrictedQueryRef[A, _, 0], RestrictedQueryRef[B, _, 1], ...)` */
+  type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[ZipWithIndex[Elems[QT]], [T] =>> T match
+    case (elem, index) => RestrictedQueryRef[elem, SetResult, index]]
 
 //  def fixUntupled[F, QT <: Tuple](bases: QT)(f: F)(using ev: Tuple.Union[QT] <:< Query[?], tf: TupledFunction[F, ToRestrictedQueryRef[QT] => ToQuery[QT]]): ToQuery[QT] =
 //    tf.untupled(multiFix(bases)(ev, tf.tupled))
@@ -169,7 +164,7 @@ object Query:
     val recurQueries = fns(refsTuple)
 
     val baseCaseDefsList = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?, ?]])
-    val recursiveDefsList: List[Query[?, ?]] = recurQueries.toList.map(_.asInstanceOf[RestrictedQuery[?, ?]].toQuery).lazyZip(baseCaseDefsList).map:
+    val recursiveDefsList: List[Query[?, ?]] = recurQueries.toList.map(_.asInstanceOf[RestrictedQuery[?, ?, ?]].toQuery).lazyZip(baseCaseDefsList).map:
       case (query: Query[t, c], ddef) =>
         // Optimization: remove any extra .distinct calls that are getting fed into a union anyway
         val lhs = ddef match
@@ -180,8 +175,9 @@ object Query:
           case t => t
         Union(lhs.asInstanceOf[Query[t, c]], rhs.asInstanceOf[Query[t, c]])(using query.tag)
 
-    refsTuple.naturalMap([t] => finalRef =>
-      val fr = finalRef.asInstanceOf[RestrictedQueryRef[t, ?]]
+    val rt = refsTuple.asInstanceOf[Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?]]]
+    rt.naturalMap([t] => finalRef =>
+      val fr = finalRef.asInstanceOf[RestrictedQueryRef[t, ?, ?]]
       given ResultTag[t] = fr.tag
       MultiRecursive(
         refsList,
@@ -190,7 +186,7 @@ object Query:
       )
     )
 
-  case class MultiRecursive[R]($param: List[RestrictedQueryRef[?, ?]],
+  case class MultiRecursive[R]($param: List[RestrictedQueryRef[?, ?, ?]],
                                $subquery: List[Query[?, ?]],
                                $resultQuery: Query[R, ?])(using ResultTag[R]) extends Query[R, SetResult]
 
@@ -200,9 +196,6 @@ object Query:
     refCount += 1
     def stringRef() = s"recref$id"
     override def toString: String = s"QueryRef[${stringRef()}]"
-
-  case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory]() extends RestrictedQuery[A, C](QueryRef[A, C]()):
-    def toQueryRef: QueryRef[A, C] = wrapped.asInstanceOf[QueryRef[A, C]]
 
   case class QueryFun[A, B]($param: QueryRef[A, ?], $body: B)
 

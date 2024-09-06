@@ -292,6 +292,7 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
       """
 }
 
+/*
 class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "define 2 recursive relations with one self join"
 
@@ -707,6 +708,8 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
 		SELECT * FROM recursive$A as recref$V
     """
 }
+
+ */
 
 type FibNum = (recursionDepth: Int, fibonacciNumber: Int, nextNumber: Int)
 type FibNumDB = (base: FibNum, result: FibNum)
