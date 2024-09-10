@@ -6,23 +6,30 @@ import scala.NamedTuple.AnyNamedTuple
 import scala.annotation.targetName
 
 case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int]() extends RestrictedQuery[A, C, Tuple1[ID]] (Query.QueryRef[A, C]()):
-  type Self = this.type
+  override type Deps = Tuple1[ID]
   def toQueryRef: Query.QueryRef[A, C] = wrapped.asInstanceOf[Query.QueryRef[A, C]]
+
 
 /**
  * A restricted reference to a query that disallows aggregation.
  * Explicitly do not export aggregate, or any aggregation helpers, exists, etc.
  *
  * Methods can accept RestrictedQuery[A] or Query[A]
- * NOTE: Query[?] indicates no aggregation, but could turn into aggregation, RestrictedQuery[?] means none present and none addable
+ * NOTE: Query[?] indicates no aggregation, but could turn into aggregation, RestrictedQuery[?] means none present and none addable.
+ *
+ * flatMap/union/unionAll/etc. that accept another RestrictedQuery contain a contextual parameter ev that serves as an affine
+ * recursion restriction, e.g. every input relation can only be "depended" on at most once per query since the dependency set
+ * parameter `D` must be disjoint.
  */
 class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(protected val wrapped: Query[A, C]) extends DatabaseAST[A]:
   val tag: ResultTag[A] = qTag
   def toQuery: Query[A, C] = wrapped
+  type Deps = D
 
   // flatMap given a function that returns regular Query does not add any dependencies
   @targetName("restrictedQueryFlatMap")
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NonScalarExpr] => Query[B, ?]): RestrictedQuery[B, BagResult, D] = RestrictedQuery(wrapped.flatMap(f))
+  def flatMap[B: ResultTag](f: Expr.Ref[A, NonScalarExpr] => Query[B, ?]): RestrictedQuery[B, BagResult, D] =
+    new RestrictedQuery(wrapped.flatMap(f))
 
   @targetName("restrictedQueryFlatMapRestricted")
   def flatMap[B: ResultTag, D2 <: Tuple](f: Expr.Ref[A, NonScalarExpr] => RestrictedQuery[B, ?, D2])(using ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[B, BagResult, Tuple.Concat[D, D2]] =
