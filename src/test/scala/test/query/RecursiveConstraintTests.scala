@@ -382,7 +382,7 @@ class RecursiveConstraintLinearFailTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-
+*/
 class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: multiple uses of path in multifix"
 
@@ -424,15 +424,57 @@ class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-*/
+
+class RecursiveConstraintLinear4FailTest extends munit.FunSuite {
+  def testDescription: String = "Non-linear recursion: zero usage of path in multifix"
+
+  def expectedError: String = "Cannot prove that tyql.Query.ExpectedResult[(tyql.Query[Edge, ?], tyql.Query[Edge, ?])] <:< tyql.Query.ActualResult["
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+               // BOILERPLATE
+               import language.experimental.namedTuples
+               import tyql.{Table, Expr}
+
+               type Edge = (x: Int, y: Int)
+
+               val tables = (
+                 edges = Table[Edge]("edges"),
+                 edges2 = Table[Edge]("otherEdges"),
+                 emptyEdges = Table[Edge]("empty")
+               )
+
+              // TEST
+                val pathBase = tables.edges
+                val pathToABase = tables.emptyEdges
+                val (pathResult, pathToAResult) = fix[(Query[Edge, ?], Query[Edge, ?]), (Tuple1[0], Tuple1[0])](pathBase, pathToABase)((path, pathToA) =>
+                  val P = path.flatMap(p =>
+                    testDB.tables.edges
+                      .filter(e => p.y == e.x)
+                      .map(e => (x = p.x, y = e.y).toRow)
+                  )
+                  val PtoA = path.filter(e => e.x == 1)
+                  (P.distinct, PtoA.distinct)
+                )
+
+                pathToAResult
+                  )
+              """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
 // TODO: this should fail
-//class RecursiveConstraintLinear4FailTest extends SQLStringQueryTest[TCDB, Edge] {
+//class RecursiveConstraintTempFailTest extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "Non-linear recursion: 0 usages of path, multifix"
 //
 //  def query() =
 //    val pathBase = testDB.tables.edges
 //    val pathToABase = testDB.tables.emptyEdges
-//    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
+////    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
+//    val (pathResult, pathToAResult) = fix[(Query[Edge, ?], Query[Edge, ?]), (Tuple1[0], Tuple1[0])](pathBase, pathToABase)((path, pathToA) =>
 //      val P = path.flatMap(p =>
 //        testDB.tables.edges
 //          .filter(e => p.y == e.x)
