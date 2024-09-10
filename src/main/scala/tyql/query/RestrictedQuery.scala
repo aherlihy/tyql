@@ -9,15 +9,27 @@ case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int]() ex
   type Self = this.type
   def toQueryRef: Query.QueryRef[A, C] = wrapped.asInstanceOf[Query.QueryRef[A, C]]
 
+trait RestrictedQuery1[B]:
+  self =>
+  type Deps = B
+  
+  def flatMap[B1](q: RestrictedQuery1[B1]): RestrictedQuery1[(B, B1)] = new RestrictedQuery1[(B, B1)]:
+    type Deps = (self.Deps, q.Deps)
+
 /**
  * A restricted reference to a query that disallows aggregation.
  * Explicitly do not export aggregate, or any aggregation helpers, exists, etc.
  *
  * Methods can accept RestrictedQuery[A] or Query[A]
- * NOTE: Query[?] indicates no aggregation, but could turn into aggregation, RestrictedQuery[?] means none present and none addable
+ * NOTE: Query[?] indicates no aggregation, but could turn into aggregation, RestrictedQuery[?] means none present and none addable.
+ *
+ * flatMap/union/unionAll/etc. that accept another RestrictedQuery contain a contextual parameter ev that serves as an affine
+ * recursion restriction, e.g. every input relation can only be "depended" on at most once per query since the dependency set
+ * parameter `D` must be disjoint.
  */
 class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(protected val wrapped: Query[A, C]) extends DatabaseAST[A]:
   val tag: ResultTag[A] = qTag
+  type deps
   def toQuery: Query[A, C] = wrapped
 
   // flatMap given a function that returns regular Query does not add any dependencies
@@ -49,7 +61,7 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
   def unionAll(that: Query[A, ?]): RestrictedQuery[A, BagResult, D] =
     RestrictedQuery(Query.UnionAll(wrapped, that))
 
-  // TODO: Does nonEmpty count as non-monotone?
+  // TODO: Does nonEmpty count as non-monotone? (yes)
   def nonEmpty: Expr[Boolean, NonScalarExpr] =
     Expr.NonEmpty(wrapped)
 

@@ -8,6 +8,7 @@ import java.time.LocalDate
 import scala.reflect.ClassTag
 import Utils.*
 import tyql.Aggregation.AggFilter
+import tyql.Query.{ToRestrictedQuery, ToRestrictedQueryRef}
 
 trait ResultCategory
 class SetResult extends ResultCategory
@@ -108,9 +109,9 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val ref = Ref[A, NonScalarExpr]()
     Query.Map(this, Fun(ref, f(ref).toRow))
 
-  def fix(p: RestrictedQueryRef[A, ?, ?] => RestrictedQuery[A, SetResult, ?]): Query[A, SetResult] =
-    val fn: Tuple1[RestrictedQueryRef[A, ?, 0]] => Tuple1[RestrictedQuery[A, SetResult, ?]] = r => Tuple1(p(r._1))
-    Query.fix(Tuple1(this))(fn)._1
+  def fix(p: RestrictedQueryRef[A, ?, 0] => RestrictedQuery[A, SetResult, Tuple1[0]]): Query[A, SetResult] =
+    val fn: Tuple1[RestrictedQueryRef[A, ?, 0]] => Tuple1[RestrictedQuery[A, SetResult, Tuple1[0]]] = r => Tuple1(p(r._1))
+    Query.fix[Tuple1[Query[A, ?]], Tuple1[Tuple1[0]]](Tuple1(this))(fn)._1
 
   def withFilter(p: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] =
     val ref = Ref[A, NonScalarExpr]()
@@ -138,7 +139,24 @@ object Query:
    */
   type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, SetResult]]
 
-  type ToRestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, SetResult, ?]]
+//  type ToRestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, SetResult, ?]]
+
+  type CreateRestrictedQuery[T] = T match
+    case (t, d) => RestrictedQuery[t, SetResult, d]
+  type ToRestrictedQuery[QT <: Tuple, DT <: Tuple] = Tuple.Map[Tuple.Zip[Elems[QT], DT], CreateRestrictedQuery]
+
+//  type Actual = Tuple3[Tuple1[0],Tuple1[2],Tuple1[1]]
+//  type FlatActual = Tuple.FlatMap[Actual, [T] =>> T]
+//  type Expected = GenerateIndices[0, Tuple.Size[(0,0,0)]]
+//  type UnionActual = Tuple.Union[FlatActual]
+//  type UnionExpected = Tuple.Union[Expected]
+//  val check: UnionExpected <:< UnionActual = summon[UnionExpected <:< UnionActual]
+
+  type ExtractDependencies[D] <: Tuple = D match
+    case RestrictedQuery[a, c, d] => d
+//    case Query[a, c] => EmptyTuple
+  type ExpectedResult[QT <: Tuple] = Tuple.Union[GenerateIndices[0, Tuple.Size[QT]]]
+  type ActualResult[RT <: Tuple] = Tuple.Union[Tuple.FlatMap[RT, ExtractDependencies]]
 
   /** Given a Tuple `(Query[A], Query[B], ...)`, return `(RestrictedQueryRef[A, _, 0], RestrictedQueryRef[B, _, 1], ...)` */
   type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[ZipWithIndex[Elems[QT]], [T] =>> T match
@@ -153,7 +171,13 @@ object Query:
    * TODO: in theory, the results could be assumed to be sets due to the outermost UNION(base, recur), but better to enforce .distinct (also bc we flatten the unions)
    * @param fns A function from a tuple of restricted query refs to a tuple of *SET* restricted queries.
    */
-  def fix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToRestrictedQueryRef[QT] => ToRestrictedQuery[QT]): ToQuery[QT] =
+  def fix[QT <: Tuple, DT <: Tuple](bases: QT)
+                                   (fns: ToRestrictedQueryRef[QT] => ToRestrictedQuery[QT, DT])
+                                   (using Tuple.Union[DT] <:< Tuple)
+                                   (using Tuple.Size[QT] =:= Tuple.Size[DT])
+                                   (using ExpectedResult[QT] <:< ActualResult[ToRestrictedQuery[QT, DT]])
+                                   (using Tuple.Union[QT] <:< Query[?, ?]):
+   ToQuery[QT] =
     // If base cases are themselves recursive definitions.
     val baseRefsAndDefs = bases.toArray.map {
       case MultiRecursive(params, querys, resultQ) => ???// TODO: decide on semantics for multiple fix definitions. (param, query)

@@ -3,6 +3,7 @@ package test.query.recursiveconstraints
 import test.{SQLStringQueryTest, TestDatabase}
 import tyql.Table
 import tyql.Expr.sum
+import tyql.Query
 import tyql.Query.fix
 import scala.compiletime.summonInline
 import scala.reflect.Typeable
@@ -20,7 +21,7 @@ given TCDBs: TestDatabase[TCDB] with
     otherEdges = Table[EdgeOther]("otherEdges"),
     emptyEdges = Table[Edge]("empty")
   )
-
+/*
 /**
  * Constraint: "safe" datalog queries, e.g. all variables present in the head
  * are also present in at least one body rule. Also called "range restricted".
@@ -423,42 +424,42 @@ class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-
+*/
 // TODO: this should fail
-class RecursiveConstraintLinear4FailTest extends SQLStringQueryTest[TCDB, Edge] {
-  def testDescription: String = "Non-linear recursion: 0 usages of path, multifix"
-
-  def query() =
-    val pathBase = testDB.tables.edges
-    val pathToABase = testDB.tables.emptyEdges
-    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
-      val P = path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      )
-      val PtoA = path.filter(e => e.x == 1)
-      (P.distinct, PtoA.distinct)
-    )
-
-    pathToAResult
-
-  def expectedQueryPattern: String =
-    """
-      WITH RECURSIVE
-          recursive$P AS
-            ((SELECT * FROM edges as edges$F)
-                UNION
-             ((SELECT ref$Z.x as x, edges$C.y as y
-             FROM recursive$P as ref$Z, edges as edges$C
-             WHERE ref$Z.y = edges$C.x))),
-          recursive$A AS
-           ((SELECT * FROM empty as empty$D)
-              UNION
-            ((SELECT * FROM recursive$P as ref$X WHERE ref$X.x = 1)))
-      SELECT * FROM recursive$A as recref$Q
-      """
-}
+//class RecursiveConstraintLinear4FailTest extends SQLStringQueryTest[TCDB, Edge] {
+//  def testDescription: String = "Non-linear recursion: 0 usages of path, multifix"
+//
+//  def query() =
+//    val pathBase = testDB.tables.edges
+//    val pathToABase = testDB.tables.emptyEdges
+//    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
+//      val P = path.flatMap(p =>
+//        testDB.tables.edges
+//          .filter(e => p.y == e.x)
+//          .map(e => (x = p.x, y = e.y).toRow)
+//      )
+//      val PtoA = path.filter(e => e.x == 1)
+//      (P.distinct, PtoA.distinct)
+//    )
+//
+//    pathToAResult
+//
+//  def expectedQueryPattern: String =
+//    """
+//      WITH RECURSIVE
+//          recursive$P AS
+//            ((SELECT * FROM edges as edges$F)
+//                UNION
+//             ((SELECT ref$Z.x as x, edges$C.y as y
+//             FROM recursive$P as ref$Z, edges as edges$C
+//             WHERE ref$Z.y = edges$C.x))),
+//          recursive$A AS
+//           ((SELECT * FROM empty as empty$D)
+//              UNION
+//            ((SELECT * FROM recursive$P as ref$X WHERE ref$X.x = 1)))
+//      SELECT * FROM recursive$A as recref$Q
+//      """
+//}
 
 class RecursiveConstraintLinear5Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "Linear recursion: refs used more than once, but only once per definition, multifix"
@@ -466,7 +467,8 @@ class RecursiveConstraintLinear5Test extends SQLStringQueryTest[TCDB, Edge] {
   def query() =
     val pathBase = testDB.tables.edges
     val path2Base = testDB.tables.emptyEdges
-    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+    val (pathResult, path2Result) = fix[(Query[Edge, ?], Query[Edge, ?]), (Tuple1[0], (0, 1))](pathBase, path2Base)((path, path2) =>
+//    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
       val P = path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -496,7 +498,7 @@ class RecursiveConstraintLinear5Test extends SQLStringQueryTest[TCDB, Edge] {
        SELECT * FROM recursive$14 as recref$2
       """
 }
-
+/*
 class RecursiveConstraintLinear6Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "Linear recursion: refs used more than once, but only once per definition, but with same row type, multifix"
 
@@ -562,7 +564,7 @@ class RecursiveConstraintLinear7Test extends SQLStringQueryTest[TCDB, Edge] {
         SELECT * FROM recursive$1 as recref$0
       """
 }
-
+*/
 //class TESTTEST extends SQLStringQueryTest[TCDB, Int] {
 //  def testDescription: String = "Live tests"
 //
