@@ -1,13 +1,12 @@
 package test.query.recursiveconstraints
 
 import test.{SQLStringQueryTest, TestDatabase}
-import tyql.Table
+import tyql.{Query, RestrictedQuery, Table, SetResult}
 import tyql.Expr.sum
-import tyql.Query
 import tyql.Query.fix
+
 import scala.compiletime.summonInline
 import scala.reflect.Typeable
-
 import language.experimental.namedTuples
 
 type Edge = (x: Int, y: Int)
@@ -21,7 +20,7 @@ given TCDBs: TestDatabase[TCDB] with
     otherEdges = Table[EdgeOther]("otherEdges"),
     emptyEdges = Table[Edge]("empty")
   )
-/*
+
 /**
  * Constraint: "safe" datalog queries, e.g. all variables present in the head
  * are also present in at least one body rule. Also called "range restricted".
@@ -54,7 +53,7 @@ class RecursionConstraintRangeRestrictionTest extends SQLStringQueryTest[TCDB, E
 }
 class RecursionConstraintRangeRestrictionFailTest extends munit.FunSuite {
   def testDescription: String = "Range restricted incorrectly"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(y : Int), tyql.SetResult, path.D]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, ?]"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(y : Int), tyql.SetResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
@@ -111,7 +110,7 @@ class RecursionConstraintCategoryResultTest extends SQLStringQueryTest[TCDB, Edg
 }
 class RecursionConstraintCategory1FailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, path.D]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, ?]"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
@@ -145,7 +144,7 @@ class RecursionConstraintCategory1FailTest extends munit.FunSuite {
 }
 class RecursionConstraintCategory2FailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, missing distinct"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, path.D]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, ?]"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
@@ -316,7 +315,7 @@ class RecursiveConstraintLinearTest extends SQLStringQueryTest[TCDB, Int] {
 class RecursiveConstraintLinear2FailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 2 usages of path, inline fix"
 
-  def expectedError: String = "Cannot prove that Tuple.Disjoint[path.D, path.D]"
+  def expectedError: String = "Cannot prove that Tuple.Disjoint[Tuple1[(0 : Int)], Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
@@ -351,7 +350,7 @@ class RecursiveConstraintLinear2FailTest extends munit.FunSuite {
 class RecursiveConstraintLinearFailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 0 usages of path, inline fix"
 
-  def expectedError: String = "Found:    tyql.Query[(x : Int, y : Int), tyql.SetResult]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, ?]"
+  def expectedError: String = "Found:    tyql.Query[(x : Int, y : Int), tyql.SetResult]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
@@ -382,7 +381,7 @@ class RecursiveConstraintLinearFailTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-*/
+
 class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: multiple uses of path in multifix"
 
@@ -428,7 +427,7 @@ class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
 class RecursiveConstraintLinear4FailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: zero usage of path in multifix"
 
-  def expectedError: String = "Cannot prove that tyql.Query.ExpectedResult[(tyql.Query[Edge, ?], tyql.Query[Edge, ?])] <:< tyql.Query.ActualResult["
+  def expectedError: String = "Cannot prove that tyql.Query.ExpectedResult[(tyql.Table[Edge], tyql.Table[Edge])] <:< tyql.Query.ActualResult["
 
   test(testDescription) {
     val error: String =
@@ -449,9 +448,9 @@ class RecursiveConstraintLinear4FailTest extends munit.FunSuite {
               // TEST
                 val pathBase = tables.edges
                 val pathToABase = tables.emptyEdges
-                val (pathResult, pathToAResult) = fix[(Query[Edge, ?], Query[Edge, ?]), (Tuple1[0], Tuple1[0])](pathBase, pathToABase)((path, pathToA) =>
+                val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
                   val P = path.flatMap(p =>
-                    testDB.tables.edges
+                    tables.edges
                       .filter(e => p.y == e.x)
                       .map(e => (x = p.x, y = e.y).toRow)
                   )
@@ -466,51 +465,17 @@ class RecursiveConstraintLinear4FailTest extends munit.FunSuite {
   }
 }
 
-// TODO: this should fail
-//class RecursiveConstraintTempFailTest extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "Non-linear recursion: 0 usages of path, multifix"
-//
-//  def query() =
-//    val pathBase = testDB.tables.edges
-//    val pathToABase = testDB.tables.emptyEdges
-////    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
-//    val (pathResult, pathToAResult) = fix[(Query[Edge, ?], Query[Edge, ?]), (Tuple1[0], Tuple1[0])](pathBase, pathToABase)((path, pathToA) =>
-//      val P = path.flatMap(p =>
-//        testDB.tables.edges
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      )
-//      val PtoA = path.filter(e => e.x == 1)
-//      (P.distinct, PtoA.distinct)
-//    )
-//
-//    pathToAResult
-//
-//  def expectedQueryPattern: String =
-//    """
-//      WITH RECURSIVE
-//          recursive$P AS
-//            ((SELECT * FROM edges as edges$F)
-//                UNION
-//             ((SELECT ref$Z.x as x, edges$C.y as y
-//             FROM recursive$P as ref$Z, edges as edges$C
-//             WHERE ref$Z.y = edges$C.x))),
-//          recursive$A AS
-//           ((SELECT * FROM empty as empty$D)
-//              UNION
-//            ((SELECT * FROM recursive$P as ref$X WHERE ref$X.x = 1)))
-//      SELECT * FROM recursive$A as recref$Q
-//      """
-//}
-
 class RecursiveConstraintLinear5Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "Linear recursion: refs used more than once, but only once per definition, multifix"
 
   def query() =
     val pathBase = testDB.tables.edges
     val path2Base = testDB.tables.emptyEdges
-    val (pathResult, path2Result) = fix[(Query[Edge, ?], Query[Edge, ?]), (Tuple1[0], (0, 1))](pathBase, path2Base)((path, path2) =>
-//    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+//    type QT = (Query[Edge, ?], Query[Edge, ?])
+//    type DT = (Tuple1[0], (0, 1))
+//    type RQT = (RestrictedQuery[Edge, SetResult, Tuple1[0]], RestrictedQuery[Edge, SetResult, (0, 1)])
+//    val (pathResult, path2Result) = fix[QT, DT, RQT](pathBase, path2Base)((path, path2) =>
+    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
       val P = path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -540,7 +505,7 @@ class RecursiveConstraintLinear5Test extends SQLStringQueryTest[TCDB, Edge] {
        SELECT * FROM recursive$14 as recref$2
       """
 }
-/*
+
 class RecursiveConstraintLinear6Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "Linear recursion: refs used more than once, but only once per definition, but with same row type, multifix"
 
@@ -606,7 +571,7 @@ class RecursiveConstraintLinear7Test extends SQLStringQueryTest[TCDB, Edge] {
         SELECT * FROM recursive$1 as recref$0
       """
 }
-*/
+
 //class TESTTEST extends SQLStringQueryTest[TCDB, Int] {
 //  def testDescription: String = "Live tests"
 //
