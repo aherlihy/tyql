@@ -294,7 +294,7 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
 }
 
 // This should fail because non-linear
-/*
+
 class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "define 2 recursive relations with one self join"
 
@@ -302,13 +302,13 @@ class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
     val pathBase = testDB.tables.edges
     val pathToABase = testDB.tables.emptyEdges
 
-    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
+    val (pathResult, pathToAResult) = unrestrictedFix(pathBase, pathToABase)((path, pathToA) =>
       val P = path.flatMap(p =>
         path
           .filter(p2 => p.y == p2.x)
           .map(p2 => (x = p.x, y = p2.y).toRow)
       )
-      val PtoA = path.filter(e => e.x == 9)
+      val PtoA = pathToA.filter(e => e.x == 9)
       (P.distinct, PtoA.distinct)
     )
 
@@ -326,7 +326,7 @@ class RecursiveSelfJoinTest extends SQLStringQueryTest[TCDB, Edge] {
             recursive$A AS
              ((SELECT * FROM empty as empty$D)
                 UNION
-              ((SELECT * FROM recursive$P as ref$Q WHERE ref$Q.x = 9)))
+              ((SELECT * FROM recursive$A as ref$Q WHERE ref$Q.x = 9)))
         SELECT * FROM recursive$A as recref$S
         """
 }
@@ -338,7 +338,7 @@ class RecursiveSelfJoin2Test extends SQLStringQueryTest[TCDB, Edge] {
     val pathBase = testDB.tables.edges
     val pathToABase = testDB.tables.emptyEdges
 
-    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
+    val (pathResult, pathToAResult) = unrestrictedFix(pathBase, pathToABase)((path, pathToA) =>
       val P = path.flatMap(p =>
         path
           .filter(p2 => p.y == p2.x)
@@ -393,7 +393,7 @@ class RecursiveCSPADistinctTest extends SQLStringQueryTest[CSPADB, Location] {
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         ).distinct
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
       (valueFlow, valueAlias, memoryAlias) =>
         val VF =
           // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
@@ -504,7 +504,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
       (valueFlow, valueAlias, memoryAlias) =>
         val VF =
           // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
@@ -625,7 +625,7 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
       (valueFlow, valueAlias, memoryAlias) =>
         // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
         val vfDef1 =
@@ -710,8 +710,6 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
 		SELECT * FROM recursive$A as recref$V
     """
 }
-
- */
 
 type FibNum = (recursionDepth: Int, fibonacciNumber: Int, nextNumber: Int)
 type FibNumDB = (base: FibNum, result: FibNum)

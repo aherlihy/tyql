@@ -1,23 +1,14 @@
 package tyql
 
-import tyql.Utils.{GenerateIndices, ZipWithIndex}
+import tyql.Utils.{GenerateIndices, HasDuplicate, ZipWithIndex}
 import tyql.{DatabaseAST, Expr, NonScalarExpr, Query, ResultTag}
 
 import scala.NamedTuple.AnyNamedTuple
-import scala.annotation.{targetName, implicitNotFound}
-
-inline val linearErrorMsg = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
+import scala.annotation.{implicitNotFound, targetName}
 
 case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int]() extends RestrictedQuery[A, C, Tuple1[ID]] (Query.QueryRef[A, C]()):
   type Self = this.type
   def toQueryRef: Query.QueryRef[A, C] = wrapped.asInstanceOf[Query.QueryRef[A, C]]
-
-trait RestrictedQuery1[B]:
-  self =>
-  type Deps = B
-  
-  def flatMap[B1](q: RestrictedQuery1[B1]): RestrictedQuery1[(B, B1)] = new RestrictedQuery1[(B, B1)]:
-    type Deps = (self.Deps, q.Deps)
 
 /**
  * A restricted reference to a query that disallows aggregation.
@@ -41,7 +32,8 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
 
   @targetName("restrictedQueryFlatMapRestricted")
   def flatMap[B: ResultTag, D2 <: Tuple](f: Expr.Ref[A, NonScalarExpr] => RestrictedQuery[B, ?, D2])
-                                        (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[B, BagResult, Tuple.Concat[D, D2]] =
+//                                        (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true)
+    : RestrictedQuery[B, BagResult, Tuple.Concat[D, D2]] =
     val toR: Expr.Ref[A, NonScalarExpr] => Query[B, ?] = arg => f(arg).toQuery
     RestrictedQuery(wrapped.flatMap(toR))
 
@@ -53,10 +45,13 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
   def distinct: RestrictedQuery[A, SetResult, D] = RestrictedQuery(wrapped.distinct)
 
   def union[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])
-                        (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[A, SetResult, Tuple.Concat[D, D2]] =
+//                        (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true)
+    : RestrictedQuery[A, SetResult, Tuple.Concat[D, D2]] =
     RestrictedQuery(Query.Union(wrapped, that.toQuery))
 
-  def unionAll[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])(using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[A, BagResult, Tuple.Concat[D, D2]] =
+  def unionAll[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])
+//                           (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true)
+    : RestrictedQuery[A, BagResult, Tuple.Concat[D, D2]] =
     RestrictedQuery(Query.UnionAll(wrapped, that.toQuery))
 
   @targetName("unionQuery")
@@ -86,24 +81,32 @@ object RestrictedQuery {
    */
   type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, SetResult]]
 
-  type CreateRestrictedQuery[T] = T match
+  type ConstructRestrictedQuery[T] = T match
     case (t, d) => RestrictedQuery[t, SetResult, d]
-
-  type ToRestrictedQuery[QT <: Tuple, DT <: Tuple] = Tuple.Map[Tuple.Zip[Elems[QT], DT], CreateRestrictedQuery]
+  // monotone, linear, and set restricted
+  type ToRestrictedQuery[QT <: Tuple, DT <: Tuple] = Tuple.Map[Tuple.Zip[Elems[QT], DT], ConstructRestrictedQuery]
+  // only include the monotone restriction, ignore category or linearity
+  type ToMonotoneQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, ?, ?]]
+  type ToMonotoneQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?]]
 
   type InverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
-    case RestrictedQuery[a, c, d] *: t => d *: InverseMapDeps[t]
+    case RestrictedQuery[a, c, d] *: t => HasDuplicate[d] *: InverseMapDeps[t]
     case EmptyTuple => EmptyTuple
   }
-  //  type Deps[RQT <: Tuple] = Tuple.InverseMap[RQT, [T] =>> RestrictedQuery[?, ?, T]]
-  //  type ElemsRQT[RQT <: Tuple] = Tuple.InverseMap[RQT, [T] =>> RestrictedQuery[T, ?, ?]]
 
-  //  type Actual = Tuple3[Tuple1[0],Tuple1[2],Tuple1[1]]
-  //  type FlatActual = Tuple.FlatMap[Actual, [T] =>> T]
-  //  type Expected = GenerateIndices[0, Tuple.Size[(0,0,0)]]
-  //  type UnionActual = Tuple.Union[FlatActual]
-  //  type UnionExpected = Tuple.Union[Expected]
-  //  val check: UnionExpected <:< UnionActual = summon[UnionExpected <:< UnionActual]
+    // test affine
+    type testA = (0, 1)
+    val checkA = summon[testA =:= HasDuplicate[testA]]
+//    val testB = ((0, 1), (0, 3), (1, 2))
+//    val checkB = summon[testB =:= HasDuplicate[testB]]
+
+  // test linear
+    type Actual = Tuple3[Tuple1[0],Tuple1[0],Tuple1[1]]
+    type FlatActual = Tuple.FlatMap[Actual, [T <: Tuple] =>> T]
+    type Expected = GenerateIndices[0, Tuple.Size[(0,0,0)]]
+    type UnionActual = Tuple.Union[FlatActual]
+    type UnionExpected = Tuple.Union[Expected]
+//    val check: UnionExpected <:< UnionActual = summon[UnionExpected <:< UnionActual]
 
   type ExtractDependencies[D] <: Tuple = D match
     case RestrictedQuery[a, c, d] => d

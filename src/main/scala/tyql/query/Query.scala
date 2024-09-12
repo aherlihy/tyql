@@ -2,9 +2,10 @@ package tyql
 
 import language.experimental.namedTuples
 import NamedTuple.AnyNamedTuple
-import scala.annotation.{targetName, implicitNotFound}
+import scala.annotation.{implicitNotFound, targetName}
 import scala.reflect.ClassTag
-import Utils.naturalMap
+import Utils.{HasDuplicate, naturalMap}
+import tyql.RestrictedQuery.ToRestrictedQueryRef
 
 trait ResultCategory
 class SetResult extends ResultCategory
@@ -128,7 +129,10 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 
 object Query:
   import Expr.{Pred, Fun, Ref}
-  import RestrictedQuery.{ToRestrictedQueryRef, InverseMapDeps, ToRestrictedQuery, ExpectedResult, ActualResult, ToQuery, Elems}
+  import RestrictedQuery.*
+
+  def unrestrictedFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToMonotoneQueryRef[QT] => ToMonotoneQuery[QT]): ToQuery[QT] =
+    fixImpl(bases)(fns)
 
   /**
    * Fixed point computation.
@@ -136,21 +140,30 @@ object Query:
    * @param bases Tuple of the base case queries. NOTE: bases do not have to be sets since they will be directly fed into an union.
    * TODO: in theory, the results could be assumed to be sets due to the outermost UNION(base, recur), but better to enforce .distinct (also bc we flatten the unions)
    * @param fns A function from a tuple of restricted query refs to a tuple of *SET* restricted queries.
+   *
+   * QT is the tuple of Query
+   * DT is the tuple of tuple of constant ints. Used to track dependencies of recursive definitions in order to enforce that every recursive reference is used at least once.
+   * RQT is the tuple of RestrictedQuery that should be returned from fns.
    */
   def fix[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
                                     (bases: QT)
                                     (fns: ToRestrictedQueryRef[QT] => RQT)
                                     (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
                                     (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
-                                    (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev2: DT <:< InverseMapDeps[RQT])
-                                    (using @implicitNotFound("Recursive definitions must use at least one reference to a recursive relation: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT])
-                                    (using @implicitNotFound("Recursive definitions must be linearly recursive, e.g. every reference to the recursive relations must be used") ev4: ExpectedResult[QT] <:< ActualResult[RQT]): ToQuery[QT] =
+                                    (using @implicitNotFound("Cannot constrain DT") ev2: DT <:< InverseMapDeps[RQT])
+                                    (using @implicitNotFound("Recursive definitions must be linear: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT])
+                                    (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
+//                                    (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition: ${RQT}") ev2: Tuple.Union[Tuple.Map[DT, CheckDuplicate]] =:= false)
+      : ToQuery[QT] =
+    fixImpl(bases)(fns)
+
+  def fixImpl[QT <: Tuple, P <: Tuple, R <: Tuple](bases: QT)(fns: P => R): ToQuery[QT] =
     // If base cases are themselves recursive definitions.
     val baseRefsAndDefs = bases.toArray.map {
       case MultiRecursive(params, querys, resultQ) => ???// TODO: decide on semantics for multiple fix definitions. (param, query)
       case base: Query[?, ?] => (RestrictedQueryRef()(using base.tag), base)
     }
-    val refsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[ToRestrictedQueryRef[QT]]
+    val refsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[P]
     val refsList = baseRefsAndDefs.map(_._1).toList
     val recurQueries = fns(refsTuple)
 

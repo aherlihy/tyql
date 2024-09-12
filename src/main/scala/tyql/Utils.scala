@@ -9,6 +9,12 @@ object Utils:
 
   type ZipWithIndex[T <: Tuple] = Tuple.Zip[T, GenerateIndices[0, Tuple.Size[T]]]
 
+  type HasDuplicate[T <: Tuple] <: Tuple = T match
+    case EmptyTuple => T
+    case h *: t => Tuple.Contains[t, h] match
+      case true => Nothing
+      case false => h *: HasDuplicate[t]
+
   extension [Base <: Tuple, F[_], G[_]](tuple: Tuple.Map[Base, F])
     /** Map a tuple `(F[A], F[B], ...)` to a tuple `(G[A], G[B], ...)`. */
     inline def naturalMap(f: [t] => F[t] => G[t]): Tuple.Map[Base, G] =

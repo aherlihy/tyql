@@ -108,7 +108,7 @@ class RecursionConstraintCategoryResultTest extends SQLStringQueryTest[TCDB, Edg
       (SELECT * FROM edges2 as edges2$F))) SELECT * FROM recursive$A as recref$E
       """
 }
-class RecursionConstraintCategory1FailTest extends munit.FunSuite {
+class RecursionConstraintCategoryUnionAllFailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll"
   def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
@@ -142,7 +142,7 @@ class RecursionConstraintCategory1FailTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-class RecursionConstraintCategory2FailTest extends munit.FunSuite {
+class RecursionConstraintCategoryFlatmapFailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, missing distinct"
   def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
@@ -252,7 +252,7 @@ class RecursionConstraintMonotonic2FailTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-class RecursionConstraintMonotonic3FailTest extends munit.FunSuite {
+class RecursionConstraintMonotonicInlineFailTest extends munit.FunSuite {
   def testDescription: String = "Aggregation within inline fix"
   def expectedError: String = "value aggregate is not a member of tyql.RestrictedQueryRef"
 
@@ -312,7 +312,7 @@ class RecursiveConstraintLinearTest extends SQLStringQueryTest[TCDB, Int] {
         """
 }
 
-class RecursiveConstraintLinearFailTest extends munit.FunSuite {
+class RecursiveConstraintLinearFailInline0Test extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 0 usages of path, inline fix"
 
   // Special because inline fix
@@ -348,11 +348,12 @@ class RecursiveConstraintLinearFailTest extends munit.FunSuite {
   }
 }
 
-class RecursiveConstraintLinear2FailTest extends munit.FunSuite {
+// TODO: improve error messages for inline fix
+class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 2 usages of path, inline fix"
 
-  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
-
+//  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.SetResult, ((0 : Int), (0 : Int))]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
   test(testDescription) {
     val error: String =
       compileErrors(
@@ -383,10 +384,10 @@ class RecursiveConstraintLinear2FailTest extends munit.FunSuite {
   }
 }
 
-class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
+class RecursiveConstraintLinearMultifix2xFailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: multiple uses of path in multifix"
 
-  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
+  def expectedError: String = "Recursive definitions must be linear"
 
   test(testDescription) {
     val error: String =
@@ -425,10 +426,10 @@ class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
   }
 }
 
-class RecursiveConstraintLinear4FailTest extends munit.FunSuite {
+class RecursiveConstraintLinearMultifix0FailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: zero usage of path in multifix"
 
-  def expectedError: String = "Recursive definitions must be linearly recursive, e.g. every reference to the recursive relations must be used"
+  def expectedError: String = "Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions"
 
   test(testDescription) {
     val error: String =
@@ -771,23 +772,19 @@ class RecursiveConstraintInvalid5FailTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-//
+
 //class TESTTEST extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "Live tests"
 //
 //  def query() =
-//    val pathBase = testDB.tables.edges
-//    val path2Base = testDB.tables.otherEdges
-//    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
-//      val P = path2.flatMap(p =>
+//    val path = testDB.tables.edges
+//    path.fix(path =>
+//      path.flatMap(p =>
 //        path
-//          .filter(e => p.q == e.x)
-//          .map(e => (x = p.q, y = e.y).toRow)
+//          .filter(e => p.y == e.x)
+//          .map(e => (x = p.x, y = e.y).toRow)
 //      ).distinct
-//      val P2 = path2
-//      (P, P2, P2)
 //    )
-//    pathResult
 //
 //  def expectedQueryPattern: String =
 //    """
