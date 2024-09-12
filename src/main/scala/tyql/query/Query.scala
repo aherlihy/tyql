@@ -1,21 +1,17 @@
 package tyql
 
 import language.experimental.namedTuples
-import scala.util.TupledFunction
-import NamedTuple.{AnyNamedTuple, NamedTuple}
-import scala.annotation.targetName
-import java.time.LocalDate
+import NamedTuple.AnyNamedTuple
+import scala.annotation.{targetName, implicitNotFound}
 import scala.reflect.ClassTag
-import Utils.*
-import tyql.Aggregation.AggFilter
-import tyql.Query.{ToRestrictedQuery, ToRestrictedQueryRef}
+import Utils.naturalMap
 
 trait ResultCategory
 class SetResult extends ResultCategory
 class BagResult extends ResultCategory
 
 trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseAST[A]:
-  import Expr.{Pred, Fun, Ref}
+  import Expr.{Fun, Ref}
   val tag: ResultTag[A] = qTag
   /**
    * Classic flatMap with an inner Query that will likely be flattened into a join.
@@ -132,45 +128,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 
 object Query:
   import Expr.{Pred, Fun, Ref}
-
-  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(A, B, ...)` */
-  type Elems[QT <: Tuple] = Tuple.InverseMap[QT, [T] =>> Query[T, ?]]
-
-  /**
-   * Given a Tuple `(Query[A], Query[B], ...)`, return `(Query[A], Query[B], ...)`
-   *
-   *  This isn't just the identity because the input might actually be a subtype e.g.
-   *  `(Table[A], Table[B], ...)`
-   */
-  type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, SetResult]]
-
-  type CreateRestrictedQuery[T] = T match
-    case (t, d) => RestrictedQuery[t, SetResult, d]
-
-  type ToRestrictedQuery[QT <: Tuple, DT <: Tuple] = Tuple.Map[Tuple.Zip[Elems[QT], DT], CreateRestrictedQuery]
-
-  type InverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
-    case RestrictedQuery[a, c, d] *: t => d *: InverseMapDeps[t]
-    case EmptyTuple => EmptyTuple
-  }
-  //  type Deps[RQT <: Tuple] = Tuple.InverseMap[RQT, [T] =>> RestrictedQuery[?, ?, T]]
-  //  type ElemsRQT[RQT <: Tuple] = Tuple.InverseMap[RQT, [T] =>> RestrictedQuery[T, ?, ?]]
-
-  //  type Actual = Tuple3[Tuple1[0],Tuple1[2],Tuple1[1]]
-//  type FlatActual = Tuple.FlatMap[Actual, [T] =>> T]
-//  type Expected = GenerateIndices[0, Tuple.Size[(0,0,0)]]
-//  type UnionActual = Tuple.Union[FlatActual]
-//  type UnionExpected = Tuple.Union[Expected]
-//  val check: UnionExpected <:< UnionActual = summon[UnionExpected <:< UnionActual]
-
-  type ExtractDependencies[D] <: Tuple = D match
-    case RestrictedQuery[a, c, d] => d
-  type ExpectedResult[QT <: Tuple] = Tuple.Union[GenerateIndices[0, Tuple.Size[QT]]]
-  type ActualResult[RT <: Tuple] = Tuple.Union[Tuple.FlatMap[RT, ExtractDependencies]]
-
-  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(RestrictedQueryRef[A, _, 0], RestrictedQueryRef[B, _, 1], ...)` */
-  type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[ZipWithIndex[Elems[QT]], [T] =>> T match
-    case (elem, index) => RestrictedQueryRef[elem, SetResult, index]]
+  import RestrictedQuery.{ToRestrictedQueryRef, InverseMapDeps, ToRestrictedQuery, ExpectedResult, ActualResult, ToQuery, Elems}
 
   /**
    * Fixed point computation.
@@ -182,11 +140,11 @@ object Query:
   def fix[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
                                     (bases: QT)
                                     (fns: ToRestrictedQueryRef[QT] => RQT)
-                                    (using Tuple.Union[QT] <:< Query[?, ?])
-                                    (using DT <:< InverseMapDeps[RQT])
-                                    (using RQT <:< ToRestrictedQuery[QT, DT])
-                                    (using ExpectedResult[QT] <:< ActualResult[RQT]):
-   ToQuery[QT] =
+                                    (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
+                                    (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
+                                    (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev2: DT <:< InverseMapDeps[RQT])
+                                    (using @implicitNotFound("Recursive definitions must use at least one reference to a recursive relation: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT])
+                                    (using @implicitNotFound("Recursive definitions must be linearly recursive, e.g. every reference to the recursive relations must be used") ev4: ExpectedResult[QT] <:< ActualResult[RQT]): ToQuery[QT] =
     // If base cases are themselves recursive definitions.
     val baseRefsAndDefs = bases.toArray.map {
       case MultiRecursive(params, querys, resultQ) => ???// TODO: decide on semantics for multiple fix definitions. (param, query)

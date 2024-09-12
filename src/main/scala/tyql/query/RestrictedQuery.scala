@@ -1,9 +1,12 @@
 package tyql
 
+import tyql.Utils.{GenerateIndices, ZipWithIndex}
 import tyql.{DatabaseAST, Expr, NonScalarExpr, Query, ResultTag}
 
 import scala.NamedTuple.AnyNamedTuple
-import scala.annotation.targetName
+import scala.annotation.{targetName, implicitNotFound}
+
+inline val linearErrorMsg = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
 
 case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int]() extends RestrictedQuery[A, C, Tuple1[ID]] (Query.QueryRef[A, C]()):
   type Self = this.type
@@ -37,7 +40,8 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
   def flatMap[B: ResultTag](f: Expr.Ref[A, NonScalarExpr] => Query[B, ?]): RestrictedQuery[B, BagResult, D] = RestrictedQuery(wrapped.flatMap(f))
 
   @targetName("restrictedQueryFlatMapRestricted")
-  def flatMap[B: ResultTag, D2 <: Tuple](f: Expr.Ref[A, NonScalarExpr] => RestrictedQuery[B, ?, D2])(using ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[B, BagResult, Tuple.Concat[D, D2]] =
+  def flatMap[B: ResultTag, D2 <: Tuple](f: Expr.Ref[A, NonScalarExpr] => RestrictedQuery[B, ?, D2])
+                                        (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[B, BagResult, Tuple.Concat[D, D2]] =
     val toR: Expr.Ref[A, NonScalarExpr] => Query[B, ?] = arg => f(arg).toQuery
     RestrictedQuery(wrapped.flatMap(toR))
 
@@ -48,10 +52,11 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
 
   def distinct: RestrictedQuery[A, SetResult, D] = RestrictedQuery(wrapped.distinct)
 
-  def union[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])(using ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[A, SetResult, Tuple.Concat[D, D2]] =
+  def union[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])
+                        (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[A, SetResult, Tuple.Concat[D, D2]] =
     RestrictedQuery(Query.Union(wrapped, that.toQuery))
 
-  def unionAll[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])(using ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[A, BagResult, Tuple.Concat[D, D2]] =
+  def unionAll[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])(using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true): RestrictedQuery[A, BagResult, Tuple.Concat[D, D2]] =
     RestrictedQuery(Query.UnionAll(wrapped, that.toQuery))
 
   @targetName("unionQuery")
@@ -68,4 +73,45 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
   def isEmpty: Expr[Boolean, NonScalarExpr] =
     Expr.IsEmpty(wrapped)
 
+object RestrictedQuery {
 
+  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(A, B, ...)` */
+  type Elems[QT <: Tuple] = Tuple.InverseMap[QT, [T] =>> Query[T, ?]]
+
+  /**
+   * Given a Tuple `(Query[A], Query[B], ...)`, return `(Query[A], Query[B], ...)`
+   *
+   *  This isn't just the identity because the input might actually be a subtype e.g.
+   *  `(Table[A], Table[B], ...)`
+   */
+  type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, SetResult]]
+
+  type CreateRestrictedQuery[T] = T match
+    case (t, d) => RestrictedQuery[t, SetResult, d]
+
+  type ToRestrictedQuery[QT <: Tuple, DT <: Tuple] = Tuple.Map[Tuple.Zip[Elems[QT], DT], CreateRestrictedQuery]
+
+  type InverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
+    case RestrictedQuery[a, c, d] *: t => d *: InverseMapDeps[t]
+    case EmptyTuple => EmptyTuple
+  }
+  //  type Deps[RQT <: Tuple] = Tuple.InverseMap[RQT, [T] =>> RestrictedQuery[?, ?, T]]
+  //  type ElemsRQT[RQT <: Tuple] = Tuple.InverseMap[RQT, [T] =>> RestrictedQuery[T, ?, ?]]
+
+  //  type Actual = Tuple3[Tuple1[0],Tuple1[2],Tuple1[1]]
+  //  type FlatActual = Tuple.FlatMap[Actual, [T] =>> T]
+  //  type Expected = GenerateIndices[0, Tuple.Size[(0,0,0)]]
+  //  type UnionActual = Tuple.Union[FlatActual]
+  //  type UnionExpected = Tuple.Union[Expected]
+  //  val check: UnionExpected <:< UnionActual = summon[UnionExpected <:< UnionActual]
+
+  type ExtractDependencies[D] <: Tuple = D match
+    case RestrictedQuery[a, c, d] => d
+  type ExpectedResult[QT <: Tuple] = Tuple.Union[GenerateIndices[0, Tuple.Size[QT]]]
+  type ActualResult[RT <: Tuple] = Tuple.Union[Tuple.FlatMap[RT, ExtractDependencies]]
+
+  /** Given a Tuple `(Query[A], Query[B], ...)`, return `(RestrictedQueryRef[A, _, 0], RestrictedQueryRef[B, _, 1], ...)` */
+  type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[ZipWithIndex[Elems[QT]], [T] =>> T match
+    case (elem, index) => RestrictedQueryRef[elem, SetResult, index]]
+
+}

@@ -312,44 +312,10 @@ class RecursiveConstraintLinearTest extends SQLStringQueryTest[TCDB, Int] {
         """
 }
 
-class RecursiveConstraintLinear2FailTest extends munit.FunSuite {
-  def testDescription: String = "Non-linear recursion: 2 usages of path, inline fix"
-
-  def expectedError: String = "Cannot prove that Tuple.Disjoint[Tuple1[(0 : Int)], Tuple1[(0 : Int)]]"
-
-  test(testDescription) {
-    val error: String =
-      compileErrors(
-        """
-               // BOILERPLATE
-               import language.experimental.namedTuples
-               import tyql.{Table, Expr}
-
-               type Edge = (x: Int, y: Int)
-
-               val tables = (
-                 edges = Table[Edge]("edges"),
-                 edges2 = Table[Edge]("otherEdges"),
-                 emptyEdges = Table[Edge]("empty")
-               )
-
-              // TEST
-              val path = tables.edges
-               path.fix(path =>
-                 path.flatMap(p =>
-                  path
-                    .filter(e => p.y == e.x)
-                    .map(e => (x = p.x, y = e.y).toRow)
-                ).distinct
-              )
-              """)
-    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
-  }
-}
-
 class RecursiveConstraintLinearFailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 0 usages of path, inline fix"
 
+  // Special because inline fix
   def expectedError: String = "Found:    tyql.Query[(x : Int, y : Int), tyql.SetResult]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
@@ -382,10 +348,45 @@ class RecursiveConstraintLinearFailTest extends munit.FunSuite {
   }
 }
 
+class RecursiveConstraintLinear2FailTest extends munit.FunSuite {
+  def testDescription: String = "Non-linear recursion: 2 usages of path, inline fix"
+
+  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+               // BOILERPLATE
+               import language.experimental.namedTuples
+               import tyql.{Table, Expr}
+
+               type Edge = (x: Int, y: Int)
+
+               val tables = (
+                 edges = Table[Edge]("edges"),
+                 edges2 = Table[Edge]("otherEdges"),
+                 emptyEdges = Table[Edge]("empty")
+               )
+
+              // TEST
+              val path = tables.edges
+               path.fix(path =>
+                 path.flatMap(p =>
+                  path
+                    .filter(e => p.y == e.x)
+                    .map(e => (x = p.x, y = e.y).toRow)
+                ).distinct
+              )
+              """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
 class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: multiple uses of path in multifix"
 
-  def expectedError: String = "Cannot prove that Tuple.Disjoint[Tuple1[(0 : Int)], Tuple1[(0 : Int)]] =:= (true : Boolean)"
+  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
 
   test(testDescription) {
     val error: String =
@@ -427,7 +428,7 @@ class RecursiveConstraintLinear3FailTest extends munit.FunSuite {
 class RecursiveConstraintLinear4FailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: zero usage of path in multifix"
 
-  def expectedError: String = "Cannot prove that tyql.Query.ExpectedResult[(tyql.Table[Edge], tyql.Table[Edge])] <:< tyql.Query.ActualResult["
+  def expectedError: String = "Recursive definitions must be linearly recursive, e.g. every reference to the recursive relations must be used"
 
   test(testDescription) {
     val error: String =
@@ -572,25 +573,221 @@ class RecursiveConstraintLinear7Test extends SQLStringQueryTest[TCDB, Edge] {
       """
 }
 
-//class TESTTEST extends SQLStringQueryTest[TCDB, Int] {
+class RecursiveConstraintInvalidFailTest extends munit.FunSuite {
+  def testDescription: String = "Use multifix instead of fix for single definition"
+
+  def expectedError: String = "Found:    (pathBase : tyql.Table[Edge])\nRequired: Tuple"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+                 // BOILERPLATE
+                 import language.experimental.namedTuples
+                 import tyql.{Table, Expr}
+
+                 type Edge = (x: Int, y: Int)
+
+                 val tables = (
+                   edges = Table[Edge]("edges"),
+                   edges2 = Table[Edge]("otherEdges"),
+                   emptyEdges = Table[Edge]("empty")
+                 )
+
+                // TEST
+                  val pathBase = tables.edges
+                  val pathToABase = tables.emptyEdges
+                  val (pathResult, path2Result) = fix(pathBase)((path, path2) =>
+                    val P = path2.flatMap(p =>
+                      path
+                        .filter(e => p.q == e.x)
+                        .map(e => (x = p.q, y = e.y).toRow)
+                    ).distinct
+                    val P2 = path2
+                    (P, P2)
+                  )
+                  pathResult)
+                """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursiveConstraintInvalid2FailTest extends munit.FunSuite {
+  def testDescription: String = "Extra param in fix fns"
+
+  def expectedError: String = "Wrong number of parameters"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+                   // BOILERPLATE
+                   import language.experimental.namedTuples
+                   import tyql.{Table, Expr}
+
+                   type Edge = (x: Int, y: Int)
+
+                   val tables = (
+                     edges = Table[Edge]("edges"),
+                     edges2 = Table[Edge]("otherEdges"),
+                     emptyEdges = Table[Edge]("empty")
+                   )
+
+                  // TEST
+                val pathBase = tables.edges
+                val path2Base = tables.emptyEdges
+                val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2, path3) =>
+                  val P = path2.flatMap(p =>
+                    path
+                      .filter(e => p.q == e.x)
+                      .map(e => (x = p.q, y = e.y).toRow)
+                  ).distinct
+                  val P2 = path2
+                  (P, P2)
+                )
+                pathResult
+                    )
+                  """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursiveConstraintInvalid3FailTest extends munit.FunSuite {
+  def testDescription: String = "Too few param in fix fns"
+
+  def expectedError: String = "Wrong number of parameters"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+                     // BOILERPLATE
+                     import language.experimental.namedTuples
+                     import tyql.{Table, Expr}
+
+                     type Edge = (x: Int, y: Int)
+
+                     val tables = (
+                       edges = Table[Edge]("edges"),
+                       edges2 = Table[Edge]("otherEdges"),
+                       emptyEdges = Table[Edge]("empty")
+                     )
+
+                    // TEST
+                val pathBase = tables.edges
+                val path2Base = tables.emptyEdges
+                  val (pathResult, path2Result) = fix(pathBase, path2Base, path2Base)((path, path2) =>
+                    val P = path2.flatMap(p =>
+                      path
+                        .filter(e => p.q == e.x)
+                        .map(e => (x = p.q, y = e.y).toRow)
+                    ).distinct
+                    val P2 = path2
+                    (P, P2)
+                  )
+                  pathResult
+                      )
+                    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursiveConstraintInvalid4FailTest extends munit.FunSuite {
+  def testDescription: String = "Extra recursive relation returned from fns"
+
+  def expectedError: String = "Number of base cases must match the number of recursive definitions returned by fns"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+     """
+     // BOILERPLATE
+     import language.experimental.namedTuples
+     import tyql.{Table, Expr}
+
+     type Edge = (x: Int, y: Int)
+
+     val tables = (
+       edges = Table[Edge]("edges"),
+       edges2 = Table[Edge]("otherEdges"),
+       emptyEdges = Table[Edge]("empty")
+     )
+
+    // TEST
+      val pathBase = tables.edges
+      val path2Base = tables.emptyEdges
+    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+      val P = path2.flatMap(p =>
+        path
+          .filter(e => p.q == e.x)
+          .map(e => (x = p.q, y = e.y).toRow)
+      ).distinct
+      val P2 = path2
+      (P, P2, P2)
+    )
+    pathResult
+    )
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursiveConstraintInvalid5FailTest extends munit.FunSuite {
+  def testDescription: String = "Too few recursive relation returned from fns"
+
+  def expectedError: String = "Number of base cases must match the number of recursive definitions returned by fns"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+     // BOILERPLATE
+     import language.experimental.namedTuples
+     import tyql.{Table, Expr}
+
+     type Edge = (x: Int, y: Int)
+
+     val tables = (
+       edges = Table[Edge]("edges"),
+       edges2 = Table[Edge]("otherEdges"),
+       emptyEdges = Table[Edge]("empty")
+     )
+
+    // TEST
+      val pathBase = tables.edges
+      val path2Base = tables.emptyEdges
+    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+      val P = path2.flatMap(p =>
+        path
+          .filter(e => p.q == e.x)
+          .map(e => (x = p.q, y = e.y).toRow)
+      ).distinct
+      val P2 = path2
+      Tuple1(P)
+    )
+    pathResult
+    )
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+//
+//class TESTTEST extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "Live tests"
 //
 //  def query() =
 //    val pathBase = testDB.tables.edges
-//    val path2Base = testDB.tables.emptyEdges
+//    val path2Base = testDB.tables.otherEdges
 //    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
-//      val P = path.flatMap(p =>
+//      val P = path2.flatMap(p =>
 //        path
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
+//          .filter(e => p.q == e.x)
+//          .map(e => (x = p.q, y = e.y).toRow)
 //      ).distinct
-//      val P2 = path2.flatMap(p =>
-//        path2
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      ).distinct
-//      (P, P2)
+//      val P2 = path2
+//      (P, P2, P2)
 //    )
+//    pathResult
 //
 //  def expectedQueryPattern: String =
 //    """
