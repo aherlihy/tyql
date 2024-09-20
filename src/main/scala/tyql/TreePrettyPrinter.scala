@@ -162,6 +162,8 @@ object TreePrettyPrinter {
         s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth+1, "FINAL->", finalQStr)}\n${indent(depth)})"
       case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?, ?]].stringRef()})"
       case a: Aggregation[?] => a.prettyPrint(depth)
+      case GroupBy(source, grouping, select, having) =>
+        s"${indent(depth)}GroupBy(\n${source.prettyPrint(depth + 1)},\n${grouping.prettyPrint(depth + 1)},\n${select.prettyPrint(depth + 1)},\n${having.map(_.prettyPrint(depth + 1)).getOrElse(s"${indent(depth+1)}-")}\n${indent(depth)})"
       case _ => throw new Exception(s"Unimplemented pretty print AST $ast")
     }
   }
@@ -199,6 +201,12 @@ object TreePrettyPrinter {
         s"${indent(depth)}MultiRecursive($str\n${indent(depth)})"
       case recursiveIRVar: RecursiveIRVar =>
         s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}->${recursiveIRVar.pointsToAlias}"
+      case GroupByQuery(source, groupBy, having, overrideAlias, ast) =>
+        val srcStr = source.prettyPrintIR(depth + 1, false)
+        val groupByStr = groupBy.prettyPrintIR(depth + 1, false)
+        val havingStr = having.map(_.prettyPrintIR(depth + 1, false)).getOrElse("[]")
+        s"${indent(depth)}GroupBy(\n$srcStr,\n$groupByStr,\n$havingStr\n${indent(depth)})"
+
       case _ => throw new Exception(s"Unimplemented pretty print RelationOp $relationOp")
     }
   }

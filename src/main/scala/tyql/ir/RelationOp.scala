@@ -430,3 +430,42 @@ case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST
 
     q.flags = q.flags + f
     q
+
+case class GroupByQuery(
+                   source: RelationOp,
+                   groupBy: QueryIRNode,
+                   having: Option[QueryIRNode],
+                   overrideAlias: Option[String],
+                   ast: DatabaseAST[?]) extends RelationOp:
+  val name = overrideAlias.getOrElse({
+    val latestVar = s"subquery${QueryIRTree.idCount}"
+    QueryIRTree.idCount += 1
+    latestVar
+  })
+  override def alias = name
+
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(Seq(this, r), Seq(), None, astOther)
+
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther)
+
+  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
+    SelectQuery(p, Seq(this), Seq(), None, astOther)
+
+  override def appendFlag(f: SelectFlags): RelationOp =
+    f match
+      case SelectFlags.Distinct =>
+        source.appendFlag(f)
+      case _ =>
+        flags = flags + f
+    this
+
+  override def toSQLString(): String =
+    val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
+    val sourceStr = source.toSQLString()
+    val groupByStr = groupBy.toSQLString()
+    val havingStr = if having.nonEmpty then
+      s" HAVING ${having.get.toSQLString()}" else
+      ""
+    wrapString(s"$sourceStr GROUP BY $groupByStr$havingStr")

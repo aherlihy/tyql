@@ -11,7 +11,9 @@ enum ResultTag[T]:
   case StringTag extends ResultTag[String]
   case BoolTag extends ResultTag[Boolean]
   case LocalDateTag extends ResultTag[LocalDate]
-  case NamedTupleTag[N <: Tuple, V <: Tuple](names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
+  // names is a var to special case when we want to treat a named tuple like a regular tuple without going through type conversion
+  case NamedTupleTag[N <: Tuple, V <: Tuple](var names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
+//  case TupleTag[V <: Tuple](types: List[ResultTag[?]]) extends ResultTag[Tuple]
   case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]]) extends ResultTag[T]
   case ListTag[T](elementType: ResultTag[T]) extends ResultTag[List[T]]
   case AnyTag extends ResultTag[Any]
@@ -22,6 +24,9 @@ object ResultTag:
   given ResultTag[Boolean] = ResultTag.BoolTag
   given ResultTag[Double] = ResultTag.DoubleTag
   given ResultTag[LocalDate] = ResultTag.LocalDateTag
+//  inline given [V <: Tuple]: ResultTag[Tuple] =
+//    val tpes = summonAll[Tuple.Map[V, ResultTag]]
+//    TupleTag(tpes.toList.asInstanceOf[List[ResultTag[?]]])
   inline given [N <: Tuple, V <: Tuple]: ResultTag[NamedTuple[N, V]] =
     val names = constValueTuple[N]
     val tpes = summonAll[Tuple.Map[V, ResultTag]]

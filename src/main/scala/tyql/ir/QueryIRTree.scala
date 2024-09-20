@@ -1,6 +1,7 @@
 package tyql
 
 import tyql.Query.{Intersect, QueryRef}
+import tyql.ResultTag.NamedTupleTag
 
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
@@ -100,6 +101,9 @@ object QueryIRTree:
       )
 
     NaryRelationOp(flattened, op, ast)
+
+  private def collapseMap(lhs: QueryIRNode, rhs: QueryIRNode): RelationOp =
+    ???
 
   private def unnest(fromNodes: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
     fromNodes.reduce((q1, q2) =>
@@ -228,6 +232,28 @@ object QueryIRTree:
 
         MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), multiRecursive)
 
+      case groupBy: Query.GroupBy[?, ?, ?] =>
+        val fromIR = generateQuery(groupBy.$source, symbols)
+
+        val source = fromIR match
+          case SelectQuery(project, from, where, overrideAlias, ast) =>
+            val select = generateFun(groupBy.$selectFn, fromIR, symbols)
+            SelectQuery(collapseMap(select, project), from, where, None, groupBy)
+          case SelectAllQuery(from, where, overrideAlias, ast)  =>
+            val select = generateFun(groupBy.$selectFn, fromIR, symbols)
+            SelectQuery(select, from, where, None, groupBy)
+          case _ =>
+            val select = generateFun(groupBy.$selectFn, fromIR, symbols)
+            SelectQuery(select, Seq(fromIR), Seq(), None, groupBy) // force subquery
+
+        // Turn off the attribute names for the grouping clause since no aliases needed
+        groupBy.$groupingFn.$body.tag match
+          case t: NamedTupleTag[?, ?] => t.names = List()
+          case _ =>
+        val groupByIR = generateFun(groupBy.$groupingFn, fromIR, symbols)
+        val havingIR = groupBy.$havingFn.map(f => generateFun(f, fromIR, symbols))
+        GroupByQuery(source.appendFlag(SelectFlags.Final), groupByIR, havingIR, overrideAlias = None, ast = groupBy)
+
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
 
@@ -262,14 +288,14 @@ object QueryIRTree:
 
 
   private def generateProjection(p: Expr.Project[?] | AggregationExpr.AggProject[?], symbols: SymbolTable): QueryIRNode =
-    val inner = p match
+    val projectAST = p match
       case e: Expr.Project[?] => e.$a
       case a: AggregationExpr.AggProject[?] => a.$a
-    val a = NamedTuple.toTuple(inner.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
+    val tupleOfProject = NamedTuple.toTuple(projectAST.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
     val namedTupleNames = p.tag match
       case ResultTag.NamedTupleTag(names, types) => names.lift
       case _ => Seq()
-    val children = a.toList.zipWithIndex
+    val children = tupleOfProject.toList.zipWithIndex
       .map((expr, idx) =>
         val e = expr.asInstanceOf[Expr[?, ?]]
         AttrExpr(generateExpr(e, symbols), namedTupleNames(idx), e)

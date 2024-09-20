@@ -88,6 +88,9 @@ object Expr:
 
   def avg[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
 
+  @targetName("doubleAvg")
+  def avg(x: Expr[Double, ?]): AggregationExpr[Double] = AggregationExpr.Avg(x)
+
   def max[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
 
   def min[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Min(x)

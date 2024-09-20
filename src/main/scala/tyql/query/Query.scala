@@ -1,10 +1,11 @@
 package tyql
 
 import language.experimental.namedTuples
-import NamedTuple.AnyNamedTuple
+import NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.annotation.{implicitNotFound, targetName}
 import scala.reflect.ClassTag
 import Utils.{HasDuplicate, naturalMap}
+import tyql.Expr.StripExpr
 import tyql.RestrictedQuery.ToRestrictedQueryRef
 
 trait ResultCategory
@@ -79,6 +80,32 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 //  inline def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Query[B]): Nothing =
 //    error("No aggregation function found in f. Did you mean to use flatMap?")
 
+// TODO: Restrictions for groupBy: all columns in the selectFn must either be in the groupingFn or in an aggregate.
+//  type GetFields[T] <: Tuple = T match
+//    case Expr[t, ?] => GetFields[t]
+//    case NamedTuple[n, v] => n
+  /**
+   * TODO: Right now this most closely resembles SQL groupBy, not Spark RDD's or pairs. Do we want to pick one?
+   * @param groupingFn - must be a named tuple with the original name of the column in A, in order from left->right.
+   * @param selectFn - the project clause of the select statement that is grouped
+   * NOTE: filterFn - the HAVING clause is used to filter groups after the GROUP BY operation has been applied. filters
+   * applied before the groupBy occur in the WHERE clause.
+   * @tparam R - the return type of the expression
+   * @tparam G - the type of the grouping statement
+   * @return
+   */
+  def groupBy[R: ResultTag, G <: AnyNamedTuple](
+    groupingFn: Ref[A, NonScalarExpr] => Expr[G, ?],
+    selectFn: Ref[A, ?] => Expr[R, ?]
+//  (using ev: Tuple.Union[GetFields[A]] <:< Tuple.Union[GetFields[G]])
+   ): Query.GroupBy[A, R, G] =
+    val refG = Ref[A, NonScalarExpr]()
+    val groupFun = Fun(refG, groupingFn(refG))
+
+    val refS = Ref[A, NonScalarExpr]()
+    val selectFun = Fun(refS, selectFn(refS))
+    Query.GroupBy(this, groupFun, selectFun, None)
+
   /**
    * Classic map with an inner expression to transform the row.
    * Requires f to call toRow on the final result before returning.
@@ -120,12 +147,6 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     Query.Filter(this, Fun(ref, p(ref)))
 
   def filter(p: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] = withFilter(p)
-
-// TODO: filter + agg should be technically 'having' but probably don't want to force users to write table.having(...)?
-//    def filter(p: Ref[R, ScalarExpr] => Expr[Boolean, ScalarExpr]): Aggregation[R] =
-//      val ref = Ref[R, ScalarExpr]()
-//       Aggregation.AggFilter(x, Fun(ref, p(ref)))
-
 
 object Query:
   import Expr.{Pred, Fun, Ref}
@@ -220,13 +241,21 @@ object Query:
   case class Except[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
   case class ExceptAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
 
-  // TODO: also support spark-style groupBy or only SQL groupBy that requires an aggregate operation?
-  // TODO: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
-  // all attributes in the SELECT clause that are NOT in the scope of an  aggregate function MUST appear in the GROUP BY clause.
-  //  case class GroupBy[A, B: ResultTag, C]($q: Query[A],
-//                           $selectFn: Fun[A, Expr[B]],
-//                           $groupingFn: Fun[A, Expr[C]],
-//                           $havingFn: Fun[B, Expr[Boolean]]) extends Query[B]
+  // NOTE: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
+  case class GroupBy[S, R: ResultTag, G]($source: Query[S, ?],
+                                         $groupingFn: Fun[S, Expr[G, ?], ?],
+                                         $selectFn: Fun[S, Expr[R, ?], ?],
+                                         $havingFn: Option[Fun[S, Expr[Boolean, ?], ?]]) extends Query[R, BagResult]:
+    /**
+     * Don't overload filter because having operates on the pre-grouped type.
+     */
+    def having(p: Ref[S, ?] => Expr[Boolean, ?]): Query[R, BagResult] =
+      if ($havingFn.isEmpty)
+        val ref = Ref[S, NonScalarExpr]()(using $source.tag)
+        val fun = Fun(ref, p(ref))
+        GroupBy($source, $groupingFn, $selectFn, Some(fun))
+      else
+        throw new Exception("Error: can only support a single having statement after groupBy")
 
   // Extensions. TODO: Any reason not to move these into Query methods?
   extension [R: ResultTag, C <: ResultCategory](x: Query[R, C])
@@ -292,16 +321,6 @@ object Query:
 
     def isEmpty(): Expr[Boolean, NonScalarExpr] =
       Expr.IsEmpty(x)
-//
-//    def groupBy[B, C: ResultTag](
-//     selectFn: Expr.Ref[R] => Expr[C],
-//     groupingFn: Expr.Ref[R] => Expr[B],
-//     havingFn: Expr.Ref[C] => Expr[Boolean] // TODO: make optional
-//   ): Query[C] =
-//      val ref1 = Expr.Ref[R]()
-//      val ref2 = Expr.Ref[R]()
-//      val ref3 = Expr.Ref[C]()
-//      GroupBy(x, Fun(ref1, selectFn(ref1)), Fun(ref2, groupingFn(ref2)), Fun(ref3, havingFn(ref3)))
 
   // def single(): R =
     //   Expr.Single(x)
