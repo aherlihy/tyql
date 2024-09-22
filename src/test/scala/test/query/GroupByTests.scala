@@ -7,6 +7,7 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 import tyql.Expr.{sum, avg}
+import tyql.AggregationExpr.toRow
 
 class GroupByTest extends SQLStringQueryTest[AllCommerceDBs, (total: Double)] {
   def testDescription = "GroupBy: simple"
@@ -73,6 +74,7 @@ class GroupBy2Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def testDescription = "GroupBy: simple with having"
 
   def query() =
+    import AggregationExpr.toRow
     testDB.tables.purchases
       .groupBy(
         p => (count = p.count).toRow,
@@ -164,6 +166,60 @@ class GroupBy7Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def expectedQueryPattern: String =
     """SELECT AVG(subquery$1.total) as avg FROM (SELECT * FROM purchase as purchase$0 ORDER BY id ASC) as subquery$1 GROUP BY subquery$1.count"""
 }
+
+class GroupBy8Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double, avgNum: Int)] {
+  def testDescription = "GroupBy: simple with having, mixed scalar result"
+
+  def query() =
+    testDB.tables.purchases
+      .groupBy(
+        p => (count = p.count).toRow,
+        p => {
+          val agg = (avg = avg(p.total), avgNum = p.count)
+          agg.toRow
+        }
+      )
+      .having(
+        p => avg(p.total) == 1
+      )
+
+  def expectedQueryPattern: String =
+    """SELECT AVG(purchase$0.total) as avg, purchase$0.count as avgNum FROM purchase as purchase$0 GROUP BY purchase$0.count HAVING AVG(purchase$0.total) = 1"""
+}
+
+class GroupBy9Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double, avgNum: Int)] {
+  def testDescription = "GroupBy: simple with having, mixed scalar result"
+
+  def query() =
+    testDB.tables.purchases
+      .groupByAggregate(
+        p => (count = avg(p.count)).toRow,
+        p => {
+          val agg = (avg = avg(p.total), avgNum = p.count)
+          agg.toRow
+        }
+      )
+      .having(
+        p => avg(p.total) == 1
+      )
+
+  def expectedQueryPattern: String =
+    """SELECT AVG(purchase$0.total) as avg, purchase$0.count as avgNum FROM purchase as purchase$0 GROUP BY AVG(purchase$0.count) HAVING AVG(purchase$0.total) = 1"""
+}
+
+// TODO: not yet implemented
+//class GroupBy*Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
+//  def testDescription = "GroupBy: groupBy not-named tuple"
+//
+//  def query() =
+//    testDB.tables.purchases.sort(_.id, Ord.ASC)
+//      .groupBy(
+//        p => p.count,
+//        p => (avg = avg(p.total)).toRow)
+//
+//  def expectedQueryPattern: String =
+//    """SELECT AVG(subquery$1.total) as avg FROM purchase as purchase$0 GROUP BY purchase$0.count"""
+//}
 
 // TODO: Not yet implemneted, either force subquery or merge project statements
 //class JoinGroupByTest extends SQLStringQueryTest[AllCommerceDBs, (avg: Int)] {

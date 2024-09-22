@@ -232,19 +232,24 @@ object QueryIRTree:
 
         MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), multiRecursive)
 
-      case groupBy: Query.GroupBy[?, ?, ?] =>
+      case groupBy: Query.GroupBy[?, ?, ?, ?] =>
         val fromIR = generateQuery(groupBy.$source, symbols)
 
-        val source = fromIR match
+        def getSource(f: RelationOp): RelationOp = f match
           case SelectQuery(project, from, where, overrideAlias, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(collapseMap(select, project), from, where, None, groupBy)
-          case SelectAllQuery(from, where, overrideAlias, ast)  =>
+          case SelectAllQuery(from, where, overrideAlias, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, from, where, None, groupBy)
+          case MultiRecursiveRelationOp(aliases, query, finalQ, ast) =>
+            val newSource = getSource(finalQ).appendFlags(finalQ.flags)
+            MultiRecursiveRelationOp(aliases, query, newSource, ast)
           case _ =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, Seq(fromIR), Seq(), None, groupBy) // force subquery
+
+        val source = getSource(fromIR)
 
         // Turn off the attribute names for the grouping clause since no aliases needed
         groupBy.$groupingFn.$body.tag match

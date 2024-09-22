@@ -20,6 +20,16 @@ class AggregateAggregationExprTest extends SQLStringAggregationTest[AllCommerceD
   def expectedQueryPattern: String = "SELECT SUM(product$A.price) FROM product as product$A"
 }
 
+class AggregateAggregationExpr2Test extends SQLStringAggregationTest[AllCommerceDBs, (s: Double, t: Double)] {
+  def testDescription: String = "Aggregation: aggregate + expr.sum + scalar, only for grouping"
+
+  def query() =
+    testDB.tables.products
+      .aggregate(p => (s = sum(p.price), t = p.price).toGroupingRow)
+
+  def expectedQueryPattern: String = "SELECT SUM(product$A.price) as s, product$A.price as t FROM product as product$A"
+}
+
 class AggregateProjectAggregationExprTest extends SQLStringAggregationTest[AllCommerceDBs, (s: Double)] {
   def testDescription: String = "Aggregation: aggregate + expr.sum with named tuple"
 

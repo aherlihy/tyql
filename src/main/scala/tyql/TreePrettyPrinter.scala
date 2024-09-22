@@ -115,7 +115,7 @@ object TreePrettyPrinter {
             val namedStr = namedTupleNames(idx).fold("")(n => s"$n=")
             s"${indent(depth+1)}$namedStr${e.prettyPrint(0)}"
           )
-        s"${indent(depth)}Project(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
+        s"${indent(depth)}AggProject(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
       case _ => throw new Exception(s"Unimplemented pretty print AGG $agg")
     }
   }

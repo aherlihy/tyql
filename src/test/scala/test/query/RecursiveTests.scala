@@ -922,7 +922,20 @@ given BOMDBs: TestDatabase[BOMDB] with
     basic = Table[Basic]("basic")
   )
 
-class RecursionBOMTest extends SQLStringAggregationTest[BOMDB, Int] {
+  override def init(): String =
+    """
+    CREATE TABLE assbl (
+    part VARCHAR(255) NOT NULL,
+    spart VARCHAR(255) NOT NULL
+    );
+
+    CREATE TABLE basic (
+        part VARCHAR(255) NOT NULL,
+        days INT NOT NULL
+    );
+    """
+
+class RecursionBOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int)] {
   def testDescription: String = "BOM 'days til delivery' stratified with final aggregation"
 
   def query() =
@@ -933,7 +946,7 @@ class RecursionBOMTest extends SQLStringAggregationTest[BOMDB, Int] {
           .filter(wf => assbl.spart == wf.part)
           .map(wf => (part = assbl.part, days = wf.days).toRow)
       ).distinct
-    ).aggregate(wf => max(wf.days)) // .groupBy(wf.part, wf => (part = wf.part, max = max(wf.days))
+    ).groupBy(wf => (part = wf.part).toRow, wf => (part = wf.part, max = max(wf.days)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -945,7 +958,7 @@ class RecursionBOMTest extends SQLStringAggregationTest[BOMDB, Int] {
                   assbl$180.part as part, ref$89.days as days
                 FROM assbl as assbl$180, recursive$178 as ref$89
                 WHERE assbl$180.spart = ref$89.part)))
-        SELECT MAX(recref$14.days) FROM recursive$178 as recref$14
+        SELECT recref$14.part as part, MAX(recref$14.days) as max FROM recursive$178 as recref$14 GROUP BY recref$14.part
       """
 }
 

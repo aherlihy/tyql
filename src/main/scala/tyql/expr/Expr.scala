@@ -1,7 +1,5 @@
 package tyql
 
-import tyql.Expr.ListExpr
-
 import scala.annotation.targetName
 import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
@@ -134,6 +132,7 @@ object Expr:
 
   type StripExpr[E] = E match
     case Expr[b, s] => b
+    case AggregationExpr[b] => b
 
   // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
