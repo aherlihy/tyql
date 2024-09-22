@@ -45,6 +45,7 @@ object TreePrettyPrinter {
       case Ne(x, y) => s"${indent(depth)}Ne(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Gt(x, y) => s"${indent(depth)}Gt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Lt(x, y) => s"${indent(depth)}Lt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Lte(x, y) => s"${indent(depth)}Lte(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case ListExpr(elements) =>
         s"${indent(depth)}ListExpr(\n${elements.map(_.prettyPrint(depth + 1)).mkString("\n")}\n${indent(depth)}"
       case ListPrepend(x, list) =>
@@ -64,6 +65,7 @@ object TreePrettyPrinter {
       case Or(x, y) => s"${indent(depth)}Or(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Not(x) => s"${indent(depth)}Not(${x.prettyPrint(depth + 1)})"
       case Plus(x, y) => s"${indent(depth)}Plus(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Times(x, y) => s"${indent(depth)}Times(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Upper(x) => s"${indent(depth)}Upper(${x.prettyPrint(depth + 1)})"
       case Lower(x) => s"${indent(depth)}Lower(${x.prettyPrint(depth + 1)})"
       case Concat(x, y) =>

@@ -232,7 +232,7 @@ object QueryIRTree:
 
         MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), multiRecursive)
 
-      case groupBy: Query.GroupBy[?, ?, ?, ?] =>
+      case groupBy: Query.GroupBy[?, ?, ?, ?, ?] =>
         val fromIR = generateQuery(groupBy.$source, symbols)
 
         def getSource(f: RelationOp): RelationOp = f match
@@ -317,10 +317,12 @@ object QueryIRTree:
       case p: Expr.Project[?] => generateProjection(p, symbols)
       case g: Expr.Gt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
       case g: Expr.Lt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
+      case g: Expr.Lte[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", g)
       case g: Expr.GtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
       case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", a)
       case n: Expr.Not[?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", n)
       case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", a)
+      case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", a)
       case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", a)
       case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", a)
       case a: Expr.Concat[?, ?, ?, ?] =>
@@ -339,6 +341,7 @@ object QueryIRTree:
           (l, r) => s"$l, $r",
           a
         )
+      case l: Expr.DoubleLit => Literal(s"${l.$value}", l)
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
       case l: Expr.BooleanLit => Literal(s"\"${l.$value}\"", l)
@@ -360,6 +363,6 @@ object QueryIRTree:
       case s: AggregationExpr.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
       case s: AggregationExpr.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
       case s: AggregationExpr.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
-      case c: AggregationExpr.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT(1)", c)
+      case c: AggregationExpr.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT($o)", c)
       case p: AggregationExpr.AggProject[?] => generateProjection(p, symbols)
       case _ => throw new Exception(s"Unimplemented aggregation op: $ast")

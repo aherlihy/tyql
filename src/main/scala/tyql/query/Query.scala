@@ -86,19 +86,25 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 //    case NamedTuple[n, v] => n
   /**
    * TODO: Right now this most closely resembles SQL groupBy, not Spark RDD's or pairs. Do we want to pick one?
-   * @param groupingFn - must be a named tuple with the original name of the column in A, in order from left->right.
+   *
+   * groupBy where the grouping clause is NOT an aggregation. Hopefully we can merge or overload groupBy and groupByAggregate
+   * but for now keep separate.
+   * Can add a 'having' statement incrementally by calling .having on the result.
+   * The selectFn MUST return an aggregation.
+   *
+   * @param groupingFn - must be a named tuple, in order from left->right. Must return an non-scalar expression.
    * @param selectFn - the project clause of the select statement that is grouped
    * NOTE: filterFn - the HAVING clause is used to filter groups after the GROUP BY operation has been applied. filters
    * applied before the groupBy occur in the WHERE clause.
    * @tparam R - the return type of the expression
-   * @tparam G - the type of the grouping statement
+   * @tparam GroupResult - the type of the grouping statement
    * @return
    */
   def groupBy[R: ResultTag, GroupResult](
     groupingFn: Ref[A, NonScalarExpr] => Expr[GroupResult, NonScalarExpr],
     selectFn: Ref[A, ScalarExpr] => Expr[R, ScalarExpr]
 //  (using ev: Tuple.Union[GetFields[A]] <:< Tuple.Union[GetFields[G]])
-   ): Query.GroupBy[A, R, GroupResult, NonScalarExpr] =
+   ): Query.GroupBy[A, R, GroupResult, NonScalarExpr, ScalarExpr] =
     val refG = Ref[A, NonScalarExpr]()
     val groupFun = Fun(refG, groupingFn(refG))
 
@@ -106,16 +112,56 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val selectFun = Fun(refS, selectFn(refS))
     Query.GroupBy(this, groupFun, selectFun, None)
 
+  /**
+   * groupBy where the grouping clause IS an aggregation. Hopefully we can merge or overload groupBy and groupByAggregate
+   * but for now keep separate.
+   * Can add a 'having' statement incrementally by calling .having on the result.
+   * The selectFn MUST return an aggregation.
+   *
+   * @param groupingFn - must be a named tuple, in order from left->right. Must return an aggregation.
+   * @param selectFn - the project clause of the select statement that is grouped.
+   * NOTE: filterFn - the HAVING clause is used to filter groups after the GROUP BY operation has been applied. filters
+   * applied before the groupBy occur in the WHERE clause.
+   * @tparam R - the return type of the expression
+   * @tparam GroupResult - the type of the grouping statement
+   * @return
+   */
   def groupByAggregate[R: ResultTag, GroupResult](
     groupingFn: Ref[A, ScalarExpr] => Expr[GroupResult, ScalarExpr],
     selectFn: Ref[A, ScalarExpr] => Expr[R, ScalarExpr]
-  ): Query.GroupBy[A, R, GroupResult, ScalarExpr] =
+  ): Query.GroupBy[A, R, GroupResult, ScalarExpr, ScalarExpr] =
     val refG = Ref[A, ScalarExpr]()
     val groupFun = Fun(refG, groupingFn(refG))
 
     val refS = Ref[A, ScalarExpr]()
     val selectFun = Fun(refS, selectFn(refS))
     Query.GroupBy(this, groupFun, selectFun, None)
+
+  /**
+   * filter based on a groupBy result. Separate for now, hopefully can merge with groupBy/groupByAggregate.
+   * The selectFn MUST NOT return an aggregation.
+   * The groupingFn MUST NOT return an aggregation
+   *
+   * @param groupingFn - must be a named tuple, in order from left->right. Must return a scalar expression.
+   * @param selectFn - the project clause of the select statement that is grouped. Must return a scalar expression.
+   * @param havingFn - the filter clause. Must return an aggregation.
+   * @tparam R - the return type of the expression
+   * @tparam GroupResult - the type of the grouping statement
+   * @return
+   */
+  def filterByGroupBy[R: ResultTag, GroupResult](
+                                          groupingFn: Ref[A, NonScalarExpr] => Expr[GroupResult, NonScalarExpr],
+                                          selectFn: Ref[A, NonScalarExpr] => Expr[R, NonScalarExpr],
+                                          havingFn: Ref[A, ?] => Expr[Boolean, ?]
+                                        ): Query.GroupBy[A, R, GroupResult, NonScalarExpr, NonScalarExpr] =
+    val refG = Ref[A, NonScalarExpr]()
+    val groupFun = Fun(refG, groupingFn(refG))
+
+    val refS = Ref[A, NonScalarExpr]()
+    val selectFun = Fun(refS, selectFn(refS))
+
+    // Workaround for: "ScalarExpr is not subtype of ?"
+    Query.GroupBy(this, groupFun, selectFun, None).having(havingFn).asInstanceOf[Query.GroupBy[A, R, GroupResult, NonScalarExpr, NonScalarExpr]]
 
 //  def groupByAny[R: ResultTag, GroupResult, GroupShape <: ExprShape](
 //    groupingFn: Ref[A, GroupShape] => Expr[GroupResult, GroupShape],
@@ -265,10 +311,15 @@ object Query:
   case class ExceptAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
 
   // NOTE: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
-  case class GroupBy[SourceType, ResultType: ResultTag, GroupingType, S <: ExprShape](
-    $source: Query[SourceType, ?],
-    $groupingFn: Fun[SourceType, Expr[GroupingType, S], S],
-    $selectFn: Fun[SourceType, Expr[ResultType, ScalarExpr], ScalarExpr],
+  case class GroupBy[
+    SourceType,
+    ResultType: ResultTag,
+    GroupingType,
+    GroupingShape <: ExprShape,
+    SelectShape <: ExprShape
+  ]($source: Query[SourceType, ?],
+    $groupingFn: Fun[SourceType, Expr[GroupingType, GroupingShape], GroupingShape],
+    $selectFn: Fun[SourceType, Expr[ResultType, SelectShape], SelectShape],
     $havingFn: Option[Fun[SourceType, Expr[Boolean, ?], ?]]) extends Query[ResultType, BagResult]:
     /**
      * Don't overload filter because having operates on the pre-grouped type.
@@ -316,7 +367,7 @@ object Query:
 
     def size: Aggregation[Int] =
       val ref = Ref[R, ScalarExpr]()
-      Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Count(ref)))
+      Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Count(Expr.IntLit(1))))
 
     def union(that: Query[R, ?]): Query[R, SetResult] =
       Union(x, that)

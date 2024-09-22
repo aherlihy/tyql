@@ -2,7 +2,7 @@ package test.query.recursive
 import test.{SQLStringAggregationTest, SQLStringQueryTest, TestDatabase}
 import tyql.*
 import Query.{fix, unrestrictedFix}
-import Expr.{max, min, IntLit, sum}
+import Expr.{max, min, IntLit, sum, count}
 
 import language.experimental.namedTuples
 import NamedTuple.*
@@ -18,6 +18,22 @@ given TCDBs: TestDatabase[TCDB] with
     otherEdges = Table[Edge2]("otherEdges"),
     emptyEdges = Table[Edge]("empty")
   )
+
+  override def init(): String =
+    """
+      CREATE TABLE edges (
+        x INT,
+        y INT
+      );
+      CREATE TABLE emptyEdges (
+        x INT,
+        y INT
+      );
+     CREATE TABLE otherEdges (
+        z INT,
+        q INT
+      );
+    """
 
 class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "TC"
@@ -200,54 +216,6 @@ class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
             """
 }
 
-// TODO: should this error?
-//class NotRecursiveCTETest extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "No recursion"
-//
-//  def query() =
-//    val path = testDB.tables.edges
-//    path.fix(path =>
-//      testDB.tables.edges
-//    )
-//  def expectedQueryPattern: String =
-//    """
-//    WITH RECURSIVE recursive$A AS
-//      (SELECT * FROM edges as edges$B
-//        UNION
-//      SELECT * FROM edges as edges$E)
-//    SELECT * FROM recursive$A as recref$Z
-//      """
-//}
-
-//class RecursiveSCCTest extends SQLStringQueryTest[TCDB, Edge2] {
-//  def testDescription: String = "Multi-relation recursion"
-//
-//  def query() =
-//    val path1 = testDB.tables.edges
-//    val path2 = testDB.tables.otherEdges
-//
-//    // Option 1: untupled
-//    val (fullPath1, fullPath2) = fixUntupled((p: Query[Edge], q: Query[Edge2]) =>
-//      (p, q)
-//    )(path1, path2)
-//
-//    // Option 2: tupled
-//    val (fullPath1a, fullPath2a) = fix((t: (Query[Edge], Query[Edge2])) =>
-//      (t._1, t._2)
-//    )((path1, path2))
-//
-//    // Option 3: static tuple length
-//    val (fullPath1b, fullPath2b) = fixTwo(path1, path2)((p, q) =>
-//      (p, q)
-//    )
-//
-//    fullPath2
-//  def expectedQueryPattern: String =
-//    """
-//    """
-//}
-
-
 type Location = (p1: Int, p2: Int)
 type CSPADB = (assign: Location, dereference: Location, empty: Location)
 
@@ -257,6 +225,22 @@ given CSPADBs: TestDatabase[CSPADB] with
     dereference = Table[Location]("dereference"),
     empty = Table[Location]("empty") // TODO: define singleton for empty table?
   )
+
+  override def init(): String =
+  """
+  CREATE TABLE assign (
+      p1 INT,
+      p2 INT
+    );
+    CREATE TABLE dereference (
+      p1 INT,
+      p2 INT
+    );
+    CREATE TABLE empty (
+      p1 INT,
+      p2 INT
+    );
+  """
 
 class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "define 2 recursive relations, use multifix"
@@ -593,17 +577,6 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
 
 class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location] {
   def testDescription: String = "CSPA, but with comprehensions to see if nicer"
-  def dbSetup: String = """
-    CREATE TABLE assign (
-      p1 INT,
-      p2 INT
-    );
-    CREATE TABLE dereference (
-      p1 INT,
-      p2 INT
-    );
-  """
-
   def query() =
     val assign = testDB.tables.assign
     val dereference = testDB.tables.dereference
@@ -720,10 +693,8 @@ given FibNumDBs: TestDatabase[FibNumDB] with
     base = Table[FibNum]("base"),
     result = Table[FibNum]("result")
   )
-class RecursionFibTest extends SQLStringQueryTest[FibNumDB, (FibonacciNumberIndex: Int, FibonacciNumber: Int)] {
-  def testDescription: String = "Fibonacci example from duckdb docs"
 
-  def dbSetup: String = """
+  override def init(): String = """
     CREATE TABLE base (
       recursionDepth INT,
       fibonacciNumber INT,
@@ -731,6 +702,9 @@ class RecursionFibTest extends SQLStringQueryTest[FibNumDB, (FibonacciNumberInde
     );
     INSERT INTO base (recursionDepth, fibonacciNumber, nextNumber) VALUES (0, 0, 1);
   """
+class RecursionFibTest extends SQLStringQueryTest[FibNumDB, (FibonacciNumberIndex: Int, FibonacciNumber: Int)] {
+  def testDescription: String = "Fibonacci example from duckdb docs"
+
   def query() =
     val fib = testDB.tables.base
     fib.fix(fib =>
@@ -763,10 +737,7 @@ given TagDBs: TestDatabase[TagDB] with
     hierarchy = Table[TagHierarchy]("hierarchy")
   )
 
-class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
-  def testDescription: String = "Tag tree example from duckdb docs"
-  def dbSetup: String =
-    """
+  override def init(): String = """
     CREATE TABLE tag (id INTEGER, name VARCHAR, subclassof INTEGER);
     INSERT INTO tag VALUES
       (1, 'U2',     5),
@@ -779,6 +750,9 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
       (8, 'Movies', 9),
       (9, 'Art', -1);
     """
+
+class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
+  def testDescription: String = "Tag tree example from duckdb docs"
 
   def query() =
     // For now encode NULL as -1, TODO: implement nulls
@@ -823,16 +797,16 @@ given ReachabilityDBs: TestDatabase[ReachabilityDB] with
   override def tables = (
     edge = Table[Edge]("edge")
   )
-class RecursionReachabilityTest extends SQLStringQueryTest[ReachabilityDB, Path] {
-  def testDescription: String = "Enumerate all paths from a node example from duckdb docs"
-  def dbSetup: String =
-    """
+
+  override def init(): String = """
     CREATE TABLE edge (x INTEGER, y INTEGER);
     INSERT INTO edge
       VALUES
         (1, 3), (1, 5), (2, 4), (2, 5), (2, 10), (3, 1), (3, 5), (3, 8), (3, 10),
         (5, 3), (5, 4), (5, 8), (6, 3), (6, 4), (7, 4), (8, 1), (9, 4);
     """
+class RecursionReachabilityTest extends SQLStringQueryTest[ReachabilityDB, Path] {
+  def testDescription: String = "Enumerate all paths from a node example from duckdb docs"
 
   def query() =
     val pathBase = testDB.tables.edge
@@ -865,14 +839,6 @@ class RecursionReachabilityTest extends SQLStringQueryTest[ReachabilityDB, Path]
 }
 class RecursionShortestPathTest extends SQLStringQueryTest[ReachabilityDB, Path] {
   def testDescription: String = "Shortest path example from duckdb docs"
-  def dbSetup: String =
-    """
-    CREATE TABLE edge (x INTEGER, y INTEGER);
-    INSERT INTO edge
-      VALUES
-        (1, 3), (1, 5), (2, 4), (2, 5), (2, 10), (3, 1), (3, 5), (3, 8), (3, 10),
-        (5, 3), (5, 4), (5, 8), (6, 3), (6, 4), (7, 4), (8, 1), (9, 4);
-    """
 
   def query() =
     val pathBase = testDB.tables.edge
@@ -972,7 +938,20 @@ given SSSPDBs: TestDatabase[SSSPDB] with
     base = Table[SSSPBase]("base") // e.g. (0, 1)
   )
 
-class RecursionSSSPTest extends SQLStringAggregationTest[SSSPDB, Double] {
+  override def init(): String =
+    """
+     CREATE TABLE edge (
+        src INT,
+        dst INT,
+        cost DOUBLE
+      );
+      CREATE TABLE base (
+        dst INT,
+        cost DOUBLE
+      );
+      """
+
+class RecursionSSSPTest extends SQLStringQueryTest[SSSPDB, SSSPBase] {
   def testDescription: String = "Single source shortest path"
 
   def query() =
@@ -983,7 +962,7 @@ class RecursionSSSPTest extends SQLStringAggregationTest[SSSPDB, Double] {
           .filter(s => s.dst == edge.src)
           .map(s => (dst = edge.dst, cost = s.cost + edge.cost).toRow)
       ).distinct
-    ).aggregate(s => min(s.cost)) // .aggregate(s => (dst = s.dst, cost = min(s.cost)))
+    ).groupBy(s => (dst = s.dst).toRow, s => (dst = s.dst, cost = min(s.cost)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -995,7 +974,7 @@ class RecursionSSSPTest extends SQLStringAggregationTest[SSSPDB, Double] {
                   edge$64.dst as dst, ref$29.cost + edge$64.cost as cost
                 FROM edge as edge$64, recursive$62 as ref$29
                 WHERE ref$29.dst = edge$64.src)))
-        SELECT MIN(recref$5.cost) FROM recursive$62 as recref$5
+        SELECT recref$5.dst as dst, MIN(recref$5.cost) as cost FROM recursive$62 as recref$5 GROUP BY recref$5.dst
       """
 }
 
@@ -1028,7 +1007,7 @@ class RecursionCCTest extends SQLStringAggregationTest[TCDB, Int] {
       """
 }
 
-class RecursionCPTest extends SQLStringAggregationTest[TCDB, Int] {
+class RecursionCPTest extends SQLStringQueryTest[TCDB, (dst: Int, sum: Int)] {
   def testDescription: String = "Count paths"
 
   def query() =
@@ -1039,7 +1018,7 @@ class RecursionCPTest extends SQLStringAggregationTest[TCDB, Int] {
           .filter(cpaths => cpaths.y == edge.x)
           .map(cpaths => (y = edge.y, cnt = cpaths.cnt).toRow)
       ).distinct
-    ).aggregate(s => sum(s.cnt)) // .aggregate(s.y, sum(s.cnt))
+    ).groupBy(s => (dst = s.y).toRow, s => (dst = s.y, sum = sum(s.cnt)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -1051,7 +1030,7 @@ class RecursionCPTest extends SQLStringAggregationTest[TCDB, Int] {
                   edges$139.y as y, ref$65.cnt as cnt
                  FROM edges as edges$139, recursive$137 as ref$65
                  WHERE ref$65.y = edges$139.x)))
-         SELECT SUM(recref$11.cnt) FROM recursive$137 as recref$11
+         SELECT recref$11.y as dst, SUM(recref$11.cnt) as sum FROM recursive$137 as recref$11 GROUP BY recref$11.y
       """
 }
 
@@ -1061,8 +1040,15 @@ type ManagementDB = (reports: Report)
 given ManagementDBs: TestDatabase[ManagementDB] with
   override def tables = (
     reports = Table[Report]("reports")
-    )
-class RecursionManagementTest extends SQLStringAggregationTest[ManagementDB, Int] {
+  )
+
+  override def init(): String = """
+    CREATE TABLE report (
+      empl INT,
+      mgr INT
+    );
+  """
+class RecursionManagementTest extends SQLStringQueryTest[ManagementDB, (mgr: Int, cnt: Int)] {
   def testDescription: String = "Management query to calculate total number of employees managed"
 
   def query() =
@@ -1073,7 +1059,7 @@ class RecursionManagementTest extends SQLStringAggregationTest[ManagementDB, Int
           .filter(ec => ec.mgr == report.mgr)
           .map(ec => (mgr = report.mgr, cnt = ec.cnt).toRow)
       ).distinct
-    ).size // .aggregate(ec => (mgr = ec.mgr, cnt = count(ec.cnt))
+    ).groupBy(ec => (mgr = ec.mgr).toRow, ec => (mgr = ec.mgr, cnt = count(ec.cnt)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -1084,48 +1070,197 @@ class RecursionManagementTest extends SQLStringAggregationTest[ManagementDB, Int
              ((SELECT reports$159.mgr as mgr, ref$77.cnt as cnt
                FROM reports as reports$159, recursive$157 as ref$77
                WHERE ref$77.mgr = reports$159.mgr)))
-        SELECT COUNT(1) FROM recursive$157 as recref$13
+        SELECT recref$13.mgr as mgr, COUNT(recref$13.cnt) as cnt FROM recursive$157 as recref$13 GROUP BY recref$13.mgr
       """
 }
 
-//type Organizer = (orgName: String)
-//type Friend = (personName: String, friendName: String)
-//type PartyDB = (organizer: Organizer, friends: Friend)
-//
-//given PartyDBs: TestDatabase[PartyDB] with
-//  override def tables = (
-//    organizer = Table[Organizer]("organizer"),
-//    friends = Table[Friend]("friends")
-//  )
-//class RecursionPartyTest extends SQLStringAggregationTest[PartyDB, String] {
-//  def testDescription: String = "Mututally recursive wh will attend a party query"
+type Sales = (m: Int, p: Double)
+type Sponsor = (m1: Int, m2: Int)
+type MLMDatabase = (sales: Sales, sponsors: Sponsor)
+
+given MLMDatabases: TestDatabase[MLMDatabase] with
+  override def tables = (
+    sales = Table[Sales]("sales"),
+    sponsors = Table[Sponsor]("sponsors")
+  )
+
+  override def init(): String =
+    """
+      CREATE TABLE sales (
+        m INT,
+        p DOUBLE
+      );
+
+      CREATE TABLE sponsor (
+        m1 INT,
+        m2 INT
+      );
+    """
+
+class RecursionMLMBonusTest extends SQLStringQueryTest[MLMDatabase, (m: Int, b: Double)] {
+  def testDescription: String = "MLM Bonus query to calculate the bonus distributed to each member"
+
+  def query() =
+    val base = testDB.tables.sales.map(s => (m = s.m, b = s.p * 0.1).toRow)
+    base.fix(bonus =>
+      testDB.tables.sponsors.flatMap(sponsor =>
+        bonus
+          .filter(b => b.m == sponsor.m2)
+          .map(b => (m = sponsor.m1, b = b.b * 0.5).toRow)
+      ).distinct
+    ).groupBy(r => (m = r.m).toRow, r => (m = r.m, b = sum(r.b)).toRow)
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE
+          recursive$240 AS
+            ((SELECT sales$240.m as m, sales$240.p * 0.1 as b FROM sales as sales$240)
+              UNION
+            ((SELECT sponsors$242.m1 as m, ref$121.b * 0.5 as b
+             FROM sponsors as sponsors$242, recursive$240 as ref$121
+             WHERE ref$121.m = sponsors$242.m2)))
+       SELECT recref$20.m as m, SUM(recref$20.b) as b FROM recursive$240 as recref$20 GROUP BY recref$20.m
+      """
+}
+
+type Interval = (s: Int, e: Int)
+type IntervalDB = (intervals: Interval)
+
+given IntervalDBs: TestDatabase[IntervalDB] with
+  override def tables = (
+    intervals = Table[Interval]("inter")
+    )
+
+  override def init(): String =
+    """
+      CREATE TABLE intervals (
+        s INT,
+        e INT
+      );
+    """
+
+/** TODO: figure out how to do groupBy on join result.
+ * Right now have unimplemented "mergeMap" method but probably better to extract all source relations from source
+ * query and then supply them as arguments to the function arguments of groupBy, so the project/groupBy/having functions
+ * can access the original, non-aggregated relations.
+ */
+//class RecursionIntervalCoalesceTest extends SQLStringQueryTest[IntervalDB, (s: Int, e: Int)] {
+//  def testDescription: String = "Interval Coalesce query to find the smallest set of intervals that cover input intervals"
 //
 //  def query() =
-//    val baseAttend = testDB.tables.organizer.map(o => (person = o.orgName).toRow)
-//    val baseFriends = testDB.tables.friends.map(f => (name = f.personName, nCount = IntLit(0)).toRow)
+//    // Step 1: Create the non-recursive view `lstart`
+//    val lstart = testDB.tables.intervals
+//      .flatMap(a =>
+//        testDB.tables.intervals
+//          .filter(b => a.s <= b.e)
+//          .map(b => (as = a.s, bs = b.s).toRow))
+//      .filterByGroupBy(
+//        row => (t = row.as).toRow,
+//        row => (t = row.as).toRow,
+//        rows => rows.as == min(rows.bs)
+//      )
 //
-//    fix(baseAttend, baseFriends)((attend, cntfriends) =>
-//      val attendRecur = cntfriends.filter(cf => cf.nCount > 3)
-//      val countRecur = cntfriends.flatMap(friend =>
-//        attend
-//          .filter(att => att.person == friend.name)
-//          .map(att => friend)
-//        )
-//      (attendRecur.distinct, countRecur.distinct)
-//    )._1.size
+//    // Step 2: Define the recursive `coal` relation
+//    val base = lstart.flatMap(ls =>
+//      testDB.tables.intervals
+//        .filter(int => ls.t == int.s)
+//        .map(int => (s = ls.t, e = int.e))
+//    )
+//
+//    base.fix(coal =>
+//      testDB.tables.intervals.flatMap(inter =>
+//        coal
+//          .filter(c => c.s <= inter.s && inter.s <= c.e)
+//          .map(c => (s = c.s, e = inter.e).toRow)
+//      ).distinct
+//    ).groupBy(c => (s = c.s).toRow, c => (s = c.s, e = max(c.e)).toRow)
 //
 //  def expectedQueryPattern: String =
 //    """
-//        WITH RECURSIVE
-//          recursive$157 AS
-//            ((SELECT reports$157.mgr as mgr, 1 as cnt FROM reports as reports$157)
-//              UNION
-//             ((SELECT reports$159.mgr as mgr, ref$77.cnt as cnt
-//               FROM reports as reports$159, recursive$157 as ref$77
-//               WHERE ref$77.mgr = reports$159.mgr)))
-//        SELECT COUNT(1) FROM recursive$157 as recref$13
-//      """
+//      CREATE VIEW lstart AS
+//        (SELECT a.s AS t
+//         FROM inter a, inter b
+//         WHERE a.s <= b.e
+//         GROUP BY a.s
+//         HAVING a.s = MIN(b.s));
+//
+//      WITH RECURSIVE
+//        coal (s, e) AS
+//          ((SELECT lstart.t AS s, inter.e AS e
+//            FROM lstart, inter
+//            WHERE lstart.t = inter.s)
+//            UNION
+//           (SELECT coal.s, inter.e
+//            FROM coal, inter
+//            WHERE coal.s <= inter.s AND inter.s <= coal.e))
+//      SELECT coalref.s AS s, MAX(coalref.e) AS e
+//      FROM coal as coalref
+//      GROUP BY coalref.s
+//    """
 //}
+
+type Organizer = (orgName: String)
+type Friend = (pName: String, fName: String)
+type PartyDB = (organizers: Organizer, friends: Friend)
+
+given PartyDBs: TestDatabase[PartyDB] with
+  override def tables = (
+    organizers = Table[Organizer]("organizer"),
+    friends = Table[Friend]("friends")
+  )
+
+  override def init(): String =
+    """
+    CREATE TABLE organizer (
+      orgName VARCHAR(255)
+    );
+
+    CREATE TABLE friend (
+      pName VARCHAR(255),
+      fName VARCHAR(255)
+    );
+  """
+//class RecursionPartyAttendanceTest extends SQLStringQueryTest[PartyDB, (person: String)] {
+//  def testDescription: String = "Mutually recursive query to find people who will attend the party"
+//
+//  def query() =
+//    val baseAttend = testDB.tables.organizers.map(o => (person = o.orgName).toRow)
+//    val baseCntFriends = testDB.tables.friends.map(f => (fName = f.fName, nCount = IntLit(0)).toRow)
+//    val (finalAttend, finalCntFriends) = fix(baseAttend, baseCntFriends)((attend, cntfriends) =>
+//      val recurAttend = cntfriends
+//        .filter(cf => cf.nCount > 3)
+//        .map(cf => (person = cf.fName))
+//
+//      val recurCntFriends = testDB.tables.friends
+//        .flatMap(friends =>
+//          attend
+//            .filter(att => att.person == friends.pName)
+//            .map(att => friends)
+//        ).groupBy(f => (fName = f.fName).toRow, f => (name = f.fName, nCount = count(f.pName)))
+//
+//      (recurAttend, recurCntFriends)
+//    )
+//
+//    finalAttend
+//
+//  def expectedQueryPattern: String =
+//    """
+//      WITH RECURSIVE
+//        attend (person) AS
+//          ((SELECT orgName FROM organizer)
+//            UNION
+//           (SELECT cntfriends.name
+//            FROM cntfriends
+//            WHERE cntfriends.ncount >= 3)),
+//        cntfriends (name, ncount) AS
+//          (SELECT friend.fName, COUNT(friend.pName) AS ncount
+//           FROM attend, friend
+//           WHERE attend.person = friend.pName
+//           GROUP BY friend.fName)
+//      SELECT person FROM attend
+//    """
+//}
+
 
 type Shares = (by: String, of: String, percent: Int)
 type CShares = (byCom: String, ofCom: String, tot: Int)
@@ -1137,6 +1272,8 @@ given CompanyControlDBs: TestDatabase[CompanyControlDB] with
     emptyShares = Table[Shares]("emptyShares"),
     control = Table[(com1: String, com2: String)]("emptyControl")
   )
+
+
 class RecursionCompanyControlTest extends SQLStringAggregationTest[CompanyControlDB, Int] {
   def testDescription: String = "Company control"
 
