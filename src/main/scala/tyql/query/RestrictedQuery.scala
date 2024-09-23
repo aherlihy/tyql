@@ -6,7 +6,7 @@ import tyql.{DatabaseAST, Expr, NonScalarExpr, Query, ResultTag}
 import scala.NamedTuple.AnyNamedTuple
 import scala.annotation.{implicitNotFound, targetName}
 
-case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int]() extends RestrictedQuery[A, C, Tuple1[ID]] (Query.QueryRef[A, C]()):
+case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int](w: Option[Query.QueryRef[A, C]] = None) extends RestrictedQuery[A, C, Tuple1[ID]] (w.getOrElse(Query.QueryRef[A, C]())):
   type Self = this.type
   def toQueryRef: Query.QueryRef[A, C] = wrapped.asInstanceOf[Query.QueryRef[A, C]]
 
@@ -88,6 +88,9 @@ object RestrictedQuery {
   // only include the monotone restriction, ignore category or linearity
   type ToMonotoneQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, ?, ?]]
   type ToMonotoneQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?]]
+  // ignore category, linearity, and monotone
+  type ToUnrestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, ?]]
+  type ToUnrestrictedQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query.QueryRef[T, ?]]
 
   type InverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
     case RestrictedQuery[a, c, d] *: t => HasDuplicate[d] *: InverseMapDeps[t]

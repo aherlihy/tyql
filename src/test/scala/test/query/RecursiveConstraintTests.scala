@@ -773,6 +773,187 @@ class RecursiveConstraintInvalid5FailTest extends munit.FunSuite {
   }
 }
 
+class RecursiveConstraintGroupbyInlineFailTest extends munit.FunSuite {
+  def testDescription: String = "Try to call groupBy on join between recur + non-recur"
+
+  def expectedError: String = "value groupBy is not a member of tyql.RestrictedQuery["
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+     // BOILERPLATE
+     import language.experimental.namedTuples
+     import tyql.{Table, Expr}
+     import tyql.Expr.min
+
+     type Edge = (x: Int, y: Int)
+
+     val tables = (
+       edges = Table[Edge]("edges"),
+       edges2 = Table[Edge]("otherEdges"),
+       emptyEdges = Table[Edge]("empty")
+     )
+
+    // TEST
+    val edges = tables.edges.groupBy(e => (x = e.x).toRow, e => (x = e.x, y = min(e.y)).toRow)
+
+    edges.fix(minReach =>
+      minReach.flatMap(mr =>
+        edges
+          .filter(e => mr.y == e.x)
+          .map(e => (x = mr.x, y = e.y).toRow)
+      ).groupBy(
+        row => (x = row.x).toRow,
+        row => (x = row.x, min_y = min(row.y)).toRow
+      )
+    )
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursiveConstraintGroupbyMultifixFailTest extends munit.FunSuite {
+  def testDescription: String = "Try to call groupBy on join between recur + non-recur, multifix"
+
+  def expectedError: String = "value groupBy is not a member of tyql.RestrictedQuery["
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+     // BOILERPLATE
+     import language.experimental.namedTuples
+     import tyql.{Table, Expr}
+     import tyql.Expr.min
+
+     type Edge = (x: Int, y: Int)
+
+     val tables = (
+       edges = Table[Edge]("edges"),
+       edges2 = Table[Edge]("otherEdges"),
+       emptyEdges = Table[Edge]("empty")
+     )
+
+    // TEST
+    val parentChild = tables.edges
+
+    val ancestorBase = parentChild
+    val descendantBase = parentChild
+
+    val (ancestorResult, descendantResult) = fix(ancestorBase, descendantBase) { (ancestor, descendant) =>
+      val newAncestor = ancestor.flatMap(a =>
+        parentChild
+          .filter(p => a.y == p.x)
+          .map(p => (x = a.x, y = p.y).toRow)
+      ).groupBy(x => (x = x.x).toRow, x => (x = x.x, y = min(x.y)))
+
+      val newDescendant = descendant.flatMap(d =>
+        parentChild
+          .filter(p => d.x == p.y)
+          .map(p => (x = d.y, y = p.x).toRow)
+      )
+      (newAncestor.distinct, newDescendant.distinct)
+    }
+
+    ancestorResult
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursiveConstraintNonlinearFailTest extends munit.FunSuite {
+  def testDescription: String = "Use all args in one relation, none in the other, but with groupBy in one"
+
+  def expectedError: String = "Recursive definitions must be linear:"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+     // BOILERPLATE
+     import language.experimental.namedTuples
+     import tyql.{Table, Expr}
+     import tyql.Expr.min
+
+     type Edge = (x: Int, y: Int)
+
+     val tables = (
+       edges = Table[Edge]("edges"),
+       edges2 = Table[Edge]("otherEdges"),
+       emptyEdges = Table[Edge]("empty")
+     )
+
+    // TEST
+    val parentChild = tables.edges
+
+    val ancestorBase = parentChild
+    val descendantBase = parentChild
+
+    val (ancestorResult, descendantResult) = fix(ancestorBase, descendantBase) { (ancestor, descendant) =>
+      val newAncestor = parentChild.groupBy(
+        row => (x = row.x).toRow,
+        row => (x = row.x, mutual_friend_count = count(row.y)).toRow
+      )
+      val newDescendant = descendant.flatMap(d =>
+       ancestor
+          .filter(p => d.x == p.y)
+          .map(p => (x = d.y, y = p.x).toRow)
+      )
+      (newAncestor.distinct, newDescendant.distinct)
+    }
+
+    ancestorResult
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+class RecursiveConstraintAggregationMutualRecursionFailTest extends munit.FunSuite {
+  def testDescription: String = "Aggregation in mutual recursion"
+
+  def expectedError: String = "Recursive definitions must be linear:"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+     // BOILERPLATE
+     import language.experimental.namedTuples
+     import tyql.{Table, Expr}
+     import tyql.Expr.sum
+
+    type Shares = (by: String, of: String, percent: Int)
+    type Control = (com1: String, com2: String)
+    type CompanyControlDB = (shares: Shares, control: Control)
+
+    val tables = (
+        shares = Table[Shares]("shares"),
+        control = Table[Control]("control")
+    )
+
+    // TEST
+    val (cshares, control) = fix(tables.shares, tables.control)((cshares, control) =>
+      val csharesRecur = control.flatMap(con =>
+        cshares
+          .filter(cs => cs.by == con.com2)
+          .map(cs => (by = con.com1, of = cs.of, percent = cs.percent))
+      ).union(cshares)
+        .groupBy(
+          c => (by = c.by, of = c.of).toRow,
+          c => (by = c.by, of = c.of, percent = sum(c.percent)).toRow
+        ).distinct
+      val controlRecur = cshares
+        .filter(s => s.percent > 50)
+        .map(s => (com1 = s.by, com2 = s.of))
+        .distinct
+      (csharesRecur, controlRecur)
+    )
+    control
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
 //class TESTTEST extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "Live tests"
 //

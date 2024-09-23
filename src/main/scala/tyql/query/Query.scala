@@ -84,11 +84,16 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 //  type GetFields[T] <: Tuple = T match
 //    case Expr[t, ?] => GetFields[t]
 //    case NamedTuple[n, v] => n
+// TODO: figure out how to do groupBy on join result.
+//   Right now have unimplemented "mergeMap" method but probably better to extract all source relations from source
+//   query and then supply them as arguments to the function arguments of groupBy, so the project/groupBy/having functions
+//   can access the original, non-aggregated relations.
+// TODO: Right now groupBy most closely resembles SQL groupBy, not Spark RDD's or pairs.
+//   Do we want to pick one?
+// TODO: Merge groupBy, groupByAggregate, and filterByGroupBy?
+//  Right now separated due to issues with overloading, but in theory could be condensed into a single groupBy method
   /**
-   * TODO: Right now this most closely resembles SQL groupBy, not Spark RDD's or pairs. Do we want to pick one?
-   *
-   * groupBy where the grouping clause is NOT an aggregation. Hopefully we can merge or overload groupBy and groupByAggregate
-   * but for now keep separate.
+   * groupBy where the grouping clause is NOT an aggregation.
    * Can add a 'having' statement incrementally by calling .having on the result.
    * The selectFn MUST return an aggregation.
    *
@@ -113,8 +118,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     Query.GroupBy(this, groupFun, selectFun, None)
 
   /**
-   * groupBy where the grouping clause IS an aggregation. Hopefully we can merge or overload groupBy and groupByAggregate
-   * but for now keep separate.
+   * groupBy where the grouping clause IS an aggregation.
    * Can add a 'having' statement incrementally by calling .having on the result.
    * The selectFn MUST return an aggregation.
    *
@@ -138,9 +142,10 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     Query.GroupBy(this, groupFun, selectFun, None)
 
   /**
-   * filter based on a groupBy result. Separate for now, hopefully can merge with groupBy/groupByAggregate.
+   * filter based on a groupBy result.
    * The selectFn MUST NOT return an aggregation.
-   * The groupingFn MUST NOT return an aggregation
+   * The groupingFn MUST NOT return an aggregation.
+   * The filterFn MUST return an aggregation.
    *
    * @param groupingFn - must be a named tuple, in order from left->right. Must return a scalar expression.
    * @param selectFn - the project clause of the select statement that is grouped. Must return a scalar expression.
@@ -160,7 +165,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val refS = Ref[A, NonScalarExpr]()
     val selectFun = Fun(refS, selectFn(refS))
 
-    // Workaround for: "ScalarExpr is not subtype of ?"
+    // Cast is workaround for: "ScalarExpr is not subtype of ?"
     Query.GroupBy(this, groupFun, selectFun, None).having(havingFn).asInstanceOf[Query.GroupBy[A, R, GroupResult, NonScalarExpr, NonScalarExpr]]
 
 //  def groupByAny[R: ResultTag, GroupResult, GroupShape <: ExprShape](
@@ -190,7 +195,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val ref = Ref[A, NonScalarExpr]()
     Query.Map(this, Fun(ref, f(ref)))
 
-/**
+  /**
    * A version of the above-defined map that allows users to skip calling toRow on the result in f.
    *
    * @param f    a function that returns a named-tuple-of-Expr.
@@ -221,8 +226,11 @@ object Query:
   import Expr.{Pred, Fun, Ref}
   import RestrictedQuery.*
 
-  def unrestrictedFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToMonotoneQueryRef[QT] => ToMonotoneQuery[QT]): ToQuery[QT] =
+  def monotoneFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToMonotoneQueryRef[QT] => ToMonotoneQuery[QT]): ToQuery[QT] =
     fixImpl(bases)(fns)
+
+  def unrestrictedFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToUnrestrictedQueryRef[QT] => ToUnrestrictedQuery[QT]): ToQuery[QT] =
+    unrestrictedFixImpl(bases)(fns)
 
   /**
    * Fixed point computation.
@@ -234,6 +242,11 @@ object Query:
    * QT is the tuple of Query
    * DT is the tuple of tuple of constant ints. Used to track dependencies of recursive definitions in order to enforce that every recursive reference is used at least once.
    * RQT is the tuple of RestrictedQuery that should be returned from fns.
+   *
+   * NOTE: Because groupBy is a Query not an Aggregation, the results of groupBy are allowed as base-cases of recursive queries.
+   * This is consistent with stratified aggregation. However, if you wanted to prevent recursion of any kind within mutual recursive
+   * queries (e.g. postgres), would need to add a constraint to prevent fix(...) from taking in anything of type GroupBy within QT.
+   * Not applicable to inline fix, since the restriction is only for mutual recursion.
    */
   def fix[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
                                     (bases: QT)
@@ -246,6 +259,42 @@ object Query:
 //                                    (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition: ${RQT}") ev2: Tuple.Union[Tuple.Map[DT, CheckDuplicate]] =:= false)
       : ToQuery[QT] =
     fixImpl(bases)(fns)
+
+  def unrestrictedFixImpl[QT <: Tuple, P <: Tuple, R <: Tuple](bases: QT)(fns: P => R): ToQuery[QT] =
+    // If base cases are themselves recursive definitions.
+    val baseRefsAndDefs = bases.toArray.map {
+      case MultiRecursive(params, querys, resultQ) => ??? // TODO: decide on semantics for multiple fix definitions. (param, query)
+      case base: Query[?, ?] => (RestrictedQueryRef()(using base.tag), base)
+    }
+    val refsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[P]
+    val unrestrictedRefsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1.toQueryRef)).asInstanceOf[P]
+    val refsList = baseRefsAndDefs.map(_._1).toList
+    val recurQueries = fns(unrestrictedRefsTuple)
+
+    val baseCaseDefsList = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?, ?]])
+    val recursiveDefsList: List[Query[?, ?]] = recurQueries.toList.map(_.asInstanceOf[Query[?, ?]]).lazyZip(baseCaseDefsList).map:
+      case (query: Query[t, c], ddef) =>
+        // Optimization: remove any extra .distinct calls that are getting fed into a union anyway
+        val lhs = ddef match
+          case Distinct(from) => from
+          case t => t
+        val rhs = query match
+          case Distinct(from) => from
+          case t => t
+        Union(lhs.asInstanceOf[Query[t, c]], rhs.asInstanceOf[Query[t, c]])(using query.tag)
+
+    val rt = refsTuple.asInstanceOf[Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?]]]
+    rt.naturalMap([t] => finalRef =>
+      val fr = finalRef.asInstanceOf[RestrictedQueryRef[t, ?, ?]]
+
+      given ResultTag[t] = fr.tag
+
+      MultiRecursive(
+        refsList,
+        recursiveDefsList,
+        fr.toQueryRef
+      )
+    )
 
   def fixImpl[QT <: Tuple, P <: Tuple, R <: Tuple](bases: QT)(fns: P => R): ToQuery[QT] =
     // If base cases are themselves recursive definitions.

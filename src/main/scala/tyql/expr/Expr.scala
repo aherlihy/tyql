@@ -47,8 +47,8 @@ object Expr:
     def >[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
     def >(y: Int): Expr[Boolean, S1] = Gt[S1, NonScalarExpr](x, IntLit(y))
     def <[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lt(x, y)
-    def <=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lte(x, y)
     def <(y: Int): Expr[Boolean, S1] = Lt[S1, NonScalarExpr](x, IntLit(y))
+    def <=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lte(x, y)
 
     def +[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Int, CalculatedShape[S1, S2]] = Plus(x, y)
     def +(y: Int): Expr[Int, S1] = Plus[S1, NonScalarExpr, Int](x, IntLit(y))

@@ -1199,6 +1199,288 @@ given IntervalDBs: TestDatabase[IntervalDB] with
 //    """
 //}
 
+class MinReachTest extends SQLStringQueryTest[TCDB, (x: Int, min_y: Int)] {
+  def testDescription: String = "Minimum reachability using aggregation at the end"
+
+  def query() =
+    val reach = testDB.tables.edges
+    reach.fix(reach =>
+      reach
+        .flatMap(p =>
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        )
+        .distinct
+    ).groupBy(
+      row => (x = row.x).toRow,
+      row => (x = row.x, min_y = min(row.y)).toRow
+    )
+
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE recursive$R AS
+      ((SELECT * FROM edges as edges$A)
+        UNION
+      ((SELECT ref$P.x as x, edges$B.y as y
+       FROM recursive$R as ref$P, edges as edges$B
+       WHERE ref$P.y = edges$B.x)))
+    SELECT recref$F.x as x, MIN(recref$F.y) as min_y FROM recursive$R as recref$F GROUP BY recref$F.x
+    """
+}
+
+class MinReachStratifiedTest extends SQLStringQueryTest[TCDB, (x: Int, min_y: Int)] {
+  def testDescription: String = "Minimum reachability using aggregation across strata"
+
+  def query() =
+    val edges = testDB.tables.edges.groupBy(e => (x = e.x).toRow, e => (x = e.x, y = min(e.y)).toRow)
+
+    edges.fix(minReach =>
+      minReach.flatMap(mr =>
+        edges
+          .filter(e => mr.y == e.x)
+          .map(e => (x = mr.x, y = e.y).toRow)
+      ).distinct
+    ).groupBy(
+      row => (x = row.x).toRow,
+      row => (x = row.x, min_y = min(row.y)).toRow
+    )
+
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE recursive$A AS
+    ((SELECT edges$B.x as x, MIN(edges$B.y) as y
+      FROM edges as edges$B
+      GROUP BY edges$B.x)
+    UNION
+      ((SELECT ref$C.x as x, subquery$D.y as y
+      FROM recursive$A as ref$C,
+           (SELECT edges$E.x as x, MIN(edges$E.y) as y
+             FROM edges as edges$E
+             GROUP BY edges$E.x) as subquery$D
+      WHERE ref$C.y = subquery$D.x)))
+  SELECT recref$F.x as x, MIN(recref$F.y) as min_y
+  FROM recursive$A as recref$F
+  GROUP BY recref$F.x
+    """
+}
+
+type ParentChildDB = (parentChild: Edge)
+
+given ParentChildDBs: TestDatabase[ParentChildDB] with
+  override def tables = (
+    parentChild = Table[Edge]("parentChild")
+    )
+
+  override def init(): String =
+    """
+      CREATE TABLE parentChild (
+        x INT,
+        y INT
+      );
+
+      INSERT INTO parentChild (x, y) VALUES (1, 2);
+      INSERT INTO parentChild (x, y) VALUES (2, 3);
+      INSERT INTO parentChild (x, y) VALUES (3, 4);
+      INSERT INTO parentChild (x, y) VALUES (4, 5);
+      INSERT INTO parentChild (x, y) VALUES (2, 6);
+      """
+
+class MutuallyRecursiveTest extends SQLStringQueryTest[ParentChildDB, (x: Int, y: Int)] {
+  def testDescription: String = "Mutually recursive ancestor-descendant relationship"
+
+  def query() =
+    val parentChild = testDB.tables.parentChild
+
+    val ancestorBase = parentChild
+    val descendantBase = parentChild
+
+    val (ancestorResult, descendantResult) = fix(ancestorBase, descendantBase) { (ancestor, descendant) =>
+      val newAncestor = ancestor.flatMap(a =>
+        parentChild
+          .filter(p => a.y == p.x)
+          .map(p => (x = a.x, y = p.y).toRow)
+      )
+
+      val newDescendant = descendant.flatMap(d =>
+        parentChild
+          .filter(p => d.x == p.y)
+          .map(p => (x = d.y, y = p.x).toRow)
+      )
+      (newAncestor.distinct, newDescendant.distinct)
+    }
+
+    ancestorResult
+
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE
+      recursive$319 AS
+        ((SELECT * FROM parentChild as parentChild$320)
+          UNION
+        ((SELECT ref$156.x as x, parentChild$322.y as y
+          FROM recursive$319 as ref$156, parentChild as parentChild$322
+          WHERE ref$156.y = parentChild$322.x))),
+      recursive$321 AS
+        ((SELECT * FROM parentChild as parentChild$326)
+          UNION
+        ((SELECT ref$159.y as x, parentChild$328.x as y
+          FROM recursive$321 as ref$159, parentChild as parentChild$328
+          WHERE ref$159.x = parentChild$328.y)))
+    SELECT * FROM recursive$319 as recref$28
+      """
+}
+
+type FriendshipDB = (friendship: Edge)
+
+given FriendshipDBs: TestDatabase[FriendshipDB] with
+  override def tables = (
+    friendship = Table[Edge]("friendship")
+    )
+
+  override def init(): String =
+    """
+      CREATE TABLE friendship (
+        x INT,
+        y INT
+      );
+
+      INSERT INTO friendship (x, y) VALUES (1, 2);
+      INSERT INTO friendship (x, y) VALUES (2, 3);
+      INSERT INTO friendship (x, y) VALUES (3, 4);
+      INSERT INTO friendship (x, y) VALUES (4, 5);
+      INSERT INTO friendship (x, y) VALUES (2, 6);
+      """
+
+class MutualFriendsStratifiedTest extends SQLStringQueryTest[FriendshipDB, (x: Int, mutual_friend_count: Int)] {
+  def testDescription: String = "Mutually recursive query with stratified aggregation. NOTE: only duckdb"
+
+  def query() =
+    val baseFriendships = testDB.tables.friendship
+
+    // Stratum 1
+    val directFriendsCount = baseFriendships.groupBy(
+      f => (x = f.x).toRow,
+      f => (x = f.x, friend_count = count(f.y)).toRow
+    )
+
+    // Define the mutually recursive fixpoint
+    val (totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, baseFriendships) { (totalFriendsCount, friendships) =>
+      val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
+        friendships
+          .filter(f => tf1.x == f.x)
+          .flatMap(f =>
+            directFriendsCount
+              .filter(dfCount => f.y == dfCount.x)
+              .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
+          )
+      ).distinct
+
+      // Define the mutually recursive MutualFriends relation
+      val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
+        friendships
+          .filter(f => tfCount1.x <= f.x)
+          .map(f => (x = tfCount1.x, y = f.x).toRow)
+      )
+
+      (recurTotalFriendsCount, recurFriendships.distinct)
+    }
+    mutualFriendsResult.groupBy(
+      row => (x = row.x).toRow,
+      row => (x = row.x, mutual_friend_count = count(row.y)).toRow
+    )
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+        recursive$271 AS
+          ((SELECT friendship$272.x as x, COUNT(friendship$272.y) as friend_count
+           FROM friendship as friendship$272
+           GROUP BY friendship$272.x)
+              UNION
+          ((SELECT ref$135.x as x, subquery$277.friend_count as friend_count
+           FROM recursive$271 as ref$135, recursive$272 as ref$136,
+              (SELECT friendship$275.x as x, COUNT(friendship$275.y) as friend_count
+               FROM friendship as friendship$275
+               GROUP BY friendship$275.x) as subquery$277
+           WHERE (ref$135.x = ref$136.x AND ref$136.y = subquery$277.x)))),
+         recursive$272 AS
+          ((SELECT * FROM friendship as friendship$282)
+            UNION
+          ((SELECT ref$140.x as x, ref$141.x as y
+            FROM recursive$271 as ref$140, recursive$272 as ref$141
+            WHERE ref$140.x <= ref$141.x)))
+      SELECT recref$24.x as x, COUNT(recref$24.y) as mutual_friend_count FROM recursive$272 as recref$24 GROUP BY recref$24.x
+    """
+}
+
+/* Currently passes, but by the definition of fix, should not define non-mutually recursive relation using fix
+   (should be done outside of the function like in the previous test). However, would be nice to add a restriction to enforce this.*/
+class MutualFriendsStratifiedFutureFailTest extends SQLStringQueryTest[FriendshipDB, (x: Int, mutual_friend_count: Int)] {
+  def testDescription: String = "Mutually recursive query with stratified aggregation. Here define within recur the first result. Technically against the spec because by definition all arguments to fix must be mutually recursive."
+
+  def query() =
+    val baseFriendships = testDB.tables.friendship
+
+    // Stratum 1
+    val directFriendsCount = baseFriendships.groupBy(
+      f => (x = f.x).toRow,
+      f => (x = f.x, friend_count = count(f.y)).toRow
+    )
+
+    // Define the mutually recursive fixpoint
+    val (dfC, totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, directFriendsCount, baseFriendships) { (dfC2, totalFriendsCount, friendships) =>
+      val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
+        friendships
+          .filter(f => tf1.x == f.x)
+          .flatMap(f =>
+           dfC2
+              .filter(dfCount => f.y == dfCount.x)
+              .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
+          )
+      ).distinct
+
+      // Define the mutually recursive MutualFriends relation
+      val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
+        friendships
+          .filter(f => tfCount1.x <= f.x)
+          .map(f => (x = tfCount1.x, y = f.x).toRow)
+      )
+
+      (dfC2, recurTotalFriendsCount, recurFriendships.distinct)
+    }
+    mutualFriendsResult.groupBy(
+      row => (x = row.x).toRow,
+      row => (x = row.x, mutual_friend_count = count(row.y)).toRow
+    )
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+        recursive$187 AS
+          ((SELECT friendship$189.x as x, COUNT(friendship$189.y) as friend_count
+            FROM friendship as friendship$189
+            GROUP BY friendship$189.x)
+              UNION
+          ((SELECT * FROM recursive$187 as recref$16))),
+        recursive$188 AS
+          ((SELECT friendship$194.x as x, COUNT(friendship$194.y) as friend_count
+            FROM friendship as friendship$194
+            GROUP BY friendship$194.x)
+              UNION
+           ((SELECT ref$91.x as x, ref$94.friend_count as friend_count
+             FROM recursive$188 as ref$91, recursive$189 as ref$92, recursive$187 as ref$94
+             WHERE (ref$91.x = ref$92.x AND ref$92.y = ref$94.x)))),
+        recursive$189 AS
+          ((SELECT * FROM friendship as friendship$201)
+              UNION
+          ((SELECT ref$96.x as x, ref$97.x as y
+            FROM recursive$188 as ref$96, recursive$189 as ref$97
+            WHERE ref$96.x <= ref$97.x)))
+     SELECT recref$18.x as x, COUNT(recref$18.y) as mutual_friend_count FROM recursive$189 as recref$18 GROUP BY recref$18.x
+      """
+}
+
 type Organizer = (orgName: String)
 type Friend = (pName: String, fName: String)
 type PartyDB = (organizers: Organizer, friends: Friend)
@@ -1261,49 +1543,74 @@ given PartyDBs: TestDatabase[PartyDB] with
 //    """
 //}
 
-
 type Shares = (by: String, of: String, percent: Int)
-type CShares = (byCom: String, ofCom: String, tot: Int)
-type CompanyControlDB = (shares: Shares, emptyShares: Shares, control: (com1: String, com2: String))
+type Control = (com1: String, com2: String)
+type CompanyControlDB = (shares: Shares, control: Control)
 
-given CompanyControlDBs: TestDatabase[CompanyControlDB] with
+given CompanyControlDBs2: TestDatabase[CompanyControlDB] with
   override def tables = (
     shares = Table[Shares]("shares"),
-    emptyShares = Table[Shares]("emptyShares"),
-    control = Table[(com1: String, com2: String)]("emptyControl")
+    control = Table[Control]("control")
   )
 
+  override def init(): String = """
+      CREATE TABLE shares (
+        by VARCHAR(255),
+        of VARCHAR(255),
+        percent INT
+      );
 
-class RecursionCompanyControlTest extends SQLStringAggregationTest[CompanyControlDB, Int] {
+      INSERT INTO shares (by, of, percent) VALUES ('A', 'B', 60);
+      INSERT INTO shares (by, of, percent) VALUES ('B', 'C', 25);
+      INSERT INTO shares (by, of, percent) VALUES ('C', 'D', 80);
+      INSERT INTO shares (by, of, percent) VALUES ('A', 'D', 10);
+      INSERT INTO shares (by, of, percent) VALUES ('A', 'C', 40);
+    """
+
+
+class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, Control] {
   def testDescription: String = "Company control"
 
   def query() =
-    val (cshares, control) = fix(testDB.tables.emptyShares, testDB.tables.control)((cshares, control) =>
+    val (cshares, control) = unrestrictedFix(testDB.tables.shares, testDB.tables.control)((cshares, control) =>
       val csharesRecur = control.flatMap(con =>
         cshares
           .filter(cs => cs.by == con.com2)
           .map(cs => (by = con.com1, of = cs.of, percent = cs.percent))
-      ).distinct
-      val controlRecur = cshares.filter(s => s.percent > 50).map(s => (com1 = s.by, com2 = s.of)).distinct
+      ).union(cshares)
+        .groupBy(
+          c => (by = c.by, of = c.of).toRow,
+          c => (by = c.by, of = c.of, percent = sum(c.percent)).toRow
+        ).distinct
+      val controlRecur = cshares
+        .filter(s => s.percent > 50)
+        .map(s => (com1 = s.by, com2 = s.of))
+        .distinct
       (csharesRecur, controlRecur)
     )
-    cshares.aggregate(c => sum(c.percent))
+    control
+
 
   def expectedQueryPattern: String =
     """
-        WITH RECURSIVE
-            recursive$73 AS
-                ((SELECT * FROM emptyShares as emptyShares$74)
-                  UNION
-                 ((SELECT ref$34.com1 as by, ref$35.of as of, ref$35.percent as percent
-                   FROM recursive$74 as ref$34, recursive$73 as ref$35
-                   WHERE ref$35.by = ref$34.com2))),
-            recursive$74 AS
-                ((SELECT * FROM emptyControl as emptyControl$79)
-                  UNION
-                ((SELECT ref$37.by as com1, ref$37.of as com2
-                 FROM recursive$73 as ref$37
-                 WHERE ref$37.percent > 50)))
-        SELECT SUM(recref$6.percent) FROM recursive$73 as recref$6
+    WITH RECURSIVE
+      recursive$73 AS
+        ((SELECT * FROM shares as shares$74)
+          UNION
+        ((SELECT subquery$79.by as by, subquery$79.of as of, SUM(subquery$79.percent) as percent
+          FROM
+            ((SELECT ref$34.com$1 as by, ref$35.of as of, ref$35.percent as percent
+              FROM recursive$74 as ref$34, recursive$73 as ref$35
+              WHERE ref$35.by = ref$34.com$2)
+                UNION
+             (SELECT * FROM recursive$73 as recref$6)) as subquery$79
+          GROUP BY subquery$79.by, subquery$79.of))),
+      recursive$74 AS
+        ((SELECT * FROM control as control$83)
+          UNION
+         ((SELECT ref$39.by as com$1, ref$39.of as com$2
+           FROM recursive$73 as ref$39
+           WHERE ref$39.percent > 50)))
+    SELECT * FROM recursive$74 as recref$7
       """
 }
