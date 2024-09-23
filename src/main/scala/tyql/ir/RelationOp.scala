@@ -379,10 +379,10 @@ case class MultiRecursiveRelationOp(aliases: Seq[String], query: Seq[RelationOp]
   override def appendFlag(f: SelectFlags): RelationOp =
     f match
       case SelectFlags.Distinct =>
-        SelectAllQuery(Seq(this), Seq(), Some(alias), ast).appendFlag(f)
+        finalQ.appendFlag(f)
       case _ =>
         flags = flags + f
-        this
+    this
 
   override def toSQLString(): String =
     // NOTE: no parens or alias needed, since already defined

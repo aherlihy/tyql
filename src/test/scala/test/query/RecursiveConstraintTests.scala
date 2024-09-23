@@ -954,6 +954,40 @@ class RecursiveConstraintAggregationMutualRecursionFailTest extends munit.FunSui
   }
 }
 
+class RecursionConstraintCategoryUnionAll2FailTest extends munit.FunSuite {
+  def testDescription: String = "recursive query defined over bag, using unionAll, will not terminate!"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr, Query}
+
+           type Edge = (x: Int, y: Int)
+           type TCDB = (edges: Edge)
+
+           val tables = (
+             edges = Table[Edge]("edges")
+           )
+
+          // TEST
+          val base = tables.edges
+          base.fix(path =>
+            path.flatMap(p =>
+              tables.edges
+                .filter(e => p.y == e.x)
+                .map(e => (x = p.x, y = e.y).toRow)
+            )// Removing 'distinct' will cause it to never terminate
+          )
+          """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+
 //class TESTTEST extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "Live tests"
 //

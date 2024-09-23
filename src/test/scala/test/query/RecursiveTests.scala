@@ -993,7 +993,6 @@ class RecursionCCTest extends SQLStringAggregationTest[TCDB, Int] {
 
   def expectedQueryPattern: String =
     """
-        SELECT DISTINCT COUNT(1) FROM
           WITH RECURSIVE recursive$53 AS
             ((SELECT
                 edges$53.x as x, edges$53.y as id
@@ -1003,7 +1002,7 @@ class RecursionCCTest extends SQLStringAggregationTest[TCDB, Int] {
                 edges$55.y as x, ref$26.id as id
               FROM edges as edges$55, recursive$53 as ref$26
               WHERE ref$26.x = edges$55.x)))
-          SELECT recref$4.id FROM recursive$53 as recref$4
+          SELECT DISTINCT COUNT(1) FROM SELECT DISTINCT recref$4.id FROM recursive$53 as recref$4
       """
 }
 
@@ -1614,3 +1613,49 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
     SELECT * FROM recursive$74 as recref$7
       """
 }
+
+type CyclicEdge = (x: Int, y: Int)
+type CyclicGraphDB = (edges: CyclicEdge)
+
+given CyclicGraphDBs: TestDatabase[CyclicGraphDB] with
+  override def tables = (
+    edges = Table[CyclicEdge]("edges")
+    )
+
+  override def init(): String =
+    """
+      CREATE TABLE edges (
+        x INT,
+        y INT
+      );
+
+      INSERT INTO edges (x, y) VALUES (1, 2);
+      INSERT INTO edges (x, y) VALUES (2, 3);
+      INSERT INTO edges (x, y) VALUES (3, 1);
+    """
+
+class RecursiveNonterminationExampleTest extends SQLStringQueryTest[CyclicGraphDB, CyclicEdge] {
+  def testDescription: String = "Recursive query that cycles indefinitely under bag semantics"
+
+  def query() =
+    val base = testDB.tables.edges
+    base.fix(path =>
+      path.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      ).distinct // Removing 'distinct' will cause it to never terminate
+    )
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE recursive$A AS
+        ((SELECT * FROM edges as edges$B)
+          UNION
+        ((SELECT ref$R.x as x, edges$E.y as y
+         FROM recursive$A as ref$R, edges as edges$E
+         WHERE ref$R.y = edges$E.x)))
+      SELECT * FROM recursive$A as recref$Z
+    """
+}
+
