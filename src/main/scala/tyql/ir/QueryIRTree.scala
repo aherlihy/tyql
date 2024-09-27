@@ -319,6 +319,7 @@ object QueryIRTree:
       case g: Expr.Lt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
       case g: Expr.Lte[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", g)
       case g: Expr.GtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
+      case g: Expr.LtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
       case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", a)
       case n: Expr.Not[?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", n)
       case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", a)

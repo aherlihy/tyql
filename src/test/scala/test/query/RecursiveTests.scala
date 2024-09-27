@@ -227,7 +227,7 @@ given CSPADBs: TestDatabase[CSPADB] with
   )
 
   override def init(): String =
-  """
+    """
   CREATE TABLE assign (
       p1 INT,
       p2 INT
@@ -430,37 +430,37 @@ class RecursiveCSPADistinctTest extends SQLStringQueryTest[CSPADB, Location] {
     WITH RECURSIVE
       recursive$A AS
         (((SELECT * FROM assign as assign$D)
-				  UNION ALL
-			  (SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
-					UNION ALL
-				(SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F))
-					UNION
-				(((SELECT assign$G.p1 as p1, ref$J.p2 as p2
-				FROM assign as assign$G, recursive$C as ref$J
-				WHERE assign$G.p2 = ref$J.p1)
-					UNION ALL
-				(SELECT ref$K.p1 as p1, ref$L.p2 as p2
-				FROM recursive$A as ref$K, recursive$A as ref$L
-				WHERE ref$K.p2 = ref$L.p1)))),
-		  recursive$B AS
-		    ((SELECT * FROM empty as empty$M)
-					UNION
-				((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
-				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
-			recursive$C AS
-			  (((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
-					UNION ALL
-				(SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I))
-					UNION
-				(((SELECT ref$Q.p2 as p1, ref$R.p2 as p2
-				FROM recursive$A as ref$Q, recursive$A as ref$R
-				WHERE ref$Q.p1 = ref$R.p1)
-					UNION ALL
-				(SELECT ref$S.p2 as p1, ref$T.p2 as p2
-				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))))
-		SELECT * FROM recursive$A as recref$V
+          UNION ALL
+        (SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
+          UNION ALL
+        (SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F))
+          UNION
+        (((SELECT assign$G.p1 as p1, ref$J.p2 as p2
+        FROM assign as assign$G, recursive$C as ref$J
+        WHERE assign$G.p2 = ref$J.p1)
+          UNION ALL
+        (SELECT ref$K.p1 as p1, ref$L.p2 as p2
+        FROM recursive$A as ref$K, recursive$A as ref$L
+        WHERE ref$K.p2 = ref$L.p1)))),
+      recursive$B AS
+        ((SELECT * FROM empty as empty$M)
+          UNION
+        ((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+        FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
+        WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
+      recursive$C AS
+        (((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
+          UNION ALL
+        (SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I))
+          UNION
+        (((SELECT ref$Q.p2 as p1, ref$R.p2 as p2
+        FROM recursive$A as ref$Q, recursive$A as ref$R
+        WHERE ref$Q.p1 = ref$R.p1)
+          UNION ALL
+        (SELECT ref$S.p2 as p1, ref$T.p2 as p2
+        FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
+        WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))))
+    SELECT * FROM recursive$A as recref$V
     """
 }
 
@@ -497,7 +497,7 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
             memoryAlias
               .filter(m => a.p2 == m.p1)
               .map(m => (p1 = a.p1, p2 = m.p2).toRow
-            )
+              )
           ).union(
             // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
             valueFlow.flatMap(vf1 =>
@@ -541,37 +541,37 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
     WITH RECURSIVE
       recursive$A AS
         ((SELECT * FROM assign as assign$D)
-				  UNION
-			  ((SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
-					UNION
-				(SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F)
-					UNION
-				(SELECT assign$G.p1 as p1, ref$J.p2 as p2
-				FROM assign as assign$G, recursive$C as ref$J
-				WHERE assign$G.p2 = ref$J.p1)
-					UNION
-				(SELECT ref$K.p1 as p1, ref$L.p2 as p2
-				FROM recursive$A as ref$K, recursive$A as ref$L
-				WHERE ref$K.p2 = ref$L.p1))),
-		  recursive$B AS
-		    ((SELECT * FROM empty as empty$M)
-					UNION
-				((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
-				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
-			recursive$C AS
-			  ((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
-					UNION
-				((SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I)
-					UNION
-				(SELECT ref$Q.p2 as p1, ref$R.p2 as p2
-				FROM recursive$A as ref$Q, recursive$A as ref$R
-				WHERE ref$Q.p1 = ref$R.p1)
-					UNION
-				(SELECT ref$S.p2 as p1, ref$T.p2 as p2
-				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)))
-		SELECT * FROM recursive$A as recref$V
+          UNION
+        ((SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
+          UNION
+        (SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F)
+          UNION
+        (SELECT assign$G.p1 as p1, ref$J.p2 as p2
+        FROM assign as assign$G, recursive$C as ref$J
+        WHERE assign$G.p2 = ref$J.p1)
+          UNION
+        (SELECT ref$K.p1 as p1, ref$L.p2 as p2
+        FROM recursive$A as ref$K, recursive$A as ref$L
+        WHERE ref$K.p2 = ref$L.p1))),
+      recursive$B AS
+        ((SELECT * FROM empty as empty$M)
+          UNION
+        ((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+        FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
+        WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
+      recursive$C AS
+        ((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
+          UNION
+        ((SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I)
+          UNION
+        (SELECT ref$Q.p2 as p1, ref$R.p2 as p2
+        FROM recursive$A as ref$Q, recursive$A as ref$R
+        WHERE ref$Q.p1 = ref$R.p1)
+          UNION
+        (SELECT ref$S.p2 as p1, ref$T.p2 as p2
+        FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
+        WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)))
+    SELECT * FROM recursive$A as recref$V
     """
 }
 
@@ -651,37 +651,37 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
     WITH RECURSIVE
       recursive$A AS
         ((SELECT * FROM assign as assign$D)
-				  UNION
-			  ((SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
-					UNION
-				(SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F)
-					UNION
-				(SELECT assign$G.p1 as p1, ref$J.p2 as p2
-				FROM assign as assign$G, recursive$C as ref$J
-				WHERE assign$G.p2 = ref$J.p1)
-					UNION
-				(SELECT ref$K.p1 as p1, ref$L.p2 as p2
-				FROM recursive$A as ref$K, recursive$A as ref$L
-				WHERE ref$K.p2 = ref$L.p1))),
-		  recursive$B AS
-		    ((SELECT * FROM empty as empty$M)
-					UNION
-				((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
-				FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-				WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
-			recursive$C AS
-			  ((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
-					UNION
-				((SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I)
-					UNION
-				(SELECT ref$Q.p2 as p1, ref$R.p2 as p2
-				FROM recursive$A as ref$Q, recursive$A as ref$R
-				WHERE ref$Q.p1 = ref$R.p1)
-					UNION
-				(SELECT ref$S.p2 as p1, ref$T.p2 as p2
-				FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-				WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)))
-		SELECT * FROM recursive$A as recref$V
+          UNION
+        ((SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
+          UNION
+        (SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F)
+          UNION
+        (SELECT assign$G.p1 as p1, ref$J.p2 as p2
+        FROM assign as assign$G, recursive$C as ref$J
+        WHERE assign$G.p2 = ref$J.p1)
+          UNION
+        (SELECT ref$K.p1 as p1, ref$L.p2 as p2
+        FROM recursive$A as ref$K, recursive$A as ref$L
+        WHERE ref$K.p2 = ref$L.p1))),
+      recursive$B AS
+        ((SELECT * FROM empty as empty$M)
+          UNION
+        ((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
+        FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
+        WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
+      recursive$C AS
+        ((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
+          UNION
+        ((SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I)
+          UNION
+        (SELECT ref$Q.p2 as p1, ref$R.p2 as p2
+        FROM recursive$A as ref$Q, recursive$A as ref$R
+        WHERE ref$Q.p1 = ref$R.p1)
+          UNION
+        (SELECT ref$S.p2 as p1, ref$T.p2 as p2
+        FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
+        WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)))
+    SELECT * FROM recursive$A as recref$V
     """
 }
 
@@ -796,7 +796,7 @@ type ReachabilityDB = (edge: Edge)
 given ReachabilityDBs: TestDatabase[ReachabilityDB] with
   override def tables = (
     edge = Table[Edge]("edge")
-  )
+    )
 
   override def init(): String = """
     CREATE TABLE edge (x INTEGER, y INTEGER);
@@ -820,8 +820,8 @@ class RecursionReachabilityTest extends SQLStringQueryTest[ReachabilityDB, Path]
           .map(e =>
             (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
           )
-        ).distinct
-      ).sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
+      ).distinct
+    ).sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
 
   def expectedQueryPattern: String =
     """
@@ -1039,7 +1039,7 @@ type ManagementDB = (reports: Report)
 given ManagementDBs: TestDatabase[ManagementDB] with
   override def tables = (
     reports = Table[Report]("reports")
-  )
+    )
 
   override def init(): String = """
     CREATE TABLE report (
@@ -1433,7 +1433,7 @@ class MutualFriendsStratifiedFutureFailTest extends SQLStringQueryTest[Friendshi
         friendships
           .filter(f => tf1.x == f.x)
           .flatMap(f =>
-           dfC2
+            dfC2
               .filter(dfCount => f.y == dfCount.x)
               .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
           )
@@ -1573,10 +1573,10 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
   def query() =
     val (cshares, control) = unrestrictedFix(testDB.tables.shares, testDB.tables.control)((cshares, control) =>
       val csharesRecur = control.flatMap(con =>
-        cshares
-          .filter(cs => cs.by == con.com2)
-          .map(cs => (by = con.com1, of = cs.of, percent = cs.percent))
-      ).union(cshares)
+          cshares
+            .filter(cs => cs.by == con.com2)
+            .map(cs => (by = con.com1, of = cs.of, percent = cs.percent))
+        ).union(cshares)
         .groupBy(
           c => (by = c.by, of = c.of).toRow,
           c => (by = c.by, of = c.of, percent = sum(c.percent)).toRow

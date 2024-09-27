@@ -98,17 +98,17 @@ object RestrictedQuery {
   }
 
     // test affine
-    type testA = (0, 1)
-    val checkA = summon[testA =:= HasDuplicate[testA]]
+//    type testA = (0, 1)
+//    val checkA = summon[testA =:= HasDuplicate[testA]]
 //    val testB = ((0, 1), (0, 3), (1, 2))
 //    val checkB = summon[testB =:= HasDuplicate[testB]]
 
   // test linear
-    type Actual = Tuple3[Tuple1[0],Tuple1[0],Tuple1[1]]
-    type FlatActual = Tuple.FlatMap[Actual, [T <: Tuple] =>> T]
-    type Expected = GenerateIndices[0, Tuple.Size[(0,0,0)]]
-    type UnionActual = Tuple.Union[FlatActual]
-    type UnionExpected = Tuple.Union[Expected]
+//    type Actual = Tuple3[Tuple1[0],Tuple1[0],Tuple1[1]]
+//    type FlatActual = Tuple.FlatMap[Actual, [T <: Tuple] =>> T]
+//    type Expected = GenerateIndices[0, Tuple.Size[(0,0,0)]]
+//    type UnionActual = Tuple.Union[FlatActual]
+//    type UnionExpected = Tuple.Union[Expected]
 //    val check: UnionExpected <:< UnionActual = summon[UnionExpected <:< UnionActual]
 
   type ExtractDependencies[D] <: Tuple = D match

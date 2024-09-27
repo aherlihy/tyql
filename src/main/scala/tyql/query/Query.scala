@@ -329,9 +329,11 @@ object Query:
       )
     )
 
+  // TODO: in the case we want to allow bag semantics within recursive queries, set $bag
   case class MultiRecursive[R]($param: List[RestrictedQueryRef[?, ?, ?]],
                                $subquery: List[Query[?, ?]],
-                               $resultQuery: Query[R, ?])(using ResultTag[R]) extends Query[R, SetResult]
+                               $resultQuery: Query[R, ?],
+                               /*$bag: Boolean = false*/)(using ResultTag[R]) extends Query[R, SetResult]
 
   private var refCount = 0
   case class QueryRef[A: ResultTag, C <: ResultCategory]() extends Query[A, C]:

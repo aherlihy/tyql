@@ -3,6 +3,8 @@ package tyql
 import scala.annotation.targetName
 import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
+import scala.deriving.*
+import scala.compiletime.{erasedValue, summonInline}
 
 // TODO: probably seal
 trait ExprShape
@@ -59,8 +61,8 @@ object Expr:
     def >[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Boolean, CalculatedShape[S1, S2]] =
       GtDouble(x, y)
     @targetName("gtDoubleLit")
-    def >(y: Double): Expr[Boolean, S1] =
-      GtDouble[S1, NonScalarExpr](x, DoubleLit(y))
+    def >(y: Double): Expr[Boolean, S1] = GtDouble[S1, NonScalarExpr](x, DoubleLit(y))
+    def <(y: Double): Expr[Boolean, S1] = LtDouble[S1, NonScalarExpr](x, DoubleLit(y))
     @targetName("addDouble")
     def +[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] = Plus(x, y)
     @targetName("multipleDouble")
@@ -108,6 +110,7 @@ object Expr:
   case class Lte[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Gt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class GtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class LtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
 
   case class Plus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class Times[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
@@ -154,12 +157,19 @@ object Expr:
 
   /** References are placeholders for parameters */
   private var refCount = 0 // TODO: do we want to recount from 0 for each query?
+  private var exprRefCount = 0
 
-  case class Ref[A: ResultTag, S<: ExprShape]() extends Expr[A, S]:
+  // References to relations
+  case class Ref[A: ResultTag, S <: ExprShape]() extends Expr[A, S]:
     private val id = refCount
     refCount += 1
     def stringRef() = s"ref$id"
     override def toString: String = s"Ref[${stringRef()}]"
+
+  /** The internal representation of a function `A => B`
+   * Query languages are usually first-order, so Fun is not an Expr
+   */
+  case class Fun[A, B, S <: ExprShape]($param: Ref[A, S], $body: B)
 
   /** Literals are type-specific, tailored to the types that the DB supports */
   case class IntLit($value: Int) extends Expr[Int, NonScalarExpr]
@@ -173,13 +183,36 @@ object Expr:
   given Conversion[Double, DoubleLit] = DoubleLit(_)
 
   case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr]
-//  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
+  //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
 
-  /** The internal representation of a function `A => B`
-   *  Query languages are ususally first-order, so Fun is not an Expr
+  /** Should be able to rely on the implicit conversions, but not always.
+   *  One approach is to overload, another is to provide a user-facing toExpr
+   *  function.
    */
-  case class Fun[A, B, S <: ExprShape]($param: Ref[A, S], $body: B)
+  def toExpr[T](t: T): Expr[T, NonScalarExpr] = t match
+    case Int => IntLit(t)
+    case Double => DoubleLit(t)
+    case String => StringLit(t)
+    case Boolean => BooleanLit(t)
 
+/* ABSTRACTION: if we want to abstract over expressions (not relations) in the DSL, to enable better composability,
+  then the DSL needs some kind of abstraction/application operation.
+  Option 1: (already supported) use host-level abstraction e.g. define a lambda.
+  Option 2: (below) define a substitution method, WIP.
+  Option 3: Use a macro to do substitution, but then lose the macro-free claim.
+*/
+  case class RefExpr[A: ResultTag, S <: ExprShape]() extends Expr[A, S]:
+    private val id = exprRefCount
+    exprRefCount += 1
+    def stringRef() = s"exprRef$id"
+    override def toString: String = s"ExprRef[${stringRef()}]"
+
+  case class AbstractedExpr[A, B, S <: ExprShape]($param: RefExpr[A, S], $body: Expr[B, S]):
+    def apply(exprArg: Expr[A, S]): Expr[B, S] =
+      substitute($body, $param, exprArg)
+    private def substitute[C](expr: Expr[B, S],
+                              formalP: RefExpr[A, S],
+                              actualP: Expr[A, S]): Expr[B, S] = ???
   type Pred[A, S <: ExprShape] = Fun[A, Expr[Boolean, S], S]
 
   type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, NonScalarExpr]
