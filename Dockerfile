@@ -25,3 +25,6 @@ COPY src/ src/
 COPY project/build.properties properties/build.properties
 
 CMD ["sbt", "test"]
+
+LABEL version="0.2"
+LABEL description="Run the tyql test suite inside a Debian 12 container"
