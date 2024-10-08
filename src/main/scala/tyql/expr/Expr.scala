@@ -155,7 +155,7 @@ object Expr:
   /** References are placeholders for parameters */
   private var refCount = 0 // TODO: do we want to recount from 0 for each query?
 
-  case class Ref[A: ResultTag, S<: ExprShape]() extends Expr[A, S]:
+  case class Ref[A: ResultTag, S <: ExprShape]() extends Expr[A, S]:
     private val id = refCount
     refCount += 1
     def stringRef() = s"ref$id"
