@@ -97,7 +97,6 @@ object TestComparitor {
 
 }
 
-
 trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extends munit.FunSuite with TestQuery[Rows, ReturnShape] {
 
   import tyql.TreePrettyPrinter.*
@@ -196,7 +195,9 @@ class TestSuiteTest extends munit.FunSuite {
   }
 }
 
-abstract class SQLStringQueryTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
-  extends TestSQLString[Rows, Query[Return, ?]] with TestQuery[Rows, Query[Return, ?]]
-abstract class SQLStringAggregationTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
-  extends TestSQLString[Rows, Aggregation[Return]] with TestQuery[Rows, Aggregation[Return]]
+abstract class SQLStringQueryTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows])
+    extends TestSQLString[Rows, Query[Return, ?]]
+    with TestQuery[Rows, Query[Return, ?]]
+abstract class SQLStringAggregationTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows])
+    extends TestSQLString[Rows, Aggregation[Return]]
+    with TestQuery[Rows, Aggregation[Return]]

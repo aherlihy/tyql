@@ -15,7 +15,9 @@ class SortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double
   def testDescription = "Subquery: sortTakeJoin"
   def query() =
     testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.sort(_.price, Ord.DESC).take(1)
+      testDB.tables.products
+        .sort(_.price, Ord.DESC)
+        .take(1)
         .filter(prod => prod.id == purch.id)
         .map(prod => purch.total)
     )
@@ -33,7 +35,6 @@ class SortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double
 class SortTake2JoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeJoin (for comprehension)"
   def query() =
-
     for
       purch <- testDB.tables.purchases
       prod <- testDB.tables.products.sort(_.price, Ord.DESC).take(1)
@@ -55,11 +56,10 @@ class SortTake2JoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Doubl
 class SortTakeFromSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeFrom"
   def query() =
-    testDB.tables.products.sort(_.price, Ord.DESC).take(1).flatMap(prod =>
-      testDB.tables.purchases.filter(purch => prod.id == purch.productId).map(purch =>
-        purch.total
-      )
-    )
+    testDB.tables.products
+      .sort(_.price, Ord.DESC)
+      .take(1)
+      .flatMap(prod => testDB.tables.purchases.filter(purch => prod.id == purch.productId).map(purch => purch.total))
   def expectedQueryPattern = """
         SELECT purchase$D.total
         FROM
@@ -76,9 +76,7 @@ class SortTakeFromSubquery2Test extends SQLStringQueryTest[AllCommerceDBs, Doubl
   def testDescription = "Subquery: sortTakeFrom (reversed)"
   def query() =
     testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.sort(_.price, Ord.DESC).take(1).filter(prod => prod.id == purch.productId).map(prod =>
-        purch.total
-      )
+      testDB.tables.products.sort(_.price, Ord.DESC).take(1).filter(prod => prod.id == purch.productId).map(prod => purch.total)
     )
   def expectedQueryPattern = """
         SELECT purchase$A.total
@@ -95,13 +93,10 @@ class SortTakeFromSubquery2Test extends SQLStringQueryTest[AllCommerceDBs, Doubl
 class SortTakeFromSubquery3Test extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeFrom (both)"
   def query() =
-    testDB.tables.purchases.sort(_.total, Ord.ASC).take(2).flatMap(purch =>
-      testDB.tables.products.sort(_.price, Ord.DESC).take(1).
-        filter(prod => prod.id == purch.productId).
-        map(prod =>
-          purch.total
-        )
-    )
+    testDB.tables.purchases
+      .sort(_.total, Ord.ASC)
+      .take(2)
+      .flatMap(purch => testDB.tables.products.sort(_.price, Ord.DESC).take(1).filter(prod => prod.id == purch.productId).map(prod => purch.total))
   def expectedQueryPattern = """
         SELECT subquery$E.total
         FROM
@@ -120,11 +115,9 @@ class SortTakeFromSubquery3Test extends SQLStringQueryTest[AllCommerceDBs, Doubl
 class NestedSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Subquery: nest using sort"
   def query() =
-    testDB.tables.purchases.sort(_.total, Ord.ASC).flatMap(purch =>
-      testDB.tables.products.sort(_.price, Ord.DESC).
-        filter(prod => prod.id == purch.productId).
-        map(prod => prod.id)
-    )
+    testDB.tables.purchases
+      .sort(_.total, Ord.ASC)
+      .flatMap(purch => testDB.tables.products.sort(_.price, Ord.DESC).filter(prod => prod.id == purch.productId).map(prod => prod.id))
   def expectedQueryPattern = """
         SELECT subquery$B.id
         FROM
@@ -139,15 +132,10 @@ class NestedSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
       """
 }
 
-
 class SimpleNestedSubquery1Test extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Subquery: nested map"
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.
-        filter(prod => prod.id == purch.productId).
-        map(prod => prod.id)
-    )
+    testDB.tables.purchases.flatMap(purch => testDB.tables.products.filter(prod => prod.id == purch.productId).map(prod => prod.id))
   def expectedQueryPattern = """
         SELECT product$A.id
         FROM
@@ -160,12 +148,7 @@ class SimpleNestedSubquery1Test extends SQLStringQueryTest[AllCommerceDBs, Int] 
 class SimpleNestedSubquery2Test extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Subquery: nested map + inner op"
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.
-        drop(1).
-        filter(prod => prod.id == purch.productId).
-        map(prod => prod.id)
-    )
+    testDB.tables.purchases.flatMap(purch => testDB.tables.products.drop(1).filter(prod => prod.id == purch.productId).map(prod => prod.id))
   def expectedQueryPattern = """
         SELECT subquery$C.id
         FROM
@@ -198,7 +181,6 @@ class SimpleNestedFilterMapSubqueryTest extends SQLStringQueryTest[AllCommerceDB
       .filter(purch => purch.id == 1)
       //      .take(2)
       .filter(purch2 => purch2.id == 2)
-
       .map(_.id)
   def expectedQueryPattern =
     """
@@ -319,11 +301,7 @@ class SimpleNestedFilterMapSubquery4Test extends SQLStringQueryTest[AllCommerceD
 class SimpleNestedSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Subquery: nest map + outer op"
   def query() =
-    testDB.tables.purchases.drop(1).flatMap(purch =>
-      testDB.tables.products.
-        filter(prod => prod.id == purch.productId).
-        map(prod => prod.id)
-    )
+    testDB.tables.purchases.drop(1).flatMap(purch => testDB.tables.products.filter(prod => prod.id == purch.productId).map(prod => prod.id))
   def expectedQueryPattern = """
         SELECT product$A.id
         FROM
@@ -360,8 +338,7 @@ class SortTakeFromAndJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs,
       t1 <- testDB.tables.products.sort(_.price, Ord.DESC).take(3)
       t2 <- testDB.tables.purchases.sort(_.count, Ord.DESC).take(4)
       if t1.id == t2.productId
-    yield
-      (name = t1.name, count = t2.count).toRow
+    yield (name = t1.name, count = t2.count).toRow
   def expectedQueryPattern = """
       SELECT subquery$A.name as name, subquery$B.count as count
       FROM
@@ -374,11 +351,7 @@ class SingleJoinForNestedJoin extends SQLStringQueryTest[AllCommerceDBs, (name: 
   def testDescription = "Subquery: sortTakeJoin, double nested"
 
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.map(prod =>
-        (name = prod.name, id = purch.id).toRow
-      )
-    )
+    testDB.tables.purchases.flatMap(purch => testDB.tables.products.map(prod => (name = prod.name, id = purch.id).toRow))
 
   def expectedQueryPattern =
     """
@@ -390,16 +363,14 @@ class NestedJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, String] 
   def testDescription = "Subquery: nested cartesian product without project"
 
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.map(s => s)
-    ).flatMap(purch =>
-      testDB.tables.purchases.flatMap(purch =>
-          testDB.tables.products.map(s => s)
-        )
-        //        .filter(prod => prod.id == purch.id)
-        .map(prod => purch.name)
-    )
-
+    testDB.tables.purchases
+      .flatMap(purch => testDB.tables.products.map(s => s))
+      .flatMap(purch =>
+        testDB.tables.purchases
+          .flatMap(purch => testDB.tables.products.map(s => s))
+          //        .filter(prod => prod.id == purch.id)
+          .map(prod => purch.name)
+      )
 
   def expectedQueryPattern =
     """
@@ -414,16 +385,14 @@ class NestedJoinSubquery2Test extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "Subquery: nested cartesian product with project"
 
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.map(s => (prodId = s.id))
-    ).flatMap(purch =>
-      testDB.tables.purchases.flatMap(purch =>
-          testDB.tables.products.map(s => (prodId = s.id))
-        )
-        //        .filter(prod => prod.id == purch.id)
-        .map(prod => purch.prodId)
-    )
-
+    testDB.tables.purchases
+      .flatMap(purch => testDB.tables.products.map(s => (prodId = s.id)))
+      .flatMap(purch =>
+        testDB.tables.purchases
+          .flatMap(purch => testDB.tables.products.map(s => (prodId = s.id)))
+          //        .filter(prod => prod.id == purch.id)
+          .map(prod => purch.prodId)
+      )
 
   def expectedQueryPattern =
     """
@@ -439,13 +408,8 @@ class NestedJoinSubquery3Test extends SQLStringQueryTest[AllCommerceDBs, (name: 
 
   def query() =
     testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.flatMap(prod =>
-        testDB.tables.shipInfos.map(si =>
-          (name = prod.name, id = purch.id, sd = si.shippingDate).toRow
-        )
-      )
+      testDB.tables.products.flatMap(prod => testDB.tables.shipInfos.map(si => (name = prod.name, id = purch.id, sd = si.shippingDate).toRow))
     )
-
 
   def expectedQueryPattern =
     """
@@ -463,15 +427,11 @@ class NestedJoinSubquery4Test extends SQLStringQueryTest[AllCommerceDBs, (name: 
   def query() =
     testDB.tables.purchases.flatMap(purch =>
       testDB.tables.products.flatMap(prod =>
-        testDB.tables.shipInfos.filter(si =>
-          purch.id == prod.id && prod.id == si.id
-        )
-        .map(si =>
-          (name = prod.name, id = purch.id, sd = si.shippingDate).toRow
-        )
+        testDB.tables.shipInfos
+          .filter(si => purch.id == prod.id && prod.id == si.id)
+          .map(si => (name = prod.name, id = purch.id, sd = si.shippingDate).toRow)
       )
     )
-
 
   def expectedQueryPattern =
     """
@@ -488,17 +448,17 @@ class NestedJoinSubquery5Test extends SQLStringQueryTest[AllCommerceDBs, (name: 
   def testDescription = "Subquery: nested flatMaps with join condition + intermediate filter"
 
   def query() =
-    testDB.tables.purchases.filter(p => p.id == 2).flatMap(purch =>
-      testDB.tables.products.filter(p => p.id == 1).flatMap(prod =>
-        testDB.tables.shipInfos.filter(si =>
-            purch.id == prod.id && prod.id == si.id
-          )
-          .map(si =>
-            (name = prod.name, id = purch.id, sd = si.shippingDate).toRow
+    testDB.tables.purchases
+      .filter(p => p.id == 2)
+      .flatMap(purch =>
+        testDB.tables.products
+          .filter(p => p.id == 1)
+          .flatMap(prod =>
+            testDB.tables.shipInfos
+              .filter(si => purch.id == prod.id && prod.id == si.id)
+              .map(si => (name = prod.name, id = purch.id, sd = si.shippingDate).toRow)
           )
       )
-    )
-
 
   def expectedQueryPattern =
     """
@@ -515,10 +475,7 @@ class NestedJoinSubquery6Test extends SQLStringQueryTest[AllCommerceDBs, Product
   def testDescription = "Subquery: flatmap with table"
 
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products
-    )
-
+    testDB.tables.purchases.flatMap(purch => testDB.tables.products)
 
   def expectedQueryPattern =
     """
@@ -530,10 +487,7 @@ class NestedJoinSubquery7Test extends SQLStringQueryTest[AllCommerceDBs, Product
   def testDescription = "Subquery: flatmap with filtered table"
 
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.filter(s => s.name == "test")
-    )
-
+    testDB.tables.purchases.flatMap(purch => testDB.tables.products.filter(s => s.name == "test"))
 
   def expectedQueryPattern =
     """
@@ -549,10 +503,7 @@ class NestedJoinSubquery8Test extends SQLStringQueryTest[AllCommerceDBs, Product
   def testDescription = "Subquery: flatmap with filtered outer table"
 
   def query() =
-    testDB.tables.purchases.filter(s => s.id == 1).flatMap(purch =>
-      testDB.tables.products.filter(s => s.name == "test")
-    )
-
+    testDB.tables.purchases.filter(s => s.id == 1).flatMap(purch => testDB.tables.products.filter(s => s.name == "test"))
 
   def expectedQueryPattern =
     """
@@ -569,10 +520,7 @@ class NestedJoinSubquery9Test extends SQLStringQueryTest[AllCommerceDBs, (newId:
 
   def query() =
     testDB.tables.purchases
-      .flatMap(purch =>
-        testDB.tables.products.filter(s => s.name == "test").map(s => (newId = s.id).toRow)
-      )
-
+      .flatMap(purch => testDB.tables.products.filter(s => s.name == "test").map(s => (newId = s.id).toRow))
 
   def expectedQueryPattern =
     """
@@ -588,14 +536,9 @@ class NestedJoinSubquery11Test extends SQLStringQueryTest[AllCommerceDBs, (inner
   def testDescription = "Subquery: flatmap with flatmap on lhs"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products.map(p2 => (outerK1 = p1.id, outerK2 = p2.id).toRow)
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products.map(p2 => (outerK1 = p1.id, outerK2 = p2.id).toRow))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.buyers.map(p4 => (innerK1 = p3.outerK1, innerK2 = p4.name).toRow)
-    )
-
+    lhs.flatMap(p3 => testDB.tables.buyers.map(p4 => (innerK1 = p3.outerK1, innerK2 = p4.name).toRow))
 
   def expectedQueryPattern =
     """
@@ -615,16 +558,9 @@ class NestedJoinSubquery12Test extends SQLStringQueryTest[AllCommerceDBs, (inner
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products.map(p2 => (outerK1 = p1.id, outerK2 = p2.id).toRow)
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products.map(p2 => (outerK1 = p1.id, outerK2 = p2.id).toRow))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.map(p5 => (innerK1 = p3.outerK1, innerK2 = p5.name, innerK3 = p4.id).toRow)
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.map(p5 => (innerK1 = p3.outerK1, innerK2 = p5.name, innerK3 = p4.id).toRow)))
 
   def expectedQueryPattern =
     """
@@ -645,16 +581,9 @@ class NestedJoinSubquery13Test extends SQLStringQueryTest[AllCommerceDBs, Buyer]
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and identity map"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products.map(p => p)
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products.map(p => p))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.map(b => b)
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.map(b => b)))
 
   def expectedQueryPattern =
     """
@@ -675,16 +604,9 @@ class NestedJoinSubquery14Test extends SQLStringQueryTest[AllCommerceDBs, Buyer]
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and no map"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -705,11 +627,9 @@ class NestedJoinSubquery15Test extends SQLStringQueryTest[AllCommerceDBs, Produc
   def testDescription = "Subquery: flatmap with map on outer table"
 
   def query() =
-    testDB.tables.purchases.map(s => (newId = s.id).toRow)
-      .flatMap(purch =>
-        testDB.tables.products.filter(s => s.name == "test")
-      )
-
+    testDB.tables.purchases
+      .map(s => (newId = s.id).toRow)
+      .flatMap(purch => testDB.tables.products.filter(s => s.name == "test"))
 
   def expectedQueryPattern =
     """
@@ -725,21 +645,15 @@ class NestedJoinSubquery16Test extends SQLStringQueryTest[AllCommerceDBs, String
   def testDescription = "Subquery: double nested join with project"
 
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.map(prod =>
-        (name = prod.name, id = purch.id).toRow
+    testDB.tables.purchases
+      .flatMap(purch => testDB.tables.products.map(prod => (name = prod.name, id = purch.id).toRow))
+      .flatMap(purch =>
+        testDB.tables.purchases
+          .flatMap(purch => testDB.tables.products.map(prod => (name = prod.name, id = purch.id).toRow))
+          //        .sort(_.price, Ord.DESC).take(1)
+          .filter(prod => prod.id == purch.id)
+          .map(prod => purch.name)
       )
-    ).flatMap(purch =>
-      testDB.tables.purchases.flatMap(purch =>
-          testDB.tables.products.map(prod =>
-            (name = prod.name, id = purch.id).toRow
-          )
-        )
-        //        .sort(_.price, Ord.DESC).take(1)
-        .filter(prod => prod.id == purch.id)
-        .map(prod => purch.name)
-    )
-
 
   def expectedQueryPattern =
     """
@@ -756,16 +670,9 @@ class NestedJoinSubqueryFilter1Test extends SQLStringQueryTest[AllCommerceDBs, B
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filter on outer"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products.filter(p => p.id > 1)
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products.filter(p => p.id > 1))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -787,16 +694,9 @@ class NestedJoinSubqueryFilter2Test extends SQLStringQueryTest[AllCommerceDBs, B
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filter on both outer relations"
 
   def query() =
-    val lhs = testDB.tables.purchases.filter(p => p.id > 2).flatMap(p1 =>
-      testDB.tables.products.filter(p => p.id > 1)
-    )
+    val lhs = testDB.tables.purchases.filter(p => p.id > 2).flatMap(p1 => testDB.tables.products.filter(p => p.id > 1))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -818,15 +718,9 @@ class NestedJoinSubqueryFilter3Test extends SQLStringQueryTest[AllCommerceDBs, B
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filter on both outer relations, one inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.filter(p => p.id > 2).flatMap(p1 =>
-      testDB.tables.products.filter(p => p.id > 1)
-    )
+    val lhs = testDB.tables.purchases.filter(p => p.id > 2).flatMap(p1 => testDB.tables.products.filter(p => p.id > 1))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    ).filter(b => b.id > 3)
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers)).filter(b => b.id > 3)
 
   def expectedQueryPattern =
     """
@@ -853,15 +747,9 @@ class NestedJoinSubqueryFilter4Test extends SQLStringQueryTest[AllCommerceDBs, B
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filter on both outer relations, one inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.filter(b => b.id > 3)
-      )
-    )
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.filter(b => b.id > 3)))
 
   def expectedQueryPattern =
     """
@@ -882,15 +770,9 @@ class NestedJoinSubqueryFilter6Test extends SQLStringQueryTest[AllCommerceDBs, B
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filter on both outer relations, both inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.filter(s => s.id > 4).flatMap(p4 =>
-        testDB.tables.buyers.filter(b => b.id > 3)
-      )
-    )
+    lhs.flatMap(p3 => testDB.tables.shipInfos.filter(s => s.id > 4).flatMap(p4 => testDB.tables.buyers.filter(b => b.id > 3)))
 
   def expectedQueryPattern =
     """
@@ -912,15 +794,9 @@ class NestedJoinSubqueryFilter7Test extends SQLStringQueryTest[AllCommerceDBs, B
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filter outer result"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    ).filter(s => s.id > 4)
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products).filter(s => s.id > 4)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -942,15 +818,9 @@ class NestedJoinSubqueryFilter8Test extends SQLStringQueryTest[AllCommerceDBs, B
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs filters everywhere"
 
   def query() =
-    val lhs = testDB.tables.purchases.filter(s => s.id > 1).flatMap(p1 =>
-      testDB.tables.products.filter(s => s.id > 2)
-    ).filter(s => s.id > 3)
+    val lhs = testDB.tables.purchases.filter(s => s.id > 1).flatMap(p1 => testDB.tables.products.filter(s => s.id > 2)).filter(s => s.id > 3)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.filter(s => s.id > 5).flatMap(p4 =>
-        testDB.tables.buyers.filter(s => s.id > 6)
-      )
-    ).filter(s => s.id > 7)
+    lhs.flatMap(p3 => testDB.tables.shipInfos.filter(s => s.id > 5).flatMap(p4 => testDB.tables.buyers.filter(s => s.id > 6))).filter(s => s.id > 7)
 
   def expectedQueryPattern =
     """
@@ -975,16 +845,9 @@ class NestedJoinSubqueryLimit1Test extends SQLStringQueryTest[AllCommerceDBs, Bu
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and limit on outer"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products.limit(1)
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products.limit(1))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -1005,16 +868,9 @@ class NestedJoinSubqueryLimit2Test extends SQLStringQueryTest[AllCommerceDBs, Bu
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and limit on both outer relations"
 
   def query() =
-    val lhs = testDB.tables.purchases.limit(2).flatMap(p1 =>
-      testDB.tables.products.limit(1)
-    )
+    val lhs = testDB.tables.purchases.limit(2).flatMap(p1 => testDB.tables.products.limit(1))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -1035,15 +891,9 @@ class NestedJoinSubqueryLimit3Test extends SQLStringQueryTest[AllCommerceDBs, Bu
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and limit on both outer relations, one inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.limit(2).flatMap(p1 =>
-      testDB.tables.products.limit(1)
-    )
+    val lhs = testDB.tables.purchases.limit(2).flatMap(p1 => testDB.tables.products.limit(1))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    ).limit(3)
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers)).limit(3)
 
   def expectedQueryPattern =
     """
@@ -1066,9 +916,7 @@ class FlatmapLimitTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: flatmap with limit"
 
   def query() =
-    testDB.tables.shipInfos.flatMap(p4 =>
-      testDB.tables.buyers.limit(3)
-    )
+    testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.limit(3))
 
   def expectedQueryPattern =
     """
@@ -1084,9 +932,7 @@ class FlatmapFlatTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: flatmap with only row"
 
   def query() =
-    testDB.tables.shipInfos.flatMap(p4 =>
-      testDB.tables.buyers
-    )
+    testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers)
 
   def expectedQueryPattern =
     """
@@ -1102,9 +948,7 @@ class FlatmapFlat2Test extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription = "Subquery: flatmap with only row"
 
   def query() =
-    testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    )
+    testDB.tables.purchases.flatMap(p1 => testDB.tables.products)
 
   def expectedQueryPattern =
     """
@@ -1120,13 +964,7 @@ class FlatmapFlat3Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: flatmap with only row"
 
   def query() =
-    testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    ).flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
+    testDB.tables.purchases.flatMap(p1 => testDB.tables.products).flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -1142,11 +980,7 @@ class FlatmapFlat4Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: flatmap with only row"
 
   def query() =
-    testDB.tables.purchases.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.limit(1)
-      )
-    )
+    testDB.tables.purchases.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.limit(1)))
 
   def expectedQueryPattern =
     """
@@ -1162,11 +996,7 @@ class FlatmapFlat5Test extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: flatmap with only row"
 
   def query() =
-    testDB.tables.purchases.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
+    testDB.tables.purchases.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -1182,15 +1012,9 @@ class NestedJoinSubqueryLimit4Test extends SQLStringQueryTest[AllCommerceDBs, Bu
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and limit on both outer relations, one inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.limit(3)
-      )
-    )
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.limit(3)))
 
   def expectedQueryPattern =
     """
@@ -1211,15 +1035,9 @@ class NestedJoinSubqueryLimit6Test extends SQLStringQueryTest[AllCommerceDBs, Bu
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and limit on both outer relations, both inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.limit(4).flatMap(p4 =>
-        testDB.tables.buyers.limit(3)
-      )
-    )
+    lhs.flatMap(p3 => testDB.tables.shipInfos.limit(4).flatMap(p4 => testDB.tables.buyers.limit(3)))
 
   def expectedQueryPattern =
     """
@@ -1240,15 +1058,9 @@ class NestedJoinSubqueryLimit7Test extends SQLStringQueryTest[AllCommerceDBs, Bu
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and limit outer result"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    ).limit(4)
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products).limit(4)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers
-      )
-    )
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers))
 
   def expectedQueryPattern =
     """
@@ -1270,15 +1082,9 @@ class NestedJoinSubqueryLimit8Test extends SQLStringQueryTest[AllCommerceDBs, Bu
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs limits everywhere"
 
   def query() =
-    val lhs = testDB.tables.purchases.limit(1).flatMap(p1 =>
-      testDB.tables.products.limit(2)
-    ).limit(3)
+    val lhs = testDB.tables.purchases.limit(1).flatMap(p1 => testDB.tables.products.limit(2)).limit(3)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.limit(5).flatMap(p4 =>
-        testDB.tables.buyers.limit(6)
-      )
-    ).limit(7)
+    lhs.flatMap(p3 => testDB.tables.shipInfos.limit(5).flatMap(p4 => testDB.tables.buyers.limit(6))).limit(7)
 
   def expectedQueryPattern =
     """
@@ -1301,16 +1107,9 @@ class NestedJoinSubqueryFilterMap1Test extends SQLStringQueryTest[AllCommerceDBs
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filterMap on outer"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products.filter(p => p.id > 1).map(r => (newId=r.id))
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products.filter(p => p.id > 1).map(r => (newId = r.id)))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.map(r => (newId = r.id))
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.map(r => (newId = r.id))))
 
   def expectedQueryPattern =
     """
@@ -1332,16 +1131,12 @@ class NestedJoinSubqueryFilterMap2Test extends SQLStringQueryTest[AllCommerceDBs
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filterMap on both outer relations"
 
   def query() =
-    val lhs = testDB.tables.purchases.filter(p => p.id > 2).map(r => (newId=r.id)).flatMap(p1 =>
-      testDB.tables.products.filter(p => p.id > 1).map(r => (newId=r.id))
-    )
+    val lhs = testDB.tables.purchases
+      .filter(p => p.id > 2)
+      .map(r => (newId = r.id))
+      .flatMap(p1 => testDB.tables.products.filter(p => p.id > 1).map(r => (newId = r.id)))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.map(r => (newId = r.id))
-      )
-    )
-
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.map(r => (newId = r.id))))
 
   def expectedQueryPattern =
     """
@@ -1368,15 +1163,15 @@ class NestedJoinSubqueryFilterMap3Test extends SQLStringQueryTest[AllCommerceDBs
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filterMap on both outer relations, one inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.filter(p => p.id > 2).map(r => (newId=r.id)).flatMap(p1 =>
-      testDB.tables.products.filter(p => p.id > 1).map(r => (newId=r.id))
-    )
+    val lhs = testDB.tables.purchases
+      .filter(p => p.id > 2)
+      .map(r => (newId = r.id))
+      .flatMap(p1 => testDB.tables.products.filter(p => p.id > 1).map(r => (newId = r.id)))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.map(r => (newId = r.id).toRow)
-      )
-    ).filter(p=> p.newId > 3).map(r => (newId=r.newId).toRow)
+    lhs
+      .flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.map(r => (newId = r.id).toRow)))
+      .filter(p => p.newId > 3)
+      .map(r => (newId = r.newId).toRow)
 
   def expectedQueryPattern =
     """
@@ -1403,15 +1198,9 @@ class NestedJoinSubqueryFilterMap4Test extends SQLStringQueryTest[AllCommerceDBs
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filterMap on both outer relations, one inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products.map(r => (newId = r.id).toRow)
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products.map(r => (newId = r.id).toRow))
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.filter(p=> p.id > 3).map(r => (newId=r.id).toRow)
-      )
-    )
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.filter(p => p.id > 3).map(r => (newId = r.id).toRow)))
 
   def expectedQueryPattern =
     """
@@ -1433,14 +1222,13 @@ class NestedJoinSubqueryFilterMap6Test extends SQLStringQueryTest[AllCommerceDBs
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filterMap on both outer relations, both inner relation"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products.map(r => (newId = r.id).toRow)
-    )
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products.map(r => (newId = r.id).toRow))
 
     lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.filter(p => p.id > 4).map(r => (newId=r.id).toRow).flatMap(p4 =>
-        testDB.tables.buyers.filter(p =>p.id > 3).map(r => (newId=r.id).toRow)
-      )
+      testDB.tables.shipInfos
+        .filter(p => p.id > 4)
+        .map(r => (newId = r.id).toRow)
+        .flatMap(p4 => testDB.tables.buyers.filter(p => p.id > 3).map(r => (newId = r.id).toRow))
     )
 
   def expectedQueryPattern =
@@ -1463,15 +1251,9 @@ class NestedJoinSubqueryFilterMap7Test extends SQLStringQueryTest[AllCommerceDBs
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs and filterMap outer result"
 
   def query() =
-    val lhs = testDB.tables.purchases.flatMap(p1 =>
-      testDB.tables.products
-    ).filter(p =>p.id > 4).map(r => (newId=r.id).toRow)
+    val lhs = testDB.tables.purchases.flatMap(p1 => testDB.tables.products).filter(p => p.id > 4).map(r => (newId = r.id).toRow)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.map(r => (newId = r.id).toRow)
-      )
-    )
+    lhs.flatMap(p3 => testDB.tables.shipInfos.flatMap(p4 => testDB.tables.buyers.map(r => (newId = r.id).toRow)))
 
   def expectedQueryPattern =
     """
@@ -1492,15 +1274,22 @@ class NestedJoinSubqueryFilterMap8Test extends SQLStringQueryTest[AllCommerceDBs
   def testDescription = "Subquery: flatmap with flatmap on lhs and rhs filterMaps everywhere"
 
   def query() =
-    val lhs = testDB.tables.purchases.filter(p =>p.id > 1).map(r => (newId=r.id).toRow).flatMap(p1 =>
-      testDB.tables.products.filter(p =>p.id > 2).map(r => (newId=r.id).toRow)
-    ).filter(p =>p.newId > 3).map(r => (newId=r.newId).toRow)
+    val lhs = testDB.tables.purchases
+      .filter(p => p.id > 1)
+      .map(r => (newId = r.id).toRow)
+      .flatMap(p1 => testDB.tables.products.filter(p => p.id > 2).map(r => (newId = r.id).toRow))
+      .filter(p => p.newId > 3)
+      .map(r => (newId = r.newId).toRow)
 
-    lhs.flatMap(p3 =>
-      testDB.tables.shipInfos.filter(p => p.id > 5).map(r => (newId=r.id).toRow).flatMap(p4 =>
-        testDB.tables.buyers.filter(p => p.id > 6).map(r => (newId=r.id).toRow)
+    lhs
+      .flatMap(p3 =>
+        testDB.tables.shipInfos
+          .filter(p => p.id > 5)
+          .map(r => (newId = r.id).toRow)
+          .flatMap(p4 => testDB.tables.buyers.filter(p => p.id > 6).map(r => (newId = r.id).toRow))
       )
-    ).filter(p =>p.newId > 7).map(r => (newId=r.newId).toRow)
+      .filter(p => p.newId > 7)
+      .map(r => (newId = r.newId).toRow)
 
   def expectedQueryPattern =
     """
@@ -1539,12 +1328,7 @@ class NestedJoinExtraTest extends SQLStringQueryTest[AllCommerceDBs, (name: Stri
   def testDescription = "Subquery: nested flatMaps with map from both"
 
   def query() =
-    testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.map(prod =>
-        (name = prod.name, id = purch.id).toRow
-      )
-    ).filter(row => row.name == "test")
-
+    testDB.tables.purchases.flatMap(purch => testDB.tables.products.map(prod => (name = prod.name, id = purch.id).toRow)).filter(row => row.name == "test")
 
   def expectedQueryPattern =
     """
@@ -1565,12 +1349,9 @@ class NestedJoinExtra2Test extends SQLStringQueryTest[AllCommerceDBs, (name: Str
   def testDescription = "Subquery: nested flatMaps with map from both"
 
   def query() =
-    testDB.tables.purchases.filter(row => row.id == 1).flatMap(purch =>
-      testDB.tables.products.filter(row => row.name == "test").map(prod =>
-        (name = prod.name, id = purch.id).toRow
-      )
-    )
-
+    testDB.tables.purchases
+      .filter(row => row.id == 1)
+      .flatMap(purch => testDB.tables.products.filter(row => row.name == "test").map(prod => (name = prod.name, id = purch.id).toRow))
 
   def expectedQueryPattern =
     """
@@ -1584,20 +1365,12 @@ class NestedJoinExtra2Test extends SQLStringQueryTest[AllCommerceDBs, (name: Str
     """
 }
 
-
 class NestedJoinExtra4Test extends SQLStringQueryTest[AllCommerceDBs, Purchase] {
   def testDescription = "Subquery: nested join with one side nested"
 
   def query() =
-    val table1 = testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.map(prod =>
-        (name = prod.name, id = purch.id).toRow
-      )
-    )
-    table1.flatMap(t =>
-      testDB.tables.purchases.filter(f => f.id == t.id)
-    )
-
+    val table1 = testDB.tables.purchases.flatMap(purch => testDB.tables.products.map(prod => (name = prod.name, id = purch.id).toRow))
+    table1.flatMap(t => testDB.tables.purchases.filter(f => f.id == t.id))
 
   def expectedQueryPattern =
     """
@@ -1614,15 +1387,10 @@ class NestedJoinExtra4Test extends SQLStringQueryTest[AllCommerceDBs, Purchase] 
     """
 }
 
-
 class SubqueryInFilterSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Buyer] {
   def testDescription = "Subquery: subqueryInFilter"
   def query() =
-    testDB.tables.buyers.filter(c =>
-      testDB.tables.shipInfos.filter(s =>
-        c.id == s.buyerId
-      ).size == 0
-    )
+    testDB.tables.buyers.filter(c => testDB.tables.shipInfos.filter(s => c.id == s.buyerId).size == 0)
   def expectedQueryPattern = """
         SELECT
           *
@@ -1638,9 +1406,7 @@ class SubqueryInFilterSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Bu
 class SubqueryInMapSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (buyers: Buyer, count: Int)] {
   def testDescription = "Subquery: subqueryInMap"
   def query() =
-    testDB.tables.buyers.map(c =>
-      (buyers = c, count = testDB.tables.shipInfos.filter(p => c.id == p.buyerId).size).toRow
-    )
+    testDB.tables.buyers.map(c => (buyers = c, count = testDB.tables.shipInfos.filter(p => c.id == p.buyerId).size).toRow)
   def expectedQueryPattern = """
         SELECT buyers$A as buyers, (SELECT COUNT(1) FROM shippingInfo as shippingInfo$B WHERE buyers$A.id = shippingInfo$B.buyerId) as count FROM buyers as buyers$A
       """
@@ -1649,9 +1415,7 @@ class SubqueryInMapSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (buye
 class SubqueryInMapNestedSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, (buyer: Buyer, occurances: Boolean)] {
   def testDescription = "Subquery: subqueryInMapNested"
   def query() =
-    testDB.tables.buyers.map(c =>
-      (buyer = c, occurances = testDB.tables.shipInfos.filter(p => p.buyerId == c.id).size == 1).toRow
-    )
+    testDB.tables.buyers.map(c => (buyer = c, occurances = testDB.tables.shipInfos.filter(p => p.buyerId == c.id).size == 1).toRow)
   def expectedQueryPattern = """
         SELECT
           buyers$B as buyer,
@@ -1706,7 +1470,8 @@ class SubqueryUnionSelectLimitSubqueryTest extends SQLStringQueryTest[AllCommerc
       .unionAll(
         testDB.tables.products
           .map(_.name.toLowerCase)
-          .take(2))
+          .take(2)
+      )
   def expectedQueryPattern = """
         (SELECT LOWER(buyers$A.name) FROM buyers as buyers$A)
         UNION ALL
@@ -1737,8 +1502,9 @@ class UnionAllAggregateSubqueryTest extends SQLStringAggregationTest[AllCommerce
   def query() =
     testDB.tables.products
       .map(p => (name = p.name.toLowerCase, price = p.price).toRow)
-      .unionAll(testDB.tables.products
-        .map(p2 => (name = p2.name.toLowerCase, price = p2.price).toRow)
+      .unionAll(
+        testDB.tables.products
+          .map(p2 => (name = p2.name.toLowerCase, price = p2.price).toRow)
       )
       .aggregate(p => (max = max(p.price), min = min(p.price)).toRow)
   def expectedQueryPattern = """

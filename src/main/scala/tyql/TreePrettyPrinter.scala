@@ -3,9 +3,8 @@ package tyql
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
 
-/**
- * Convenience printer for AST + IR trees, for debugging.
- */
+/** Convenience printer for AST + IR trees, for debugging.
+  */
 object TreePrettyPrinter {
   import Query.*
   import Expr.*
@@ -20,7 +19,6 @@ object TreePrettyPrinter {
 //      s"${indent(level)}$key=[ ${values.head.stripLeading()} ]"
     else
       s"${indent(level)}$key=${values.mkString("[\n", ",\n", s"\n${indent(level)}]")}"
-
 
   extension (fun: Fun[?, ?, ?]) {
     def prettyPrint(depth: Int): String = fun match
@@ -40,12 +38,12 @@ object TreePrettyPrinter {
   extension (expr: Expr[?, ?]) {
     def prettyPrint(depth: Int): String = expr match {
       case Select(x, name) => s"${indent(depth)}Select(${x.prettyPrint(0)}.$name)"
-      case Ref() => s"${indent(depth)}${expr.asInstanceOf[Ref[?, ?]].stringRef()}"
-      case Eq(x, y) => s"${indent(depth)}Eq(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Ne(x, y) => s"${indent(depth)}Ne(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Gt(x, y) => s"${indent(depth)}Gt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Lt(x, y) => s"${indent(depth)}Lt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Lte(x, y) => s"${indent(depth)}Lte(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Ref()           => s"${indent(depth)}${expr.asInstanceOf[Ref[?, ?]].stringRef()}"
+      case Eq(x, y)        => s"${indent(depth)}Eq(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Ne(x, y)        => s"${indent(depth)}Ne(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Gt(x, y)        => s"${indent(depth)}Gt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Lt(x, y)        => s"${indent(depth)}Lt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Lte(x, y)       => s"${indent(depth)}Lte(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case ListExpr(elements) =>
         s"${indent(depth)}ListExpr(\n${elements.map(_.prettyPrint(depth + 1)).mkString("\n")}\n${indent(depth)}"
       case ListPrepend(x, list) =>
@@ -61,24 +59,24 @@ object TreePrettyPrinter {
       case IsEmpty(list) =>
         s"${indent(depth)}IsEmpty(\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
       case GtDouble(x, y) => s"${indent(depth)}GtDouble(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case And(x, y) => s"${indent(depth)}And(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Or(x, y) => s"${indent(depth)}Or(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Not(x) => s"${indent(depth)}Not(${x.prettyPrint(depth + 1)})"
-      case Plus(x, y) => s"${indent(depth)}Plus(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Times(x, y) => s"${indent(depth)}Times(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Upper(x) => s"${indent(depth)}Upper(${x.prettyPrint(depth + 1)})"
-      case Lower(x) => s"${indent(depth)}Lower(${x.prettyPrint(depth + 1)})"
+      case And(x, y)      => s"${indent(depth)}And(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Or(x, y)       => s"${indent(depth)}Or(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Not(x)         => s"${indent(depth)}Not(${x.prettyPrint(depth + 1)})"
+      case Plus(x, y)     => s"${indent(depth)}Plus(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Times(x, y)    => s"${indent(depth)}Times(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Upper(x)       => s"${indent(depth)}Upper(${x.prettyPrint(depth + 1)})"
+      case Lower(x)       => s"${indent(depth)}Lower(${x.prettyPrint(depth + 1)})"
       case Concat(x, y) =>
         s"${indent(depth)}Concat(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case IntLit(value) => s"${indent(depth)}IntLit($value)"
-      case StringLit(value) => s"${indent(depth)}StringLit($value)"
-      case DoubleLit(value) => s"${indent(depth)}DoubleLit($value)"
+      case IntLit(value)     => s"${indent(depth)}IntLit($value)"
+      case StringLit(value)  => s"${indent(depth)}StringLit($value)"
+      case DoubleLit(value)  => s"${indent(depth)}DoubleLit($value)"
       case BooleanLit(value) => s"${indent(depth)}BooleanLit($value)"
       case Project(inner) =>
         val a = NamedTuple.toTuple(inner.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
         val namedTupleNames = expr.tag match
           case ResultTag.NamedTupleTag(names, types) => names.lift
-          case _ => Seq()
+          case _                                     => Seq()
         val children = a.toList.zipWithIndex
           .map((expr, idx) =>
             val e = expr.asInstanceOf[Expr[?, ?]]
@@ -87,11 +85,11 @@ object TreePrettyPrinter {
           )
         s"${indent(depth)}Project(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
       case a: AggregationExpr[?] => a.prettyPrint(depth)
-      case a: Aggregation[?] => a.prettyPrint(depth)
-      case _ => throw new Exception(s"Unimplemented pretty print EXPR $expr")
+      case a: Aggregation[?]     => a.prettyPrint(depth)
+      case _                     => throw new Exception(s"Unimplemented pretty print EXPR $expr")
     }
   }
-  extension(agg: Aggregation[?]) {
+  extension (agg: Aggregation[?]) {
     def prettyPrint(depth: Int): String = agg match {
       case Aggregation.AggFlatMap(from, query) =>
         s"${indent(depth)}AggFlatMap(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
@@ -99,23 +97,23 @@ object TreePrettyPrinter {
         s"${indent(depth)}AggFilter(\n${from.prettyPrint(depth + 1)},\n${query.prettyPrint(depth + 1)}\n${indent(depth)})"
     }
   }
-  extension(agg: AggregationExpr[?]) {
+  extension (agg: AggregationExpr[?]) {
     def prettyPrint(depth: Int): String = agg match {
-      case Min(x) => s"${indent(depth)}Min(${x.prettyPrint(depth + 1).stripLeading()})"
-      case Max(x) => s"${indent(depth)}Max(${x.prettyPrint(depth + 1).stripLeading()})"
-      case Sum(x) => s"${indent(depth)}Sum(${x.prettyPrint(depth + 1).stripLeading()})"
-      case Avg(x) => s"${indent(depth)}Avg(${x.prettyPrint(depth + 1).stripLeading()})"
+      case Min(x)   => s"${indent(depth)}Min(${x.prettyPrint(depth + 1).stripLeading()})"
+      case Max(x)   => s"${indent(depth)}Max(${x.prettyPrint(depth + 1).stripLeading()})"
+      case Sum(x)   => s"${indent(depth)}Sum(${x.prettyPrint(depth + 1).stripLeading()})"
+      case Avg(x)   => s"${indent(depth)}Avg(${x.prettyPrint(depth + 1).stripLeading()})"
       case Count(x) => s"${indent(depth)}Count(${x.prettyPrint(depth + 1).stripLeading()})"
       case AggProject(inner) =>
         val a = NamedTuple.toTuple(inner.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
         val namedTupleNames = agg.tag match
           case ResultTag.NamedTupleTag(names, types) => names.lift
-          case _ => Seq()
+          case _                                     => Seq()
         val children = a.toList.zipWithIndex
           .map((expr, idx) =>
             val e = expr.asInstanceOf[Expr[?, ?]]
             val namedStr = namedTupleNames(idx).fold("")(n => s"$n=")
-            s"${indent(depth+1)}$namedStr${e.prettyPrint(0)}"
+            s"${indent(depth + 1)}$namedStr${e.prettyPrint(0)}"
           )
         s"${indent(depth)}AggProject(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
       case _ => throw new Exception(s"Unimplemented pretty print AGG $agg")
@@ -157,15 +155,15 @@ object TreePrettyPrinter {
 //      case GroupBy(query, selectFn, groupingFn, havingFn) =>
 //        s"${indent(depth)}GroupBy(\n${query.prettyPrint(depth + 1)},\n${selectFn.prettyPrint(depth + 1)},\n${groupingFn.prettyPrint(depth + 1)},\n${havingFn.prettyPrint(depth + 1)}\n${indent(depth)})"
       case MultiRecursive(refs, querys, finalQ) =>
-        val refStr = refs.toList.map(r => r.toQuery.prettyPrint(depth+1))
+        val refStr = refs.toList.map(r => r.toQuery.prettyPrint(depth + 1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?, ?]].prettyPrint(depth + 2))
         val str = refStr.zip(qryStr).map((r, q) => s"\n$r :=\n$q").mkString(",\n")
         val finalQStr = finalQ.prettyPrint(depth + 1)
-        s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth+1, "FINAL->", finalQStr)}\n${indent(depth)})"
-      case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?, ?]].stringRef()})"
+        s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth + 1, "FINAL->", finalQStr)}\n${indent(depth)})"
+      case QueryRef()        => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?, ?]].stringRef()})"
       case a: Aggregation[?] => a.prettyPrint(depth)
       case GroupBy(source, grouping, select, having) =>
-        s"${indent(depth)}GroupBy(\n${source.prettyPrint(depth + 1)},\n${grouping.prettyPrint(depth + 1)},\n${select.prettyPrint(depth + 1)},\n${having.map(_.prettyPrint(depth + 1)).getOrElse(s"${indent(depth+1)}-")}\n${indent(depth)})"
+        s"${indent(depth)}GroupBy(\n${source.prettyPrint(depth + 1)},\n${grouping.prettyPrint(depth + 1)},\n${select.prettyPrint(depth + 1)},\n${having.map(_.prettyPrint(depth + 1)).getOrElse(s"${indent(depth + 1)}-")}\n${indent(depth)})"
       case _ => throw new Exception(s"Unimplemented pretty print AST $ast")
     }
   }
@@ -176,21 +174,25 @@ object TreePrettyPrinter {
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", tableLeaf.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}TableLeaf{${relationOp.alias}{${relationOp.flags.mkString(",")}}(${tableLeaf.tableName}$astPrint)"
       case selectQuery: SelectQuery =>
-        val projectPrint =  indentWithKey(depth + 1, "project", selectQuery.project.prettyPrintIR(depth + 1, printAST))
-        val fromPrint =     indentListWithKey(depth + 1, "from", selectQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
-        val wherePrint =    indentListWithKey(depth + 1, "where", selectQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
+        val projectPrint = indentWithKey(depth + 1, "project", selectQuery.project.prettyPrintIR(depth + 1, printAST))
+        val fromPrint = indentListWithKey(depth + 1, "from", selectQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
+        val wherePrint = indentListWithKey(depth + 1, "where", selectQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", selectQuery.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}SelectQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$projectPrint,\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
       case selectAllQuery: SelectAllQuery =>
-        val fromPrint =     indentListWithKey(depth + 1, "from", selectAllQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
-        val wherePrint =    indentListWithKey(depth + 1, "where", selectAllQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
+        val fromPrint = indentListWithKey(depth + 1, "from", selectAllQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
+        val wherePrint = indentListWithKey(depth + 1, "where", selectAllQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", selectAllQuery.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}SelectAllQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
       case orderedQuery: OrderedQuery =>
         val queryPrint = orderedQuery.query.prettyPrintIR(depth + 1, printAST)
-        val sortFnPrint = indentListWithKey(depth+1, "sort", orderedQuery.sortFn.map { case (node, ord) =>
-          s"${indent(depth + 2)}${ord.toString}::${node.prettyPrintIR(depth + 2, printAST).stripLeading()}"
-        })
+        val sortFnPrint = indentListWithKey(
+          depth + 1,
+          "sort",
+          orderedQuery.sortFn.map { case (node, ord) =>
+            s"${indent(depth + 2)}${ord.toString}::${node.prettyPrintIR(depth + 2, printAST).stripLeading()}"
+          }
+        )
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", orderedQuery.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}OrderedQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$queryPrint,\n$sortFnPrint$astPrint\n${indent(depth)})"
       case naryRelationOp: NaryRelationOp =>
@@ -229,11 +231,11 @@ object TreePrettyPrinter {
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", listType.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}ListTypeExpr(\n${listType.elements.map(_.prettyPrintIR(depth + 1, printAST)).mkString("\n,")}$astPrint\n${indent(depth)})"
       case where: WhereClause =>
-        val childrenPrint = where.children.map(_.prettyPrintIR(depth + 2, printAST)).mkString("[\n", ",\n", s"\n${indent(depth+1)}]")
+        val childrenPrint = where.children.map(_.prettyPrintIR(depth + 2, printAST)).mkString("[\n", ",\n", s"\n${indent(depth + 1)}]")
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", where.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}WhereClause(\n${indent(depth + 1)}$childrenPrint$astPrint\n${indent(depth)})"
       case proj: ProjectClause =>
-        val childrenPrint = proj.children.map(_.prettyPrintIR(depth + 2, printAST)).mkString("[\n", ",\n", s"\n${indent(depth+1)}]")
+        val childrenPrint = proj.children.map(_.prettyPrintIR(depth + 2, printAST)).mkString("[\n", ",\n", s"\n${indent(depth + 1)}]")
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", proj.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}ProjectClause(\n${indent(depth + 1)}$childrenPrint$astPrint\n${indent(depth)})"
       case attrExpr: AttrExpr =>

@@ -21,25 +21,24 @@ given TCDBs: TestDatabase[TCDB] with
     emptyEdges = Table[Edge]("empty")
   )
 
-/**
- * Constraint: "safe" datalog queries, e.g. all variables present in the head
- * are also present in at least one body rule. Also called "range restricted".
- *
- * This is equivalent to saying that every column of the relation needs to be defined
- * in the recursive definition. This is handled by regular type checking the named tuple,
- * since if you try to assign (y: Int) to (x: Int, y: Int) it will not compile.
- */
+/** Constraint: "safe" datalog queries, e.g. all variables present in the head are also present in at least one body rule. Also called "range restricted".
+  *
+  * This is equivalent to saying that every column of the relation needs to be defined in the recursive definition. This is handled by regular type checking the
+  * named tuple, since if you try to assign (y: Int) to (x: Int, y: Int) it will not compile.
+  */
 class RecursionConstraintRangeRestrictionTest extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "Range restricted correctly"
 
   def query() =
     val path = testDB.tables.edges
     path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = e.y, y = e.y).toRow)
-      ).distinct
+      path
+        .flatMap(p =>
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = e.y, y = e.y).toRow)
+        )
+        .distinct
     )
   def expectedQueryPattern: String =
     """
@@ -53,12 +52,12 @@ class RecursionConstraintRangeRestrictionTest extends SQLStringQueryTest[TCDB, E
 }
 class RecursionConstraintRangeRestrictionFailTest extends munit.FunSuite {
   def testDescription: String = "Range restricted incorrectly"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(y : Int), tyql.SetResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String =
+    "Found:    tyql.RestrictedQuery[(y : Int), tyql.SetResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
@@ -90,11 +89,13 @@ class RecursionConstraintCategoryResultTest extends SQLStringQueryTest[TCDB, Edg
   def query() =
     val path = testDB.tables.edges
     path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = e.y, y = e.y).toRow)
-      ).union(testDB.tables.edges2)
+      path
+        .flatMap(p =>
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = e.y, y = e.y).toRow)
+        )
+        .union(testDB.tables.edges2)
     )
   def expectedQueryPattern: String =
     """
@@ -110,12 +111,12 @@ class RecursionConstraintCategoryResultTest extends SQLStringQueryTest[TCDB, Edg
 }
 class RecursionConstraintCategoryUnionAllFailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String =
+    "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
@@ -144,12 +145,12 @@ class RecursionConstraintCategoryUnionAllFailTest extends munit.FunSuite {
 }
 class RecursionConstraintCategoryFlatmapFailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, missing distinct"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String =
+    "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
@@ -182,8 +183,7 @@ class RecursionConstraintMonotonic1FailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
@@ -220,8 +220,7 @@ class RecursionConstraintMonotonic2FailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
@@ -258,8 +257,7 @@ class RecursionConstraintMonotonicInlineFailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -293,13 +291,17 @@ class RecursiveConstraintLinearTest extends SQLStringQueryTest[TCDB, Int] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct
-    ).map(p => p.x)
+    path
+      .fix(path =>
+        path
+          .flatMap(p =>
+            testDB.tables.edges
+              .filter(e => p.y == e.x)
+              .map(e => (x = p.x, y = e.y).toRow)
+          )
+          .distinct
+      )
+      .map(p => p.x)
 
   def expectedQueryPattern: String =
     """
@@ -316,12 +318,12 @@ class RecursiveConstraintLinearFailInline0Test extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 0 usages of path, inline fix"
 
   // Special because inline fix
-  def expectedError: String = "Found:    tyql.Query[(x : Int, y : Int), tyql.SetResult]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String =
+    "Found:    tyql.Query[(x : Int, y : Int), tyql.SetResult]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
              // BOILERPLATE
              import language.experimental.namedTuples
              import tyql.{Table, Expr}
@@ -353,11 +355,11 @@ class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 2 usages of path, inline fix"
 
 //  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.SetResult, ((0 : Int), (0 : Int))]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String =
+    "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.SetResult, ((0 : Int), (0 : Int))]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
                // BOILERPLATE
                import language.experimental.namedTuples
                import tyql.{Table, Expr}
@@ -391,8 +393,7 @@ class RecursiveConstraintLinearMultifix2xFailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
              // BOILERPLATE
              import language.experimental.namedTuples
              import tyql.{Table, Expr}
@@ -433,8 +434,7 @@ class RecursiveConstraintLinearMultifix0FailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
                // BOILERPLATE
                import language.experimental.namedTuples
                import tyql.{Table, Expr}
@@ -478,16 +478,20 @@ class RecursiveConstraintLinear5Test extends SQLStringQueryTest[TCDB, Edge] {
 //    type RQT = (RestrictedQuery[Edge, SetResult, Tuple1[0]], RestrictedQuery[Edge, SetResult, (0, 1)])
 //    val (pathResult, path2Result) = fix[QT, DT, RQT](pathBase, path2Base)((path, path2) =>
     val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
-      val P = path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct
-      val P2 = path.flatMap(p =>
-        path2
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct
+      val P = path
+        .flatMap(p =>
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        )
+        .distinct
+      val P2 = path
+        .flatMap(p =>
+          path2
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        )
+        .distinct
       (P, P2)
     )
 
@@ -548,11 +552,13 @@ class RecursiveConstraintLinear7Test extends SQLStringQueryTest[TCDB, Edge] {
     val pathBase = testDB.tables.edges
     val path2Base = testDB.tables.otherEdges
     val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
-      val P = path2.flatMap(p =>
-        path
-          .filter(e => p.q == e.x)
-          .map(e => (x = p.q, y = e.y).toRow)
-      ).distinct
+      val P = path2
+        .flatMap(p =>
+          path
+            .filter(e => p.q == e.x)
+            .map(e => (x = p.q, y = e.y).toRow)
+        )
+        .distinct
       val P2 = path2
       (P, P2)
     )
@@ -581,8 +587,7 @@ class RecursiveConstraintInvalidFailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
                  // BOILERPLATE
                  import language.experimental.namedTuples
                  import tyql.{Table, Expr}
@@ -620,8 +625,7 @@ class RecursiveConstraintInvalid2FailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
                    // BOILERPLATE
                    import language.experimental.namedTuples
                    import tyql.{Table, Expr}
@@ -660,8 +664,7 @@ class RecursiveConstraintInvalid3FailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
                      // BOILERPLATE
                      import language.experimental.namedTuples
                      import tyql.{Table, Expr}
@@ -700,8 +703,7 @@ class RecursiveConstraintInvalid4FailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-     """
+      compileErrors("""
      // BOILERPLATE
      import language.experimental.namedTuples
      import tyql.{Table, Expr}
@@ -740,8 +742,7 @@ class RecursiveConstraintInvalid5FailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
      // BOILERPLATE
      import language.experimental.namedTuples
      import tyql.{Table, Expr}
@@ -780,8 +781,7 @@ class RecursiveConstraintGroupbyInlineFailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
      // BOILERPLATE
      import language.experimental.namedTuples
      import tyql.{Table, Expr}
@@ -820,8 +820,7 @@ class RecursiveConstraintGroupbyMultifixFailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
      // BOILERPLATE
      import language.experimental.namedTuples
      import tyql.{Table, Expr}
@@ -869,8 +868,7 @@ class RecursiveConstraintNonlinearFailTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
      // BOILERPLATE
      import language.experimental.namedTuples
      import tyql.{Table, Expr}
@@ -915,8 +913,7 @@ class RecursiveConstraintAggregationMutualRecursionFailTest extends munit.FunSui
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
      // BOILERPLATE
      import language.experimental.namedTuples
      import tyql.{Table, Expr}
@@ -956,12 +953,12 @@ class RecursiveConstraintAggregationMutualRecursionFailTest extends munit.FunSui
 
 class RecursionConstraintCategoryUnionAll2FailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll, will not terminate!"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String =
+    "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
@@ -986,7 +983,6 @@ class RecursionConstraintCategoryUnionAll2FailTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-
 
 //class TESTTEST extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "Live tests"

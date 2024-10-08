@@ -59,11 +59,13 @@ class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
   def query() =
     val path = testDB.tables.edges
     path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct
+      path
+        .flatMap(p =>
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        )
+        .distinct
     )
   def expectedQueryPattern: String =
     """
@@ -82,11 +84,13 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
   def query() =
     val path = testDB.tables.edges.union(testDB.tables.edges)
     path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct
+      path
+        .flatMap(p =>
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        )
+        .distinct
     )
   def expectedQueryPattern: String =
     """
@@ -142,19 +146,22 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 //        """
 //}
 
-
 class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
   def testDescription: String = "TC with project"
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct
-    ).map(p => p.x)
+    path
+      .fix(path =>
+        path
+          .flatMap(p =>
+            testDB.tables.edges
+              .filter(e => p.y == e.x)
+              .map(e => (x = p.x, y = e.y).toRow)
+          )
+          .distinct
+      )
+      .map(p => p.x)
 
   def expectedQueryPattern: String =
     """
@@ -172,13 +179,17 @@ class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct
-    ).filter(p => p.x > 1)
+    path
+      .fix(path =>
+        path
+          .flatMap(p =>
+            testDB.tables.edges
+              .filter(e => p.y == e.x)
+              .map(e => (x = p.x, y = e.y).toRow)
+          )
+          .distinct
+      )
+      .filter(p => p.x > 1)
 
   def expectedQueryPattern: String =
     """
@@ -191,19 +202,23 @@ class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
           """
 }
 
-
 class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
   def testDescription: String = "TC with filter + map"
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct
-    ).filter(p => p.x > 1).map(p => p.x)
+    path
+      .fix(path =>
+        path
+          .flatMap(p =>
+            testDB.tables.edges
+              .filter(e => p.y == e.x)
+              .map(e => (x = p.x, y = e.y).toRow)
+          )
+          .distinct
+      )
+      .filter(p => p.x > 1)
+      .map(p => p.x)
 
   def expectedQueryPattern: String =
     """
@@ -227,7 +242,7 @@ given CSPADBs: TestDatabase[CSPADB] with
   )
 
   override def init(): String =
-  """
+    """
   CREATE TABLE assign (
       p1 INT,
       p2 INT
@@ -362,67 +377,78 @@ class RecursiveCSPADistinctTest extends SQLStringQueryTest[CSPADB, Location] {
 
     val memoryAliasBase =
       // MemoryAlias(x, x) :- Assign(_, x)
-      assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+      assign
+        .map(a => (p1 = a.p2, p2 = a.p2).toRow)
         .unionAll(
           // MemoryAlias(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
-        ).distinct
+        )
+        .distinct
 
     val valueFlowBase =
       assign // ValueFlow(y, x) :- Assign(y, x)
         .unionAll(
           // ValueFlow(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
-        ).unionAll(
+        )
+        .unionAll(
           // ValueFlow(x, x) :- Assign(_, x)
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
-        ).distinct
+        )
+        .distinct
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) =
+      unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)((valueFlow, valueAlias, memoryAlias) =>
         val VF =
           // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
-          assign.flatMap(a =>
-            memoryAlias
-              .filter(m => a.p2 == m.p1)
-              .map(m => (p1 = a.p1, p2 = m.p2).toRow
-              )
-          ).unionAll(
-            // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
-            valueFlow.flatMap(vf1 =>
-              valueFlow
-                .filter(vf2 => vf1.p2 == vf2.p1)
-                .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
+          assign
+            .flatMap(a =>
+              memoryAlias
+                .filter(m => a.p2 == m.p1)
+                .map(m => (p1 = a.p1, p2 = m.p2).toRow)
             )
-          ).distinct
+            .unionAll(
+              // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
+              valueFlow.flatMap(vf1 =>
+                valueFlow
+                  .filter(vf2 => vf1.p2 == vf2.p1)
+                  .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
+              )
+            )
+            .distinct
         val MA =
           // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-          dereference.flatMap(d1 =>
-            valueAlias.flatMap(va =>
-              dereference
-                .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
-                .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
+          dereference
+            .flatMap(d1 =>
+              valueAlias.flatMap(va =>
+                dereference
+                  .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
+                  .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
+              )
             )
-          ).distinct
+            .distinct
 
         val VA =
           // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
-          valueFlow.flatMap(vf1 =>
-            valueFlow
-              .filter(vf2 => vf1.p1 == vf2.p1)
-              .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
-          ).unionAll(
-            // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
-            valueFlow.flatMap(vf1 =>
-              memoryAlias.flatMap(m =>
-                valueFlow
-                  .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
-                  .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+          valueFlow
+            .flatMap(vf1 =>
+              valueFlow
+                .filter(vf2 => vf1.p1 == vf2.p1)
+                .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+            )
+            .unionAll(
+              // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+              valueFlow.flatMap(vf1 =>
+                memoryAlias.flatMap(m =>
+                  valueFlow
+                    .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
+                    .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+                )
               )
             )
-          ).distinct
+            .distinct
         (VF, MA, VA)
-    )
+      )
     valueFlowFinal
 
   def expectedQueryPattern: String =
@@ -473,7 +499,8 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
 
     val memoryAliasBase =
       // MemoryAlias(x, x) :- Assign(_, x)
-      assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+      assign
+        .map(a => (p1 = a.p2, p2 = a.p2).toRow)
         .union(
           // MemoryAlias(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
@@ -484,56 +511,62 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
         .union(
           // ValueFlow(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
-        ).union(
+        )
+        .union(
           // ValueFlow(x, x) :- Assign(_, x)
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) =
+      unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)((valueFlow, valueAlias, memoryAlias) =>
         val VF =
           // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
-          assign.flatMap(a =>
-            memoryAlias
-              .filter(m => a.p2 == m.p1)
-              .map(m => (p1 = a.p1, p2 = m.p2).toRow
+          assign
+            .flatMap(a =>
+              memoryAlias
+                .filter(m => a.p2 == m.p1)
+                .map(m => (p1 = a.p1, p2 = m.p2).toRow)
             )
-          ).union(
-            // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
-            valueFlow.flatMap(vf1 =>
-              valueFlow
-                .filter(vf2 => vf1.p2 == vf2.p1)
-                .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
+            .union(
+              // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
+              valueFlow.flatMap(vf1 =>
+                valueFlow
+                  .filter(vf2 => vf1.p2 == vf2.p1)
+                  .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
+              )
             )
-          )
         val MA =
           // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-          dereference.flatMap(d1 =>
-            valueAlias.flatMap(va =>
-              dereference
-                .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
-                .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
+          dereference
+            .flatMap(d1 =>
+              valueAlias.flatMap(va =>
+                dereference
+                  .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
+                  .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
+              )
             )
-          ).distinct
+            .distinct
 
         val VA =
           // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
-          valueFlow.flatMap(vf1 =>
-            valueFlow
-              .filter(vf2 => vf1.p1 == vf2.p1)
-              .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
-          ).union(
-            // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
-            valueFlow.flatMap(vf1 =>
-              memoryAlias.flatMap(m =>
-                valueFlow
-                  .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
-                  .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+          valueFlow
+            .flatMap(vf1 =>
+              valueFlow
+                .filter(vf2 => vf1.p1 == vf2.p1)
+                .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+            )
+            .union(
+              // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+              valueFlow.flatMap(vf1 =>
+                memoryAlias.flatMap(m =>
+                  valueFlow
+                    .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
+                    .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+                )
               )
             )
-          )
         (VF, MA, VA)
-    )
+      )
     valueFlowFinal
 
   def expectedQueryPattern: String =
@@ -583,7 +616,8 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
 
     val memoryAliasBase =
       // MemoryAlias(x, x) :- Assign(_, x)
-      assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+      assign
+        .map(a => (p1 = a.p2, p2 = a.p2).toRow)
         .union(
           // MemoryAlias(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
@@ -594,13 +628,14 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
         .union(
           // ValueFlow(x, x) :- Assign(x, _)
           assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
-        ).union(
+        )
+        .union(
           // ValueFlow(x, x) :- Assign(_, x)
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) =
+      unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)((valueFlow, valueAlias, memoryAlias) =>
         // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
         val vfDef1 =
           for
@@ -644,7 +679,7 @@ class RecursiveCSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location
         val VA = vaDef1.union(vaDef2)
 
         (VF, MA.distinct, VA)
-    )
+      )
     valueFlowFinal
   def expectedQueryPattern: String =
     """
@@ -707,12 +742,14 @@ class RecursionFibTest extends SQLStringQueryTest[FibNumDB, (FibonacciNumberInde
 
   def query() =
     val fib = testDB.tables.base
-    fib.fix(fib =>
-      fib
-        .filter(f => (f.recursionDepth + 1) < 10)
-        .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
-        .distinct
-    ).map(f => (FibonacciNumberIndex = f.recursionDepth, FibonacciNumber = f.fibonacciNumber).toRow)
+    fib
+      .fix(fib =>
+        fib
+          .filter(f => (f.recursionDepth + 1) < 10)
+          .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
+          .distinct
+      )
+      .map(f => (FibonacciNumberIndex = f.recursionDepth, FibonacciNumber = f.fibonacciNumber).toRow)
   def expectedQueryPattern: String =
     """
     WITH RECURSIVE
@@ -763,16 +800,21 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
         val initListPath: Expr.ListExpr[String] = List(t.name).toExpr
         (id = t.id, source = t.name, path = initListPath).toRow
       )
-    tagHierarchy0.fix(tagHierarchy1 =>
-      tagHierarchy1.flatMap(hier =>
-        testDB.tables.tag
-          .filter(t => t.subclassof == hier.id)
-          .map(t =>
-            val listPath = hier.path.prepend(t.name)
-            (id = t.id, source = t.name, path = listPath).toRow
+    tagHierarchy0
+      .fix(tagHierarchy1 =>
+        tagHierarchy1
+          .flatMap(hier =>
+            testDB.tables.tag
+              .filter(t => t.subclassof == hier.id)
+              .map(t =>
+                val listPath = hier.path.prepend(t.name)
+                (id = t.id, source = t.name, path = listPath).toRow
+              )
           )
-      ).distinct
-    ).filter(h => h.source == "Oasis").map(h => h.path)
+          .distinct
+      )
+      .filter(h => h.source == "Oasis")
+      .map(h => h.path)
   def expectedQueryPattern: String =
     """
       WITH RECURSIVE
@@ -813,15 +855,18 @@ class RecursionReachabilityTest extends SQLStringQueryTest[ReachabilityDB, Path]
       .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
       .filter(p => p.startNode == 1) // Filter after map means subquery
 
-    pathBase.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edge
-          .filter(e => e.x == p.endNode && !p.path.contains(e.y))
-          .map(e =>
-            (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
+    pathBase
+      .fix(path =>
+        path
+          .flatMap(p =>
+            testDB.tables.edge
+              .filter(e => e.x == p.endNode && !p.path.contains(e.y))
+              .map(e => (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow)
           )
-        ).distinct
-      ).sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
+          .distinct
+      )
+      .sort(p => p.path, Ord.ASC)
+      .sort(p => p.path.length, Ord.ASC)
 
   def expectedQueryPattern: String =
     """
@@ -845,17 +890,18 @@ class RecursionShortestPathTest extends SQLStringQueryTest[ReachabilityDB, Path]
       .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
       .filter(p => p.startNode == 1) // Filter after map means subquery
 
-    pathBase.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edge
-          .filter(e =>
-            e.x == p.endNode && path.filter(p2 => p2.path.contains(e.y)).isEmpty
+    pathBase
+      .fix(path =>
+        path
+          .flatMap(p =>
+            testDB.tables.edge
+              .filter(e => e.x == p.endNode && path.filter(p2 => p2.path.contains(e.y)).isEmpty)
+              .map(e => (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow)
           )
-          .map(e =>
-            (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
-          )
-      ).distinct
-    ).sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
+          .distinct
+      )
+      .sort(p => p.path, Ord.ASC)
+      .sort(p => p.path.length, Ord.ASC)
 
   def expectedQueryPattern: String =
     """
@@ -906,13 +952,17 @@ class RecursionBOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int
 
   def query() =
     val waitFor = testDB.tables.basic
-    waitFor.fix(waitFor =>
-      testDB.tables.assbl.flatMap(assbl =>
-        waitFor
-          .filter(wf => assbl.spart == wf.part)
-          .map(wf => (part = assbl.part, days = wf.days).toRow)
-      ).distinct
-    ).groupBy(wf => (part = wf.part).toRow, wf => (part = wf.part, max = max(wf.days)).toRow)
+    waitFor
+      .fix(waitFor =>
+        testDB.tables.assbl
+          .flatMap(assbl =>
+            waitFor
+              .filter(wf => assbl.spart == wf.part)
+              .map(wf => (part = assbl.part, days = wf.days).toRow)
+          )
+          .distinct
+      )
+      .groupBy(wf => (part = wf.part).toRow, wf => (part = wf.part, max = max(wf.days)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -956,13 +1006,17 @@ class RecursionSSSPTest extends SQLStringQueryTest[SSSPDB, SSSPBase] {
 
   def query() =
     val base = testDB.tables.base
-    base.fix(sp =>
-      testDB.tables.edge.flatMap(edge =>
-        sp
-          .filter(s => s.dst == edge.src)
-          .map(s => (dst = edge.dst, cost = s.cost + edge.cost).toRow)
-      ).distinct
-    ).groupBy(s => (dst = s.dst).toRow, s => (dst = s.dst, cost = min(s.cost)).toRow)
+    base
+      .fix(sp =>
+        testDB.tables.edge
+          .flatMap(edge =>
+            sp
+              .filter(s => s.dst == edge.src)
+              .map(s => (dst = edge.dst, cost = s.cost + edge.cost).toRow)
+          )
+          .distinct
+      )
+      .groupBy(s => (dst = s.dst).toRow, s => (dst = s.dst, cost = min(s.cost)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -983,13 +1037,19 @@ class RecursionCCTest extends SQLStringAggregationTest[TCDB, Int] {
 
   def query() =
     val base = testDB.tables.edges.map(e => (x = e.x, id = e.y))
-    base.fix(cc =>
-      testDB.tables.edges.flatMap(edge =>
-        cc
-          .filter(s => s.x == edge.x)
-          .map(s => (x = edge.y, id = s.id).toRow)
-      ).distinct
-    ).map(s => s.id).distinct.size
+    base
+      .fix(cc =>
+        testDB.tables.edges
+          .flatMap(edge =>
+            cc
+              .filter(s => s.x == edge.x)
+              .map(s => (x = edge.y, id = s.id).toRow)
+          )
+          .distinct
+      )
+      .map(s => s.id)
+      .distinct
+      .size
 
   def expectedQueryPattern: String =
     """
@@ -1011,13 +1071,17 @@ class RecursionCPTest extends SQLStringQueryTest[TCDB, (dst: Int, sum: Int)] {
 
   def query() =
     val base = testDB.tables.edges.map(e => (y = IntLit(1), cnt = IntLit(1)).toRow)
-    base.fix(cp =>
-      testDB.tables.edges.flatMap(edge =>
-        cp
-          .filter(cpaths => cpaths.y == edge.x)
-          .map(cpaths => (y = edge.y, cnt = cpaths.cnt).toRow)
-      ).distinct
-    ).groupBy(s => (dst = s.y).toRow, s => (dst = s.y, sum = sum(s.cnt)).toRow)
+    base
+      .fix(cp =>
+        testDB.tables.edges
+          .flatMap(edge =>
+            cp
+              .filter(cpaths => cpaths.y == edge.x)
+              .map(cpaths => (y = edge.y, cnt = cpaths.cnt).toRow)
+          )
+          .distinct
+      )
+      .groupBy(s => (dst = s.y).toRow, s => (dst = s.y, sum = sum(s.cnt)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -1052,13 +1116,17 @@ class RecursionManagementTest extends SQLStringQueryTest[ManagementDB, (mgr: Int
 
   def query() =
     val base = testDB.tables.reports.map(e => (mgr = e.mgr, cnt = IntLit(1)).toRow)
-    base.fix(empCount =>
-      testDB.tables.reports.flatMap(report =>
-        empCount
-          .filter(ec => ec.mgr == report.mgr)
-          .map(ec => (mgr = report.mgr, cnt = ec.cnt).toRow)
-      ).distinct
-    ).groupBy(ec => (mgr = ec.mgr).toRow, ec => (mgr = ec.mgr, cnt = count(ec.cnt)).toRow)
+    base
+      .fix(empCount =>
+        testDB.tables.reports
+          .flatMap(report =>
+            empCount
+              .filter(ec => ec.mgr == report.mgr)
+              .map(ec => (mgr = report.mgr, cnt = ec.cnt).toRow)
+          )
+          .distinct
+      )
+      .groupBy(ec => (mgr = ec.mgr).toRow, ec => (mgr = ec.mgr, cnt = count(ec.cnt)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -1101,13 +1169,17 @@ class RecursionMLMBonusTest extends SQLStringQueryTest[MLMDatabase, (m: Int, b: 
 
   def query() =
     val base = testDB.tables.sales.map(s => (m = s.m, b = s.p * 0.1).toRow)
-    base.fix(bonus =>
-      testDB.tables.sponsors.flatMap(sponsor =>
-        bonus
-          .filter(b => b.m == sponsor.m2)
-          .map(b => (m = sponsor.m1, b = b.b * 0.5).toRow)
-      ).distinct
-    ).groupBy(r => (m = r.m).toRow, r => (m = r.m, b = sum(r.b)).toRow)
+    base
+      .fix(bonus =>
+        testDB.tables.sponsors
+          .flatMap(sponsor =>
+            bonus
+              .filter(b => b.m == sponsor.m2)
+              .map(b => (m = sponsor.m1, b = b.b * 0.5).toRow)
+          )
+          .distinct
+      )
+      .groupBy(r => (m = r.m).toRow, r => (m = r.m, b = sum(r.b)).toRow)
 
   def expectedQueryPattern: String =
     """
@@ -1128,7 +1200,7 @@ type IntervalDB = (intervals: Interval)
 given IntervalDBs: TestDatabase[IntervalDB] with
   override def tables = (
     intervals = Table[Interval]("inter")
-    )
+  )
 
   override def init(): String =
     """
@@ -1138,11 +1210,10 @@ given IntervalDBs: TestDatabase[IntervalDB] with
       );
     """
 
-/** TODO: figure out how to do groupBy on join result.
- * Right now have unimplemented "mergeMap" method but probably better to extract all source relations from source
- * query and then supply them as arguments to the function arguments of groupBy, so the project/groupBy/having functions
- * can access the original, non-aggregated relations.
- */
+/** TODO: figure out how to do groupBy on join result. Right now have unimplemented "mergeMap" method but probably better to extract all source relations from
+  * source query and then supply them as arguments to the function arguments of groupBy, so the project/groupBy/having functions can access the original,
+  * non-aggregated relations.
+  */
 //class RecursionIntervalCoalesceTest extends SQLStringQueryTest[IntervalDB, (s: Int, e: Int)] {
 //  def testDescription: String = "Interval Coalesce query to find the smallest set of intervals that cover input intervals"
 //
@@ -1203,18 +1274,20 @@ class MinReachTest extends SQLStringQueryTest[TCDB, (x: Int, min_y: Int)] {
 
   def query() =
     val reach = testDB.tables.edges
-    reach.fix(reach =>
-      reach
-        .flatMap(p =>
-          testDB.tables.edges
-            .filter(e => p.y == e.x)
-            .map(e => (x = p.x, y = e.y).toRow)
-        )
-        .distinct
-    ).groupBy(
-      row => (x = row.x).toRow,
-      row => (x = row.x, min_y = min(row.y)).toRow
-    )
+    reach
+      .fix(reach =>
+        reach
+          .flatMap(p =>
+            testDB.tables.edges
+              .filter(e => p.y == e.x)
+              .map(e => (x = p.x, y = e.y).toRow)
+          )
+          .distinct
+      )
+      .groupBy(
+        row => (x = row.x).toRow,
+        row => (x = row.x, min_y = min(row.y)).toRow
+      )
 
   def expectedQueryPattern: String =
     """
@@ -1234,16 +1307,20 @@ class MinReachStratifiedTest extends SQLStringQueryTest[TCDB, (x: Int, min_y: In
   def query() =
     val edges = testDB.tables.edges.groupBy(e => (x = e.x).toRow, e => (x = e.x, y = min(e.y)).toRow)
 
-    edges.fix(minReach =>
-      minReach.flatMap(mr =>
-        edges
-          .filter(e => mr.y == e.x)
-          .map(e => (x = mr.x, y = e.y).toRow)
-      ).distinct
-    ).groupBy(
-      row => (x = row.x).toRow,
-      row => (x = row.x, min_y = min(row.y)).toRow
-    )
+    edges
+      .fix(minReach =>
+        minReach
+          .flatMap(mr =>
+            edges
+              .filter(e => mr.y == e.x)
+              .map(e => (x = mr.x, y = e.y).toRow)
+          )
+          .distinct
+      )
+      .groupBy(
+        row => (x = row.x).toRow,
+        row => (x = row.x, min_y = min(row.y)).toRow
+      )
 
   def expectedQueryPattern: String =
     """
@@ -1269,7 +1346,7 @@ type ParentChildDB = (parentChild: Edge)
 given ParentChildDBs: TestDatabase[ParentChildDB] with
   override def tables = (
     parentChild = Table[Edge]("parentChild")
-    )
+  )
 
   override def init(): String =
     """
@@ -1335,7 +1412,7 @@ type FriendshipDB = (friendship: Edge)
 given FriendshipDBs: TestDatabase[FriendshipDB] with
   override def tables = (
     friendship = Table[Edge]("friendship")
-    )
+  )
 
   override def init(): String =
     """
@@ -1365,15 +1442,17 @@ class MutualFriendsStratifiedTest extends SQLStringQueryTest[FriendshipDB, (x: I
 
     // Define the mutually recursive fixpoint
     val (totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, baseFriendships) { (totalFriendsCount, friendships) =>
-      val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
-        friendships
-          .filter(f => tf1.x == f.x)
-          .flatMap(f =>
-            directFriendsCount
-              .filter(dfCount => f.y == dfCount.x)
-              .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
-          )
-      ).distinct
+      val recurTotalFriendsCount = totalFriendsCount
+        .flatMap(tf1 =>
+          friendships
+            .filter(f => tf1.x == f.x)
+            .flatMap(f =>
+              directFriendsCount
+                .filter(dfCount => f.y == dfCount.x)
+                .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
+            )
+        )
+        .distinct
 
       // Define the mutually recursive MutualFriends relation
       val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
@@ -1416,7 +1495,8 @@ class MutualFriendsStratifiedTest extends SQLStringQueryTest[FriendshipDB, (x: I
 /* Currently passes, but by the definition of fix, should not define non-mutually recursive relation using fix
    (should be done outside of the function like in the previous test). However, would be nice to add a restriction to enforce this.*/
 class MutualFriendsStratifiedFutureFailTest extends SQLStringQueryTest[FriendshipDB, (x: Int, mutual_friend_count: Int)] {
-  def testDescription: String = "Mutually recursive query with stratified aggregation. Here define within recur the first result. Technically against the spec because by definition all arguments to fix must be mutually recursive."
+  def testDescription: String =
+    "Mutually recursive query with stratified aggregation. Here define within recur the first result. Technically against the spec because by definition all arguments to fix must be mutually recursive."
 
   def query() =
     val baseFriendships = testDB.tables.friendship
@@ -1428,25 +1508,28 @@ class MutualFriendsStratifiedFutureFailTest extends SQLStringQueryTest[Friendshi
     )
 
     // Define the mutually recursive fixpoint
-    val (dfC, totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, directFriendsCount, baseFriendships) { (dfC2, totalFriendsCount, friendships) =>
-      val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
-        friendships
-          .filter(f => tf1.x == f.x)
-          .flatMap(f =>
-           dfC2
-              .filter(dfCount => f.y == dfCount.x)
-              .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
+    val (dfC, totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, directFriendsCount, baseFriendships) {
+      (dfC2, totalFriendsCount, friendships) =>
+        val recurTotalFriendsCount = totalFriendsCount
+          .flatMap(tf1 =>
+            friendships
+              .filter(f => tf1.x == f.x)
+              .flatMap(f =>
+                dfC2
+                  .filter(dfCount => f.y == dfCount.x)
+                  .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
+              )
           )
-      ).distinct
+          .distinct
 
-      // Define the mutually recursive MutualFriends relation
-      val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
-        friendships
-          .filter(f => tfCount1.x <= f.x)
-          .map(f => (x = tfCount1.x, y = f.x).toRow)
-      )
+        // Define the mutually recursive MutualFriends relation
+        val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
+          friendships
+            .filter(f => tfCount1.x <= f.x)
+            .map(f => (x = tfCount1.x, y = f.x).toRow)
+        )
 
-      (dfC2, recurTotalFriendsCount, recurFriendships.distinct)
+        (dfC2, recurTotalFriendsCount, recurFriendships.distinct)
     }
     mutualFriendsResult.groupBy(
       row => (x = row.x).toRow,
@@ -1566,21 +1649,23 @@ given CompanyControlDBs2: TestDatabase[CompanyControlDB] with
       INSERT INTO shares (by, of, percent) VALUES ('A', 'C', 40);
     """
 
-
 class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, Control] {
   def testDescription: String = "Company control"
 
   def query() =
     val (cshares, control) = unrestrictedFix(testDB.tables.shares, testDB.tables.control)((cshares, control) =>
-      val csharesRecur = control.flatMap(con =>
-        cshares
-          .filter(cs => cs.by == con.com2)
-          .map(cs => (by = con.com1, of = cs.of, percent = cs.percent))
-      ).union(cshares)
+      val csharesRecur = control
+        .flatMap(con =>
+          cshares
+            .filter(cs => cs.by == con.com2)
+            .map(cs => (by = con.com1, of = cs.of, percent = cs.percent))
+        )
+        .union(cshares)
         .groupBy(
           c => (by = c.by, of = c.of).toRow,
           c => (by = c.by, of = c.of, percent = sum(c.percent)).toRow
-        ).distinct
+        )
+        .distinct
       val controlRecur = cshares
         .filter(s => s.percent > 50)
         .map(s => (com1 = s.by, com2 = s.of))
@@ -1588,7 +1673,6 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
       (csharesRecur, controlRecur)
     )
     control
-
 
   def expectedQueryPattern: String =
     """
@@ -1620,7 +1704,7 @@ type CyclicGraphDB = (edges: CyclicEdge)
 given CyclicGraphDBs: TestDatabase[CyclicGraphDB] with
   override def tables = (
     edges = Table[CyclicEdge]("edges")
-    )
+  )
 
   override def init(): String =
     """
@@ -1640,11 +1724,13 @@ class RecursiveNonterminationExampleTest extends SQLStringQueryTest[CyclicGraphD
   def query() =
     val base = testDB.tables.edges
     base.fix(path =>
-      path.flatMap(p =>
-        testDB.tables.edges
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      ).distinct // Removing 'distinct' will cause it to never terminate
+      path
+        .flatMap(p =>
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        )
+        .distinct // Removing 'distinct' will cause it to never terminate
     )
 
   def expectedQueryPattern: String =
