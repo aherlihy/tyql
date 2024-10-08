@@ -923,6 +923,3 @@ class MixedProjectMapErrorTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-
-
-

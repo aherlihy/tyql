@@ -315,4 +315,3 @@ class FlowMapAggregateTest7 extends SQLStringAggregationTest[AllCommerceDBs, (su
 //      (name = b.name, date = b.dateOfBirth)
 //  def expectedQueryPattern: String = "SELECT buyers$A.name as name, buyers$A.dateOfBirth as date FROM buyers as buyers$A"
 //}
-

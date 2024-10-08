@@ -168,4 +168,3 @@ class ScopeSubquery4Test extends SQLStringQueryTest[AllCommerceDBs, (purchId: In
         WHERE subquery$D.id = subquery$C.productId
       """
 }
-
