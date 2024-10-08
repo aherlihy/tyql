@@ -47,9 +47,10 @@ sealed trait DialectFeature
 trait ExtendedMathFeature extends DialectFeature:
     def log(): Double
 
-given [A <: 3, B <: Int & (13 `to` 14) | (19 `to` 30)](using dialect: SQLite[A, B, ?]): ExtendedMathFeature= new ExtendedMathFeature:
+given [A <: 3, B <: Int & (13 `to` 14) | (19 `to` 30)](using dialect: SQLite[A, B, ?]): ExtendedMathFeature = new ExtendedMathFeature:
     override def log(): Double = 3.0
 // You can easily do `|` in the list of constraints of a single type-number, but the following needs a @targetName due to double definition
+// cannot use `: ExtendedMathFeature with {}` here at all, even with @targetName (TODO why?)
 @targetName("someOtherSQLite")
 given [A <: 2, B <: 10](using dialect: SQLite[A, B, ?]): ExtendedMathFeature = new ExtendedMathFeature:
     override def log(): Double = 3.0
