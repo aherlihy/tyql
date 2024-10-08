@@ -1,6 +1,6 @@
 package test.query.relationops
 import test.SQLStringQueryTest
-import test.query.{commerceDBs,  AllCommerceDBs, Product}
+import test.query.{commerceDBs, AllCommerceDBs, Product}
 
 import tyql.*
 import tyql.Expr.toRow
@@ -14,11 +14,12 @@ class RelationOpsUnionTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)]
     testDB.tables.products
       .map: prod =>
         (id = prod.id).toRow
-      .union(testDB.tables.purchases
-        .map: purch =>
-          (id = purch.id).toRow
+      .union(
+        testDB.tables.purchases
+          .map: purch =>
+            (id = purch.id).toRow
       )
-  def expectedQueryPattern: String =  """
+  def expectedQueryPattern: String = """
         (SELECT product$A.id as id
         FROM product as product$A)
         UNION
@@ -33,7 +34,7 @@ class RelationOpsUnion2Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
     testDB.tables.products
       .map(prod => prod)
       .union(testDB.tables.products.map(purch => purch))
-  def expectedQueryPattern: String =  """
+  def expectedQueryPattern: String = """
         (SELECT product$A
         FROM product as product$A)
         UNION
@@ -68,7 +69,8 @@ class RelationOpsUnion4Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
   def testDescription: String = "RelationOps: union n-ary"
 
   def query() =
-    testDB.tables.products.map(prod => prod)
+    testDB.tables.products
+      .map(prod => prod)
       .union(testDB.tables.products.map(prod => prod))
       .union(testDB.tables.products.map(prod => prod))
       .union(testDB.tables.products.map(prod => prod))
@@ -93,11 +95,14 @@ class RelationOpsUnion5Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
   def testDescription: String = "RelationOps: n-ary with nested unions get flattened"
 
   def query() =
-    testDB.tables.products.map(prod => prod)
+    testDB.tables.products
+      .map(prod => prod)
       .union(
-        testDB.tables.products.map(prod => prod)
+        testDB.tables.products
+          .map(prod => prod)
           .union(testDB.tables.products.map(prod => prod))
-      ).union(testDB.tables.products.map(prod => prod))
+      )
+      .union(testDB.tables.products.map(prod => prod))
 
   def expectedQueryPattern: String =
     """
@@ -119,9 +124,11 @@ class RelationOpsUnionMixedTest extends SQLStringQueryTest[AllCommerceDBs, (id: 
   def testDescription: String = "RelationOps: n-ary with nested unions + other op do not get flattened"
 
   def query() =
-    testDB.tables.products.map(prod => (id = prod.id))
+    testDB.tables.products
+      .map(prod => (id = prod.id))
       .union(
-        testDB.tables.buyers.map(buyer => (id = buyer.id))
+        testDB.tables.buyers
+          .map(buyer => (id = buyer.id))
           .unionAll(testDB.tables.purchases.map(pr => (id = pr.id)))
       )
 
@@ -142,10 +149,13 @@ class RelationOpsUnionMixedDistinctTest extends SQLStringQueryTest[AllCommerceDB
   def testDescription: String = "RelationOps: n-ary with nested unions + other op do not get flattened with distinct"
 
   def query() =
-    testDB.tables.products.map(prod => (id = prod.id))
+    testDB.tables.products
+      .map(prod => (id = prod.id))
       .union(
-        testDB.tables.buyers.map(buyer => (id = buyer.id))
-          .unionAll(testDB.tables.purchases.map(pr => (id = pr.id))).distinct
+        testDB.tables.buyers
+          .map(buyer => (id = buyer.id))
+          .unionAll(testDB.tables.purchases.map(pr => (id = pr.id)))
+          .distinct
       )
 
   def expectedQueryPattern: String =
@@ -167,11 +177,12 @@ class RelationOpsUnionAllTest extends SQLStringQueryTest[AllCommerceDBs, (id: In
     testDB.tables.products
       .map: prod =>
         (id = prod.id).toRow
-      .unionAll(testDB.tables.purchases
-        .map: purch =>
-          (id = purch.id).toRow
+      .unionAll(
+        testDB.tables.purchases
+          .map: purch =>
+            (id = purch.id).toRow
       )
-  def expectedQueryPattern: String =  """
+  def expectedQueryPattern: String = """
         (SELECT product$A.id as id
         FROM product as product$A)
         UNION ALL
@@ -186,11 +197,12 @@ class RelationOpsIntersectTest extends SQLStringQueryTest[AllCommerceDBs, (id: I
     testDB.tables.products
       .map: prod =>
         (id = prod.id).toRow
-      .intersect(testDB.tables.purchases
-        .map: purch =>
-          (id = purch.id).toRow
+      .intersect(
+        testDB.tables.purchases
+          .map: purch =>
+            (id = purch.id).toRow
       )
-  def expectedQueryPattern: String =  """
+  def expectedQueryPattern: String = """
         (SELECT product$A.id as id
         FROM product as product$A)
         INTERSECT
@@ -198,4 +210,3 @@ class RelationOpsIntersectTest extends SQLStringQueryTest[AllCommerceDBs, (id: I
         FROM purchase as purchase$B)
       """
 }
-

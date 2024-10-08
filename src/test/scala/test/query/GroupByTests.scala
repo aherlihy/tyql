@@ -76,12 +76,8 @@ class GroupBy2Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def query() =
     import AggregationExpr.toRow
     testDB.tables.purchases
-      .groupBy(
-        p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .having(
-        p => avg(p.total) == 1
-      )
+      .groupBy(p => (count = p.count).toRow, p => (avg = avg(p.total)).toRow)
+      .having(p => avg(p.total) == 1)
 
   def expectedQueryPattern: String =
     """SELECT AVG(purchase$0.total) as avg FROM purchase as purchase$0 GROUP BY purchase$0.count HAVING AVG(purchase$0.total) = 1"""
@@ -92,12 +88,8 @@ class GroupBy3Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
 
   def query() =
     testDB.tables.purchases
-      .groupBy(
-        p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .filter(
-        p => p.avg == 1
-      )
+      .groupBy(p => (count = p.count).toRow, p => (avg = avg(p.total)).toRow)
+      .filter(p => p.avg == 1)
 
   def expectedQueryPattern: String =
     """SELECT * FROM (SELECT AVG(purchase$0.total) as avg FROM purchase as purchase$0 GROUP BY purchase$0.count) as subquery$1 WHERE subquery$1.avg = 1"""
@@ -109,12 +101,8 @@ class GroupBy4Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def query() =
     testDB.tables.purchases
       .filter(p => p.id > 10)
-      .groupBy(
-        p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .having(
-        p => p.count == 1
-      )
+      .groupBy(p => (count = p.count).toRow, p => (avg = avg(p.total)).toRow)
+      .having(p => p.count == 1)
 
   def expectedQueryPattern: String =
     """SELECT AVG(purchase$0.total) as avg FROM purchase as purchase$0 WHERE purchase$0.id > 10 GROUP BY purchase$0.count HAVING purchase$0.count = 1"""
@@ -126,12 +114,9 @@ class GroupBy5Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def query() =
     testDB.tables.purchases
       .filter(p => p.id > 10)
-      .groupBy(
-        p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .having(
-        p => p.count == 1
-      ).distinct
+      .groupBy(p => (count = p.count).toRow, p => (avg = avg(p.total)).toRow)
+      .having(p => p.count == 1)
+      .distinct
 
   def expectedQueryPattern: String =
     """SELECT DISTINCT AVG(purchase$0.total) as avg FROM purchase as purchase$0 WHERE purchase$0.id > 10 GROUP BY purchase$0.count HAVING purchase$0.count = 1"""
@@ -143,12 +128,10 @@ class GroupBy6Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def query() =
     testDB.tables.purchases
       .filter(p => p.id > 10)
-      .groupBy(
-        p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .having(
-        p => p.count == 1
-      ).distinct.sort(_.avg, Ord.ASC)
+      .groupBy(p => (count = p.count).toRow, p => (avg = avg(p.total)).toRow)
+      .having(p => p.count == 1)
+      .distinct
+      .sort(_.avg, Ord.ASC)
 
   def expectedQueryPattern: String =
     """SELECT DISTINCT AVG(purchase$0.total) as avg FROM purchase as purchase$0 WHERE purchase$0.id > 10 GROUP BY purchase$0.count HAVING purchase$0.count = 1 ORDER BY avg ASC"""
@@ -158,10 +141,9 @@ class GroupBy7Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
   def testDescription = "GroupBy: force subquery in groupBy using sort"
 
   def query() =
-    testDB.tables.purchases.sort(_.id, Ord.ASC)
-      .groupBy(
-        p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
+    testDB.tables.purchases
+      .sort(_.id, Ord.ASC)
+      .groupBy(p => (count = p.count).toRow, p => (avg = avg(p.total)).toRow)
 
   def expectedQueryPattern: String =
     """SELECT AVG(subquery$1.total) as avg FROM (SELECT * FROM purchase as purchase$0 ORDER BY id ASC) as subquery$1 GROUP BY subquery$1.count"""
@@ -179,9 +161,7 @@ class GroupBy8Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double, avgN
           agg.toRow
         }
       )
-      .having(
-        p => avg(p.total) == 1
-      )
+      .having(p => avg(p.total) == 1)
 
   def expectedQueryPattern: String =
     """SELECT AVG(purchase$0.total) as avg, purchase$0.count as avgNum FROM purchase as purchase$0 GROUP BY purchase$0.count HAVING AVG(purchase$0.total) = 1"""
@@ -199,9 +179,7 @@ class GroupBy9Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double, avgN
           agg.toRow
         }
       )
-      .having(
-        p => avg(p.total) == 1
-      )
+      .having(p => avg(p.total) == 1)
 
   def expectedQueryPattern: String =
     """SELECT AVG(purchase$0.total) as avg, purchase$0.count as avgNum FROM purchase as purchase$0 GROUP BY AVG(purchase$0.count) HAVING AVG(purchase$0.total) = 1"""

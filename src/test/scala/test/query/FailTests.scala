@@ -11,8 +11,7 @@ class MissingAttributeCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.Table
@@ -54,8 +53,7 @@ class MapMapProjectCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.Table
@@ -99,8 +97,7 @@ class MapMapToRowCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.Table
@@ -144,8 +141,7 @@ class MapMapAggregateCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -189,8 +185,7 @@ class MapMapAggregateProjectCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -234,8 +229,7 @@ class AggregateFluentMapCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -275,8 +269,7 @@ class FlatmapExprCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -318,8 +311,7 @@ class FlatmapFlatmapCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -363,8 +355,7 @@ class MapFlatmapCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -408,8 +399,7 @@ class AggregateWithoutAggregationCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -450,8 +440,7 @@ class AggregateWithoutAggregationProjectCompileErrorTest extends munit.FunSuite 
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -493,8 +482,7 @@ class AggregateFluentFilterCompileErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -534,8 +522,7 @@ class AggregateInMapErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -577,8 +564,7 @@ class AggregateInMapProjectErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -620,8 +606,7 @@ class AggregateInMapSubexpressionErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -664,8 +649,7 @@ class AggregateInFlatmapErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -707,8 +691,7 @@ class AggregateInFlatmapProjectErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -750,8 +733,7 @@ class AggregateInNestedFlatmapErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -795,8 +777,7 @@ class MapInNestedAggregateErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -842,8 +823,7 @@ class MixedProjectAggregateErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -887,8 +867,7 @@ class MixedProjectMapErrorTest extends munit.FunSuite {
 
   test(testDescription) {
     val error: String =
-      compileErrors(
-        """
+      compileErrors("""
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr}
@@ -923,6 +902,3 @@ class MixedProjectMapErrorTest extends munit.FunSuite {
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-
-
-

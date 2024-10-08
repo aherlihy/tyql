@@ -1,13 +1,12 @@
 package test.query.join
 import test.SQLStringQueryTest
-import test.query.{commerceDBs,  AllCommerceDBs}
+import test.query.{commerceDBs, AllCommerceDBs}
 
 import tyql.*
 import tyql.Expr.*
 import language.experimental.namedTuples
 import NamedTuple.*
 // import scala.language.implicitConversions
-
 
 import java.time.LocalDate
 

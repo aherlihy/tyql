@@ -26,12 +26,11 @@ end Query1
 trait Expr1[Result] extends Selectable:
   type Fields = NamedTuple.Map[NamedTuple.From[Result], Expr1]
   def selectDynamic(fieldName: String) = Expr1.Select(this, fieldName)
-  def == (other: Expr1[?]): Expr1[Boolean] = Expr1.Eq(this, other)
+  def ==(other: Expr1[?]): Expr1[Boolean] = Expr1.Eq(this, other)
 
 object Expr1:
 
-  extension (x: Expr1[Boolean])
-    def && (y: Expr1[Boolean]): Expr1[Boolean] = And(x, y)
+  extension (x: Expr1[Boolean]) def &&(y: Expr1[Boolean]): Expr1[Boolean] = And(x, y)
   case class And($x: Expr1[Boolean], $y: Expr1[Boolean]) extends Expr1[Boolean]
 
   case class Select[A]($x: Expr1[A], $name: String) extends Expr1
@@ -59,11 +58,8 @@ object Expr1:
   case class Fun[A, B]($param: Ref[A], $f: B)
   type Pred[A] = Fun[A, Expr1[Boolean]]
 
-  /** Explicit conversion from
-   *      (name_1: Expr1[T_1], ..., name_n: Expr1[T_n])
-   *  to
-   *      Expr1[(name_1: T_1, ..., name_n: T_n)]
-   */
+  /** Explicit conversion from (name_1: Expr1[T_1], ..., name_n: Expr1[T_n]) to Expr1[(name_1: T_1, ..., name_n: T_n)]
+    */
   extension [A <: AnyNamedTuple](x: A) def toRow: Project[A] = Project(x)
   given [A <: AnyNamedTuple]: Conversion[A, Expr1.Project[A]] = Expr1.Project(_)
 
@@ -143,7 +139,7 @@ class Repro2_Pass2(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase,
 [error]    |      ^^^^^^^^^^^^^^^
 [error]    |      Found:    (name : tyql.Expr1[String])
 [error]    |      Required: tyql.Expr1[(newName : String)]
-*/
+ */
 
 // REPRO3: implicit conversion doesn't happen for nested Expr1ession
 class Repro3_Pass1(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase, (name: String)] {
@@ -180,7 +176,7 @@ class Repro3_Pass2(using TestDatabase1[TDatabase]) extends TestQuery1[TDatabase,
 
 >>> Workaround: add explicit `==` that takes in literal types in trait Expr1
 Maybe the compiler looks for == that returns a type which has a member called &&, and when it looks like at Expr1[Boolean] it doesn't find the member && because it's an extension method?
-*/
+ */
 
 @main def main() =
   println("test")
