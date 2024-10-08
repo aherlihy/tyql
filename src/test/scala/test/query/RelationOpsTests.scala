@@ -198,4 +198,3 @@ class RelationOpsIntersectTest extends SQLStringQueryTest[AllCommerceDBs, (id: I
         FROM purchase as purchase$B)
       """
 }
-

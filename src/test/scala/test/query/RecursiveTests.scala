@@ -1658,4 +1658,3 @@ class RecursiveNonterminationExampleTest extends SQLStringQueryTest[CyclicGraphD
       SELECT * FROM recursive$A as recref$Z
     """
 }
-

@@ -9,4 +9,3 @@ trait DatabaseAST[Result](using val qTag: ResultTag[Result]):
 
   def toQueryIR: QueryIRNode =
     QueryIRTree.generateFullQuery(this, SymbolTable())
-
