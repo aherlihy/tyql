@@ -79,7 +79,7 @@ object RestrictedQuery {
    *  This isn't just the identity because the input might actually be a subtype e.g.
    *  `(Table[A], Table[B], ...)`
    */
-  type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, SetResult]]
+  type ToQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query.MultiRecursive[T]]
 
   type ConstructRestrictedQuery[T] = T match
     case (t, d) => RestrictedQuery[t, SetResult, d]

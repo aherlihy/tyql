@@ -189,11 +189,11 @@ object Expr:
    *  One approach is to overload, another is to provide a user-facing toExpr
    *  function.
    */
-  def toExpr[T](t: T): Expr[T, NonScalarExpr] = t match
-    case Int => IntLit(t)
-    case Double => DoubleLit(t)
-    case String => StringLit(t)
-    case Boolean => BooleanLit(t)
+//  def toExpr[T](t: T): Expr[T, NonScalarExpr] = t match
+//    case t:Int => IntLit(t)
+//    case t:Double => DoubleLit(t)
+//    case t:String => StringLit(t)
+//    case t:Boolean => BooleanLit(t)
 
 /* ABSTRACTION: if we want to abstract over expressions (not relations) in the DSL, to enable better composability,
   then the DSL needs some kind of abstraction/application operation.

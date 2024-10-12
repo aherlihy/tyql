@@ -222,6 +222,12 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 
   def filter(p: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] = withFilter(p)
 
+  def nonEmpty: Expr[Boolean, NonScalarExpr] =
+    Expr.NonEmpty(this)
+
+  def isEmpty: Expr[Boolean, NonScalarExpr] =
+    Expr.IsEmpty(this)
+
 object Query:
   import Expr.{Pred, Fun, Ref}
   import RestrictedQuery.*
@@ -442,11 +448,6 @@ object Query:
     def contains(that: Expr[R, NonScalarExpr]): Expr[Boolean, NonScalarExpr] =
       Expr.Contains(x, that)
 
-    def nonEmpty(): Expr[Boolean, NonScalarExpr] =
-      Expr.NonEmpty(x)
-
-    def isEmpty(): Expr[Boolean, NonScalarExpr] =
-      Expr.IsEmpty(x)
 
   // def single(): R =
     //   Expr.Single(x)

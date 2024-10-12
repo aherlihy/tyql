@@ -198,7 +198,7 @@ object TreePrettyPrinter {
         val childrenPrint = naryRelationOp.children.map(_.prettyPrintIR(depth + 1, printAST))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", naryRelationOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}N-aryRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
-      case MultiRecursiveRelationOp(alias, query, finalQ, ast) =>
+      case MultiRecursiveRelationOp(alias, query, finalQ, carriedSymbols, ast) =>
         val qryStr = query.map(q => q.prettyPrintIR(depth + 1, false))
         val str = alias.zip(qryStr).map((r, q) => s"\n$r => $q").mkString(",\n")
         s"${indent(depth)}MultiRecursive($str\n${indent(depth)})"

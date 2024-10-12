@@ -16,7 +16,11 @@ class SymbolTable(val innerTable: Map[String, RelationOp] = Map.empty):
     SymbolTable(innerTable + (alias -> pointsTo))
   def bind(aliases: Iterable[(String, RelationOp)]): SymbolTable =
     SymbolTable(innerTable ++ aliases)
-  def apply(alias: String): RelationOp = innerTable(alias)
+  def apply(alias: String): RelationOp =
+    if (innerTable.contains(alias))
+      innerTable(alias)
+    else
+      throw new Exception(s"Symbol $alias missing from symbol table. Contents: ${innerTable.keys.mkString("[", ", ", "]")}")
 
 /**
  * Relation-level operations, e.g. a table, union of tables, SELECT query, etc.
@@ -24,6 +28,7 @@ class SymbolTable(val innerTable: Map[String, RelationOp] = Map.empty):
 trait RelationOp extends QueryIRNode:
   var flags: Set[SelectFlags] = Set.empty
   def alias: String
+  val carriedSymbols: List[(String, RecursiveIRVar)] = List.empty
 
   /**
    * Avoid overloading
@@ -361,16 +366,20 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
   override def toSQLString(): String =
     wrapString(children.map(_.toSQLString()).mkString(s" $op "))
 
-case class MultiRecursiveRelationOp(aliases: Seq[String], query: Seq[RelationOp], finalQ: RelationOp, ast: DatabaseAST[?]) extends RelationOp:
+case class MultiRecursiveRelationOp(aliases: Seq[String],
+                                    query: Seq[RelationOp],
+                                    finalQ: RelationOp,
+                                    override val carriedSymbols: List[(String, RecursiveIRVar)],
+                                    ast: DatabaseAST[?]) extends RelationOp:
   val alias = finalQ.alias
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendWhere(w, astOther), ast
+      aliases, query, finalQ.appendWhere(w, astOther), carriedSymbols, ast
     ).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendProject(p, astOther), ast
+      aliases, query, finalQ.appendProject(p, astOther), carriedSymbols, ast
     ).appendFlags(flags)
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =

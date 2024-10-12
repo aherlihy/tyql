@@ -126,13 +126,14 @@ object QueryIRTree:
         TableLeaf(table.$name, table)
       case map: Query.Map[?, ?] =>
         val actualParam = generateActualParam(map.$from, map.$query.$param, symbols)
-        val attrNode = generateFun(map.$query, actualParam, symbols)
+        val attrNode = generateFun(map.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
         actualParam.appendProject(attrNode, map)
       case filter: Query.Filter[?, ?] =>
         val (predicateASTs, fromNodeAST) = collapseFilters(Seq(), filter, symbols)
         val actualParam = generateActualParam(fromNodeAST, filter.$pred.$param, symbols)
+        val allSymbols = symbols.bind(actualParam.carriedSymbols)
         val predicateExprs = predicateASTs.map(pred =>
-          generateFun(pred, actualParam, symbols)
+          generateFun(pred, actualParam, allSymbols)
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         actualParam.appendWhere(where, filter)
@@ -140,7 +141,7 @@ object QueryIRTree:
         val (predicateASTs, fromNodeAST) = collapseFilters(Seq(), filter, symbols)
         val actualParam = generateActualParam(fromNodeAST, filter.$pred.$param, symbols)
         val predicateExprs = predicateASTs.map(pred =>
-          generateFun(pred, actualParam, symbols)
+          generateFun(pred, actualParam, symbols.bind(actualParam.carriedSymbols))
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         actualParam.appendWhere(where, filter)  
@@ -154,7 +155,7 @@ object QueryIRTree:
         OrderedQuery(actualParam.appendFlag(SelectFlags.Final), orderByExprs, sort)
       case flatMap: Query.FlatMap[?, ?] =>
         val actualParam = generateActualParam(flatMap.$from, flatMap.$query.$param, symbols)
-        val (unevaluated, boundST) = partiallyGenerateFun(flatMap.$query, actualParam, symbols)
+        val (unevaluated, boundST) = partiallyGenerateFun(flatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
         val (fromNodes, projectIR) = collapseFlatMap(
           Seq(actualParam),
           boundST,
@@ -167,7 +168,7 @@ object QueryIRTree:
         unnest(fromNodes, projectIR, flatMap)
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
         val actualParam = generateActualParam(aggFlatMap.$from, aggFlatMap.$query.$param, symbols)
-        val (unevaluated, boundST) = partiallyGenerateFun(aggFlatMap.$query, actualParam, symbols)
+        val (unevaluated, boundST) = partiallyGenerateFun(aggFlatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
         val (fromNodes, projectIR) = unevaluated match
          case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
            collapseFlatMap(
@@ -230,7 +231,7 @@ object QueryIRTree:
             SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery)
           case q => ??? //generateQuery(q, allSymbols, multiRecursive.$resultQuery)
 
-        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), multiRecursive)
+        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive)
 
       case groupBy: Query.GroupBy[?, ?, ?, ?, ?] =>
         val fromIR = generateQuery(groupBy.$source, symbols)
@@ -242,9 +243,9 @@ object QueryIRTree:
           case SelectAllQuery(from, where, overrideAlias, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, from, where, None, groupBy)
-          case MultiRecursiveRelationOp(aliases, query, finalQ, ast) =>
+          case MultiRecursiveRelationOp(aliases, query, finalQ, carriedSymbols, ast) =>
             val newSource = getSource(finalQ).appendFlags(finalQ.flags)
-            MultiRecursiveRelationOp(aliases, query, newSource, ast)
+            MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, ast)
           case _ =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, Seq(fromIR), Seq(), None, groupBy) // force subquery

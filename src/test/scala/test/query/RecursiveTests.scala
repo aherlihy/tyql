@@ -1,8 +1,8 @@
 package test.query.recursive
 import test.{SQLStringAggregationTest, SQLStringQueryTest, TestDatabase}
 import tyql.*
-import Query.{fix, unrestrictedFix}
-import Expr.{max, min, IntLit, sum, count}
+import Query.{fix, unrestrictedFix, unrestrictedFixImpl}
+import Expr.{IntLit, count, max, min, sum}
 
 import language.experimental.namedTuples
 import NamedTuple.*
@@ -928,8 +928,8 @@ class RecursionBOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int
       """
 }
 
-type SSSPEdge = (src: Int, dst: Int, cost: Double)
-type SSSPBase = (dst: Int, cost: Double)
+type SSSPEdge = (src: Int, dst: Int, cost: Int)
+type SSSPBase = (dst: Int, cost: Int)
 type SSSPDB = (edge: SSSPEdge, base: SSSPBase)
 
 given SSSPDBs: TestDatabase[SSSPDB] with
@@ -1285,8 +1285,8 @@ given ParentChildDBs: TestDatabase[ParentChildDB] with
       INSERT INTO parentChild (x, y) VALUES (2, 6);
       """
 
-class MutuallyRecursiveTest extends SQLStringQueryTest[ParentChildDB, (x: Int, y: Int)] {
-  def testDescription: String = "Mutually recursive ancestor-descendant relationship"
+class AncestorRecursiveTest extends SQLStringQueryTest[ParentChildDB, (x: Int, y: Int)] {
+  def testDescription: String = "recursive ancestor-descendant relationship"
 
   def query() =
     val parentChild = testDB.tables.parentChild
@@ -1559,6 +1559,11 @@ given CompanyControlDBs2: TestDatabase[CompanyControlDB] with
         percent INT
       );
 
+      CREATE TABLE control (
+        com1 VARCHAR(255),
+        com2 VARCHAR(255)
+      );
+
       INSERT INTO shares (by, of, percent) VALUES ('A', 'B', 60);
       INSERT INTO shares (by, of, percent) VALUES ('B', 'C', 25);
       INSERT INTO shares (by, of, percent) VALUES ('C', 'D', 80);
@@ -1598,16 +1603,16 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
           UNION
         ((SELECT subquery$79.by as by, subquery$79.of as of, SUM(subquery$79.percent) as percent
           FROM
-            ((SELECT ref$34.com$1 as by, ref$35.of as of, ref$35.percent as percent
+            ((SELECT ref$34.com1 as by, ref$35.of as of, ref$35.percent as percent
               FROM recursive$74 as ref$34, recursive$73 as ref$35
-              WHERE ref$35.by = ref$34.com$2)
+              WHERE ref$35.by = ref$34.com2)
                 UNION
              (SELECT * FROM recursive$73 as recref$6)) as subquery$79
           GROUP BY subquery$79.by, subquery$79.of))),
       recursive$74 AS
         ((SELECT * FROM control as control$83)
           UNION
-         ((SELECT ref$39.by as com$1, ref$39.of as com$2
+         ((SELECT ref$39.by as com1, ref$39.of as com2
            FROM recursive$73 as ref$39
            WHERE ref$39.percent > 50)))
     SELECT * FROM recursive$74 as recref$7
@@ -1658,4 +1663,77 @@ class RecursiveNonterminationExampleTest extends SQLStringQueryTest[CyclicGraphD
       SELECT * FROM recursive$A as recref$Z
     """
 }
+
+type Orbits = (x: String, y: String)
+type PlanetaryDB = (orbits: Orbits, base: Orbits, intermediate: Orbits)
+
+given PlanetaryDBs: TestDatabase[PlanetaryDB] with
+  override def tables = (
+    orbits = Table[Orbits]("orbits"),
+    base = Table[Orbits]("base"),
+    intermediate = Table[Orbits]("intermediate")
+  )
+
+  override def init(): String =
+    """
+      CREATE TABLE orbits (
+          x TEXT,
+          y TEXT
+      );
+
+      INSERT INTO orbits (x, y) VALUES
+      ('Earth', 'Sun'),
+      ('Moon', 'Earth'),
+      ('ISS', 'Earth'),
+      ('Mars', 'Sun'),
+      ('Phobos', 'Mars'),
+      ('Deimos', 'Mars');
+      """
+
+class RecursiveOrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
+  def testDescription: String = "Planetary orbits from souffle benchmark"
+
+  def query() =
+    val base = testDB.tables.base
+    val orbits = unrestrictedFix(Tuple1(base))(orbitsT =>
+      val orbits = orbitsT._1
+      val res = orbits.flatMap(p =>
+        orbits
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      ).distinct
+      Tuple1(res)
+    )._1
+
+    val orbitsRef = orbits.$resultQuery
+
+    orbits.filter(o =>
+        orbitsRef.flatMap(o1 => orbitsRef
+            .filter(o2 => o1.y == o2.x)
+            .map(o2 => (x = o1.x, y = o2.y).toRow)
+        ).filter(io => o.x == io.x && o.y == io.y)
+        .isEmpty
+    )
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE
+          recursive$1 AS
+            ((SELECT * FROM base as base$1)
+              UNION
+            ((SELECT ref$0.x as x, ref$1.y as y
+              FROM recursive$1 as ref$0, recursive$1 as ref$1
+              WHERE ref$0.y = ref$1.x)))
+        SELECT *
+        FROM recursive$1 as recref$0
+        WHERE NOT EXISTS
+          (SELECT * FROM
+            (SELECT ref$4.x as x, ref$5.y as y
+            FROM recursive$1 as ref$4, recursive$1 as ref$5
+            WHERE ref$4.y = ref$5.x) as subquery$9
+          WHERE recref$0.x = subquery$9.x AND recref$0.y = subquery$9.y)
+    """
+
+}
+
 
