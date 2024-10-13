@@ -160,11 +160,12 @@ object Expr:
   private var exprRefCount = 0
 
   // References to relations
-  case class Ref[A: ResultTag, S <: ExprShape]() extends Expr[A, S]:
-    private val id = refCount
+  case class Ref[A: ResultTag, S <: ExprShape](idx: Int = -1) extends Expr[A, S]:
+    private val $id = refCount
     refCount += 1
-    def stringRef() = s"ref$id"
-    override def toString: String = s"Ref[${stringRef()}]"
+    val idxStr = if idx == -1 then "" else s"_$idx"
+    def stringRef() = s"ref${$id}$idxStr"
+    override def toString: String = s"Ref[${stringRef()}]$idxStr"
 
   /** The internal representation of a function `A => B`
    * Query languages are usually first-order, so Fun is not an Expr

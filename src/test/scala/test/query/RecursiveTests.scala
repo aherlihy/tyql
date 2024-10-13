@@ -1736,4 +1736,46 @@ class RecursiveOrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
 
 }
 
+class RecursiveAPSPTest extends SQLStringQueryTest[SSSPDB, SSSPEdge] {
+  def testDescription: String = "APSP benchmark"
+
+  def query() =
+    val base = testDB.tables.edge.groupBy(
+      e => (src = e.src, dst = e.dst).toRow,
+      e => (src = e.src, dst = e.dst, cost = min(e.cost)).toRow
+    )
+
+    val asps = unrestrictedFix(Tuple1(base))(pathT =>
+      val path = pathT._1
+      val res = path.aggregate(p =>
+        path
+          .filter(e => p.dst == e.src)
+          .aggregate(e => (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow)
+      ).groupBySource(
+        p =>
+          (g1 = p._1.src, g2 = p._2.dst).toRow
+      )
+      Tuple1(res)
+    )._1
+    asps.aggregate(a => (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow).groupBySource(
+      p =>
+        (g1 = p._1.src, g2 = p._1.dst).toRow
+    )
+
+  def expectedQueryPattern: String =
+    """
+     WITH RECURSIVE
+      recursive$1 AS
+        ((SELECT edge$1.src as src, edge$1.dst as dst, MIN(edge$1.cost) as cost
+          FROM edge as edge$1 GROUP BY edge$1.src, edge$1.dst)
+
+          UNION
+
+          ((SELECT ref$2.src as src, ref$3.dst as dst, MIN(ref$2.cost + ref$3.cost) as cost
+            FROM recursive$1 as ref$2, recursive$1 as ref$3
+            WHERE ref$2.dst = ref$3.src
+            GROUP BY ref$2.src, ref$3.dst)))
+     SELECT recref$0.src as src, recref$0.dst as dst, MIN(recref$0.cost) as cost FROM recursive$1 as recref$0 GROUP BY recref$0.src, recref$0.dst
+    """
+}
 

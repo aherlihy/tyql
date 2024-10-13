@@ -199,4 +199,4 @@ class TestSuiteTest extends munit.FunSuite {
 abstract class SQLStringQueryTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
   extends TestSQLString[Rows, Query[Return, ?]] with TestQuery[Rows, Query[Return, ?]]
 abstract class SQLStringAggregationTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
-  extends TestSQLString[Rows, Aggregation[Return]] with TestQuery[Rows, Aggregation[Return]]
+  extends TestSQLString[Rows, Aggregation[?, Return]] with TestQuery[Rows, Aggregation[?, Return]]

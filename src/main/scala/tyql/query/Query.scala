@@ -38,19 +38,19 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val ref = Ref[A, NonScalarExpr]()
     RestrictedQuery(Query.FlatMap(this, Fun(ref, f(ref).toQuery)))
   /**
-   * Equivalent to aggregate(f: Ref => Aggregation).
+   * Equivalent to flatMap(f: Ref => Aggregation).
    * NOTE: make Ref of type NExpr so that relation.id is counted as NExpr, not ScalarExpr
    *
    * @param f   a function that returns an Aggregation (guaranteed agg in subtree)
    * @tparam B  the result type of the aggregation.
    * @return    Aggregation[B], a scalar result, e.g. a single value of type B.
    */
-  def aggregate[B: ResultTag](f: Ref[A, NonScalarExpr] => Aggregation[B]): Aggregation[B] =
+  def aggregate[B: ResultTag, T <: Tuple](f: Ref[A, NonScalarExpr] => Aggregation[T, B]): Aggregation[A *: T, B] =
     val ref = Ref[A, NonScalarExpr]()
-    Aggregation.AggFlatMap(this, Fun(ref, f(ref)))
+    Aggregation.AggFlatMap[A *: T, B](this, Fun(ref, f(ref)))
 
   /**
-   * Equivalent version of map(f: Ref => Aggregation).
+   * Equivalent version of map(f: Ref => AggregationExpr).
    * Requires f to call toRow on the final result before returning.
    * Sometimes the implicit conversion kicks in and converts a named-tuple-of-Agg into a Agg-of-named-tuple,
    * but not always. As an alternative, can use the aggregate defined below that explicitly calls toRow on the result of f.
@@ -60,9 +60,9 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
    * @return    Aggregation[B], a scalar result, e.g. single value of type B.
    */
   @targetName("AggregateExpr")
-  def aggregate[B: ResultTag](f: Ref[A, NonScalarExpr] => AggregationExpr[B]): Aggregation[B] =
+  def aggregate[B: ResultTag](f: Ref[A, NonScalarExpr] => AggregationExpr[B]): Aggregation[A *: EmptyTuple, B] =
     val ref = Ref[A, NonScalarExpr]()
-    Aggregation.AggFlatMap(this, Fun(ref, f(ref)))
+    Aggregation.AggFlatMap[A *: EmptyTuple, B](this, Fun(ref, f(ref)))
 
   /**
    * A version of the above-defined aggregate that allows users to skip calling toRow on the result in f.
@@ -71,11 +71,15 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
    * @tparam B   the named-tuple-of-Aggregation that will be converted to an Aggregation-of-named-tuple
    * @return     Aggregation of B.toRow, e.g. a scalar result of type B.toRow
    */
-  def aggregate[B <: AnyNamedTuple: AggregationExpr.IsTupleOfAgg]/*(using ev: AggregationExpr.IsTupleOfAgg[B] =:= true)*/(using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Ref[A, NonScalarExpr] => B): Aggregation[ NamedTuple.Map[B, Expr.StripExpr] ] =
+  def aggregate[B <: AnyNamedTuple: AggregationExpr.IsTupleOfAgg]/*(using ev: AggregationExpr.IsTupleOfAgg[B] =:= true)*/
+    (using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])
+    (f: Ref[A, NonScalarExpr] => B)
+  : Aggregation[A *: EmptyTuple, NamedTuple.Map[B, Expr.StripExpr] ] =
+
     import AggregationExpr.toRow
     val ref = Ref[A, NonScalarExpr]()
     val row = f(ref).toRow
-    Aggregation.AggFlatMap(this, Fun(ref, row))
+    Aggregation.AggFlatMap[A *: EmptyTuple, NamedTuple.Map[B, Expr.StripExpr] ](this, Fun(ref, row.asInstanceOf[Expr[NamedTuple.Map[B, Expr.StripExpr], ScalarExpr]]))
 
 //  inline def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Query[B]): Nothing =
 //    error("No aggregation function found in f. Did you mean to use flatMap?")
@@ -85,9 +89,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 //    case Expr[t, ?] => GetFields[t]
 //    case NamedTuple[n, v] => n
 // TODO: figure out how to do groupBy on join result.
-//   Right now have unimplemented "mergeMap" method but probably better to extract all source relations from source
-//   query and then supply them as arguments to the function arguments of groupBy, so the project/groupBy/having functions
-//   can access the original, non-aggregated relations.
+//  GroupBy grouping function when applied to the result of a join accesses only columns from the original queries.
 // TODO: Right now groupBy most closely resembles SQL groupBy, not Spark RDD's or pairs.
 //   Do we want to pick one?
 // TODO: Merge groupBy, groupByAggregate, and filterByGroupBy?
@@ -367,6 +369,28 @@ object Query:
   case class Except[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
   case class ExceptAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
 
+  case class NewGroupBy[
+    AllSourceTypes <: Tuple,
+    ResultType: ResultTag,
+    GroupingType,
+    GroupingShape <: ExprShape
+  ]($source: Aggregation[AllSourceTypes, ResultType],
+    $grouping: Expr[GroupingType, GroupingShape],
+    $sourceRefs: Seq[Ref[?, ?]],
+    $sourceTags: collection.Seq[(String, ResultTag[?])],
+    $having: Option[Expr[Boolean, ?]]) extends Query[ResultType, BagResult]:
+    /**
+     * Don't overload filter because having operates on the pre-grouped type.
+     */
+    def having(havingFn: ToNonScalarRef[AllSourceTypes] => Expr[Boolean, ?]): Query[ResultType, BagResult] =
+      if ($having.isEmpty)
+        val refsTuple = Tuple.fromArray($sourceRefs.toArray).asInstanceOf[ToNonScalarRef[AllSourceTypes]]
+
+        val havingResult = havingFn(refsTuple)
+        NewGroupBy($source, $grouping, $sourceRefs, $sourceTags, Some(havingResult))
+      else
+        throw new Exception("Error: can only support a single having statement after groupBy")
+
   // NOTE: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
   case class GroupBy[
     SourceType,
@@ -406,23 +430,23 @@ object Query:
 
     def distinct: Query[R, SetResult] = Distinct(x)
 
-    def sum[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[B] =
+    def sum[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[R *: EmptyTuple, B] =
       val ref = Ref[R, NonScalarExpr]()
        Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Sum(f(ref))))
 
-    def avg[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[B] =
+    def avg[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[R *: EmptyTuple, B] =
       val ref = Ref[R, NonScalarExpr]()
        Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Avg(f(ref))))
 
-    def max[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[B] =
+    def max[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[R *: EmptyTuple, B] =
       val ref = Ref[R, NonScalarExpr]()
        Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Max(f(ref))))
 
-    def min[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[B] =
+    def min[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[R *: EmptyTuple, B] =
       val ref = Ref[R, NonScalarExpr]()
        Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Min(f(ref))))
 
-    def size: Aggregation[Int] =
+    def size: Aggregation[R *: EmptyTuple, Int] =
       val ref = Ref[R, ScalarExpr]()
       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Count(Expr.IntLit(1))))
 

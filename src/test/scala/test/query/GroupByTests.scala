@@ -1,13 +1,13 @@
 package test.query.groupby
 import test.SQLStringQueryTest
-import test.query.{commerceDBs, AllCommerceDBs, Purchase}
-
+import test.query.recursive.{SSSPDB, SSSPEdge, SSSPDBs}
+import test.query.{AllCommerceDBs, Purchase, commerceDBs}
 import tyql.*
+
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
-import tyql.Expr.{sum, avg}
-import tyql.AggregationExpr.toRow
+import tyql.Expr.{avg, min, sum}
 
 class GroupByTest extends SQLStringQueryTest[AllCommerceDBs, (total: Double)] {
   def testDescription = "GroupBy: simple"
@@ -222,17 +222,95 @@ class GroupBy9Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double, avgN
 //}
 
 // TODO: Not yet implemneted, either force subquery or merge project statements
-//class JoinGroupByTest extends SQLStringQueryTest[AllCommerceDBs, (avg: Int)] {
-//  def testDescription = "GroupBy: GroupByJoin"
-//  def query() =
-//    testDB.tables.buyers.flatMap(b =>
-//      testDB.tables.shipInfos.map(si =>
-//        (name = b.name, shippingId = si.id).toRow
-//      )
-//    ).groupBy(
-//      p => (name = p.name).toRow,
-//      p => (avg = avg(p.shippingId)).toRow
-//    )
-//
-//  def expectedQueryPattern = "SELECT buyers$A.name as name, shippingInfo$B.shippingDate as shippingDate FROM buyers as buyers$A, shippingInfo as shippingInfo$B"
-//}
+class JoinGroupByTest extends SQLStringQueryTest[AllCommerceDBs, (newId: Int, newName: String)] {
+  def testDescription = "GroupBy: GroupByJoin"
+  def query() =
+    testDB.tables.buyers.aggregate(b =>
+      testDB.tables.shipInfos.aggregate(si =>
+        (newId = sum(si.id), newName = b.name).toGroupingRow
+      )
+    ).groupBySource(
+      (buy, ship) =>
+        (name = ship.shippingDate).toRow,
+    )
+
+  def expectedQueryPattern = """
+    SELECT SUM(shippingInfo$B.id) as newId, buyers$A.name as newName
+    FROM buyers as buyers$A, shippingInfo as shippingInfo$B
+    GROUP BY shippingInfo$B.shippingDate
+  """
+}
+
+class JoinGroupByTest1 extends SQLStringQueryTest[AllCommerceDBs, (newId: Int)] {
+  def testDescription = "GroupBy: GroupByJoin"
+  def query() =
+    testDB.tables.shipInfos.aggregate(si =>
+      (newId = sum(si.id)).toGroupingRow
+    ).groupBySource(
+      p =>
+        (name = p._1.id).toRow,
+    )
+
+  def expectedQueryPattern = """
+    SELECT SUM(shippingInfo$A.id) as newId
+    FROM shippingInfo as shippingInfo$A
+    GROUP BY shippingInfo$A.id
+  """
+}
+
+class JoinGroupByTest2 extends SQLStringQueryTest[AllCommerceDBs, (newId: Int)] {
+  def testDescription = "GroupBy: GroupByJoin"
+  def query() =
+    testDB.tables.shipInfos.aggregate(si =>
+      (newId = sum(si.id)).toGroupingRow
+    ).groupBySource(
+      p =>
+        (name = sum(p._1.id)).toRow,
+    )
+
+  def expectedQueryPattern = """
+    SELECT SUM(shippingInfo$A.id) as newId
+    FROM shippingInfo as shippingInfo$A
+    GROUP BY SUM(shippingInfo$A.id)
+  """
+}
+
+class JoinGroupByTest3 extends SQLStringQueryTest[AllCommerceDBs, (newId1: Int, newId2: Int, min: Int)] {
+  def testDescription = "GroupBy: GroupByJoin"
+  def query() =
+    testDB.tables.buyers.aggregate(b1 =>
+      testDB.tables.buyers.aggregate(b2 =>
+        (newId1 = b1.id, newId2 = b2.id, min = min(b1.id + b2.id)).toGroupingRow
+      )
+    ).groupBySource(
+      p =>
+        (g1 = p._1.id, g2 = p._2.id).toRow,
+    )
+
+  def expectedQueryPattern = """
+    SELECT buyers$A.id as newId1, buyers$B.id as newId2, MIN(buyers$A.id + buyers$B.id) as min
+    FROM buyers as buyers$A, buyers as buyers$B
+    GROUP BY buyers$A.id, buyers$B.id
+  """
+}
+
+class JoinGroupByTest4 extends SQLStringQueryTest[SSSPDB, SSSPEdge] {
+  def testDescription = "GroupBy: GroupByJoin"
+  def query() =
+    val path = testDB.tables.edge
+    path.aggregate(p =>
+      path
+        .filter(e => p.dst == e.src)
+        .aggregate(e => (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow)
+    ).groupBySource(
+      p =>
+        (g1 = p._1.src, g2 = p._2.dst).toRow
+    )
+
+  def expectedQueryPattern = """
+     SELECT edge$16.src as src, edge$17.dst as dst, MIN(edge$16.cost + edge$17.cost) as cost
+     FROM edge as edge$16, edge as edge$17
+     WHERE edge$16.dst = edge$17.src
+     GROUP BY edge$16.src, edge$17.dst
+  """
+}

@@ -144,7 +144,7 @@ object QueryIRTree:
           generateFun(pred, actualParam, symbols.bind(actualParam.carriedSymbols))
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
-        actualParam.appendWhere(where, filter)  
+        actualParam.appendWhere(where, filter)
       case sort: Query.Sort[?, ?, ?] =>
         val (orderByASTs, fromNodeAST) = collapseSort(Seq(), sort, symbols)
         val actualParam = generateActualParam(fromNodeAST, sort.$body.$param, symbols)
@@ -232,6 +232,28 @@ object QueryIRTree:
           case q => ??? //generateQuery(q, allSymbols, multiRecursive.$resultQuery)
 
         MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive)
+
+      case Query.NewGroupBy(source, grouping, sourceRefs, tags, having) =>
+        val sourceIR = generateQuery(source, symbols)
+        val sourceTables = sourceIR match
+          case SelectQuery(_, from, _, _, _) =>
+            if from.length != tags.length then throw new Exception("Unimplemented: groupBy on complex query")
+            from
+          case SelectAllQuery(from, _, _, _) =>
+            if from.length != tags.length then throw new Exception("Unimplemented: groupBy on complex query")
+            from
+          case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _) =>
+            carriedSymbols.map(_._2)
+          case _ => throw new Exception("Unimplemented: groupBy on complex query")
+
+        val newSymbols = symbols.bind(sourceRefs.zipWithIndex.map((r, i) => (r.stringRef(), sourceTables(i))))
+        grouping.tag match
+          case t: NamedTupleTag[?, ?] => t.names = List()
+          case _ =>
+        val groupingIR = generateExpr(grouping, newSymbols)
+        val havingIR = having.map(h => generateExpr(h, newSymbols))
+
+        GroupByQuery(sourceIR.appendFlag(SelectFlags.Final), groupingIR, havingIR, overrideAlias = None, ast)
 
       case groupBy: Query.GroupBy[?, ?, ?, ?, ?] =>
         val fromIR = generateQuery(groupBy.$source, symbols)
@@ -349,7 +371,7 @@ object QueryIRTree:
       case l: Expr.BooleanLit => Literal(s"\"${l.$value}\"", l)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
-      case a: Aggregation[?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
+      case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
       case p: Expr.ListPrepend[?] => BinExprOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), (l, r) => s"list_prepend($l, $r)", p)
       case p: Expr.ListAppend[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_append($l, $r)", p)
