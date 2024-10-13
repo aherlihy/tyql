@@ -1779,9 +1779,9 @@ class RecursiveAPSPTest extends SQLStringQueryTest[SSSPDB, SSSPEdge] {
     """
 }
 
-type PointsToDB = (addressOf: Edge, assign: Edge, load: Edge, store: Edge)
+type AndersenPointsToDB = (addressOf: Edge, assign: Edge, load: Edge, store: Edge)
 
-given PointsToDBs: TestDatabase[PointsToDB] with
+given AndersenPointsToDBs: TestDatabase[AndersenPointsToDB] with
   override def tables = (
     addressOf = Table[Edge]("addressOf"),
     assign = Table[Edge]("assign"),
@@ -1789,47 +1789,7 @@ given PointsToDBs: TestDatabase[PointsToDB] with
     store = Table[Edge]("store")
   )
 
-  override def init(): String =
-    """
-        CREATE TABLE addressOf (
-            y TEXT,
-            x TEXT
-        );
-
-        CREATE TABLE assign (
-            y TEXT,
-            z TEXT
-        );
-
-        CREATE TABLE load (
-            y TEXT,
-            x TEXT
-        );
-
-        CREATE TABLE store (
-            y TEXT,
-            x TEXT
-        );
-
-
-        INSERT INTO addressOf (y, x) VALUES
-        ('a', 'b'),
-        ('c', 'd');
-
-        INSERT INTO assign (y, z) VALUES
-        ('e', 'a'),
-        ('f', 'e');
-
-        INSERT INTO load (y, x) VALUES
-        ('g', 'b'),
-        ('h', 'g');
-
-        INSERT INTO store (y, x) VALUES
-        ('i', 'd'),
-        ('j', 'i');
-      """
-
-class RecursiveAndersensTest extends SQLStringQueryTest[PointsToDB, Edge] {
+class RecursiveAndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge] {
   def testDescription: String = "Andersens points-to"
 
   def query() =
@@ -1886,3 +1846,131 @@ class RecursiveAndersensTest extends SQLStringQueryTest[PointsToDB, Edge] {
     """
 
 }
+
+type PTOp = (x: String, y: String, h: String)
+type PTEdge = (x: String, y: String)
+type PointsToDB = (newPT: PTEdge, assign: PTEdge, load: PTOp, store: PTOp, baseHPT: PTOp)
+
+given PointsToDBs: TestDatabase[PointsToDB] with
+  override def tables = (
+    newPT = Table[PTEdge]("new"),
+    assign = Table[PTEdge]("assign"),
+    load = Table[PTOp]("load"),
+    store = Table[PTOp]("store"),
+    baseHPT= Table[PTOp]("baseHPT")
+  )
+
+class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, PTEdge] {
+  def testDescription: String = "Field-sensitive subset-based oop points-to"
+
+  def query() =
+    val baseVPT = testDB.tables.newPT.map(a => (x = a.x, y = a.y).toRow)
+    val baseHPT = testDB.tables.baseHPT
+    val pt = unrestrictedFix((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
+      val vpt = testDB.tables.assign.flatMap(a =>
+        varPointsTo.filter(p => a.y == p.x).map(p =>
+          (x = a.x, y = p.y).toRow
+        )
+      ).union(
+        testDB.tables.load.flatMap(l =>
+          heapPointsTo.flatMap(hpt =>
+            varPointsTo
+              .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
+              .map(pt2 =>
+                (x = l.x, y = hpt.h).toRow
+              )
+          )
+        )
+      )
+      val hpt = testDB.tables.store.flatMap(s =>
+        varPointsTo.flatMap(vpt1 =>
+          varPointsTo
+            .filter(vpt2 => s.x == vpt1.x && s.y == vpt2.x)
+            .map(vpt2 =>
+              (x = vpt1.y, y = s.y, h = vpt2.y).toRow
+            )
+        )
+      )
+
+      (vpt, hpt)
+    )
+    pt._1
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE
+          recursive$1 AS
+            ((SELECT new$2.x as x, new$2.y as y
+              FROM new as new$2)
+                UNION
+            ((SELECT assign$4.x as x, ref$2.y as y
+              FROM assign as assign$4, recursive$1 as ref$2
+              WHERE assign$4.y = ref$2.x)
+                UNION
+             (SELECT load$7.x as x, ref$5.h as y
+              FROM load as load$7, recursive$2 as ref$5, recursive$1 as ref$6
+              WHERE load$7.y = ref$6.x AND load$7.h = ref$5.y AND ref$6.y = ref$5.x))),
+          recursive$2 AS
+            ((SELECT *
+              FROM baseHPT as baseHPT$13)
+                UNION
+            ((SELECT ref$9.y as x, store$15.y as y, ref$10.y as h
+              FROM store as store$15, recursive$1 as ref$9, recursive$1 as ref$10
+              WHERE store$15.x = ref$9.x AND store$15.y = ref$10.x)))
+        SELECT * FROM recursive$1 as recref$0
+    """
+}
+
+type Number = (id: Int, value: Int)
+type NumberType = (value: Int, typ: String)
+type EvenOddDB = (numbers: Number)
+
+given EvenOddDBs: TestDatabase[EvenOddDB] with
+  override def tables = (
+    numbers = Table[Number]("numbers")
+  )
+
+class RecursiveEvenOddTest extends SQLStringQueryTest[EvenOddDB, NumberType] {
+  def testDescription: String = "Mutually recursive even-odd (classic)"
+
+  def query() =
+    val evenBase = testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = Expr.StringLit("even")).toRow)
+    val oddBase = testDB.tables.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = Expr.StringLit("odd")).toRow)
+
+    val (even, odd) = unrestrictedFix((evenBase, oddBase))((even, odd) =>
+      val evenResult = testDB.tables.numbers.flatMap(num =>
+        odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = Expr.StringLit("even")))
+      )
+      val oddResult = testDB.tables.numbers.flatMap(num =>
+        even.filter(e => num.value == e.value + 1).map(e => (value = num.value, typ = Expr.StringLit("odd")))
+      )
+      (evenResult, oddResult)
+    )
+    odd
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+        recursive$1 AS
+          ((SELECT numbers$2.value as value, "even" as typ
+            FROM numbers as numbers$2
+            WHERE numbers$2.value = 0)
+          UNION
+            ((SELECT numbers$4.value as value, "even" as typ
+              FROM numbers as numbers$4, recursive$2 as ref$5
+              WHERE numbers$4.value = ref$5.value + 1))),
+         recursive$2 AS
+          ((SELECT numbers$8.value as value, "odd" as typ
+            FROM numbers as numbers$8
+            WHERE numbers$8.value = 1)
+              UNION
+          ((SELECT numbers$10.value as value, "odd" as typ
+            FROM numbers as numbers$10, recursive$1 as ref$8
+            WHERE numbers$10.value = ref$8.value + 1)))
+        SELECT * FROM recursive$2 as recref$1
+    """
+}
+
+
+
+
