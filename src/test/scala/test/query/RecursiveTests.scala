@@ -1779,3 +1779,110 @@ class RecursiveAPSPTest extends SQLStringQueryTest[SSSPDB, SSSPEdge] {
     """
 }
 
+type PointsToDB = (addressOf: Edge, assign: Edge, load: Edge, store: Edge)
+
+given PointsToDBs: TestDatabase[PointsToDB] with
+  override def tables = (
+    addressOf = Table[Edge]("addressOf"),
+    assign = Table[Edge]("assign"),
+    load = Table[Edge]("load"),
+    store = Table[Edge]("store")
+  )
+
+  override def init(): String =
+    """
+        CREATE TABLE addressOf (
+            y TEXT,
+            x TEXT
+        );
+
+        CREATE TABLE assign (
+            y TEXT,
+            z TEXT
+        );
+
+        CREATE TABLE load (
+            y TEXT,
+            x TEXT
+        );
+
+        CREATE TABLE store (
+            y TEXT,
+            x TEXT
+        );
+
+
+        INSERT INTO addressOf (y, x) VALUES
+        ('a', 'b'),
+        ('c', 'd');
+
+        INSERT INTO assign (y, z) VALUES
+        ('e', 'a'),
+        ('f', 'e');
+
+        INSERT INTO load (y, x) VALUES
+        ('g', 'b'),
+        ('h', 'g');
+
+        INSERT INTO store (y, x) VALUES
+        ('i', 'd'),
+        ('j', 'i');
+      """
+
+class RecursiveAndersensTest extends SQLStringQueryTest[PointsToDB, Edge] {
+  def testDescription: String = "Andersens points-to"
+
+  def query() =
+    val base = testDB.tables.addressOf.map(a => (x = a.y, y = a.x).toRow)
+    val pt = unrestrictedFix(Tuple1(base))(pointsToT =>
+      val pointsTo = pointsToT._1
+      val p1 = testDB.tables.assign.flatMap(a =>
+        pointsTo.filter(p => a.y == p.x).map(p =>
+          (x = a.x, y = p.y).toRow
+        )
+      )
+      val p2 = testDB.tables.load.flatMap(l =>
+        pointsTo.flatMap(pt1 =>
+          pointsTo
+            .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
+            .map(pt2 =>
+              (x = l.x, y = pt2.y).toRow
+            )
+          )
+        )
+      val p3 = testDB.tables.store.flatMap(s =>
+        pointsTo.flatMap(pt1 =>
+          pointsTo
+            .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
+            .map(pt2 =>
+              (x = pt1.y, y = pt2.y).toRow
+            )
+        )
+      )
+
+      Tuple1(p1.union(p2).union(p3))
+    )
+    pt._1
+
+  def expectedQueryPattern: String =
+    """
+       WITH RECURSIVE
+          recursive$1 AS
+            ((SELECT addressOf$1.y as x, addressOf$1.x as y
+              FROM addressOf as addressOf$1)
+              UNION
+            ((SELECT assign$3.x as x, ref$2.y as y
+              FROM assign as assign$3, recursive$1 as ref$2
+              WHERE assign$3.y = ref$2.x)
+                UNION
+             (SELECT load$6.x as x, ref$6.y as y
+              FROM load as load$6, recursive$1 as ref$5, recursive$1 as ref$6
+              WHERE load$6.y = ref$5.x AND ref$5.y = ref$6.x)
+              UNION
+             (SELECT ref$9.y as x, ref$10.y as y
+              FROM store as store$11, recursive$1 as ref$9, recursive$1 as ref$10
+              WHERE store$11.x = ref$9.x AND store$11.y = ref$10.x)))
+      SELECT * FROM recursive$1 as recref$0
+    """
+
+}
