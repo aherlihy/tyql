@@ -79,7 +79,7 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: TableLeaf =>
+      case t: (TableLeaf | RecursiveIRVar) =>
         SelectAllQuery(Seq(this, t), Seq(), None, astOther)
       case q: SelectAllQuery =>
         SelectAllQuery(this +: q.from, q.where, None, astOther)
@@ -135,7 +135,7 @@ case class SelectAllQuery(from: Seq[RelationOp],
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: TableLeaf =>
+      case t: (TableLeaf | RecursiveIRVar) =>
         SelectAllQuery(from :+ t, where, None, astOther)
       case q: SelectAllQuery =>
         val newF = from ++ q.from
@@ -197,7 +197,7 @@ case class SelectQuery(project: QueryIRNode,
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: TableLeaf =>
+      case t: (TableLeaf  | RecursiveIRVar) =>
         SelectAllQuery(Seq(this, t), Seq(), None, astOther)
       case q: SelectAllQuery =>
         SelectAllQuery(this +: q.from, q.where, None, astOther)
@@ -249,7 +249,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: TableLeaf =>
+      case t: (TableLeaf  | RecursiveIRVar) =>
         OrderedQuery(query.mergeWith(t, astOther), sortFn, ast)
       case q: SelectAllQuery =>
         SelectAllQuery(
@@ -329,9 +329,9 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
     )
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: TableLeaf =>
+      case t:(TableLeaf  | RecursiveIRVar) =>
         SelectAllQuery(
-          Seq(this, t),
+          Seq(this, r),
           Seq(),
           Some(alias),
           astOther
@@ -408,8 +408,8 @@ case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST
   // TODO: for now reuse TableOp's methods
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: TableLeaf =>
-        SelectAllQuery(Seq(this, t), Seq(), None, astOther)
+      case t: (TableLeaf  | RecursiveIRVar) =>
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
       case q: SelectAllQuery =>
         SelectAllQuery(this +: q.from, q.where, None, astOther)
       case q: SelectQuery =>

@@ -24,7 +24,7 @@ object Aggregation:
         val srcInner = getSourceTables(fm.$query.$body, srcOuter)
         srcInner
       case qr: Query.QueryRef[?, ?] => (sources :+ (s"${qr.stringRef()}", qr.tag))
-      case mr: Query.MultiRecursive[?] => (sources ++ mr.$param.map(rqr => (s"${rqr.toQueryRef.stringRef()}", rqr.tag)))
+      case mr: Query.MultiRecursive[?] => getSourceTables(mr.$resultQuery, sources)//sources ++ mr.$param.map(rqr => (s"${rqr.toQueryRef.stringRef()}", rqr.tag)))
       case _ =>
         throw new Exception(s"GroupBy on result of ${q} not yet implemented")
 
@@ -51,6 +51,7 @@ object Aggregation:
       val sourceTags = getNestedSourceTables($query, sourceTagsOuter)
 
       val argRefs = sourceTags.map(_._2).zipWithIndex.map((tag, idx) => Ref(idx)(using tag)).toArray
+      println(s"argRefs=${argRefs.map(_.stringRef()).mkString(", ")}")
       val refsTuple = Tuple.fromArray(argRefs).asInstanceOf[ToNonScalarRef[AllSourceTypes]]
 
       val groupResult = groupingFn(refsTuple)

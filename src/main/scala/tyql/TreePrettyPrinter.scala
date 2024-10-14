@@ -144,13 +144,13 @@ object TreePrettyPrinter {
       case Distinct(from) =>
         s"${indent(depth)}Distinct(\n${from.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Union(thisQuery, other) =>
-        s"${indent(depth)}Union(${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
+        s"${indent(depth)}Union(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Intersect(thisQuery, other) =>
         s"${indent(depth)}Intersect(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Except(thisQuery, other) =>
         s"${indent(depth)}Except(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case UnionAll(thisQuery, other) =>
-        s"${indent(depth)}UnionAll(${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
+        s"${indent(depth)}UnionAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case IntersectAll(thisQuery, other) =>
         s"${indent(depth)}IntersectAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case ExceptAll(thisQuery, other) =>

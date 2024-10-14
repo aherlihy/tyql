@@ -214,9 +214,19 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     type DT = Tuple1[Tuple1[0]]
     type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0]]]
     val fn: Tuple1[RestrictedQueryRef[A, ?, 0]] => RQT = r => Tuple1(p(r._1))
-//    Query.fix(Tuple1(this))(fn)._1
     Query.fix[QT, DT, RQT](Tuple1(this))(fn)._1
-//    Query.fix[Tuple1[Tuple1[0]], Tuple1[Query[A, ?]]](Tuple1(this))(fn)._1
+
+  def unrestrictedFix(p: Query.QueryRef[A, ?] => Query[A, ?]): Query[A, BagResult] =
+    type QT = Tuple1[Query[A, ?]]
+    val fn: Tuple1[Query.QueryRef[A, ?]] => Tuple1[Query[A, ?]] = r => Tuple1(p(r._1))
+    val t = Query.unrestrictedFix[QT](Tuple1(this))(fn)._1
+    t.asInstanceOf[Query[A, BagResult]]
+
+  def unrestrictedBagFix(p: Query.QueryRef[A, ?] => Query[A, ?]): Query[A, BagResult] =
+    type QT = Tuple1[Query[A, ?]]
+    val fn: Tuple1[Query.QueryRef[A, ?]] => Tuple1[Query[A, ?]] = r => Tuple1(p(r._1))
+    val t = Query.unrestrictedBagFix[QT](Tuple1(this))(fn)._1
+    t.asInstanceOf[Query[A, BagResult]]
 
   def withFilter(p: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] =
     val ref = Ref[A, NonScalarExpr]()
@@ -237,8 +247,13 @@ object Query:
   def monotoneFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToMonotoneQueryRef[QT] => ToMonotoneQuery[QT]): ToQuery[QT] =
     fixImpl(bases)(fns)
 
+  // No restrictions at all but still use set semantics (union between base + recur)
   def unrestrictedFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToUnrestrictedQueryRef[QT] => ToUnrestrictedQuery[QT]): ToQuery[QT] =
-    unrestrictedFixImpl(bases)(fns)
+    unrestrictedFixImpl(true)(bases)(fns)
+
+  // No restrictions at all, use bag semantics
+  def unrestrictedBagFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToUnrestrictedQueryRef[QT] => ToUnrestrictedQuery[QT]): ToQuery[QT] =
+    unrestrictedFixImpl(false)(bases)(fns)
 
   /**
    * Fixed point computation.
@@ -268,7 +283,7 @@ object Query:
       : ToQuery[QT] =
     fixImpl(bases)(fns)
 
-  def unrestrictedFixImpl[QT <: Tuple, P <: Tuple, R <: Tuple](bases: QT)(fns: P => R): ToQuery[QT] =
+  def unrestrictedFixImpl[QT <: Tuple, P <: Tuple, R <: Tuple](setBased: Boolean)(bases: QT)(fns: P => R): ToQuery[QT] =
     // If base cases are themselves recursive definitions.
     val baseRefsAndDefs = bases.toArray.map {
       case MultiRecursive(params, querys, resultQ) => ??? // TODO: decide on semantics for multiple fix definitions. (param, query)
@@ -280,16 +295,22 @@ object Query:
     val recurQueries = fns(unrestrictedRefsTuple)
 
     val baseCaseDefsList = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?, ?]])
-    val recursiveDefsList: List[Query[?, ?]] = recurQueries.toList.map(_.asInstanceOf[Query[?, ?]]).lazyZip(baseCaseDefsList).map:
-      case (query: Query[t, c], ddef) =>
-        // Optimization: remove any extra .distinct calls that are getting fed into a union anyway
-        val lhs = ddef match
-          case Distinct(from) => from
-          case t => t
-        val rhs = query match
-          case Distinct(from) => from
-          case t => t
-        Union(lhs.asInstanceOf[Query[t, c]], rhs.asInstanceOf[Query[t, c]])(using query.tag)
+    val recursiveDefsList: List[Query[?, ?]] =
+      if (setBased)
+        recurQueries.toList.map(_.asInstanceOf[Query[?, ?]]).lazyZip(baseCaseDefsList).map:
+          case (query: Query[t, c], ddef) =>
+            // Optimization: remove any extra .distinct calls that are getting fed into a union anyway
+            val lhs = ddef match
+              case Distinct(from) => from
+              case t => t
+            val rhs = query match
+              case Distinct(from) => from
+              case t => t
+            Union(lhs.asInstanceOf[Query[t, c]], rhs.asInstanceOf[Query[t, c]])(using query.tag)
+      else
+        recurQueries.toList.map(_.asInstanceOf[Query[?, ?]]).lazyZip(baseCaseDefsList).map:
+          case (query: Query[t, c], ddef) =>
+            UnionAll(ddef.asInstanceOf[Query[t, c]], query.asInstanceOf[Query[t, c]])(using query.tag)
 
     val rt = refsTuple.asInstanceOf[Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?]]]
     rt.naturalMap([t] => finalRef =>
@@ -340,8 +361,7 @@ object Query:
   // TODO: in the case we want to allow bag semantics within recursive queries, set $bag
   case class MultiRecursive[R]($param: List[RestrictedQueryRef[?, ?, ?]],
                                $subquery: List[Query[?, ?]],
-                               $resultQuery: Query[R, ?],
-                               /*$bag: Boolean = false*/)(using ResultTag[R]) extends Query[R, SetResult]
+                               $resultQuery: Query[R, ?])(using ResultTag[R]) extends Query[R, SetResult]
 
   private var refCount = 0
   case class QueryRef[A: ResultTag, C <: ResultCategory]() extends Query[A, C]:

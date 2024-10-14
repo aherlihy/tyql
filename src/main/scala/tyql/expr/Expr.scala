@@ -100,6 +100,8 @@ object Expr:
   def min[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
 
   def count(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
+  @targetName("stringCnt")
+  def count(x: Expr[String, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
 
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want

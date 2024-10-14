@@ -1,6 +1,6 @@
 package test.query.groupby
 import test.SQLStringQueryTest
-import test.query.recursive.{SSSPDB, SSSPEdge, SSSPDBs}
+import test.query.recursivebenchmarks.{WeightedGraphDB, WeightedEdge, WeightedGraphDBs}
 import test.query.{AllCommerceDBs, Purchase, commerceDBs}
 import tyql.*
 
@@ -294,7 +294,7 @@ class JoinGroupByTest3 extends SQLStringQueryTest[AllCommerceDBs, (newId1: Int, 
   """
 }
 
-class JoinGroupByTest4 extends SQLStringQueryTest[SSSPDB, SSSPEdge] {
+class JoinGroupByTest4 extends SQLStringQueryTest[WeightedGraphDB, WeightedEdge] {
   def testDescription = "GroupBy: GroupByJoin"
   def query() =
     val path = testDB.tables.edge
