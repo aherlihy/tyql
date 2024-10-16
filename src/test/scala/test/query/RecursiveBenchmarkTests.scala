@@ -69,30 +69,42 @@ given GraphDBs: TestDatabase[GraphDB] with
     edge = Table[Edge]("edge"),
   )
 
-class CCTest extends SQLStringAggregationTest[GraphDB, Int] {
+class CCTest extends SQLStringQueryTest[GraphDB, (x: Int, id: Int)] {
   def testDescription: String = "Connected components benchmark"
 
   def query() =
-    val base = testDB.tables.edge.map(e => (x = e.x, y = e.y))
+    val undirected = testDB.tables.edge.union( // cyclic
+      testDB.tables.edge.map(e =>
+        (x = e.y, y = e.x).toRow
+      )
+    )
+    val base = undirected.map(b => (x = b.x, y = b.x)) // self cycles
+
     base.unrestrictedFix(cc =>
-      cc.flatMap(edge =>
-        cc
-          .filter(s => s.x == edge.x)
-          .map(s => (x = edge.y, y = s.y).toRow)
+      cc.flatMap(path1 =>
+        undirected
+          .filter(base => path1.y == base.x)
+          .map(path2 => (x = path1.x, y = path2.y).toRow)
       ).distinct
-    ).distinct.size
+    ).aggregate(g => (x = g.x, id = min(g.y)).toGroupingRow).groupBySource(a => a._1.x)
 
   def expectedQueryPattern: String =
     """
-    WITH RECURSIVE
-      recursive$1 AS
-        ((SELECT edge$1.x as x, edge$1.y as y
-          FROM edge as edge$1)
+WITH RECURSIVE
+  recursive$1 AS
+    ((SELECT subquery$5.x as x, subquery$5.x as y
+      FROM
+        ((SELECT * FROM edge as edge$1)
           UNION
-        ((SELECT ref$1.y as x, ref$2.y as y
-          FROM recursive$1 as ref$1, recursive$1 as ref$2
-          WHERE ref$2.x = ref$1.x)))
-    SELECT DISTINCT COUNT(1) FROM recursive$1 as recref$0
+         (SELECT edge$3.y as x, edge$3.x as y FROM edge as edge$3)) as subquery$5)
+      UNION
+    ((SELECT ref$2.x as x, subquery$10.y as y
+      FROM recursive$1 as ref$2,
+        ((SELECT * FROM edge as edge$6)
+          UNION
+         (SELECT edge$8.y as x, edge$8.x as y FROM edge as edge$8)) as subquery$10
+      WHERE ref$2.y = subquery$10.x)))
+SELECT recref$0.x as x, MIN(recref$0.y) as id FROM recursive$1 as recref$0 GROUP BY recref$0.x
       """
 }
 
