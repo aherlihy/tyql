@@ -51,7 +51,6 @@ object Aggregation:
       val sourceTags = getNestedSourceTables($query, sourceTagsOuter)
 
       val argRefs = sourceTags.map(_._2).zipWithIndex.map((tag, idx) => Ref(idx)(using tag)).toArray
-      println(s"argRefs=${argRefs.map(_.stringRef()).mkString(", ")}")
       val refsTuple = Tuple.fromArray(argRefs).asInstanceOf[ToNonScalarRef[AllSourceTypes]]
 
       val groupResult = groupingFn(refsTuple)

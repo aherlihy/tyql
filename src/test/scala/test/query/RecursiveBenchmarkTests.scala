@@ -27,7 +27,7 @@ def query() =
     .groupBySource(e =>
       (src = e._1.src, dst = e._1.dst).toRow)
 
-  val asps = base.unrestrictedBagFix(path =>
+  val asps = base.unrestrictedFix(path =>
     path.aggregate(p =>
       path
         .filter(e =>
@@ -35,7 +35,7 @@ def query() =
         .aggregate(e =>
           (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow))
         .groupBySource(p =>
-          (g1 = p._1.src, g2 = p._2.dst).toRow)
+          (g1 = p._1.src, g2 = p._2.dst).toRow).distinct
   )
   asps
     .aggregate(a =>
@@ -49,7 +49,7 @@ def expectedQueryPattern: String =
     recursive$1 AS
       ((SELECT edge$1.src as src, edge$1.dst as dst, MIN(edge$1.cost) as cost
         FROM edge as edge$1 GROUP BY edge$1.src, edge$1.dst)
-        UNION ALL
+        UNION
         ((SELECT ref$2.src as src, ref$3.dst as dst, MIN(ref$2.cost + ref$3.cost) as cost
           FROM recursive$1 as ref$2, recursive$1 as ref$3
           WHERE ref$2.dst = ref$3.src
@@ -69,8 +69,8 @@ given GraphDBs: TestDatabase[GraphDB] with
     edge = Table[Edge]("edge"),
   )
 
-class CCTest extends SQLStringQueryTest[GraphDB, (x: Int, id: Int)] {
-  def testDescription: String = "Connected components benchmark"
+class CCMonotoneTest extends SQLStringQueryTest[GraphDB, (x: Int, id: Int)] {
+  def testDescription: String = "Connected components monotone benchmark"
 
   def query() =
     val undirected = testDB.tables.edge.union( // cyclic
@@ -140,7 +140,7 @@ class OrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
                 .filter(o2 => o1.y == o2.x)
                 .map(o2 => (x = o1.x, y = o2.y).toRow))
             .filter(io => o.x == io.x && o.y == io.y)
-            .isEmpty
+            .nonEmpty
         )
 
   def expectedQueryPattern: String =
@@ -154,7 +154,7 @@ class OrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
               WHERE ref$0.y = ref$1.x)))
         SELECT *
         FROM recursive$1 as recref$0
-        WHERE NOT EXISTS
+        WHERE EXISTS
           (SELECT * FROM
             (SELECT ref$4.x as x, ref$5.y as y
             FROM recursive$1 as ref$4, recursive$1 as ref$5
@@ -170,15 +170,15 @@ given AndersenPointsToDBs: TestDatabase[AndersenPointsToDB] with
   override def tables = (
     addressOf = Table[Edge]("addressOf"),
     assign = Table[Edge]("assign"),
-    load = Table[Edge]("load"),
+    load = Table[Edge]("loadT"),
     store = Table[Edge]("store")
   )
 
-class RecursiveAndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge] {
+class AndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge] {
   def testDescription: String = "Andersens points-to"
 
   def query() =
-    val base = testDB.tables.addressOf.map(a => (x = a.y, y = a.x).toRow)
+    val base = testDB.tables.addressOf.map(a => (x = a.x, y = a.y).toRow)
     base.unrestrictedFix(pointsTo =>
       testDB.tables.assign.flatMap(a =>
         pointsTo.filter(p => a.y == p.x).map(p =>
@@ -200,16 +200,16 @@ class RecursiveAndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge
     """
        WITH RECURSIVE
           recursive$1 AS
-            ((SELECT addressOf$1.y as x, addressOf$1.x as y
+            ((SELECT addressOf$1.x as x, addressOf$1.y as y
               FROM addressOf as addressOf$1)
               UNION
             ((SELECT assign$3.x as x, ref$2.y as y
               FROM assign as assign$3, recursive$1 as ref$2
               WHERE assign$3.y = ref$2.x)
                 UNION
-             (SELECT load$6.x as x, ref$6.y as y
-              FROM load as load$6, recursive$1 as ref$5, recursive$1 as ref$6
-              WHERE load$6.y = ref$5.x AND ref$5.y = ref$6.x)
+             (SELECT loadT$6.x as x, ref$6.y as y
+              FROM loadT as loadT$6, recursive$1 as ref$5, recursive$1 as ref$6
+              WHERE loadT$6.y = ref$5.x AND ref$5.y = ref$6.x)
               UNION
              (SELECT ref$9.y as x, ref$10.y as y
               FROM store as store$11, recursive$1 as ref$9, recursive$1 as ref$10
@@ -221,18 +221,18 @@ class RecursiveAndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge
 
 type ProgramHeapOp = (x: String, y: String, h: String)
 type ProgramOp = (x: String, y: String)
-type PointsToDB = (newPT: ProgramOp, assign: ProgramOp, load: ProgramHeapOp, store: ProgramHeapOp, baseHPT: ProgramHeapOp)
+type PointsToDB = (newPT: ProgramOp, assign: ProgramOp, loadT: ProgramHeapOp, store: ProgramHeapOp, baseHPT: ProgramHeapOp)
 
 given PointsToDBs: TestDatabase[PointsToDB] with
   override def tables = (
     newPT = Table[ProgramOp]("new"),
     assign = Table[ProgramOp]("assign"),
-    load = Table[ProgramHeapOp]("load"),
+    loadT = Table[ProgramHeapOp]("loadT"),
     store = Table[ProgramHeapOp]("store"),
     baseHPT= Table[ProgramHeapOp]("baseHPT")
   )
 
-class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramOp] {
+class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] {
   def testDescription: String = "Field-sensitive subset-based oop points-to"
 
   def query() =
@@ -244,7 +244,7 @@ class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramOp] {
           (x = a.x, y = p.y).toRow
         )
       ).unionAll(
-        testDB.tables.load.flatMap(l =>
+        testDB.tables.loadT.flatMap(l =>
           heapPointsTo.flatMap(hpt =>
             varPointsTo
               .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
@@ -266,7 +266,7 @@ class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramOp] {
 
       (vpt, hpt)
     )
-    pt._1
+    pt._2
 
   def expectedQueryPattern: String =
     """
@@ -279,9 +279,9 @@ class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramOp] {
               FROM assign as assign$4, recursive$1 as ref$2
               WHERE assign$4.y = ref$2.x)
                 UNION ALL
-             (SELECT load$7.x as x, ref$5.h as y
-              FROM load as load$7, recursive$2 as ref$5, recursive$1 as ref$6
-              WHERE load$7.y = ref$6.x AND load$7.h = ref$5.y AND ref$6.y = ref$5.x))),
+             (SELECT loadT$7.x as x, ref$5.h as y
+              FROM loadT as loadT$7, recursive$2 as ref$5, recursive$1 as ref$6
+              WHERE loadT$7.y = ref$6.x AND loadT$7.h = ref$5.y AND ref$6.y = ref$5.x))),
           recursive$2 AS
             ((SELECT *
               FROM baseHPT as baseHPT$13)
@@ -289,7 +289,7 @@ class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramOp] {
             ((SELECT ref$9.y as x, store$15.y as y, ref$10.y as h
               FROM store as store$15, recursive$1 as ref$9, recursive$1 as ref$10
               WHERE store$15.x = ref$9.x AND store$15.y = ref$10.x)))
-        SELECT * FROM recursive$1 as recref$0
+        SELECT * FROM recursive$2 as recref$0
     """
 }
 
@@ -534,7 +534,7 @@ class PartyAttendanceTest extends SQLStringQueryTest[PartyDB, (person: String)] 
     """
 }
 
-type Shares = (by: String, of: String, percent: Int)
+type Shares = (byC: String, of: String, percent: Int)
 type Control = (com1: String, com2: String)
 type CompanyControlDB = (shares: Shares, control: Control)
 
@@ -551,14 +551,14 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
     val (cshares, control) = unrestrictedFix(testDB.tables.shares, testDB.tables.control)((cshares, control) =>
       val csharesRecur = control.aggregate(con =>
           cshares
-            .filter(cs => cs.by == con.com2)
-            .aggregate(cs => (by = con.com1, of = cs.of, percent = sum(cs.percent)).toGroupingRow)
+            .filter(cs => cs.byC == con.com2)
+            .aggregate(cs => (byC = con.com1, of = cs.of, percent = sum(cs.percent)).toGroupingRow)
         ).groupBySource(
-          (con, csh) => (by = con.com1, of = csh.of).toRow
+          (con, csh) => (byC = con.com1, of = csh.of).toRow
         ).distinct
       val controlRecur = cshares
         .filter(s => s.percent > 50)
-        .map(s => (com1 = s.by, com2 = s.of).toRow)
+        .map(s => (com1 = s.byC, com2 = s.of).toRow)
         .distinct
       (csharesRecur, controlRecur)
     )
@@ -571,14 +571,14 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
       recursive$40 AS
           ((SELECT * FROM shares as shares$41)
             UNION
-          ((SELECT ref$22.com1 as by, ref$23.of as of, SUM(ref$23.percent) as percent
+          ((SELECT ref$22.com1 as byC, ref$23.of as of, SUM(ref$23.percent) as percent
             FROM recursive$41 as ref$22, recursive$40 as ref$23
-            WHERE ref$23.by = ref$22.com2
+            WHERE ref$23.byC = ref$22.com2
             GROUP BY ref$22.com1, ref$23.of))),
       recursive$41 AS
           ((SELECT * FROM control as control$47)
             UNION
-          ((SELECT ref$27.by as com1, ref$27.of as com2 FROM recursive$40 as ref$27
+          ((SELECT ref$27.byC as com1, ref$27.of as com2 FROM recursive$40 as ref$27
             WHERE ref$27.percent > 50)))
     SELECT * FROM recursive$41 as recref$4
       """
@@ -670,13 +670,13 @@ class EvenOddTest extends SQLStringQueryTest[EvenOddDB, NumberType] {
     val evenBase = testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
     val oddBase = testDB.tables.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
 
-    val (even, odd) = unrestrictedFix((evenBase, oddBase))((even, odd) =>
+    val (even, odd) = fix((evenBase, oddBase))((even, odd) =>
       val evenResult = testDB.tables.numbers.flatMap(num =>
         odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = StringLit("even")))
-      )
+      ).distinct
       val oddResult = testDB.tables.numbers.flatMap(num =>
         even.filter(e => num.value == e.value + 1).map(e => (value = num.value, typ = StringLit("odd")))
-      )
+      ).distinct
       (evenResult, oddResult)
     )
     odd
@@ -856,21 +856,21 @@ class TrustChainTest extends SQLStringQueryTest[TrustDB, (person: String, count:
   def query() = {
     val baseFriends = testDB.tables.friends
 
-    val (mutualTrust, friends) = unrestrictedBagFix((baseFriends, baseFriends))((mutualTrust, friends) => {
-      val mutualTrustResult = testDB.tables.friends.flatMap(f =>
-        mutualTrust
+    val (trust, friends) = unrestrictedBagFix((baseFriends, baseFriends))((trust, friends) => {
+      val mutualTrustResult = friends.flatMap(f =>
+        trust
           .filter(mt => mt.person2 == f.person1)
           .map(mt => (person1 = mt.person1, person2 = f.person2).toRow)
       )
 
-      val friendsResult = mutualTrust.map(mt =>
+      val friendsResult = trust.map(mt =>
         (person1 = mt.person1, person2 = mt.person2).toRow
       )
 
       (mutualTrustResult, friendsResult)
     })
 
-    mutualTrust
+    trust
       .aggregate(mt => (person = mt.person2, count = count(mt.person1)).toGroupingRow)
       .groupBySource(mt => (person = mt._1.person2).toRow).sort(mt => mt.count, Ord.ASC)
   }
@@ -878,20 +878,115 @@ class TrustChainTest extends SQLStringQueryTest[TrustDB, (person: String, count:
   def expectedQueryPattern: String =
     """
       WITH RECURSIVE
-        recursive$225 AS
-          ((SELECT * FROM friends as friends$226)
-            UNION ALL
-          ((SELECT ref$118.person1 as person1, friends$228.person2 as person2
-            FROM friends as friends$228, recursive$225 as ref$118
-            WHERE ref$118.person2 = friends$228.person1))),
-        recursive$226 AS
-          ((SELECT * FROM friends as friends$232)
-            UNION ALL
-          ((SELECT ref$120.person1 as person1, ref$120.person2 as person2
-            FROM recursive$225 as ref$120)))
-     SELECT recref$18.person2 as person, COUNT(recref$18.person1) as count
-     FROM recursive$225 as recref$18
-     GROUP BY recref$18.person2
-     ORDER BY count ASC
+      recursive$247 AS
+        ((SELECT * FROM friends as friends$248)
+          UNION ALL
+        ((SELECT ref$127.person1 as person1, ref$126.person2 as person2
+          FROM recursive$248 as ref$126, recursive$247 as ref$127
+          WHERE ref$127.person2 = ref$126.person1))),
+      recursive$248 AS
+        ((SELECT * FROM friends as friends$253)
+          UNION ALL
+        ((SELECT ref$129.person1 as person1, ref$129.person2 as person2
+          FROM recursive$247 as ref$129)))
+      SELECT recref$19.person2 as person, COUNT(recref$19.person1) as count
+      FROM recursive$247 as recref$19
+      GROUP BY recref$19.person2 ORDER BY count ASC
+    """
+}
+//
+//class MutualTrustChainTest extends SQLStringQueryTest[TrustDB, (person: String, count: Int)] {
+//  def testDescription: String = "Mutually recursive trust chain, non-linear recursion"
+//
+//  def query() = {
+//    val baseFriends = testDB.tables.friends
+//
+//    val (trust, friends) = unrestrictedBagFix((baseFriends, baseFriends))((trust, friends) => {
+//      val mutualTrustResult = friends.flatMap(f =>
+//        trust
+//          .filter(mt => mt.person2 == f.person1)
+//          .map(mt => (person1 = mt.person1, person2 = f.person2).toRow)
+//      )
+//
+//      val friendsResult = trust.flatMap(t1 =>
+//        trust.filter(t2 => t1.person1 == t2.person2 && t2.person2 == t2.person1).map(t1 =>
+//          (person1 = t1.person1, person2 = t1.person2).toRow
+//        )
+//      ).union(
+//        trust.flatMap(t1 =>
+//          trust.filter(t2 => t1.person2 == t2.person1 && t2.person2 == t2.person1).map(t1 =>
+//            (person1 = t1.person1, person2 = t1.person2).toRow
+//          )
+//        )
+//      )
+//
+//      (mutualTrustResult, friendsResult)
+//    })
+//
+//    trust
+//      .aggregate(mt => (person = mt.person2, count = count(mt.person1)).toGroupingRow)
+//      .groupBySource(mt => (person = mt._1.person2).toRow).sort(mt => mt.count, Ord.ASC)
+//  }
+//
+//  def expectedQueryPattern: String =
+//    """
+//        WITH RECURSIVE
+//        recursive$247 AS
+//          ((SELECT * FROM friends as friends$248)
+//            UNION ALL
+//          ((SELECT ref$127.person1 as person1, ref$126.person2 as person2
+//            FROM recursive$248 as ref$126, recursive$247 as ref$127
+//            WHERE ref$127.person2 = ref$126.person1))),
+//        recursive$248 AS
+//          ((SELECT * FROM friends as friends$253)
+//            UNION ALL
+//          ((SELECT ref$129.person1 as person1, ref$129.person2 as person2
+//            FROM recursive$247 as ref$129)))
+//        SELECT recref$19.person2 as person, COUNT(recref$19.person1) as count
+//        FROM recursive$247 as recref$19
+//        GROUP BY recref$19.person2 ORDER BY count ASC
+//      """
+//}
+
+
+type Instruction = (opN: String, varN: String)
+type Jump = (a: String, b: String)
+
+type FlowDB = (readOp: Instruction, writeOp: Instruction, jumpOp: Jump)
+given FlowDBs: TestDatabase[FlowDB] with
+  override def tables = (
+    readOp = Table[Instruction]("readOp"),
+    writeOp = Table[Instruction]("writeOp"),
+    jumpOp = Table[Jump]("jumpOp")
+  )
+
+class FlowTest extends SQLStringQueryTest[FlowDB, (r: String, w: String)] {
+  def testDescription: String = "Data flow query"
+
+  def query() = {
+    testDB.tables.jumpOp
+      .unrestrictedBagFix(flow =>
+        flow.flatMap(f1 =>
+          flow.filter(f2 => f1.b == f2.a).map(f2 =>
+            (a = f1.a, b = f2.b).toRow)))
+      .flatMap(f =>
+        testDB.tables.readOp.flatMap(r =>
+          testDB.tables.writeOp
+            .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
+            .map(w => (r = r.opN, w = w.opN).toRow)))
+  }
+
+  def expectedQueryPattern: String =
+    """
+     WITH RECURSIVE
+      recursive$161 AS
+        ((SELECT * FROM jumpOp as jumpOp$161)
+          UNION ALL
+        ((SELECT ref$78.a as a, ref$79.b as b
+          FROM recursive$161 as ref$78, recursive$161 as ref$79
+          WHERE ref$78.b = ref$79.a)))
+    SELECT readOp$168.opN as r, writeOp$169.opN as w
+     FROM recursive$161 as recref$13, readOp as readOp$168, writeOp as writeOp$169
+     WHERE writeOp$169.opN = recref$13.a AND writeOp$169.varN = readOp$168.varN AND recref$13.b = readOp$168.opN
     """
 }

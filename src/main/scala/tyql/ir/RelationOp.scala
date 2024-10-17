@@ -1,5 +1,7 @@
 package tyql
 
+import tyql.SelectFlags.Final
+
 /**
  * Modifiers for query generation, e.g. queries at the expression level need surrounding parens.
  */
@@ -327,6 +329,7 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
       Some(alias),
       astOther
     )
+
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
       case t:(TableLeaf  | RecursiveIRVar) =>
@@ -383,7 +386,9 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
     ).appendFlags(flags)
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
-    ???
+    MultiRecursiveRelationOp(
+      aliases, query, finalQ.mergeWith(r, astOther).appendFlag(Final), carriedSymbols, ast
+    ).appendFlags(flags)
 
   override def appendFlag(f: SelectFlags): RelationOp =
     f match
