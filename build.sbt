@@ -24,5 +24,7 @@ lazy val root = (project in file("."))
     name := "tyql",
     Test / parallelExecution := false,
 //    Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
-
 )
+lazy val bench = (project in file("bench"))
+  .dependsOn(root)
+  .enablePlugins(JmhPlugin)

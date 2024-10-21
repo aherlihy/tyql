@@ -232,7 +232,7 @@ given PointsToDBs: TestDatabase[PointsToDB] with
     baseHPT= Table[ProgramHeapOp]("baseHPT")
   )
 
-class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] {
+class JavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] {
   def testDescription: String = "Field-sensitive subset-based oop points-to"
 
   def query() =
@@ -257,7 +257,7 @@ class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] 
       val hpt = testDB.tables.store.flatMap(s =>
         varPointsTo.flatMap(vpt1 =>
           varPointsTo
-            .filter(vpt2 => s.x == vpt1.x && s.y == vpt2.x)
+            .filter(vpt2 => s.x == vpt1.x && s.h == vpt2.x)
             .map(vpt2 =>
               (x = vpt1.y, y = s.y, h = vpt2.y).toRow
             )
@@ -288,7 +288,7 @@ class RecursiveJavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] 
                 UNION ALL
             ((SELECT ref$9.y as x, store$15.y as y, ref$10.y as h
               FROM store as store$15, recursive$1 as ref$9, recursive$1 as ref$10
-              WHERE store$15.x = ref$9.x AND store$15.y = ref$10.x)))
+              WHERE store$15.x = ref$9.x AND store$15.h = ref$10.x)))
         SELECT * FROM recursive$2 as recref$0
     """
 }
@@ -990,3 +990,64 @@ class FlowTest extends SQLStringQueryTest[FlowDB, (r: String, w: String)] {
      WHERE writeOp$169.opN = recref$13.a AND writeOp$169.varN = readOp$168.varN AND recref$13.b = readOp$168.opN
     """
 }
+class PointsToCountTest extends SQLStringAggregationTest[PointsToDB, Int] {
+  def testDescription: String = "PointsToCount applied to Field-sensitive subset-based oop points-to"
+
+  def query() =
+    val baseVPT = testDB.tables.newPT.map(a => (x = a.x, y = a.y).toRow)
+    val baseHPT = testDB.tables.baseHPT
+    val pt = unrestrictedFix((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
+      val vpt = testDB.tables.assign.flatMap(a =>
+        varPointsTo.filter(p => a.y == p.x).map(p =>
+          (x = a.x, y = p.y).toRow
+        )
+      ).union(
+        testDB.tables.loadT.flatMap(l =>
+          heapPointsTo.flatMap(hpt =>
+            varPointsTo
+              .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
+              .map(pt2 =>
+                (x = l.x, y = hpt.h).toRow
+              )
+          )
+        )
+      )
+      val hpt = testDB.tables.store.flatMap(s =>
+        varPointsTo.flatMap(vpt1 =>
+          varPointsTo
+            .filter(vpt2 => s.x == vpt1.x && s.h == vpt2.x)
+            .map(vpt2 =>
+              (x = vpt1.y, y = s.y, h = vpt2.y).toRow
+            )
+        )
+      )
+
+      (vpt, hpt)
+    )
+    pt._1.filter(vpt => vpt.x == "r").size
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE
+          recursive$1 AS
+            ((SELECT new$2.x as x, new$2.y as y
+              FROM new as new$2)
+                UNION
+            ((SELECT assign$4.x as x, ref$2.y as y
+              FROM assign as assign$4, recursive$1 as ref$2
+              WHERE assign$4.y = ref$2.x)
+                UNION
+             (SELECT loadT$7.x as x, ref$5.h as y
+              FROM loadT as loadT$7, recursive$2 as ref$5, recursive$1 as ref$6
+              WHERE loadT$7.y = ref$6.x AND loadT$7.h = ref$5.y AND ref$6.y = ref$5.x))),
+          recursive$2 AS
+            ((SELECT *
+              FROM baseHPT as baseHPT$13)
+                UNION
+            ((SELECT ref$9.y as x, store$15.y as y, ref$10.y as h
+              FROM store as store$15, recursive$1 as ref$9, recursive$1 as ref$10
+              WHERE store$15.x = ref$9.x AND store$15.h = ref$10.x)))
+        SELECT COUNT(1) FROM recursive$1 as recref$0 WHERE recref$0.x = "r"
+    """
+}
+
