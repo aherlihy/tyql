@@ -4,6 +4,7 @@ import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 import scala.annotation.experimental
+import Helpers.*
 
 @experimental
 @Fork(1)
@@ -11,42 +12,34 @@ import scala.annotation.experimental
 @Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.SECONDS, batchSize= 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
-class RecursiveBenchmark {
-  // interface to DB
-  var collectionsDB = CollectionsBackend()
+class TyQLBenchmark {
   var duckDB = DuckDBBackend()
-  // benchmarks
   val benchmarks = Map(
     "tc" -> TCQuery()
   )
 
-  /*******************Boilerplate*****************/
   @Setup(Level.Trial)
   def loadDB(): Unit = {
     duckDB.connect()
     benchmarks.values.foreach(bm =>
       duckDB.loadData(bm.name)
-//      collectionsDB.loadData(bm.name)
+      deleteOutputFiles(bm.outdir, "tyql")
     )
   }
 
-//  @Benchmark def collections(blackhole: Blackhole): Unit = {
-//    runCollectionsFix()
-//    blackhole.consume(
-//      println("collections")
-//    )
-//  }
+  @TearDown(Level.Trial)
+  def writeDB(): Unit = {
+    benchmarks.values.foreach(bm =>
+      bm.writeTyQLResult()
+    )
+    duckDB.close()
+  }
 
-  @Benchmark def tc_scalasql(blackhole: Blackhole): Unit = {
+  /*******************Boilerplate*****************/
+  @Benchmark def tc(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("tc").executeDuckDB(duckDB)
+      benchmarks("tc").executeTyQL(duckDB)
     )
   }
 
-//  @Benchmark def recursive(blackhole: Blackhole): Unit = {
-//    runRecursive()
-//    blackhole.consume(
-//      println("tyql")
-//    )
-//  }
 }
