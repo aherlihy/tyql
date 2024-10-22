@@ -82,12 +82,10 @@ object Helpers {
 
   def deleteOutputFiles(p: String, fileName: String): Unit =
     val filePath = s"$p/$fileName.csv"
-    println(s"trying to delete $filePath")
     val path = Paths.get(filePath)
     if (Files.exists(path)) {
       try {
         Files.delete(path)
-        println(s"File $filePath deleted successfully")
       } catch {
         case e: Exception => println(s"Failed to delete file: ${e.getMessage}")
       }

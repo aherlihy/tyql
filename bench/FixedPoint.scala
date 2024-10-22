@@ -1,5 +1,6 @@
 package tyql.bench
 import scala.collection.mutable
+import scalasql.{Table as ScalaSQLTable}
 
 type constant = String | Int | Double
 object FixedPointQuery {
@@ -11,4 +12,20 @@ object FixedPointQuery {
       acc ++ bases
     else
       fix(next, acc ++ bases)(fns)
+
+  final def dbFix[P[_[_]]]
+    (bases: ScalaSQLTable[P], acc: ScalaSQLTable[P])
+    (fns: () => Unit)
+    (cmp: () => Boolean)
+    (init: () => Unit)
+  : ScalaSQLTable[P] =
+
+    fns()
+
+    val isEmpty = cmp()
+    if (isEmpty)
+      acc
+    else
+      init()
+      dbFix(bases, acc)(fns)(cmp)(init)
 }

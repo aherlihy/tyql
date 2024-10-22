@@ -5,15 +5,22 @@ import buildinfo.BuildInfo
 import java.sql.{Connection, DriverManager, ResultSet, Statement}
 import scala.annotation.experimental
 import Helpers.*
+import scalasql.{DbClient, Config}
+import scalasql.PostgresDialect._
 
 @experimental
 class DuckDBBackend {
   var connection: Connection = null
+  var scalaSqlDb: DbClient = null
 
   def connect(): Unit =
     Class.forName("org.duckdb.DuckDBDriver")
 
     connection = DriverManager.getConnection("jdbc:duckdb:")
+    scalaSqlDb = new scalasql.DbClient.Connection(connection, new Config{
+      override def nameMapper(v: String) = v
+      override def tableNameMapper(v: String) = s"${v.toLowerCase()}"
+    })
 
   def loadData(benchmark: String): Unit =
     val datadir = s"${BuildInfo.baseDirectory}/bench/data/$benchmark/"
@@ -27,13 +34,10 @@ class DuckDBBackend {
       statement.execute(ddl)
     )
 
-
     val allCSV = getCSVFiles(datadir)
     allCSV.foreach(csv =>
       statement.execute(s"COPY ${benchmark}_edge FROM '$csv'")
     )
-
-
 
   def runQuery(sqlString: String): ResultSet =
     val statement = connection.createStatement()

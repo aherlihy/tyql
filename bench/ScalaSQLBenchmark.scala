@@ -8,8 +8,8 @@ import Helpers.*
 
 @experimental
 @Fork(1)
-@Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.SECONDS, batchSize = 1)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.SECONDS, batchSize= 1)
+@Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
+@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class ScalaSQLBenchmark {
@@ -38,7 +38,7 @@ class ScalaSQLBenchmark {
   /*******************Boilerplate*****************/
   @Benchmark def tc(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("tc").executeScalaSQL(duckDB)
+      benchmarks("tc").executeScalaSQL(duckDB.scalaSqlDb)
     )
   }
 }

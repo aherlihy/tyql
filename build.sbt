@@ -4,6 +4,11 @@ inThisBuild(Seq(
   organization := "ch.epfl.lamp",
   scalaVersion := "3.5.1-RC1",
   version := "0.0.1",
+  libraryDependencies ++= Seq(
+    "org.scalameta" %% "munit" % "1.0.0+24-ee555b1d-SNAPSHOT" % Test,
+    "org.duckdb" % "duckdb_jdbc" % "1.1.1",
+    "com.lihaoyi" %% "scalasql" % "0.1.11"
+  )
 ))
 
 scalacOptions ++= Seq(
@@ -15,10 +20,6 @@ scalacOptions ++= Seq(
 //resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
-libraryDependencies ++= Seq(
-  "org.scalameta" %% "munit" % "1.0.0+24-ee555b1d-SNAPSHOT" % Test,
-  "org.duckdb" % "duckdb_jdbc" % "1.1.1",
-)
 
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
@@ -40,4 +41,5 @@ lazy val bench = (project in file("bench"))
     // By enforcing this using `compileOrder`, we avoid having to run these generated files
     // through the Scala typechecker which has a significant impact on compile-time.
     Jmh/compileOrder := CompileOrder.ScalaThenJava
+
   )
