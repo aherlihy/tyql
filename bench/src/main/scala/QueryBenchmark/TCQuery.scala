@@ -15,9 +15,7 @@ import scalasql.core.SqlStr.SqlStringSyntax
 
 @experimental
 class TCQuery extends QueryBenchmark {
-  val name = "tc"
-  val datadir = s"${BuildInfo.baseDirectory}/bench/data/$name"
-  val outdir = s"$datadir/out"
+  override def name = "tc"
 
   // TYQL data model
   type Edge = (x: Int, y: Int)
@@ -32,7 +30,7 @@ class TCQuery extends QueryBenchmark {
   def fromSSRow(r: ResultEdgeSS[?]): Seq[String] = Seq(
     r.startNode.toString,
     r.endNode.toString,
-    r.path.toString//("[", ", ", "]")
+    r.path.toString
   )
   object tc_edge extends ScalaSQLTable[EdgeSS]
   object tc_path extends ScalaSQLTable[ResultEdgeSS]
@@ -129,10 +127,12 @@ class TCQuery extends QueryBenchmark {
       delta.isEmpty
 
     val reInit: () => Unit = () =>
-      val delta = tc_path_temp.select.except(tc_path.select).map(r => (r.startNode, r.endNode, r.path))
+      // for set-semantic insert delta
+      // val delta = tc_path_temp.select.except(tc_path.select).map(r => (r.startNode, r.endNode, r.path))
+
       val insertNew = tc_path.insert.select(
         c => (c.startNode, c.endNode, c.path),
-        delta
+        tc_path_temp.select.map(r => (r.startNode, r.endNode, r.path))
       )
       db.run(insertNew)
       db.run(tc_path_temp.delete(_ => true))
