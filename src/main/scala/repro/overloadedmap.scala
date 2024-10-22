@@ -48,7 +48,7 @@ trait RowConversion[From, To]:
 // General test classes:
 case class T2(id: Int, name: String)
 
-@main def main() =
+def main() =
   import Expr2.*
   val t1 = Query2[T2]()
   val q1: Query2[(newId: Int, newName: String)] = t1.map(r => (newId = r.id, newName = r.name).toRow)
