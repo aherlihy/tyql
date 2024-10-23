@@ -16,7 +16,8 @@ class ScalaSQLBenchmark {
   var duckDB = DuckDBBackend()
   val benchmarks = Map(
     "tc" -> TCQuery(),
-    "sssp" -> SSSPQuery()
+    "sssp" -> SSSPQuery(),
+    "ancestry" -> AncestryQuery()
   )
 
   @Setup(Level.Trial)
@@ -46,6 +47,12 @@ class ScalaSQLBenchmark {
   @Benchmark def sssp(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("sssp").executeScalaSQL(duckDB)
+    )
+  }
+
+  @Benchmark def ancestry(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("ancestry").executeScalaSQL(duckDB)
     )
   }
 }

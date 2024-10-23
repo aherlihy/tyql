@@ -15,7 +15,8 @@ import Helpers.*
 class CollectionsBenchmark {
   val benchmarks = Map(
     "tc" -> TCQuery(),
-    "sssp" -> SSSPQuery()
+    "sssp" -> SSSPQuery(),
+    "ancestry" -> AncestryQuery()
   )
 
   @Setup(Level.Trial)
@@ -43,6 +44,11 @@ class CollectionsBenchmark {
   @Benchmark def sssp(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("sssp").executeCollections()
+    )
+  }
+  @Benchmark def ancestry(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("ancestry").executeCollections()
     )
   }
 }

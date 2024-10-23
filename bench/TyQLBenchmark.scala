@@ -16,7 +16,8 @@ class TyQLBenchmark {
   var duckDB = DuckDBBackend()
   val benchmarks = Map(
     "tc" -> TCQuery(),
-    "sssp" -> SSSPQuery()
+    "sssp" -> SSSPQuery(),
+    "ancestry" -> AncestryQuery()
   )
 
   @Setup(Level.Trial)
@@ -46,6 +47,12 @@ class TyQLBenchmark {
   @Benchmark def sssp(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("sssp").executeTyQL(duckDB)
+    )
+  }
+
+  @Benchmark def ancestry(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("ancestry").executeTyQL(duckDB)
     )
   }
 }
