@@ -42,43 +42,49 @@ object Helpers {
     }
 
   def resultSetToCSV(resultSet: ResultSet, outputFile: String): Unit =
-    val writer = new BufferedWriter(new FileWriter(outputFile))
+    if (resultSet == null) // skipped test
+      println(s"SKIPPING result set $outputFile")
+    else
+      val writer = new BufferedWriter(new FileWriter(outputFile))
 
-    try {
-      val metaData: ResultSetMetaData = resultSet.getMetaData
-      val columnCount: Int = metaData.getColumnCount
+      try {
+        val metaData: ResultSetMetaData = resultSet.getMetaData
+        val columnCount: Int = metaData.getColumnCount
 
-      val header = (1 to columnCount).map(metaData.getColumnName).mkString(",")
-      writer.write(header)
-      writer.newLine()
-
-      while (resultSet.next()) {
-        val row = (1 to columnCount).map { i =>
-          val value = resultSet.getObject(i)
-          if (value != null) value.toString else "" // Handle null values
-        }.mkString(",")
-
-        writer.write(row)
+        val header = (1 to columnCount).map(metaData.getColumnName).mkString(",")
+        writer.write(header)
         writer.newLine()
+
+        while (resultSet.next()) {
+          val row = (1 to columnCount).map { i =>
+            val value = resultSet.getObject(i)
+            if (value != null) value.toString else "" // Handle null values
+          }.mkString(",")
+
+          writer.write(row)
+          writer.newLine()
+        }
+      } finally {
+        writer.close()
       }
-    } finally {
-      writer.close()
-    }
 
   def collectionToCSV[T](data: Seq[T], outputFile: String, headers: Seq[String], toCsvRow: T => Seq[String]): Unit =
-    val file = new BufferedWriter(new FileWriter(outputFile))
+    if (data == null) // skipped test
+      println(s"SKIPPING result set $outputFile")
+    else
+      val file = new BufferedWriter(new FileWriter(outputFile))
 
-    try {
-      file.write(headers.mkString(","))
-      file.newLine()
-
-      data.foreach { row =>
-        file.write(toCsvRow(row).mkString(","))
+      try {
+        file.write(headers.mkString(","))
         file.newLine()
+
+        data.foreach { row =>
+          file.write(toCsvRow(row).mkString(","))
+          file.newLine()
+        }
+      } finally {
+        file.close()
       }
-    } finally {
-      file.close()
-    }
 
   def deleteOutputFiles(p: String, fileName: String): Unit =
     val filePath = s"$p/$fileName.csv"

@@ -92,12 +92,12 @@ class TCQuery extends QueryBenchmark {
       ).distinct
     ).sortBy(r => r.path.length)
 
-  def executeScalaSQL(dbClient: scalasql.DbClient): Unit =
+  def executeScalaSQL(ddb: DuckDBBackend): Unit =
     def initList(v1: Expr[Int], v2: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"[$v1, $v2]" }
     def listAppend(v: Expr[Int], lst: Expr[String]): Expr[String] = Expr { implicit ctx => sql"list_append($lst, $v)" }
     def listContains(v: Expr[Int], lst: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"list_contains($lst, $v)" }
     def listLength(lst: Expr[String]): Expr[Int] = Expr { implicit ctx => sql"length($lst)" }
-    val db = dbClient.getAutoCommitClientConnection
+    val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val dropTable = tc_path.delete(_ => true)
     db.run(dropTable)
     val base = tc_path.insert.select(

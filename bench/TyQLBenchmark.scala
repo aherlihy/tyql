@@ -15,7 +15,8 @@ import Helpers.*
 class TyQLBenchmark {
   var duckDB = DuckDBBackend()
   val benchmarks = Map(
-    "tc" -> TCQuery()
+    "tc" -> TCQuery(),
+    "sssp" -> SSSPQuery()
   )
 
   @Setup(Level.Trial)
@@ -42,4 +43,9 @@ class TyQLBenchmark {
     )
   }
 
+  @Benchmark def sssp(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("sssp").executeTyQL(duckDB)
+    )
+  }
 }

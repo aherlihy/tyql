@@ -14,7 +14,8 @@ import Helpers.*
 @BenchmarkMode(Array(Mode.AverageTime))
 class CollectionsBenchmark {
   val benchmarks = Map(
-    "tc" -> TCQuery()
+    "tc" -> TCQuery(),
+    "sssp" -> SSSPQuery()
   )
 
   @Setup(Level.Trial)
@@ -36,6 +37,12 @@ class CollectionsBenchmark {
   @Benchmark def tc(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("tc").executeCollections()
+    )
+  }
+
+  @Benchmark def sssp(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("sssp").executeCollections()
     )
   }
 }

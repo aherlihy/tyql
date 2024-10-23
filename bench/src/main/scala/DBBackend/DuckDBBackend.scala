@@ -36,7 +36,12 @@ class DuckDBBackend {
 
     val allCSV = getCSVFiles(datadir)
     allCSV.foreach(csv =>
-      statement.execute(s"COPY ${benchmark}_edge FROM '$csv'")
+      val table = csv.getFileName().toString.replace(".csv", "")
+      statement.execute(s"COPY ${benchmark}_$table FROM '$csv'")
+      // print ok:
+      val checkQ = statement.executeQuery(s"SELECT COUNT(*) FROM ${benchmark}_$table")
+      checkQ.next()
+      println(s"LOADED into ${benchmark}_$table: ${checkQ.getInt(1)}")
     )
 
   def runQuery(sqlString: String): ResultSet =
@@ -45,4 +50,5 @@ class DuckDBBackend {
 
   def close(): Unit =
     connection.close()
+//    scalaSqlDb.close()
 }
