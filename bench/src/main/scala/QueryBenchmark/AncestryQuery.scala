@@ -3,7 +3,7 @@ package tyql.bench
 import buildinfo.BuildInfo
 import scalasql.MySqlDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
-import scalasql.{Expr, Table as ScalaSQLTable}
+import scalasql.{Expr, query, Table as ScalaSQLTable}
 import Helpers.*
 
 import java.sql.{Connection, ResultSet}
@@ -49,16 +49,12 @@ class AncestryQuery extends QueryBenchmark {
 
   //   ScalaSQL data model
   case class ParentSS[T[_]](parent: T[String], child: T[String])
-  case class GenSS[T[_]](name: T[String], gen: T[Int])
-  case class ResultSS[T[_]](name: T[String])
-
-  def fromSSRes(r: ResultSS[?]): Seq[String] = Seq(
-    r.name.toString
-  )
+  case class ResultSS[T[_]](name: T[String], gen: T[Int])
 
   object ancestry_parents extends ScalaSQLTable[ParentSS]
-  object ancestry_base extends ScalaSQLTable[GenSS]
-  object ancestry_recur extends ScalaSQLTable[GenSS]
+  object ancestry_delta extends ScalaSQLTable[ResultSS]
+  object ancestry_derived extends ScalaSQLTable[ResultSS]
+  object ancestry_tmp extends ScalaSQLTable[ResultSS]
 
   // Result types for later printing
   var resultTyql: ResultSet = null
@@ -93,46 +89,22 @@ class AncestryQuery extends QueryBenchmark {
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
-    val dropTable = ancestry_recur.delete(_ => true)
-    db.run(dropTable)
+    val toTuple = (c: ResultSS[?]) => (c.name, c.gen)
 
-    val base = ancestry_base.insert.select(
-      c => (c.name, c.gen),
-      ancestry_parents.select
-        .filter(p => p.parent === "Alice").map(e => (e.child, Expr(1)))
-    )
-    db.run(base)
+    val initBase = () =>
+      ancestry_parents.select.filter(p => p.parent === "Alice").map(e => (e.child, Expr(1)))
 
-    val fixFn: () => Unit = () =>
-      val innerQ = for {
-        base <- ancestry_base.select
+    val fixFn: ScalaSQLTable[ResultSS] => query.Select[(Expr[String], Expr[Int]), (String, Int)] = parents =>
+      for {
+        base <- parents.select
         parents <- ancestry_parents.join(base.name === _.parent)
       } yield (parents.child, base.gen + 1)
 
-      val query = ancestry_recur.insert.select(
-        c => (c.name, c.gen),
-        innerQ
-      )
-      db.run(query)
+    FixedPointQuery.semiNaive(
+      db, ancestry_delta, ancestry_derived, ancestry_tmp
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
 
-    val cmp: () => Boolean = () =>
-      val diff = ancestry_recur.select.except(ancestry_base.select)
-      val delta = db.run(diff)
-      delta.isEmpty
-
-    val reInit: () => Unit = () =>
-      // for set-semantic insert delta
-      val delta = ancestry_recur.select.except(ancestry_base.select).map(r => (r.name, r.gen))
-
-      val insertNew = ancestry_base.insert.select(
-        c => (c.name, c.gen),
-        delta
-      )
-      db.run(insertNew)
-      db.run(ancestry_recur.delete(_ => true))
-
-    FixedPointQuery.dbFix(ancestry_base, ancestry_recur)(fixFn)(cmp)(reInit)
-    val result = ancestry_base.select
+    val result = ancestry_derived.select
       .filter(_.gen === 2)
       .sortBy(_.name)
       .map(r => r.name)

@@ -9,7 +9,7 @@ import buildinfo.BuildInfo
 import Helpers.*
 
 import scala.jdk.CollectionConverters.*
-import scalasql.{Table as ScalaSQLTable, Expr}
+import scalasql.{Table as ScalaSQLTable, Expr, query}
 import scalasql.PostgresDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
 
@@ -33,8 +33,9 @@ class TCQuery extends QueryBenchmark {
     r.path.toString
   )
   object tc_edge extends ScalaSQLTable[EdgeSS]
-  object tc_path extends ScalaSQLTable[ResultEdgeSS]
-  object tc_path_temp extends ScalaSQLTable[ResultEdgeSS]
+  object tc_delta extends ScalaSQLTable[ResultEdgeSS]
+  object tc_derived extends ScalaSQLTable[ResultEdgeSS]
+  object tc_tmp extends ScalaSQLTable[ResultEdgeSS]
 
   // Collections data model + initialization
   case class EdgeCC(x: Int, y: Int)
@@ -75,7 +76,7 @@ class TCQuery extends QueryBenchmark {
             .filter(e => e.x == p.endNode && !p.path.contains(e.y))
             .map(e =>
               (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow)))
-      .sort(p => p.path.length, Ord.ASC)
+      .sort(p => p.path.length, Ord.ASC).sort(p => p.startNode, Ord.ASC).sort(_.endNode, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -90,7 +91,7 @@ class TCQuery extends QueryBenchmark {
           .filter(e => p.endNode == e.x && !p.path.contains(e.y))
           .map(e => ResultEdgeCC(startNode = p.startNode, endNode = e.y, p.path :+ e.y))
       ).distinct
-    ).sortBy(r => r.path.length)
+    ).sortBy(r => r.path.length).sortBy(_.startNode).sortBy(_.endNode)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     def initList(v1: Expr[Int], v2: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"[$v1, $v2]" }
@@ -98,49 +99,27 @@ class TCQuery extends QueryBenchmark {
     def listContains(v: Expr[Int], lst: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"list_contains($lst, $v)" }
     def listLength(lst: Expr[String]): Expr[Int] = Expr { implicit ctx => sql"length($lst)" }
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
-    val dropTable = tc_path.delete(_ => true)
-    db.run(dropTable)
-    val base = tc_path.insert.select(
-      c => (c.startNode, c.endNode, c.path),
+    val toTuple = (c: ResultEdgeSS[?]) => (c.startNode, c.endNode, c.path)
+
+    val initBase = () =>
       tc_edge.select
         .filter(_.x === Expr(1))
         .map(e => (e.x, e.y, initList(e.x, e.y)))
-    )
-    db.run(base)
 
-    val fixFn: () => Unit = () =>
-      val innerQ = for {
-        p <- tc_path.select
+    val fixFn: ScalaSQLTable[ResultEdgeSS] => query.Select[(Expr[Int], Expr[Int], Expr[String]), (Int, Int, String)] = path =>
+      for {
+        p <- path.select
         e <- tc_edge.join(p.endNode === _.x)
         if !listContains(e.y, p.path)
       } yield (p.startNode, e.y, listAppend(e.y, p.path))
 
-      val query = tc_path_temp.insert.select(
-        c => (c.startNode, c.endNode, c.path),
-        innerQ
-      )
-      db.run(query)
-
-    val cmp: () => Boolean = () =>
-      val diff = tc_path_temp.select.except(tc_path.select)
-      val delta = db.run(diff)
-      delta.isEmpty
-
-    val reInit: () => Unit = () =>
-      // for set-semantic insert delta
-      // val delta = tc_path_temp.select.except(tc_path.select).map(r => (r.startNode, r.endNode, r.path))
-
-      val insertNew = tc_path.insert.select(
-        c => (c.startNode, c.endNode, c.path),
-        tc_path_temp.select.map(r => (r.startNode, r.endNode, r.path))
-      )
-      db.run(insertNew)
-      db.run(tc_path_temp.delete(_ => true))
-
-    FixedPointQuery.dbFix(tc_path, tc_path)(fixFn)(cmp)(reInit)
+    FixedPointQuery.semiNaive(
+      db, tc_delta, tc_derived, tc_tmp
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]])
 
 
-    resultScalaSQL = db.run(tc_path.select)
+    val result = tc_derived.select.sortBy(_.path).sortBy(_.endNode).sortBy(_.startNode)
+    resultScalaSQL = db.run(result)
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

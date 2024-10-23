@@ -30,7 +30,7 @@ class DuckDBBackend {
     val statement = connection.createStatement()
 
     ddlCmds.foreach(ddl =>
-      println(s"Executing DDL: $ddl")
+//      println(s"Executing DDL: $ddl")
       statement.execute(ddl)
     )
 
@@ -41,7 +41,7 @@ class DuckDBBackend {
       // print ok:
       val checkQ = statement.executeQuery(s"SELECT COUNT(*) FROM ${benchmark}_$table")
       checkQ.next()
-      println(s"LOADED into ${benchmark}_$table: ${checkQ.getInt(1)}")
+//      println(s"LOADED into ${benchmark}_$table: ${checkQ.getInt(1)}")
     )
 
   def runQuery(sqlString: String): ResultSet =

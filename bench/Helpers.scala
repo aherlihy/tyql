@@ -43,7 +43,8 @@ object Helpers {
 
   def resultSetToCSV(resultSet: ResultSet, outputFile: String): Unit =
     if (resultSet == null) // skipped test
-      println(s"SKIPPING result set $outputFile")
+//      println(s"SKIPPING result set $outputFile")
+      {}
     else
       val writer = new BufferedWriter(new FileWriter(outputFile))
 
@@ -65,12 +66,14 @@ object Helpers {
           writer.newLine()
         }
       } finally {
+        println(s"WROTE RESULT TO $outputFile")
+        writer.flush()
         writer.close()
       }
 
   def collectionToCSV[T](data: Seq[T], outputFile: String, headers: Seq[String], toCsvRow: T => Seq[String]): Unit =
     if (data == null) // skipped test
-      println(s"SKIPPING result set $outputFile")
+      {}
     else
       val file = new BufferedWriter(new FileWriter(outputFile))
 
@@ -83,11 +86,14 @@ object Helpers {
           file.newLine()
         }
       } finally {
+        println(s"WROTE RESULT TO $outputFile")
+        file.flush()
         file.close()
       }
 
   def deleteOutputFiles(p: String, fileName: String): Unit =
     val filePath = s"$p/$fileName.csv"
+    println(s"TRYING TO DELETE $filePath")
     val path = Paths.get(filePath)
     if (Files.exists(path)) {
       try {
@@ -95,7 +101,5 @@ object Helpers {
       } catch {
         case e: Exception => println(s"Failed to delete file: ${e.getMessage}")
       }
-    } else {
-      println(s"File $filePath does not exist")
     }
 }

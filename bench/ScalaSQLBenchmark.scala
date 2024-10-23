@@ -17,7 +17,8 @@ class ScalaSQLBenchmark {
   val benchmarks = Map(
     "tc" -> TCQuery(),
     "sssp" -> SSSPQuery(),
-    "ancestry" -> AncestryQuery()
+    "ancestry" -> AncestryQuery(),
+    "andersens" -> AndersensQuery()
   )
 
   @Setup(Level.Trial)
@@ -25,12 +26,11 @@ class ScalaSQLBenchmark {
     duckDB.connect()
     benchmarks.values.foreach(bm =>
       duckDB.loadData(bm.name)
-      deleteOutputFiles(bm.outdir, "scalasql")
     )
   }
 
   @TearDown(Level.Trial)
-  def writeDB(): Unit = {
+  def close(): Unit = {
     benchmarks.values.foreach(bm =>
       bm.writeScalaSQLResult()
     )
@@ -53,6 +53,11 @@ class ScalaSQLBenchmark {
   @Benchmark def ancestry(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("ancestry").executeScalaSQL(duckDB)
+    )
+  }
+  @Benchmark def andersens(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("andersens").executeScalaSQL(duckDB)
     )
   }
 }

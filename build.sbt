@@ -21,6 +21,7 @@ scalacOptions ++= Seq(
 resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
 
+
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
   .settings(
@@ -29,6 +30,18 @@ lazy val root = (project in file("."))
 //    Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
     buildInfoKeys := Seq[BuildInfoKey](baseDirectory),
     buildInfoPackage := "buildinfo",
+//    cleanFiles ++= Seq(
+//      baseDirectory.value / "bench/data/ancestry/out/collections.csv",
+//      baseDirectory.value / "bench/data/ancestry/out/tyql.csv",
+//      baseDirectory.value / "bench/data/ancestry/out/scalasql.csv",
+//      baseDirectory.value / "bench/data/andersens/out/collections.csv",
+//      baseDirectory.value / "bench/data/andersens/out/tyql.csv",
+//      baseDirectory.value / "bench/data/andersens/out/scalasql.csv",
+//    ),
+    cleanFiles ++= Seq("andersens", "ancestry", "sssp", "tc")
+      .flatMap(bm => Seq("collections", "tyql", "scalasql")
+        .map(ty =>
+          baseDirectory.value / s"bench/data/$bm/out/$ty.csv"))
 )
 lazy val bench = (project in file("bench"))
   .dependsOn(root)

@@ -3,7 +3,7 @@ package tyql.bench
 import buildinfo.BuildInfo
 import scalasql.MySqlDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
-import scalasql.{Expr, Table as ScalaSQLTable}
+import scalasql.{Expr, query, Table as ScalaSQLTable}
 import Helpers.*
 
 import java.sql.{Connection, ResultSet}
@@ -62,8 +62,10 @@ class SSSPQuery extends QueryBenchmark {
   )
 
   object sssp_edge extends ScalaSQLTable[WEdgeSS]
-  object sssp_base extends ScalaSQLTable[WResultEdgeSS]
-  object sssp_recur extends ScalaSQLTable[WResultEdgeSS]
+  object sssp_base extends ScalaSQLTable[WEdgeSS]
+  object sssp_delta extends ScalaSQLTable[WResultEdgeSS]
+  object sssp_derived extends ScalaSQLTable[WResultEdgeSS]
+  object sssp_tmp extends ScalaSQLTable[WResultEdgeSS]
   //
 
   // Result types for later printing
@@ -106,41 +108,22 @@ class SSSPQuery extends QueryBenchmark {
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
-    val dropTable = sssp_recur.delete(_ => true)
-    db.run(dropTable)
+    val toTuple = (c: WResultEdgeSS[?]) => (c.dst, c.cost)
 
-    val fixFn: () => Unit = () =>
-      val innerQ = for {
-        s <- sssp_base.select
+    val initBase = () => sssp_base.select.map(e => (e.dst, e.cost))
+
+    val fixFn: ScalaSQLTable[WResultEdgeSS] => query.Select[(Expr[Int], Expr[Int]), (Int, Int)] = path =>
+      for {
+        s <- path.select
         edge <- sssp_edge.join(s.dst === _.src)
       } yield (edge.dst, s.cost + edge.cost)
 
-      val query = sssp_recur.insert.select(
-        c => (c.dst, c.cost),
-        innerQ
-      )
-      db.run(query)
+    FixedPointQuery.semiNaive(
+      db, sssp_delta, sssp_derived, sssp_tmp
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]])
 
-    val cmp: () => Boolean = () =>
-      val diff = sssp_recur.select.except(sssp_base.select)
-      val delta = db.run(diff)
-      delta.isEmpty
-
-    val reInit: () => Unit = () =>
-      // for set-semantic insert delta
-      val delta = sssp_recur.select.except(sssp_base.select).map(r => (r.dst, r.cost))
-
-      val insertNew = sssp_base.insert.select(
-        c => (c.dst, c.cost),
-        delta
-      )
-      db.run(insertNew)
-      db.run(sssp_recur.delete(_ => true))
-
-    FixedPointQuery.dbFix(sssp_base, sssp_recur)(fixFn)(cmp)(reInit)
-
-//    sssp_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
-    backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM sssp_base as s GROUP BY s.dst")
+    //    sssp_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
+    backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

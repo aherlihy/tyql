@@ -16,16 +16,12 @@ class CollectionsBenchmark {
   val benchmarks = Map(
     "tc" -> TCQuery(),
     "sssp" -> SSSPQuery(),
-    "ancestry" -> AncestryQuery()
+    "ancestry" -> AncestryQuery(),
+    "andersens" -> AndersensQuery()
   )
-
-  @Setup(Level.Trial)
-  def loadDB(): Unit = {
-    benchmarks.values.foreach(bm =>
-      bm.initializeCollections()
-      deleteOutputFiles(bm.outdir, "collections")
-    )
-  }
+  benchmarks.values.foreach(bm =>
+    bm.initializeCollections()
+  )
 
   @TearDown(Level.Trial)
   def writeDB(): Unit = {
@@ -49,6 +45,11 @@ class CollectionsBenchmark {
   @Benchmark def ancestry(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("ancestry").executeCollections()
+    )
+  }
+  @Benchmark def andersens(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("andersens").executeCollections()
     )
   }
 }
