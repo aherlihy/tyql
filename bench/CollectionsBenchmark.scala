@@ -25,6 +25,8 @@ class CollectionsBenchmark {
     "dataflow" -> DataflowQuery(),
     "evenodd" -> EvenOddQuery(),
     "cc" -> CompanyControlQuery(),
+    "pointstocount" -> PointsToCountQuery(),
+    "javapointsto" -> JavaPointsTo(),
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -95,6 +97,18 @@ class CollectionsBenchmark {
   @Benchmark def cc(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("cc")
+    )
+  }
+
+  @Benchmark def pointstocount(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("pointstocount")
+    )
+  }
+
+  @Benchmark def javapointsto(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("javapointsto")
     )
   }
 }

@@ -1,7 +1,7 @@
 package tyql.bench
 
 import buildinfo.BuildInfo
-import scalasql.MySqlDialect.*
+import scalasql.PostgresDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
 import scalasql.{Expr, query, Table as ScalaSQLTable}
 import Helpers.*

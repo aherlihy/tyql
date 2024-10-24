@@ -25,6 +25,8 @@ class TyQLBenchmark {
     "dataflow" -> DataflowQuery(),
     "evenodd" -> EvenOddQuery(),
     "cc" -> CompanyControlQuery(),
+    "pointstocount" -> PointsToCountQuery(),
+    "javapointsto" -> JavaPointsTo(),
   )
 
   def run(bm: String) = benchmarks(bm).executeTyQL(duckDB)
@@ -103,6 +105,18 @@ class TyQLBenchmark {
   @Benchmark def cc(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("cc")
+    )
+  }
+
+  @Benchmark def pointstocount(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("pointstocount")
+    )
+  }
+
+  @Benchmark def javapointsto(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("javapointsto")
     )
   }
 }

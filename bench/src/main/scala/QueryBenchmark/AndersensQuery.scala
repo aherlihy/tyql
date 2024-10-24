@@ -1,7 +1,7 @@
 package tyql.bench
 
 import buildinfo.BuildInfo
-import scalasql.MySqlDialect.*
+import scalasql.PostgresDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
 import scalasql.{Expr, Table as ScalaSQLTable, query}
 import Helpers.*
@@ -143,7 +143,7 @@ class AndersensQuery extends QueryBenchmark {
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
       db, andersens_delta, andersens_derived, andersens_tmp
-    )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => Select[Any, Any]])
+    )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]])
 
     val result = andersens_derived.select.sortBy(_.x)
     resultScalaSQL = db.run(result)

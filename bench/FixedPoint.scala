@@ -22,12 +22,14 @@ object FixedPointQuery {
     val basesA = bases.toArray
     val accA = acc.toArray
 
-    val combo = accA.zip(basesA).asInstanceOf[Array[(S, S)]].map((a: S, b: S) => if (set) then (a ++ b).distinct else a ++ b)
-    val res = Tuple.fromArray(combo).asInstanceOf[T]
 
     if (nextA.zip(basesA).map((t: Tuple2[?, ?]) => t._1 == t._2).toList.forall(b => b))
+      val combo = accA.zip(basesA).asInstanceOf[Array[(S, S)]].map((a: S, b: S) => if (set) then (a ++ b).distinct else a ++ b)
+      val res = Tuple.fromArray(combo).asInstanceOf[T]
       res
     else
+      val combo = accA.zip(basesA).asInstanceOf[Array[(S, S)]].map((a: S, b: S) => if (set) then (a ++ b).distinct else a ++ b)
+      val res = Tuple.fromArray(combo).asInstanceOf[T]
       multiFix(set)(next, res)(fns)
 
   final def scalaSQLFix[P[_[_]]]

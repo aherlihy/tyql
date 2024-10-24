@@ -1,7 +1,7 @@
 package tyql.bench
 
 import buildinfo.BuildInfo
-import scalasql.MySqlDialect.*
+import scalasql.PostgresDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
 import scalasql.{Expr, query, Table as ScalaSQLTable}
 
@@ -18,7 +18,7 @@ import Helpers.*
 @experimental
 class CompanyControlQuery extends QueryBenchmark {
   override def name = "cc"
-  override def set = true
+  override def set = false
 
   // TYQL data model
   type Shares = (byC: String, of: String, percent: Int)
