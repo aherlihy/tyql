@@ -21,6 +21,7 @@ class CollectionsBenchmark {
     "asps" -> ASPSQuery(),
     "bom" -> BOMQuery(),
     "orbits" -> OrbitsQuery(),
+    "dataflow" -> DataflowQuery(),
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -73,6 +74,12 @@ class CollectionsBenchmark {
   @Benchmark def orbits(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("orbits").executeCollections()
+    )
+  }
+
+  @Benchmark def dataflow(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("dataflow").executeCollections()
     )
   }
 }

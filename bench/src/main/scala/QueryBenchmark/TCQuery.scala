@@ -91,7 +91,7 @@ class TCQuery extends QueryBenchmark {
         collectionsDB.edge
           .filter(e => p.endNode == e.x && !p.path.contains(e.y))
           .map(e => ResultEdgeCC(startNode = p.startNode, endNode = e.y, p.path :+ e.y))
-      ).distinct
+      )//.distinct
     ).sortBy(r => r.path.length).sortBy(_.startNode).sortBy(_.endNode)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =

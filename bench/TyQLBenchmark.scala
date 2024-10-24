@@ -22,6 +22,7 @@ class TyQLBenchmark {
     "asps" -> ASPSQuery(),
     "bom" -> BOMQuery(),
     "orbits" -> OrbitsQuery(),
+    "dataflow" -> DataflowQuery(),
   )
 
   @Setup(Level.Trial)
@@ -80,6 +81,12 @@ class TyQLBenchmark {
   @Benchmark def orbits(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("orbits").executeTyQL(duckDB)
+    )
+  }
+
+  @Benchmark def dataflow(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("dataflow").executeTyQL(duckDB)
     )
   }
 }
