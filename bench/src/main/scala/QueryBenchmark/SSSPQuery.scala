@@ -124,7 +124,7 @@ class SSSPQuery extends QueryBenchmark {
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]])
 
     //    sssp_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
-    backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst")
+    backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst ORDER BY s.cost")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

@@ -18,7 +18,8 @@ class CollectionsBenchmark {
     "sssp" -> SSSPQuery(),
     "ancestry" -> AncestryQuery(),
     "andersens" -> AndersensQuery(),
-    "asps" -> ASPSQuery()
+    "asps" -> ASPSQuery(),
+    "bom" -> BOMQuery()
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -37,24 +38,34 @@ class CollectionsBenchmark {
       benchmarks("tc").executeCollections()
     )
   }
+
   @Benchmark def sssp(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("sssp").executeCollections()
     )
   }
+
   @Benchmark def ancestry(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("ancestry").executeCollections()
     )
   }
+
   @Benchmark def andersens(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("andersens").executeCollections()
     )
   }
+
   @Benchmark def asps(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("asps").executeCollections()
+    )
+  }
+
+  @Benchmark def bom(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("bom").executeCollections()
     )
   }
 }

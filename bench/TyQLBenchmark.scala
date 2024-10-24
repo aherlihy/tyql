@@ -19,7 +19,8 @@ class TyQLBenchmark {
     "sssp" -> SSSPQuery(),
     "ancestry" -> AncestryQuery(),
     "andersens" -> AndersensQuery(),
-    "asps" -> ASPSQuery()
+    "asps" -> ASPSQuery(),
+    "bom" -> BOMQuery()
   )
 
   @Setup(Level.Trial)
@@ -66,6 +67,12 @@ class TyQLBenchmark {
   @Benchmark def asps(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("asps").executeTyQL(duckDB)
+    )
+  }
+
+  @Benchmark def bom(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("bom").executeTyQL(duckDB)
     )
   }
 }
