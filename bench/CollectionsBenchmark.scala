@@ -19,7 +19,8 @@ class CollectionsBenchmark {
     "ancestry" -> AncestryQuery(),
     "andersens" -> AndersensQuery(),
     "asps" -> ASPSQuery(),
-    "bom" -> BOMQuery()
+    "bom" -> BOMQuery(),
+    "orbits" -> OrbitsQuery(),
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -66,6 +67,12 @@ class CollectionsBenchmark {
   @Benchmark def bom(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("bom").executeCollections()
+    )
+  }
+
+  @Benchmark def orbits(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("orbits").executeCollections()
     )
   }
 }

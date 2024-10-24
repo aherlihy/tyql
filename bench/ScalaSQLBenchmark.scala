@@ -20,7 +20,8 @@ class ScalaSQLBenchmark {
     "ancestry" -> AncestryQuery(),
     "andersens" -> AndersensQuery(),
     "asps" -> ASPSQuery(),
-    "bom" -> BOMQuery()
+    "bom" -> BOMQuery(),
+    "orbits" -> OrbitsQuery(),
   )
 
   @Setup(Level.Trial)
@@ -73,6 +74,12 @@ class ScalaSQLBenchmark {
   @Benchmark def bom(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("bom").executeScalaSQL(duckDB)
+    )
+  }
+
+  @Benchmark def orbits(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("orbits").executeScalaSQL(duckDB)
     )
   }
 }
