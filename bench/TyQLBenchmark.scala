@@ -24,7 +24,10 @@ class TyQLBenchmark {
     "orbits" -> OrbitsQuery(),
     "dataflow" -> DataflowQuery(),
     "evenodd" -> EvenOddQuery(),
+    "cc" -> CompanyControlQuery(),
   )
+
+  def run(bm: String) = benchmarks(bm).executeTyQL(duckDB)
 
   @Setup(Level.Trial)
   def loadDB(): Unit = {
@@ -45,55 +48,61 @@ class TyQLBenchmark {
   /*******************Boilerplate*****************/
   @Benchmark def tc(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("tc").executeTyQL(duckDB)
+      run("tc")
     )
   }
 
   @Benchmark def sssp(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("sssp").executeTyQL(duckDB)
+      run("sssp")
     )
   }
 
   @Benchmark def ancestry(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("ancestry").executeTyQL(duckDB)
+      run("ancestry")
     )
   }
 
   @Benchmark def andersens(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("andersens").executeTyQL(duckDB)
+      run("andersens")
     )
   }
 
   @Benchmark def asps(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("asps").executeTyQL(duckDB)
+      run("asps")
     )
   }
 
   @Benchmark def bom(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("bom").executeTyQL(duckDB)
+      run("bom")
     )
   }
 
   @Benchmark def orbits(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("orbits").executeTyQL(duckDB)
+      run("orbits")
     )
   }
 
   @Benchmark def dataflow(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("dataflow").executeTyQL(duckDB)
+      run("dataflow")
     )
   }
 
   @Benchmark def evenodd(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("evenodd").executeTyQL(duckDB)
+      run("evenodd")
+    )
+  }
+
+  @Benchmark def cc(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("cc")
     )
   }
 }

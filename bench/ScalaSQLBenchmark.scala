@@ -24,7 +24,10 @@ class ScalaSQLBenchmark {
     "orbits" -> OrbitsQuery(),
     "dataflow" -> DataflowQuery(),
     "evenodd" -> EvenOddQuery(),
+    "cc" -> CompanyControlQuery(),
   )
+
+  def run(bm: String) = benchmarks(bm).executeScalaSQL(duckDB)
 
   @Setup(Level.Trial)
   def loadDB(): Unit = {
@@ -45,55 +48,61 @@ class ScalaSQLBenchmark {
   /*******************Boilerplate*****************/
   @Benchmark def tc(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("tc").executeScalaSQL(duckDB)
+      run("tc")
     )
   }
 
   @Benchmark def sssp(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("sssp").executeScalaSQL(duckDB)
+      run("sssp")
     )
   }
 
   @Benchmark def ancestry(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("ancestry").executeScalaSQL(duckDB)
+      run("ancestry")
     )
   }
 
   @Benchmark def andersens(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("andersens").executeScalaSQL(duckDB)
+      run("andersens")
     )
   }
 
   @Benchmark def asps(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("asps").executeScalaSQL(duckDB)
+      run("asps")
     )
   }
 
   @Benchmark def bom(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("bom").executeScalaSQL(duckDB)
+      run("bom")
     )
   }
 
   @Benchmark def orbits(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("orbits").executeScalaSQL(duckDB)
+      run("orbits")
     )
   }
 
   @Benchmark def dataflow(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("dataflow").executeScalaSQL(duckDB)
+      run("dataflow")
     )
   }
 
   @Benchmark def evenodd(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("evenodd").executeScalaSQL(duckDB)
+      run("evenodd")
+    )
+  }
+
+  @Benchmark def cc(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("cc")
     )
   }
 }

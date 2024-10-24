@@ -13,6 +13,7 @@ import Helpers.*
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class CollectionsBenchmark {
+  def run(bm: String) = benchmarks(bm).executeCollections()
   val benchmarks = Map(
     "tc" -> TCQuery(),
     "sssp" -> SSSPQuery(),
@@ -23,6 +24,7 @@ class CollectionsBenchmark {
     "orbits" -> OrbitsQuery(),
     "dataflow" -> DataflowQuery(),
     "evenodd" -> EvenOddQuery(),
+    "cc" -> CompanyControlQuery(),
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -38,55 +40,61 @@ class CollectionsBenchmark {
   /*******************Boilerplate*****************/
   @Benchmark def tc(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("tc").executeCollections()
+      run("tc")
     )
   }
 
   @Benchmark def sssp(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("sssp").executeCollections()
+      run("sssp")
     )
   }
 
   @Benchmark def ancestry(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("ancestry").executeCollections()
+      run("ancestry")
     )
   }
 
   @Benchmark def andersens(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("andersens").executeCollections()
+      run("andersens")
     )
   }
 
   @Benchmark def asps(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("asps").executeCollections()
+      run("asps")
     )
   }
 
   @Benchmark def bom(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("bom").executeCollections()
+      run("bom")
     )
   }
 
   @Benchmark def orbits(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("orbits").executeCollections()
+      run("orbits")
     )
   }
 
   @Benchmark def dataflow(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("dataflow").executeCollections()
+      run("dataflow")
     )
   }
 
   @Benchmark def evenodd(blackhole: Blackhole): Unit = {
     blackhole.consume(
-      benchmarks("evenodd").executeCollections()
+      run("evenodd")
+    )
+  }
+
+  @Benchmark def cc(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("cc")
     )
   }
 }
