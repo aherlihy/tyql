@@ -113,7 +113,7 @@ class TCQuery extends QueryBenchmark {
         if !listContains(e.y, p.path)
       } yield (p.startNode, e.y, listAppend(e.y, p.path))
 
-    FixedPointQuery.semiNaive(
+    FixedPointQuery.scalaSQLSemiNaive(
       db, tc_delta, tc_derived, tc_tmp
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]])
 

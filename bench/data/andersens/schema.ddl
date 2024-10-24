@@ -1,7 +1,10 @@
-DROP TABLE IF EXISTS addressOf;
-DROP TABLE IF EXISTS assign;
-DROP TABLE IF EXISTS loadT;
-DROP TABLE IF EXISTS store;
+DROP TABLE IF EXISTS andersens_addressOf;
+DROP TABLE IF EXISTS andersens_assign;
+DROP TABLE IF EXISTS andersens_loadT;
+DROP TABLE IF EXISTS andersens_store;
+DROP TABLE IF EXISTS andersens_delta;
+DROP TABLE IF EXISTS andersens_derived;
+DROP TABLE IF EXISTS andersens_tmp;
 
 CREATE TABLE andersens_addressOf
 (

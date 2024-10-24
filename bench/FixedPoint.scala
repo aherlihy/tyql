@@ -14,23 +14,7 @@ object FixedPointQuery {
     else
       fix(next, acc ++ bases)(fns)
 
-  final def dbFix[P[_[_]]]
-    (bases: ScalaSQLTable[P], acc: ScalaSQLTable[P])
-    (fns: () => Unit)
-    (cmp: () => Boolean)
-    (init: () => Unit)
-  : ScalaSQLTable[P] =
-
-    fns()
-
-    val isEmpty = cmp()
-    if (isEmpty)
-      acc
-    else
-      init()
-      dbFix(bases, acc)(fns)(cmp)(init)
-
-  final def tableFix[P[_[_]]]
+  final def scalaSQLFix[P[_[_]]]
     (bases: ScalaSQLTable[P], acc: ScalaSQLTable[P])
     (fns: ScalaSQLTable[P] => ScalaSQLTable[P])
     (cmp: ScalaSQLTable[P] => Boolean)
@@ -44,7 +28,7 @@ object FixedPointQuery {
       acc
     else
       init()
-      tableFix(bases, acc)(fns)(cmp)(init)
+      scalaSQLFix(bases, acc)(fns)(cmp)(init)
 
 //   final def semiNaive[P[_[_]]](db: DbApi,
 //                                delta: ScalaSQLTable[P],
@@ -68,13 +52,13 @@ object FixedPointQuery {
 //     resetIter()
 //   }
 
-  final def semiNaive[Q, T >: Tuple, P[_[_]]](db: DbApi,
-                               delta: ScalaSQLTable[P],
-                               derived: ScalaSQLTable[P],
-                               tmp: ScalaSQLTable[P])
-                              (toTuple: P[Expr] => Tuple)
-                              (initBase: () => query.Select[T, Q])
-                              (initRecur: ScalaSQLTable[P] => query.Select[T, Q])
+  final def scalaSQLSemiNaive[Q, T >: Tuple, P[_[_]]](db: DbApi,
+                                                      delta: ScalaSQLTable[P],
+                                                      derived: ScalaSQLTable[P],
+                                                      tmp: ScalaSQLTable[P])
+                                                     (toTuple: P[Expr] => Tuple)
+                                                     (initBase: () => query.Select[T, Q])
+                                                     (initRecur: ScalaSQLTable[P] => query.Select[T, Q])
   : Unit = { //ScalaSQLTable[P] =
 
     db.run(delta.delete(_ => true))
@@ -101,15 +85,15 @@ object FixedPointQuery {
         query
       ))
       db.run(delta.delete(_ => true))
-      db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(delta)} SELECT * FROM ${ScalaSQLTable.name(tmp)}")
+      db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(delta)} (SELECT * FROM ${ScalaSQLTable.name(tmp)})")
       delta
     }
 
     val init: () => Unit = () => {
-      db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(derived)} SELECT * FROM ${ScalaSQLTable.name(delta)}")
+      db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(derived)} (SELECT * FROM ${ScalaSQLTable.name(delta)})")
     }
 
-    tableFix(delta, derived)(fixFn)(cmp)(init)
+    scalaSQLFix(delta, derived)(fixFn)(cmp)(init)
     init()
   }
 

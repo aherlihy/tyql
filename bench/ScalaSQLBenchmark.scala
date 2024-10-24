@@ -18,7 +18,8 @@ class ScalaSQLBenchmark {
     "tc" -> TCQuery(),
     "sssp" -> SSSPQuery(),
     "ancestry" -> AncestryQuery(),
-    "andersens" -> AndersensQuery()
+    "andersens" -> AndersensQuery(),
+    "asps" -> ASPSQuery()
   )
 
   @Setup(Level.Trial)
@@ -58,6 +59,11 @@ class ScalaSQLBenchmark {
   @Benchmark def andersens(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("andersens").executeScalaSQL(duckDB)
+    )
+  }
+  @Benchmark def asps(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("asps").executeScalaSQL(duckDB)
     )
   }
 }

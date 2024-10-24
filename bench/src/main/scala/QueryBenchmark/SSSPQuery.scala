@@ -118,7 +118,7 @@ class SSSPQuery extends QueryBenchmark {
         edge <- sssp_edge.join(s.dst === _.src)
       } yield (edge.dst, s.cost + edge.cost)
 
-    FixedPointQuery.semiNaive(
+    FixedPointQuery.scalaSQLSemiNaive(
       db, sssp_delta, sssp_derived, sssp_tmp
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]])
 

@@ -140,7 +140,7 @@ class AndersensQuery extends QueryBenchmark {
       innerQ1.union(innerQ2).union(innerQ3).except(andersens_derived.select.map(r => (r.x, r.y)))
 
 
-    FixedPointQuery.semiNaive(
+    FixedPointQuery.scalaSQLSemiNaive(
       db, andersens_delta, andersens_derived, andersens_tmp
     )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => Select[Any, Any]])
 
