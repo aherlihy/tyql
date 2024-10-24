@@ -17,6 +17,7 @@ import tyql.Expr.min
 @experimental
 class SSSPQuery extends QueryBenchmark {
   override def name = "sssp"
+  override def set = true
 
   // TYQL data model
   type WeightedEdge = (src: Int, dst: Int, cost: Int)
@@ -93,7 +94,7 @@ class SSSPQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.base
-    resultCollections = FixedPointQuery.fix(base, Seq())(sp =>
+    resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
         collectionsDB.edge.flatMap(edge =>
           sp
             .filter(s => s.dst == edge.src)
@@ -118,7 +119,7 @@ class SSSPQuery extends QueryBenchmark {
         edge <- sssp_edge.join(s.dst === _.src)
       } yield (edge.dst, s.cost + edge.cost)
 
-    FixedPointQuery.scalaSQLSemiNaive(
+    FixedPointQuery.scalaSQLSemiNaive(set)(
       db, sssp_delta, sssp_derived, sssp_tmp
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]])
 

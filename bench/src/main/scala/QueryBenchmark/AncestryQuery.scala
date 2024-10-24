@@ -17,6 +17,7 @@ import tyql.Expr.{IntLit, min}
 @experimental
 class AncestryQuery extends QueryBenchmark {
   override def name = "ancestry"
+  override def set = true
 
   // TYQL data model
   type Parent = (parent: String, child: String)
@@ -78,7 +79,7 @@ class AncestryQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.parents.filter(p => p.parent == "Alice").map(e => GenCC(name = e.child, gen = 1))
-    resultCollections = FixedPointQuery.fix(base, Seq())(sp =>
+    resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
         collectionsDB.parents.flatMap(parent =>
           sp
             .filter(g => parent.parent == g.name)
@@ -100,7 +101,7 @@ class AncestryQuery extends QueryBenchmark {
         parents <- ancestry_parents.join(base.name === _.parent)
       } yield (parents.child, base.gen + 1)
 
-    FixedPointQuery.scalaSQLSemiNaive(
+    FixedPointQuery.scalaSQLSemiNaive(set)(
       db, ancestry_delta, ancestry_derived, ancestry_tmp
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
 

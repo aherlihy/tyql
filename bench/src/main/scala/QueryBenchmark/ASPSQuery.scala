@@ -17,6 +17,7 @@ import tyql.Expr.min
 @experimental
 class ASPSQuery extends QueryBenchmark {
   override def name = "asps"
+  override def set = true
 
   // TYQL data model
   type WeightedEdge = (src: Int, dst: Int, cost: Int)
@@ -100,7 +101,7 @@ class ASPSQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.edge.groupBy(s => (s.src, s.dst)).mapValues(_.minBy(_.cost)).values.toSeq
-    resultCollections = FixedPointQuery.fix(base, Seq())(path =>
+    resultCollections = FixedPointQuery.fix(set)(base, Seq())(path =>
       path.flatMap(p =>
         path
           .filter(e => p.dst == e.src)
@@ -133,7 +134,7 @@ class ASPSQuery extends QueryBenchmark {
       else
         db.values(fixAgg)
 
-    FixedPointQuery.scalaSQLSemiNaive(
+    FixedPointQuery.scalaSQLSemiNaive(set)(
       db, asps_delta, asps_derived, asps_tmp
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WEdgeSS] => query.Select[Any, Any]])
 

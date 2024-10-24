@@ -9,6 +9,7 @@ trait QueryBenchmark {
   def name: String
   def datadir = s"${BuildInfo.baseDirectory}/bench/data/$name"
   def outdir = s"$datadir/out"
+  def set: Boolean
 
   def initializeCollections(): Unit
   def executeTyQL(ddb: DuckDBBackend): Unit

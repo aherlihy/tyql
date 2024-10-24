@@ -17,6 +17,7 @@ import tyql.Expr.{IntLit, min}
 @experimental
 class AndersensQuery extends QueryBenchmark {
   override def name = "andersens"
+  override def set = true
 
   // TYQL data model
   type Edge = (x: String, y: String)
@@ -96,7 +97,7 @@ class AndersensQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.addressOf.map(a => EdgeCC(x = a.x, y = a.y))
-    resultCollections = FixedPointQuery.fix(base, Seq())(pointsTo =>
+    resultCollections = FixedPointQuery.fix(set)(base, Seq())(pointsTo =>
       collectionsDB.assign.flatMap(a =>
           pointsTo.filter(p => a.y == p.x).map(p =>
             EdgeCC(x = a.x, y = p.y)))
@@ -140,7 +141,7 @@ class AndersensQuery extends QueryBenchmark {
       innerQ1.union(innerQ2).union(innerQ3).except(andersens_derived.select.map(r => (r.x, r.y)))
 
 
-    FixedPointQuery.scalaSQLSemiNaive(
+    FixedPointQuery.scalaSQLSemiNaive(set)(
       db, andersens_delta, andersens_derived, andersens_tmp
     )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => Select[Any, Any]])
 

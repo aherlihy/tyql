@@ -16,6 +16,7 @@ import scalasql.core.SqlStr.SqlStringSyntax
 @experimental
 class TCQuery extends QueryBenchmark {
   override def name = "tc"
+  override def set = false
 
   // TYQL data model
   type Edge = (x: Int, y: Int)
@@ -85,7 +86,7 @@ class TCQuery extends QueryBenchmark {
     val path = collectionsDB.edge
       .filter(p => p.x == 1)
       .map(e => ResultEdgeCC(e.x, e.y, Seq(e.x, e.y)))
-    resultCollections = FixedPointQuery.fix(path, Seq())(path =>
+    resultCollections = FixedPointQuery.fix(set)(path, Seq())(path =>
       path.flatMap(p =>
         collectionsDB.edge
           .filter(e => p.endNode == e.x && !p.path.contains(e.y))
@@ -113,7 +114,7 @@ class TCQuery extends QueryBenchmark {
         if !listContains(e.y, p.path)
       } yield (p.startNode, e.y, listAppend(e.y, p.path))
 
-    FixedPointQuery.scalaSQLSemiNaive(
+    FixedPointQuery.scalaSQLSemiNaive(set)(
       db, tc_delta, tc_derived, tc_tmp
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]])
 
