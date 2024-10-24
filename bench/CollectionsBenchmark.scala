@@ -22,6 +22,7 @@ class CollectionsBenchmark {
     "bom" -> BOMQuery(),
     "orbits" -> OrbitsQuery(),
     "dataflow" -> DataflowQuery(),
+    "evenodd" -> EvenOddQuery(),
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -80,6 +81,12 @@ class CollectionsBenchmark {
   @Benchmark def dataflow(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("dataflow").executeCollections()
+    )
+  }
+
+  @Benchmark def evenodd(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("evenodd").executeCollections()
     )
   }
 }

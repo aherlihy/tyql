@@ -23,6 +23,7 @@ class ScalaSQLBenchmark {
     "bom" -> BOMQuery(),
     "orbits" -> OrbitsQuery(),
     "dataflow" -> DataflowQuery(),
+    "evenodd" -> EvenOddQuery(),
   )
 
   @Setup(Level.Trial)
@@ -87,6 +88,12 @@ class ScalaSQLBenchmark {
   @Benchmark def dataflow(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("dataflow").executeScalaSQL(duckDB)
+    )
+  }
+
+  @Benchmark def evenodd(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("evenodd").executeScalaSQL(duckDB)
     )
   }
 }

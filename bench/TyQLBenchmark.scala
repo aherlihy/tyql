@@ -23,6 +23,7 @@ class TyQLBenchmark {
     "bom" -> BOMQuery(),
     "orbits" -> OrbitsQuery(),
     "dataflow" -> DataflowQuery(),
+    "evenodd" -> EvenOddQuery(),
   )
 
   @Setup(Level.Trial)
@@ -87,6 +88,12 @@ class TyQLBenchmark {
   @Benchmark def dataflow(blackhole: Blackhole): Unit = {
     blackhole.consume(
       benchmarks("dataflow").executeTyQL(duckDB)
+    )
+  }
+
+  @Benchmark def evenodd(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      benchmarks("evenodd").executeTyQL(duckDB)
     )
   }
 }
