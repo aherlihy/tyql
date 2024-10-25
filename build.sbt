@@ -38,8 +38,20 @@ lazy val root = (project in file("."))
 //      baseDirectory.value / "bench/data/andersens/out/tyql.csv",
 //      baseDirectory.value / "bench/data/andersens/out/scalasql.csv",
 //    ),
-    cleanFiles ++= Seq("andersens", "ancestry", "sssp", "tc")
-      .flatMap(bm => Seq("collections", "tyql", "scalasql")
+    cleanFiles ++= Seq("tc",
+      "sssp",
+      "ancestry",
+      "andersens",
+      "asps",
+      "bom",
+      "orbits",
+      "dataflow",
+      "evenodd",
+      "cc",
+      "pointstocount",
+      "javapointsto",
+      "trustchain",
+    ).flatMap(bm => Seq("collections", "tyql", "scalasql")
         .map(ty =>
           baseDirectory.value / s"bench/data/$bm/out/$ty.csv"))
 )

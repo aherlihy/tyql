@@ -88,7 +88,7 @@ class EvenOddQuery extends QueryBenchmark {
       (evenResult, oddResult)
     )
 
-    val queryStr = odd.toQueryIR.toSQLString().replace("\"", "'")
+    val queryStr = odd.sort(_.value, Ord.ASC).toQueryIR.toSQLString().replace("\"", "'")
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
@@ -104,7 +104,7 @@ class EvenOddQuery extends QueryBenchmark {
       ).distinct
       (evenResult, oddResult)
     )
-    resultCollections = odd
+    resultCollections = odd.sortBy(_.value)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -119,8 +119,9 @@ class EvenOddQuery extends QueryBenchmark {
         .map(n => ( n.value, Expr("odd")))
       (even, odd)
 
-    val fixFn: (ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS]) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)]) =
-      (even, odd) =>
+    val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)]) =
+      (recur) =>
+        val (even, odd) = recur
         val evenResult = for {
           n <- evenodd_numbers.select
           o <- odd.join(n.value === _.value + 1)
@@ -138,9 +139,9 @@ class EvenOddQuery extends QueryBenchmark {
       (toTuple, toTuple)
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[(ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS]) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
-    val result = evenodd_derived2.select
+    val result = evenodd_derived2.select.sortBy(_.value)
     resultScalaSQL = db.run(result)
 
 

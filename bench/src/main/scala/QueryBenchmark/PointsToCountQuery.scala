@@ -18,7 +18,7 @@ import Helpers.*
 @experimental
 class PointsToCountQuery extends QueryBenchmark {
   override def name = "pointstocount"
-  override def set = true
+  override def set = false
 
   // TYQL data model
   type ProgramHeapOp = (x: String, y: String, h: String)
@@ -137,7 +137,7 @@ class PointsToCountQuery extends QueryBenchmark {
 
       (vpt, hpt)
     )
-    val query = pt._1.sort(_.x, Ord.ASC)//.filter(vpt => vpt.x == "r").size
+    val query = pt._1.sort(_.x, Ord.ASC).sort(_.y, Ord.ASC)//.filter(vpt => vpt.x == "r").size
 
     val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
     resultTyql = ddb.runQuery(queryStr)
@@ -147,7 +147,6 @@ class PointsToCountQuery extends QueryBenchmark {
     val baseHPT = collectionsDB.hpt
     var it = 0
     val pt = FixedPointQuery.multiFix(set)((baseVPT, baseHPT), (Seq(), Seq()))((varPointsTo, heapPointsTo) =>
-      println(s"bases at it@$it: $varPointsTo, $heapPointsTo")
       it+=1
       val vpt = collectionsDB.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
@@ -173,11 +172,10 @@ class PointsToCountQuery extends QueryBenchmark {
             )
         )
       )
-      println(s"vpt=$vpt")
 
       (vpt, hpt)
     )
-    resultCollections = pt._1.sortBy(_.x)//Seq(pt._1.filter(vpt => vpt.x == "r").size)
+    resultCollections = pt._1.sortBy(_.x).sortBy(_.y)//Seq(pt._1.filter(vpt => vpt.x == "r").size)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -190,26 +188,28 @@ class PointsToCountQuery extends QueryBenchmark {
       (pointstocount_new.select.map(c => (c.x, c.y)),
         pointstocount_hpt.select.map(c => (c.x, c.y, c.h)))
 
-    val fixFn: (ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS]) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]) = (varPointsTo, heapPointsTo) =>
-      val vpt1 = for {
-        a <- pointstocount_assign.select
-        p <- varPointsTo.join(_.x === a.y)
-      } yield (a.x, p.y)
-      val vpt2 = for {
-        l <- pointstocount_loadT.select
-        h <- heapPointsTo.join(_.y === l.h)
-        v <- varPointsTo.join(_.x === l.y)
-        if v.y === h.x
-      } yield (l.x, h.h)
-      val vpt = vpt1.union(vpt2)
+    val fixFn: ((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]) =
+      recur =>
+        val (varPointsTo, heapPointsTo) = recur
+        val vpt1 = for {
+          a <- pointstocount_assign.select
+          p <- varPointsTo.join(_.x === a.y)
+        } yield (a.x, p.y)
+        val vpt2 = for {
+          l <- pointstocount_loadT.select
+          h <- heapPointsTo.join(_.y === l.h)
+          v <- varPointsTo.join(_.x === l.y)
+          if v.y === h.x
+        } yield (l.x, h.h)
+        val vpt = vpt1.union(vpt2)
 
-      val hpt = for {
-        s <- pointstocount_store.select
-        v1 <- varPointsTo.join(_.x === s.x)
-        v2 <- varPointsTo.join(_.x === s.h)
-      } yield (v1.y, s.y, v2.y)
+        val hpt = for {
+          s <- pointstocount_store.select
+          v1 <- varPointsTo.join(_.x === s.x)
+          v2 <- varPointsTo.join(_.x === s.h)
+        } yield (v1.y, s.y, v2.y)
 
-      (vpt, hpt)
+        (vpt, hpt)
 
     FixedPointQuery.scalaSQLSemiNaive2(set)(
       db, (pointstocount_delta1, pointstocount_delta2), (pointstocount_derived1, pointstocount_derived2), (pointstocount_tmp1, pointstocount_tmp2)
@@ -217,13 +217,13 @@ class PointsToCountQuery extends QueryBenchmark {
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[(ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS]) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
 //    val result = pointstocount_derived2.select.filter(_.x === "r").size // this does not work!!!!!
 //    println(s"FINAL RES=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY r.x")}")
 //    backupResultScalaSql = ddb.runQuery(s"SELECT COUNT(1) FROM ${ScalaSQLTable.name(pointstocount_derived2)} as r WHERE r.x = 'r'")
 
-    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY r.x")
+    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY x, y")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

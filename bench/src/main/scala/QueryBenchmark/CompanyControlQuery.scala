@@ -130,8 +130,9 @@ class CompanyControlQuery extends QueryBenchmark {
     val initBase = () =>
       (cc_shares.select.map(c => (c.byC, c.of, c.percent)), cc_control.select.map(c => (c.com1, c.com2)))
 
-    val fixFn: (ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS]) => (query.Select[(Expr[String], Expr[String], Expr[Int]), (String, String, Int)], query.Select[(Expr[String], Expr[String]), (String, String)]) =
-      (cshares, control) =>
+    val fixFn: ((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[String], Expr[String], Expr[Int]), (String, String, Int)], query.Select[(Expr[String], Expr[String]), (String, String)]) =
+      (recur) =>
+        val (cshares, control) = recur
         val fixAgg = db.runRaw[(String, String, Int)](
           "SELECT ref22.com1 as byC, ref23.of as of, SUM(ref23.percent) as percent " +
          s"FROM ${ScalaSQLTable.name(control)} as ref22, ${ScalaSQLTable.name(cshares)} as ref23 " +
@@ -156,7 +157,7 @@ class CompanyControlQuery extends QueryBenchmark {
       ((c: SharesSS[?]) => (c.byC, c.of, c.percent), (c: ResultSS[?]) => (c.com1, c.com2))
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[(ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS]) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
     val result = cc_derived2.select.sortBy(_.com1)
     resultScalaSQL = db.run(result)

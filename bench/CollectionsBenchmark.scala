@@ -8,8 +8,8 @@ import Helpers.*
 
 @experimental
 @Fork(1)
-@Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.SECONDS, batchSize = 1)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.SECONDS, batchSize= 1)
+@Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
+@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class CollectionsBenchmark {
@@ -27,6 +27,7 @@ class CollectionsBenchmark {
     "cc" -> CompanyControlQuery(),
     "pointstocount" -> PointsToCountQuery(),
     "javapointsto" -> JavaPointsTo(),
+    "trustchain" -> TrustChainQuery(),
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -109,6 +110,12 @@ class CollectionsBenchmark {
   @Benchmark def javapointsto(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("javapointsto")
+    )
+  }
+
+  @Benchmark def trustchain(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("trustchain")
     )
   }
 }
