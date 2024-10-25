@@ -28,6 +28,7 @@ class CollectionsBenchmark {
     "pointstocount" -> PointsToCountQuery(),
     "javapointsto" -> JavaPointsTo(),
     "trustchain" -> TrustChainQuery(),
+    "party" -> PartyQuery(),
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -116,6 +117,12 @@ class CollectionsBenchmark {
   @Benchmark def trustchain(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("trustchain")
+    )
+  }
+
+  @Benchmark def party(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("party")
     )
   }
 }

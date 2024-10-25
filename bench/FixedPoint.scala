@@ -203,8 +203,8 @@ object FixedPointQuery {
     val copyInto: (Tables, Tables, Tables) => Tables = (currentDelta, acc, temp) => {
 //      println("----CopyInto----")
 //      println(s"currentDelta=${ScalaSQLTable.name(currentDelta._1)}, acc=${ScalaSQLTable.name(acc._1)}, temp=${ScalaSQLTable.name(temp._1)}")
-      printTable(currentDelta, "currentDelta")
-      printTable(acc, "acc")
+//      printTable(currentDelta, "currentDelta")
+//      printTable(acc, "acc")
       if (set)
         db.run(temp._1.delete(_ => true))
         db.run(temp._2.delete(_ => true))

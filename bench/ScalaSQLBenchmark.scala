@@ -28,6 +28,7 @@ class ScalaSQLBenchmark {
     "pointstocount" -> PointsToCountQuery(),
     "javapointsto" -> JavaPointsTo(),
     "trustchain" -> TrustChainQuery(),
+    "party" -> PartyQuery(),
   )
 
   def run(bm: String) = benchmarks(bm).executeScalaSQL(duckDB)
@@ -124,6 +125,12 @@ class ScalaSQLBenchmark {
   @Benchmark def trustchain(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("trustchain")
+    )
+  }
+
+  @Benchmark def party(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("party")
     )
   }
 }

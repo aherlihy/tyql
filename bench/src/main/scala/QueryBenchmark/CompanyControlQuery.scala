@@ -108,13 +108,8 @@ class CompanyControlQuery extends QueryBenchmark {
           .filter(cs => cs.byC == con.com2)
           .map(cs => SharesCC(con.com1, cs.of, cs.percent))
           .groupBy(csh => (csh.byC, csh.of))
-          .mapValues(s =>
-            val sum = s.map(s3 => s3.percent).sum
-            val byC = s.head.byC
-            val of = s.head.of
-            SharesCC(byC, of, sum)
-          )
-          .values.toSeq
+          .map((k, v) => SharesCC(k._1, k._2, v.map(s3 => s3.percent).sum))
+           .toSeq
       )
       val controlRecur = cshares
         .filter(s => s.percent > 50)

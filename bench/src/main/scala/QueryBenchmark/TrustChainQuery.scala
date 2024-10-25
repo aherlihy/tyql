@@ -116,12 +116,8 @@ class TrustChainQuery extends QueryBenchmark {
 
     val query = trust
       .groupBy(_.person2)
-      .mapValues(s =>
-        val count = s.size
-        val n = s.head.person2
-        ResultCC(n, count)
-      )
-      .values.toSeq
+      .map((person2, rest) => ResultCC(name = person2, count = rest.distinct.size))
+      .toSeq
 
     resultCollections = query.sortBy(_.name)
 
