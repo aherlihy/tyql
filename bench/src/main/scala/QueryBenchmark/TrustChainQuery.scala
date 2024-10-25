@@ -11,7 +11,7 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Table, Query}
-import tyql.Query.{fix, unrestrictedBagFix}
+import tyql.Query.{unrestrictedFix, unrestrictedBagFix}
 import tyql.Expr.{IntLit, StringLit, count}
 import Helpers.*
 
@@ -76,7 +76,7 @@ class TrustChainQuery extends QueryBenchmark {
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val baseFriends = tyqlDB.friends
 
-    val (trust, friends) = unrestrictedBagFix((baseFriends, baseFriends))((trust, friends) => {
+    val (trust, friends) = unrestrictedFix((baseFriends, baseFriends))((trust, friends) => {
       val mutualTrustResult = friends.flatMap(f =>
         trust
           .filter(mt => mt.person2 == f.person1)
@@ -99,8 +99,15 @@ class TrustChainQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val baseFriends = collectionsDB.friends
+//    println(s"Friends: $baseFriends")
+//    println(s"Trust: $baseFriends")
 
+//    var it = 0
     val (trust, friends) = FixedPointQuery.multiFix(set)((baseFriends, baseFriends), (Seq(), Seq()))((trust: Seq[FriendsCC], friends: Seq[FriendsCC]) => {
+//      println(s"***iteration $it")
+//      println(s"\ninput:\n\ttrust  : ${trust.map(f => f.person1 + "-" + f.person2).mkString("(", ",", ")")}\n\tfriends: ${friends.map(f => f.person1 + "-" + f.person2).mkString("(", ",", ")")}")
+
+      it += 1
       val mutualTrustResult = friends.flatMap(f =>
         trust
           .filter(mt => mt.person2 == f.person1)
@@ -111,8 +118,10 @@ class TrustChainQuery extends QueryBenchmark {
         FriendsCC(person1 = mt.person1, person2 = mt.person2)
       )
 
+//      println(s"output:\n\tRtrust : ${mutualTrustResult.map(f => f.person1 + "-" + f.person2).mkString("(", ",", ")")}\n\tRfriend: ${friendsResult.map(f => f.person1 + "-" + f.person2).mkString("(", ",", ")")}")
       (mutualTrustResult, friendsResult)
     })
+//    println(s"FINAL: ${trust.map(f => f.person1 + "-" + f.person2).mkString("(", ",", ")")}, ${friends.map(f => f.person1 + "-" + f.person2).mkString("(", ",", ")")}")
 
     val query = trust
       .groupBy(_.person2)
@@ -132,16 +141,21 @@ class TrustChainQuery extends QueryBenchmark {
       val baseTrust = trustchain_friends.select.map(f => (f.person1, f.person2))
       (baseFriends, baseTrust)
 
+//    var it = 0
     val fixFn: ((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String]), (String, String)]) =
       recur =>
-        val (friends, trust) = recur
+        val (trust, friends) = recur
+//        println(s"***iteration $it")
+//        it+=1
+//        println(s"input:\n\ttrust : ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(trust)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\tfriends: ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(friends)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         val mut = for {
-          f <- trustchain_friends.select
+          f <- friends.select
           mt <- trust.crossJoin()
           if mt.person2 === f.person1
         } yield (mt.person1, f.person2)
 
         val fr = trust.select.map(t => (t.person1, t.person2))
+//        println(s"output:\n\tmutual: ${db.run(mut).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\tfriends: ${db.run(fr).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         (mut, fr)
 
     // Fix point only on target result?
