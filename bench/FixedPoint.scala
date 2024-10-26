@@ -305,4 +305,130 @@ object FixedPointQuery {
 
     scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
   }
+
+  final def scalaSQLSemiNaiveFOUR[Q1, Q2, Q3, Q4, T1 >: Tuple, T2 >: Tuple, T3 >: Tuple, T4 >: Tuple, P1[_[_]], P2[_[_]], P3[_[_]], P4[_[_]], Tables]
+    (using Tables =:= (ScalaSQLTable[P1], ScalaSQLTable[P2], ScalaSQLTable[P3], ScalaSQLTable[P4]))
+    (set: Boolean)
+    (db: DbApi, bases_db: Tables, next_db: Tables, acc_db: Tables)
+    (toTuple: (P1[Expr] => Tuple, P2[Expr] => Tuple, P3[Expr] => Tuple, P4[Expr] => Tuple))
+    (initBase: () => (query.Select[T1, Q1], query.Select[T2, Q2], query.Select[T3, Q3], query.Select[T4, Q4]))
+    (initRecur: Tables => (query.Select[T1, Q1], query.Select[T2, Q2], query.Select[T3, Q3], query.Select[T4, Q4]))
+  : Unit = {
+
+    db.run(bases_db._1.delete(_ => true))
+    db.run(next_db._1.delete(_ => true))
+    db.run(acc_db._1.delete(_ => true))
+
+    db.run(bases_db._2.delete(_ => true))
+    db.run(next_db._2.delete(_ => true))
+    db.run(acc_db._2.delete(_ => true))
+
+    db.run(bases_db._3.delete(_ => true))
+    db.run(next_db._3.delete(_ => true))
+    db.run(acc_db._3.delete(_ => true))
+
+    db.run(bases_db._4.delete(_ => true))
+    db.run(next_db._4.delete(_ => true))
+    db.run(acc_db._4.delete(_ => true))
+
+    val (base1, base2, base3, base4) = initBase()
+
+    db.run(bases_db._1.insert.select(
+      toTuple._1,
+      base1
+    ))
+    db.run(bases_db._2.insert.select(
+      toTuple._2,
+      base2
+    ))
+    db.run(bases_db._3.insert.select(
+      toTuple._3,
+      base3
+    ))
+    db.run(bases_db._4.insert.select(
+      toTuple._4,
+      base4
+    ))
+
+    def printTable(t: Tables, name: String): Unit =
+      println(s"${name}1(${ScalaSQLTable.name(t._1)})=${db.runRaw[(Int, String, Int)](s"SELECT * FROM ${ScalaSQLTable.name(t._1)}")}")
+      println(s"${name}2(${ScalaSQLTable.name(t._2)})=${db.runRaw[(Int, String)](s"SELECT * FROM ${ScalaSQLTable.name(t._2)}")}")
+      println(s"${name}3(${ScalaSQLTable.name(t._3)})=${db.runRaw[(Int, Int)](s"SELECT * FROM ${ScalaSQLTable.name(t._3)}")}")
+      println(s"${name}4(${ScalaSQLTable.name(t._4)})=${db.runRaw[(Int, Int)](s"SELECT * FROM ${ScalaSQLTable.name(t._4)}")}")
+
+    val cmp: (Tables, Tables) => Boolean = (next, acc) => {
+      val (newDelta1, newDelta2, newDelta3, newDelta4) = (
+        next._1.select.asInstanceOf[query.Select[T1, Q1]].except(acc._1.select.asInstanceOf[query.Select[T1, Q1]]),
+        next._2.select.asInstanceOf[query.Select[T2, Q2]].except(acc._2.select.asInstanceOf[query.Select[T2, Q2]]),
+        next._3.select.asInstanceOf[query.Select[T3, Q3]].except(acc._3.select.asInstanceOf[query.Select[T3, Q3]]),
+        next._4.select.asInstanceOf[query.Select[T4, Q4]].except(acc._4.select.asInstanceOf[query.Select[T4, Q4]])
+      )
+      db.run(newDelta1).isEmpty && db.run(newDelta2).isEmpty && db.run(newDelta3).isEmpty && db.run(newDelta4).isEmpty
+    }
+
+    val fixFn: (Tables, Tables) => Unit = (base, next) => {
+      val (query1, query2, query3, query4) = initRecur(base)
+      db.run(next._1.delete(_ => true))
+      db.run(next._2.delete(_ => true))
+      db.run(next._3.delete(_ => true))
+      db.run(next._4.delete(_ => true))
+
+      db.run(next._1.insert.select(
+        toTuple._1,
+        query1
+      ))
+      db.run(next._2.insert.select(
+        toTuple._2,
+        query2
+      ))
+      db.run(next._3.insert.select(
+        toTuple._3,
+        query3
+      ))
+      db.run(next._4.insert.select(
+        toTuple._4,
+        query4
+      ))
+    }
+
+    val copyInto: (Tables, Tables) => Tables = (base, acc) => {
+      val tmp = (s"${ScalaSQLTable.name(base._1)}_tmp", s"${ScalaSQLTable.name(base._2)}_tmp", s"${ScalaSQLTable.name(base._3)}_tmp", s"${ScalaSQLTable.name(base._4)}_tmp")
+      if (set)
+        db.updateRaw(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
+        db.updateRaw(s"INSERT INTO ${tmp._1} (SELECT * FROM ${ScalaSQLTable.name(base._1)} UNION SELECT * FROM ${ScalaSQLTable.name(acc._1)})")
+
+        db.updateRaw(s"CREATE TABLE ${tmp._2} AS SELECT * FROM ${ScalaSQLTable.name(base._2)} LIMIT 0")
+        db.updateRaw(s"INSERT INTO ${tmp._2} (SELECT * FROM ${ScalaSQLTable.name(base._2)} UNION SELECT * FROM ${ScalaSQLTable.name(acc._2)})")
+
+        db.updateRaw(s"CREATE TABLE ${tmp._3} AS SELECT * FROM ${ScalaSQLTable.name(base._3)} LIMIT 0")
+        db.updateRaw(s"INSERT INTO ${tmp._3} (SELECT * FROM ${ScalaSQLTable.name(base._3)} UNION SELECT * FROM ${ScalaSQLTable.name(acc._3)})")
+
+        db.updateRaw(s"CREATE TABLE ${tmp._4} AS SELECT * FROM ${ScalaSQLTable.name(base._4)} LIMIT 0")
+        db.updateRaw(s"INSERT INTO ${tmp._4} (SELECT * FROM ${ScalaSQLTable.name(base._4)} UNION SELECT * FROM ${ScalaSQLTable.name(acc._4)})")
+
+        db.run(acc._1.delete(_ => true))
+        db.run(acc._2.delete(_ => true))
+        db.run(acc._3.delete(_ => true))
+        db.run(acc._4.delete(_ => true))
+
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${tmp._1})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${tmp._2})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._3)} (SELECT * FROM ${tmp._3})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._4)} (SELECT * FROM ${tmp._4})")
+
+        db.updateRaw(s"DROP TABLE ${tmp._1}")
+        db.updateRaw(s"DROP TABLE ${tmp._2}")
+        db.updateRaw(s"DROP TABLE ${tmp._3}")
+        db.updateRaw(s"DROP TABLE ${tmp._4}")
+
+      else
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${ScalaSQLTable.name(base._1)})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${ScalaSQLTable.name(base._2)})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._3)} (SELECT * FROM ${ScalaSQLTable.name(base._3)})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._4)} (SELECT * FROM ${ScalaSQLTable.name(base._4)})")
+      base
+    }
+
+    scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
+  }
 }

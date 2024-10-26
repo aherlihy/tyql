@@ -30,6 +30,7 @@ class TyQLBenchmark {
     "trustchain" -> TrustChainQuery(),
     "party" -> PartyQuery(),
     "cspa" -> CSPAQuery(),
+    "cba" -> CBAQuery(),
   )
 
   def run(bm: String) = benchmarks(bm).executeTyQL(duckDB)
@@ -138,6 +139,12 @@ class TyQLBenchmark {
   @Benchmark def cspa(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("cspa")
+    )
+  }
+
+  @Benchmark def cba(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("cba")
     )
   }
 }

@@ -30,6 +30,7 @@ class ScalaSQLBenchmark {
     "trustchain" -> TrustChainQuery(),
     "party" -> PartyQuery(),
     "cspa" -> CSPAQuery(),
+    "cba" -> CBAQuery(),
   )
 
   def run(bm: String) = benchmarks(bm).executeScalaSQL(duckDB)
@@ -138,6 +139,12 @@ class ScalaSQLBenchmark {
   @Benchmark def cspa(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("cspa")
+    )
+  }
+
+  @Benchmark def cba(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("cba")
     )
   }
 }
