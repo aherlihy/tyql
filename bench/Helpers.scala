@@ -7,7 +7,25 @@ import java.io.{BufferedWriter, FileWriter}
 import java.sql.{ResultSet, ResultSetMetaData}
 
 object Helpers {
-  val currentData = "data_100mb"
+  val currentData = "data_1mb"
+  val skip = Seq(
+//    "ancestry",
+//    "andersens",
+//    "asps",
+//    "bom",
+//    "cba",
+//    "cc",
+//    "cspa",
+//    "dataflow",
+//    "evenodd",
+//    "javapointsto",
+//    "orbits",
+//    "party",
+//    "pointstocount",
+//    "sssp",
+//    "tc",
+//    "trustchain",
+  )
   def readDDLFile(filePath: String): Seq[String] =
     val src = Source.fromFile(new File(filePath))
     val fileContents = src.getLines().mkString("\n")

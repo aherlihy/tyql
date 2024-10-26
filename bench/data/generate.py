@@ -13,14 +13,20 @@ def generate_string_n(length):
     """Generate a random fixed-length string of specified length."""
     return ''.join(random.choices(string.ascii_letters, k=length))
 
-def generate_integer():
+def generate_integer(max):
     """Generate a random integer between 0 and 1,000,000."""
-    return random.randint(0, 1000000)
+    return random.randint(0, max)
 
-def generate_csv(filename, size_gb, columns):
+def generate_csv(filename, size, unit, columns):
     """Generate a CSV file with random data based on specified column types."""
-    # Convert size from GB to bytes
-    size_bytes = int(size_gb * (1024**3))
+
+    # Convert size to bytes based on unit
+    if unit.lower() == 'gb':
+        size_bytes = int(size * (1024 ** 3))
+    elif unit.lower() == 'mb':
+        size_bytes = int(size * (1024 ** 2))
+    else:
+        raise ValueError("Unsupported unit. Use 'GB' or 'MB'.")
 
     # Extract column names and types
     col_names = [col[0] for col in columns]
@@ -42,6 +48,7 @@ def generate_csv(filename, size_gb, columns):
         writer.writerow(col_names)
 
         # Generate data rows
+        count = 0
         for _ in range(rows):
             row = []
             for col_type in col_types:
@@ -50,15 +57,21 @@ def generate_csv(filename, size_gb, columns):
                 elif col_type.startswith("string") and col_type[6:].isdigit():
                     cell = generate_string_n(int(col_type[6:]))
                 elif col_type in {"int", "integer"}:
-                    cell = generate_integer()
+                    if "shares" in filename:
+                        cell = generate_integer(99)
+                    elif "numbers" in filename:
+                        cell = count
+                    else:
+                        cell = generate_integer(1000000)
                 else:
                     raise ValueError(f"Unsupported column type: {col_type}")
                 row.append(cell)
             writer.writerow(row)
+            count += 1
 
     # Report approximate file size
     actual_size = os.path.getsize(filename)
-    print(f"Data generation complete. File: {filename}, Size: ~{actual_size / (1024**3):.2f} GB")
+    print(f"    --> Generated {filename}, Size: ~{actual_size / (1024**3):.2f} GB" if unit == 'gb' else f"    ---> Generated {filename}, Size: ~{actual_size / (1024**2):.2f} MB")
 
 def parse_columns(columns_input):
     """Parse the columns input as a single string into a list of (name, type) tuples."""
@@ -71,7 +84,8 @@ def parse_columns(columns_input):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate synthetic CSV data.")
-    parser.add_argument("--size", type=float, required=True, help="Approximate size of the output file in GB (e.g., 0.5 for 0.5 GB).")
+    parser.add_argument("--size", type=float, required=True, help="Approximate size of the output file.")
+    parser.add_argument("--units", type=str, choices=['GB', 'MB'], required=True, help="Units for file size: 'GB' or 'MB'.")
     parser.add_argument("--columns", type=str, required=True, help="Column definitions in the format '(name,type) (name2,type2)'")
     parser.add_argument("--filename", type=str, required=True, help="Output filename.")
 
@@ -81,4 +95,4 @@ if __name__ == "__main__":
     columns = parse_columns(args.columns)
 
     # Generate the CSV file
-    generate_csv(args.filename, args.size, columns)
+    generate_csv(args.filename, args.size, args.units, columns)

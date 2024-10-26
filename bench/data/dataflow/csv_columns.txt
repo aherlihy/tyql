@@ -1,0 +1,3 @@
+--columns "(a, string2) (b, string2)" --filename jumpOp.csv
+--columns "(opN, string2) (varN, string2)" --filename readOp.csv
+--columns "(opN, string2) (varN, string2)" --filename writeOp.csv

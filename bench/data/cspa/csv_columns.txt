@@ -1,0 +1,2 @@
+--columns "(p1, string2) (p2, string2) (percent, int)" --filename dereference.csv
+--columns "(p1, string2) (p2, string2) (percent, int)" --filename assign.csv

@@ -32,9 +32,13 @@ class CollectionsBenchmark {
     "cspa" -> CSPAQuery(),
     "cba" -> CBAQuery(),
   )
-  benchmarks.values.foreach(bm =>
-    bm.initializeCollections()
-  )
+
+  @Setup(Level.Trial)
+  def loadDB(): Unit = {
+    benchmarks.values.foreach(bm =>
+      if !Helpers.skip.contains(bm.name) then bm.initializeCollections()
+    )
+  }
 
   @TearDown(Level.Trial)
   def writeDB(): Unit = {

@@ -1,16 +1,18 @@
 #!/bin/bash
 
-# Check if the integer argument is provided
-if [ -z "$1" ]; then
-    echo "Usage: $0 <size_in_mb>"
+# Check if both arguments are provided
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: $0 <size> <unit>"
+    echo "Example: $0 100 MB or $0 0.1 GB"
     exit 1
 fi
 
-# Assign the first argument to a variable and append 'mb' to directory name
+# Assign the first argument (size) and second argument (unit) to variables
 i="$1"
-dir_suffix="data_${i}mb"
+unit="$2"
+dir_suffix="data_${i}${unit}"
 
-echo "Size ${i}MB"
+echo "Size ${i}${unit}"
 echo "Dir: ${dir_suffix}"
 
 # Loop through each subdirectory in the current directory
@@ -25,30 +27,46 @@ for dir in */; do
         mkdir -p "$target_dir"
     fi
 
+    if [[ "$dir" == *"sssp"* ]]; then
+        base_csv_path="${target_dir}/base.csv"
+        echo -e "dst,cost\n1,0" > "$base_csv_path"
+        echo "    ---> Generated $base_csv_path"
+    fi
+
     # Check if 'csv_columns.txt' exists in the subdirectory
     csv_file="${dir}csv_columns.txt"
     if [ -f "$csv_file" ]; then
-        echo "--> Found csv_columns.txt in $dir"
+#        echo "    Found csv_columns.txt in $dir"
 
         # Read the entire content of the file into a single variable
-                file_content=$(<"$csv_file")
+        file_content=$(<"$csv_file")
 
-                # Convert the content into an array by splitting on newline
-                IFS=$'\n' lines=($file_content)
+        # Convert the content into an array by splitting on newline
+        IFS=$'\n' lines=($file_content)
 
-                # Loop over each line in the array
-                for line in "${lines[@]}"; do
-                  echo "----> input: $line"
-                  # Change to the target directory and execute the Python command with `eval`
-                  (
-                      cd "$target_dir"
-                      k=$(echo "scale=2; $i / 1024" | bc)
-                      echo "Executing: python3 ../../generate.py --size $k $line"
-                      eval python3 ../../generate.py --size "$k" $line
-                  )
-                done
+        # Loop over each line in the array
+        for line in "${lines[@]}"; do
+#            echo "----> input: $line"
+            # Change to the target directory and execute the Python command with `eval`
+            (
+                cd "$target_dir"
+                echo "    python3 ../../generate.py --size $i --units $unit $line"
+                eval python3 ../../generate.py --size "$i" --units "$unit" $line
+            )
+        done
     else
         echo "--> skipping"
     fi
 done
 
+echo "TOTAL:"
+for dir in */; do
+    echo "    For $dir"
+    for file in "$dir/$dir_suffix/"*.csv; do
+        if [ -f "$file" ]; then
+            line_count=$(wc -l < "$file")
+            echo "        File: $(basename "$file"), Lines: $line_count"
+            head -n 3 "$file" | awk '{print "            "$0}'  # Indent each line for clarity
+        fi
+    done
+done

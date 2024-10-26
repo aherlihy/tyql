@@ -1,0 +1,2 @@
+--columns "(Pname, varstring) (fName, varstring)" --filename friends.csv
+--columns "(OrgName, varstring)" --filename organizers.csv

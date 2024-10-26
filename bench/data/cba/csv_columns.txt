@@ -1,0 +1,5 @@
+--columns "(x, int) (y, string1)" --filename vars.csv
+--columns "(x, int) (y, string1) (z, int)" --filename term.csv
+--columns "(x, int) (y, int)" --filename lits.csv
+--columns "(x, int) (y, int) (z, int)" --filename app.csv
+--columns "(x, int) (y, int) (z, int)" --filename abs.csv
