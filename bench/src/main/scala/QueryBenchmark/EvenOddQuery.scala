@@ -88,7 +88,7 @@ class EvenOddQuery extends QueryBenchmark {
       (evenResult, oddResult)
     )
 
-    val queryStr = odd.sort(_.value, Ord.ASC).toQueryIR.toSQLString().replace("\"", "'")
+    val queryStr = odd.sort(_.value, Ord.ASC).sort(_.typ, Ord.ASC).toQueryIR.toSQLString().replace("\"", "'")
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
@@ -108,7 +108,7 @@ class EvenOddQuery extends QueryBenchmark {
       ).distinct
       (evenResult, oddResult)
     )
-    resultCollections = odd.sortBy(_.value)
+    resultCollections = odd.sortBy(_.value).sortBy(_.typ)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -155,7 +155,7 @@ class EvenOddQuery extends QueryBenchmark {
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
     )(fixFn.asInstanceOf[((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
-    val result = evenodd_derived2.select.sortBy(_.value)
+    val result = evenodd_derived2.select.sortBy(_.value).sortBy(_.typ)
     resultScalaSQL = db.run(result)
 
 

@@ -90,7 +90,8 @@ class AndersensQuery extends QueryBenchmark {
             pointsTo
               .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
               .map(pt2 =>
-                (x = pt1.y, y = pt2.y).toRow))))).sort(_.x, Ord.ASC)
+                (x = pt1.y, y = pt2.y).toRow)))))
+      .sort(_.y, Ord.ASC).sort(_.x, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -112,7 +113,8 @@ class AndersensQuery extends QueryBenchmark {
             pointsTo
               .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
               .map(pt2 =>
-                EdgeCC(x = pt1.y, y = pt2.y)))))).sortBy(_.x)
+                EdgeCC(x = pt1.y, y = pt2.y))))))
+      .sortBy(_.y).sortBy(_.x)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -145,7 +147,7 @@ class AndersensQuery extends QueryBenchmark {
       db, andersens_delta, andersens_tmp, andersens_derived
     )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]])
 
-    val result = andersens_derived.select.sortBy(_.x)
+    val result = andersens_derived.select.sortBy(_.y).sortBy(_.x)
     resultScalaSQL = db.run(result)
 
     // Write results to csv for checking

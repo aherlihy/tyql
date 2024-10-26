@@ -99,10 +99,10 @@ class PointsToCountQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
-//  var resultScalaSQL: Seq[Expr[Int]] = null
-//  var resultCollections: Seq[Int] = null
-  var resultScalaSQL: Seq[PointsToSS[?]] = null
-  var resultCollections: Seq[PointsToCC] = null
+  var resultScalaSQL: Seq[Expr[Int]] = null
+  var resultCollections: Seq[Int] = null
+//  var resultScalaSQL: Seq[PointsToSS[?]] = null
+//  var resultCollections: Seq[PointsToCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
@@ -137,7 +137,7 @@ class PointsToCountQuery extends QueryBenchmark {
 
       (vpt, hpt)
     )
-    val query = pt._1.sort(_.y, Ord.ASC).sort(_.x, Ord.ASC)//.filter(vpt => vpt.x == "r").size
+    val query = pt._1.filter(vpt => vpt.x == "r").size
 
     val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
     resultTyql = ddb.runQuery(queryStr)
@@ -177,7 +177,7 @@ class PointsToCountQuery extends QueryBenchmark {
 
       (vpt, hpt)
     )
-    resultCollections = pt._1.sortBy(_.y).sortBy(_.x)//Seq(pt._1.filter(vpt => vpt.x == "r").size)
+    resultCollections = Seq(pt._1.filter(vpt => vpt.x == "r").size)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -224,9 +224,9 @@ class PointsToCountQuery extends QueryBenchmark {
 
 //    val result = pointstocount_derived2.select.filter(_.x === "r").size // this does not work!!!!!
 //    println(s"FINAL RES=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY r.x")}")
-//    backupResultScalaSql = ddb.runQuery(s"SELECT COUNT(1) FROM ${ScalaSQLTable.name(pointstocount_derived2)} as r WHERE r.x = 'r'")
+    backupResultScalaSql = ddb.runQuery(s"SELECT COUNT(1) FROM ${ScalaSQLTable.name(pointstocount_derived2)} as r WHERE r.x = 'r'")
 
-    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY x, y")
+//    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY x, y")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =
@@ -235,14 +235,14 @@ class PointsToCountQuery extends QueryBenchmark {
 
   def writeCollectionsResult(): Unit =
     val outfile = s"$outdir/collections.csv"
-    collectionToCSV(resultCollections, outfile, Seq("count(1)"), fromCollRes1)
+    collectionToCSV(resultCollections, outfile, Seq("count(1)"), x => Seq(x.toString))
 
   def writeScalaSQLResult(): Unit =
     val outfile = s"$outdir/scalasql.csv"
     if (backupResultScalaSql != null)
       resultSetToCSV(backupResultScalaSql, outfile)
     else
-      collectionToCSV(resultScalaSQL, outfile, Seq("count(1)"), fromSSRes1)
+      collectionToCSV(resultScalaSQL, outfile, Seq("count(1)"), x => Seq(x.toString))
 
   // Extract all results to avoid lazy-loading
   //  def printResultJDBC(resultSet: ResultSet): Unit =

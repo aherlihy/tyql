@@ -89,6 +89,7 @@ class BOMQuery extends QueryBenchmark {
       .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
       .groupBySource(wf => (part = wf._1.part).toRow)
       .sort(_.part, Ord.ASC)
+      .sort(_.max, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -106,6 +107,7 @@ class BOMQuery extends QueryBenchmark {
       .mapValues(_.minBy(_.max))
       .values.toSeq
       .sortBy(_.part)
+      .sortBy(_.max)
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -125,7 +127,7 @@ class BOMQuery extends QueryBenchmark {
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
 
     //    bom_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
-    backupResultScalaSql = ddb.runQuery(s"SELECT s.part as part, MAX(s.max) as max FROM ${ScalaSQLTable.name(bom_derived)} as s GROUP BY s.part ORDER BY s.part")
+    backupResultScalaSql = ddb.runQuery(s"SELECT s.part as part, MAX(s.max) as max FROM ${ScalaSQLTable.name(bom_derived)} as s GROUP BY s.part ORDER BY max, part")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

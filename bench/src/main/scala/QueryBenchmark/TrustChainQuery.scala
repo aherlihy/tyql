@@ -92,7 +92,9 @@ class TrustChainQuery extends QueryBenchmark {
 
     val query = trust
       .aggregate(mt => (name = mt.person2, count = count(mt.person1)).toGroupingRow)
-      .groupBySource(mt => (person = mt._1.person2).toRow).sort(mt => mt.name, Ord.ASC)
+      .groupBySource(mt => (person = mt._1.person2).toRow)
+      .sort(mt => mt.name, Ord.ASC)
+      .sort(mt => mt.count, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -129,7 +131,7 @@ class TrustChainQuery extends QueryBenchmark {
       .map((person2, rest) => ResultCC(name = person2, count = rest.distinct.size))
       .toSeq
 
-    resultCollections = query.sortBy(_.name)
+    resultCollections = query.sortBy(_.name).sortBy(_.count)
 
 
 
@@ -169,7 +171,7 @@ class TrustChainQuery extends QueryBenchmark {
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
     )(fixFn.asInstanceOf[((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
-    backupResultScalaSql = ddb.runQuery(s"SELECT r.person2, COUNT(r.person1) as count FROM ${ScalaSQLTable.name(trustchain_derived2)} as r GROUP BY r.person2 ORDER BY r.person2")
+    backupResultScalaSql = ddb.runQuery(s"SELECT r.person2 as name, COUNT(r.person1) as count FROM ${ScalaSQLTable.name(trustchain_derived2)} as r GROUP BY r.person2 ORDER BY count, r.person2")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

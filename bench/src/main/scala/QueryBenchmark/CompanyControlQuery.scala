@@ -92,7 +92,7 @@ class CompanyControlQuery extends QueryBenchmark {
         .distinct
       (csharesRecur, controlRecur)
     )
-    val query = control.sort(_.com1, Ord.ASC)
+    val query = control.sort(_.com1, Ord.ASC).sort(_.com2, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -121,7 +121,7 @@ class CompanyControlQuery extends QueryBenchmark {
         .map(s => ResultCC(com1 = s.byC, com2 = s.of))
       (csharesRecur, controlRecur)
     )
-    resultCollections = control.sortBy(_.com1)
+    resultCollections = control.sortBy(_.com1).sortBy(_.com2)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -161,7 +161,7 @@ class CompanyControlQuery extends QueryBenchmark {
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
     )(fixFn.asInstanceOf[((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
-    val result = cc_derived2.select.sortBy(_.com1)
+    val result = cc_derived2.select.sortBy(_.com1).sortBy(_.com2)
     resultScalaSQL = db.run(result)
 
 

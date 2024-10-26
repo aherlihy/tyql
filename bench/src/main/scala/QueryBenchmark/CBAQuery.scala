@@ -125,8 +125,8 @@ class CBAQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
-  var resultScalaSQL: Seq[DataSS[?]] = null
-  var resultCollections: Seq[DataCC] = null
+  var resultScalaSQL: Seq[Int] = null
+  var resultCollections: Seq[Int] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
@@ -203,8 +203,8 @@ class CBAQuery extends QueryBenchmark {
         (dt, dv, ct, cv)
       })
 
-//    dataTerm.distinct.size
-    val queryStr = dataTerm.sort(_.y, Ord.ASC).sort(_.x, Ord.ASC).toQueryIR.toSQLString().replace("\"", "'")
+    val query = dataTerm.distinct.size
+    val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
@@ -280,7 +280,7 @@ class CBAQuery extends QueryBenchmark {
         (dt1 ++ dt2, dv, ct1 ++ ct2, cv)
       })
 
-      resultCollections = dataTerm.sortBy(_.y).sortBy(_.x)
+      resultCollections = Seq(dataTerm.distinct.size)
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -366,7 +366,6 @@ class CBAQuery extends QueryBenchmark {
 
         //        println(s"output:\n\teven: ${db.run(evenResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\toddResult: ${db.run(oddResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         (dataTerm1.unionAll(dataTerm2), dataVarResult, controlTerm1.unionAll(controlTerm2), controlVarResult)
-
       }
 
     FixedPointQuery.scalaSQLSemiNaiveFOUR(set)(
@@ -377,8 +376,8 @@ class CBAQuery extends QueryBenchmark {
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any])]
     )(fixFn.asInstanceOf[((ScalaSQLTable[DataSS], ScalaSQLTable[DataSS], ScalaSQLTable[CtrlSS], ScalaSQLTable[CtrlSS])) => (query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any])])
 
-    val result = cba_derived1.select.sortBy(_.y).sortBy(_.x)
-    resultScalaSQL = db.run(result)
+    val result = cba_derived1.select.distinct
+    resultScalaSQL = Seq(db.run(result).size)
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =
@@ -387,14 +386,14 @@ class CBAQuery extends QueryBenchmark {
 
   def writeCollectionsResult(): Unit =
     val outfile = s"$outdir/collections.csv"
-    collectionToCSV(resultCollections, outfile, Seq("x", "y"), fromCollRes)
+    collectionToCSV(resultCollections, outfile, Seq("count(1)"), x => Seq(x.toString))
 
   def writeScalaSQLResult(): Unit =
     val outfile = s"$outdir/scalasql.csv"
     if (backupResultScalaSql != null)
       resultSetToCSV(backupResultScalaSql, outfile)
     else
-      collectionToCSV(resultScalaSQL, outfile, Seq("x", "y"), fromSSRes)
+      collectionToCSV(resultScalaSQL, outfile, Seq("count(1)"), x => Seq(x.toString))
 
   // Extract all results to avoid lazy-loading
   //  def printResultJDBC(resultSet: ResultSet): Unit =

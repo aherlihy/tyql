@@ -77,7 +77,9 @@ class TCQuery extends QueryBenchmark {
             .filter(e => e.x == p.endNode && !p.path.contains(e.y))
             .map(e =>
               (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow)))
-      .sort(p => p.path.length, Ord.ASC).sort(p => p.startNode, Ord.ASC).sort(_.endNode, Ord.ASC)
+      .sort(p => p.path.length, Ord.ASC)
+      .sort(p => p.startNode, Ord.ASC)
+      .sort(_.endNode, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -88,17 +90,19 @@ class TCQuery extends QueryBenchmark {
       .map(e => ResultEdgeCC(e.x, e.y, Seq(e.x, e.y)))
     var it = 0
     resultCollections = FixedPointQuery.fix(set)(path, Seq())(path =>
-      println(s"***iteration $it")
+//      println(s"***iteration $it")
       it+=1
-      println(s"input: path=${path.mkString("[", ", ", "]")}")
+//      println(s"input: path=${path.mkString("[", ", ", "]")}")
       val res = path.flatMap(p =>
         collectionsDB.edge
           .filter(e => p.endNode == e.x && !p.path.contains(e.y))
           .map(e => ResultEdgeCC(startNode = p.startNode, endNode = e.y, p.path :+ e.y))
       )//.distinct
-      println(s"output: path=${res.mkString("[", ", ", "]")}")
+//      println(s"output: path=${res.mkString("[", ", ", "]")}")
       res
-    ).sortBy(r => r.path.length).sortBy(_.startNode).sortBy(_.endNode)
+    ).sortBy(r => r.path.length)
+      .sortBy(_.startNode)
+      .sortBy(_.endNode)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     def initList(v1: Expr[Int], v2: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"[$v1, $v2]" }
@@ -115,16 +119,16 @@ class TCQuery extends QueryBenchmark {
 
     var it = 0
     val fixFn: ScalaSQLTable[ResultEdgeSS] => query.Select[(Expr[Int], Expr[Int], Expr[String]), (Int, Int, String)] = path =>
-      println(s"***iteration $it")
+//      println(s"***iteration $it")
       it += 1
-      println(s"input: path=${db.runRaw[(Int, Int, String)](s"SELECT * FROM ${ScalaSQLTable.name(path)}").mkString("[", ", ", "]")}")
+//      println(s"input: path=${db.runRaw[(Int, Int, String)](s"SELECT * FROM ${ScalaSQLTable.name(path)}").mkString("[", ", ", "]")}")
       val res = for {
         p <- path.select
         e <- tc_edge.join(p.endNode === _.x)
         if !listContains(e.y, p.path)
       } yield (p.startNode, e.y, listAppend(e.y, p.path))
 
-      println(s"output: path=${db.run(res).mkString("[", ", ", "]")}")
+//      println(s"output: path=${db.run(res).mkString("[", ", ", "]")}")
 
       res
     FixedPointQuery.scalaSQLSemiNaive(set)(

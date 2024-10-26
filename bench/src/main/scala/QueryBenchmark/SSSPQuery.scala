@@ -87,7 +87,8 @@ class SSSPQuery extends QueryBenchmark {
     )
       .aggregate(s => (dst = s.dst, cost = min(s.cost)).toGroupingRow)
       .groupBySource(s => (dst = s._1.dst).toRow)
-      .sort(r => r.cost, Ord.ASC).sort(_.dst, Ord.ASC)
+      .sort(_.cost, Ord.ASC)
+      .sort(_.dst, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -104,7 +105,8 @@ class SSSPQuery extends QueryBenchmark {
       .groupBy(_.dst)
       .mapValues(_.minBy(_.cost))
       .values.toSeq
-      .sortBy(_.cost).sortBy(_.dst)
+      .sortBy(_.cost)
+      .sortBy(_.dst)
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -124,7 +126,7 @@ class SSSPQuery extends QueryBenchmark {
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]])
 
     //    sssp_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
-    backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst ORDER BY cost,dst")
+    backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst ORDER BY dst, cost")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

@@ -302,7 +302,7 @@ class CSPAQuery extends QueryBenchmark {
 
   def writeCollectionsResult(): Unit =
     val outfile = s"$outdir/collections.csv"
-    collectionToCSV(resultCollections, outfile, Seq("p1", "p1"), fromCollRes)
+    collectionToCSV(resultCollections, outfile, Seq("p1", "p2"), fromCollRes)
 
   def writeScalaSQLResult(): Unit =
     val outfile = s"$outdir/scalasql.csv"

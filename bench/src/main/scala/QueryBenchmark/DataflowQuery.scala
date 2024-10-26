@@ -96,6 +96,7 @@ class DataflowQuery extends QueryBenchmark {
           tyqlDB.writeOp
             .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
             .map(w => (r = r.opN, w = w.opN).toRow)))
+      .sort(_.r, Ord.ASC).sort(_.w, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -114,6 +115,7 @@ class DataflowQuery extends QueryBenchmark {
           collectionsDB.writeOp
             .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
             .map(w => ResultCC(r = r.opN, w = w.opN))))
+      .sortBy(_.r).sortBy(_.w)
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -143,7 +145,7 @@ class DataflowQuery extends QueryBenchmark {
 
     val result = "SELECT readOp168.opN as r, writeOp169.opN as w " +
     s"FROM ${ScalaSQLTable.name(dataflow_derived)} as recref13, ${ScalaSQLTable.name(dataflow_readOp)} as readOp168, ${ScalaSQLTable.name(dataflow_writeOp)} as writeOp169 " +
-    "WHERE writeOp169.opN = recref13.a AND writeOp169.varN = readOp168.varN AND recref13.b = readOp168.opN "
+    "WHERE writeOp169.opN = recref13.a AND writeOp169.varN = readOp168.varN AND recref13.b = readOp168.opN ORDER BY w ASC, r ASC;"
     backupResultScalaSql = ddb.runQuery(result)
 
   // Write results to csv for checking

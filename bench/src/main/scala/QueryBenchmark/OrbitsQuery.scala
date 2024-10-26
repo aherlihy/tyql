@@ -88,7 +88,7 @@ class OrbitsQuery extends QueryBenchmark {
                 .map(o2 => (x = o1.x, y = o2.y).toRow))
             .filter(io => o.x == io.x && o.y == io.y)
             .nonEmpty
-        ).sort(_.x, Ord.ASC)
+        ).sort(_.x, Ord.ASC).sort(_.y, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -108,7 +108,7 @@ class OrbitsQuery extends QueryBenchmark {
           o4.y == o5.x && o0.x == o4.x && o0.y == o5.y
         )
       )
-    ).sortBy(_.x)
+    ).sortBy(_.x).sortBy(_.y)
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -137,7 +137,7 @@ class OrbitsQuery extends QueryBenchmark {
       s"        FROM ${ScalaSQLTable.name(orbits_derived)} as ref4, ${ScalaSQLTable.name(orbits_derived)} as ref5" +
       "       WHERE ref4.y = ref5.x) as subquery9" +
       "     WHERE recref0.x = subquery9.x AND recref0.y = subquery9.y)" +
-      " ORDER BY recref0.x"
+      " ORDER BY recref0.y, recref0.x"
     )
 
   // Write results to csv for checking

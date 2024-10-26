@@ -133,7 +133,7 @@ class PartyQuery extends QueryBenchmark {
         .map((pName, pairs) => CountsCC(fName = pName, nCount = pairs.size))
         .toSeq
 
-      println(s"output:\n\tRattend: ${recurAttend.map(f => f.person).mkString("(", ",", ")")}\n\tRfriends: ${recurCntFriends.map(f => f.fName + "=" + f.nCount).mkString("(", ",", ")")}")
+//      println(s"output:\n\tRattend: ${recurAttend.map(f => f.person).mkString("(", ",", ")")}\n\tRfriends: ${recurCntFriends.map(f => f.fName + "=" + f.nCount).mkString("(", ",", ")")}")
       (recurAttend, recurCntFriends)
     )
     resultCollections = finalAttend.distinct.sortBy(_.person)
@@ -172,7 +172,7 @@ class PartyQuery extends QueryBenchmark {
         else
           db.values(fixAgg)
 
-        println(s"output:\n\tattend: ${db.run(recurAttend).map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.run(recurFriends).map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
+//        println(s"output:\n\tattend: ${db.run(recurAttend).map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.run(recurFriends).map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
 
         (recurAttend, recurFriends)
     }

@@ -72,7 +72,9 @@ class AncestryQuery extends QueryBenchmark {
           .filter(g => parent.parent == g.name)
           .map(g => (name = parent.child, gen = g.gen + 1).toRow)
       ).distinct
-    ).filter(g => g.gen == 2).map(g => (name = g.name).toRow).sort(_.name, Ord.ASC)
+    ).filter(g => g.gen == 2)
+      .map(g => (name = g.name).toRow)
+      .sort(_.name, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
     resultTyql = ddb.runQuery(queryStr)

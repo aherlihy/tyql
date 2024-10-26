@@ -93,7 +93,9 @@ class ASPSQuery extends QueryBenchmark {
         (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow)
       .groupBySource(p =>
         (g1 = p._1.src, g2 = p._1.dst).toRow)
-      .sort(p => p.dst, Ord.ASC).sort(_.src, Ord.ASC)
+      .sort(_.dst, Ord.ASC)
+      .sort(_.src, Ord.ASC)
+      .sort(_.cost, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -113,7 +115,9 @@ class ASPSQuery extends QueryBenchmark {
     )
       .groupBy(w => (w.src, w.dst))
       .mapValues(_.minBy(_.cost)).values.toSeq
-      .sortBy(_.dst).sortBy(_.src)
+      .sortBy(_.dst)
+      .sortBy(_.src)
+      .sortBy(_.cost)
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -142,7 +146,7 @@ class ASPSQuery extends QueryBenchmark {
     backupResultScalaSql = ddb.runQuery(s"SELECT s.src as src, s.dst as dst, MIN(s.cost) as cost " +
       s"FROM ${ScalaSQLTable.name(asps_derived)} as s " +
       s"GROUP BY s.src, s.dst " +
-      s"ORDER BY s.src, s.dst;")
+      s"ORDER BY cost, src, dst;")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =
