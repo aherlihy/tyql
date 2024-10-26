@@ -7,7 +7,7 @@ import java.io.{BufferedWriter, FileWriter}
 import java.sql.{ResultSet, ResultSetMetaData}
 
 object Helpers {
-  val currentData = "data"
+  val currentData = "data_100mb"
   def readDDLFile(filePath: String): Seq[String] =
     val src = Source.fromFile(new File(filePath))
     val fileContents = src.getLines().mkString("\n")

@@ -15,22 +15,22 @@ import Helpers.*
 class ScalaSQLBenchmark {
   var duckDB = DuckDBBackend()
   val benchmarks = Map(
-    "tc" -> TCQuery(),
-    "sssp" -> SSSPQuery(),
+//    "tc" -> TCQuery(),
+//    "sssp" -> SSSPQuery(),
     "ancestry" -> AncestryQuery(),
-    "andersens" -> AndersensQuery(),
-    "asps" -> ASPSQuery(),
-    "bom" -> BOMQuery(),
-    "orbits" -> OrbitsQuery(),
-    "dataflow" -> DataflowQuery(),
-    "evenodd" -> EvenOddQuery(),
-    "cc" -> CompanyControlQuery(),
-    "pointstocount" -> PointsToCountQuery(),
-    "javapointsto" -> JavaPointsTo(),
-    "trustchain" -> TrustChainQuery(),
-    "party" -> PartyQuery(),
-    "cspa" -> CSPAQuery(),
-    "cba" -> CBAQuery(),
+//    "andersens" -> AndersensQuery(),
+//    "asps" -> ASPSQuery(),
+//    "bom" -> BOMQuery(),
+//    "orbits" -> OrbitsQuery(),
+//    "dataflow" -> DataflowQuery(),
+//    "evenodd" -> EvenOddQuery(),
+//    "cc" -> CompanyControlQuery(),
+//    "pointstocount" -> PointsToCountQuery(),
+//    "javapointsto" -> JavaPointsTo(),
+//    "trustchain" -> TrustChainQuery(),
+//    "party" -> PartyQuery(),
+//    "cspa" -> CSPAQuery(),
+//    "cba" -> CBAQuery(),
   )
 
   def run(bm: String) = benchmarks(bm).executeScalaSQL(duckDB)

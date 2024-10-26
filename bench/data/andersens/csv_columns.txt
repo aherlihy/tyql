@@ -1,0 +1,4 @@
+--columns "(x, string2) (y, string2)" --filename addressOf.csv
+--columns "(x, string2) (y, string2)" --filename assign.csv
+--columns "(x, string2) (y, string2)" --filename loadT.csv
+--columns "(x, string2) (y, string2)" --filename store.csv
