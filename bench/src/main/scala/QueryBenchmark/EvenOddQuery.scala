@@ -66,7 +66,6 @@ class EvenOddQuery extends QueryBenchmark {
   object evenodd_delta1 extends ScalaSQLTable[ResultSS]
   object evenodd_derived1 extends ScalaSQLTable[ResultSS]
   object evenodd_tmp1 extends ScalaSQLTable[ResultSS]
-  val (derived_even, derived_odd) = (evenodd_derived1, evenodd_derived2)
 
   // Result types for later printing
   var resultTyql: ResultSet = null
@@ -128,7 +127,7 @@ class EvenOddQuery extends QueryBenchmark {
     val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)]) =
       recur =>
         val (even, odd) = recur
-        val (evenAcc, oddAcc) = if it == 0 then (evenodd_delta1, evenodd_delta2) else (derived_even, derived_odd)
+        val (evenAcc, oddAcc) = if it == 0 then (evenodd_delta1, evenodd_delta2) else (evenodd_derived1, evenodd_derived2)
         it+=1
 
 //        println(s"***iteration $it")
@@ -148,7 +147,7 @@ class EvenOddQuery extends QueryBenchmark {
 //        println(s"output:\n\teven: ${db.run(evenResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\toddResult: ${db.run(oddResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         (evenResult, oddResult)
 
-    FixedPointQuery.scalaSQLSemiNaive2(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
       db, (evenodd_delta1, evenodd_delta2), (evenodd_tmp1, evenodd_tmp2), (evenodd_derived1, evenodd_derived2)
     )(
       (toTuple, toTuple)

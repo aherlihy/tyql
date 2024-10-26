@@ -161,7 +161,7 @@ class TrustChainQuery extends QueryBenchmark {
         (trustRecur, friendRecur)
 
     // Fix point only on target result?
-    FixedPointQuery.scalaSQLSemiNaive2(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
       db, (trustchain_delta1, trustchain_delta2), (trustchain_tmp1, trustchain_tmp2), (trustchain_derived1, trustchain_derived2)
     )(
       (toTuple, toTuple)

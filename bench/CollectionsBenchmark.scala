@@ -29,6 +29,7 @@ class CollectionsBenchmark {
     "javapointsto" -> JavaPointsTo(),
     "trustchain" -> TrustChainQuery(),
     "party" -> PartyQuery(),
+    "cspa" -> CSPAQuery(),
   )
   benchmarks.values.foreach(bm =>
     bm.initializeCollections()
@@ -123,6 +124,12 @@ class CollectionsBenchmark {
   @Benchmark def party(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("party")
+    )
+  }
+
+  @Benchmark def cspa(blackhole: Blackhole): Unit = {
+    blackhole.consume(
+      run("cspa")
     )
   }
 }

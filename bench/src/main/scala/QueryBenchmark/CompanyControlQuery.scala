@@ -153,7 +153,7 @@ class CompanyControlQuery extends QueryBenchmark {
         (csharesRecur, controlRecur)
 
 
-    FixedPointQuery.scalaSQLSemiNaive2(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
       db, (cc_delta1, cc_delta2), (cc_tmp1, cc_tmp2), (cc_derived1, cc_derived2)
     )(
       ((c: SharesSS[?]) => (c.byC, c.of, c.percent), (c: ResultSS[?]) => (c.com1, c.com2))

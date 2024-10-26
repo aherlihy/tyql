@@ -214,7 +214,7 @@ class PointsToCountQuery extends QueryBenchmark {
 
         (vpt, hpt)
 
-    FixedPointQuery.scalaSQLSemiNaive2(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
       db, (pointstocount_delta1, pointstocount_delta2), (pointstocount_tmp1, pointstocount_tmp2), (pointstocount_derived1, pointstocount_derived2)
     )(
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))
