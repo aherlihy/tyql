@@ -7,6 +7,7 @@ import java.io.{BufferedWriter, FileWriter}
 import java.sql.{ResultSet, ResultSetMetaData}
 
 object Helpers {
+  val currentData = "data"
   def readDDLFile(filePath: String): Seq[String] =
     val src = Source.fromFile(new File(filePath))
     val fileContents = src.getLines().mkString("\n")
@@ -14,7 +15,8 @@ object Helpers {
     src.close()
     result
 
-  def getCSVFiles(directoryPath: String): Seq[Path] =
+  def getCSVFiles(dPath: String): Seq[Path] =
+    val directoryPath = s"$dPath/$currentData"
     val dirPath = Paths.get(directoryPath)
     if (Files.isDirectory(dirPath)) {
       Files.list(dirPath)
@@ -66,7 +68,6 @@ object Helpers {
           writer.newLine()
         }
       } finally {
-        println(s"WROTE RESULT TO $outputFile")
         writer.flush()
         writer.close()
       }
@@ -86,14 +87,12 @@ object Helpers {
           file.newLine()
         }
       } finally {
-        println(s"WROTE RESULT TO $outputFile")
         file.flush()
         file.close()
       }
 
   def deleteOutputFiles(p: String, fileName: String): Unit =
     val filePath = s"$p/$fileName.csv"
-    println(s"TRYING TO DELETE $filePath")
     val path = Paths.get(filePath)
     if (Files.exists(path)) {
       try {
