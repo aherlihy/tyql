@@ -18,7 +18,7 @@ import Helpers.*
 @experimental
 class CompanyControlQuery extends QueryBenchmark {
   override def name = "cc"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type Shares = (byC: String, of: String, percent: Int)
@@ -102,19 +102,23 @@ class CompanyControlQuery extends QueryBenchmark {
     val sharesBase = collectionsDB.shares
     val controlBase = collectionsDB.control
 
-    val (shares, control) = FixedPointQuery.multiFix(set)((sharesBase, controlBase), ((Seq(), Seq())))((cshares, control) =>
-      val csharesRecur = control.flatMap(con =>
+    var it = 0
+    val (shares, control) = FixedPointQuery.multiFix(set)((sharesBase, controlBase), (Seq(), Seq()))((recur, acc) =>
+      val (cshares, ccontrol) = recur
+      val (csharesAcc, controlAcc) = if it == 0 then (sharesBase, controlBase) else acc
+      it += 1
+      val csharesRecur = controlAcc.flatMap(con =>
         cshares
           .filter(cs => cs.byC == con.com2)
           .map(cs => SharesCC(con.com1, cs.of, cs.percent))
           .groupBy(csh => (csh.byC, csh.of))
           .map((k, v) => SharesCC(k._1, k._2, v.map(s3 => s3.percent).sum))
-           .toSeq
+          .toSeq
       )
-      val controlRecur = cshares
+
+      val controlRecur = csharesAcc
         .filter(s => s.percent > 50)
         .map(s => ResultCC(com1 = s.byC, com2 = s.of))
-//        .distinct
       (csharesRecur, controlRecur)
     )
     resultCollections = control.sortBy(_.com1)
@@ -125,12 +129,15 @@ class CompanyControlQuery extends QueryBenchmark {
     val initBase = () =>
       (cc_shares.select.map(c => (c.byC, c.of, c.percent)), cc_control.select.map(c => (c.com1, c.com2)))
 
+    var it = 0
     val fixFn: ((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[String], Expr[String], Expr[Int]), (String, String, Int)], query.Select[(Expr[String], Expr[String]), (String, String)]) =
-      (recur) =>
+      recur =>
         val (cshares, control) = recur
+        val (csharesAcc, controlAcc) = if it == 0 then (cc_delta1, cc_delta2) else (cc_derived1, cc_derived2)
+        it += 1
         val fixAgg = db.runRaw[(String, String, Int)](
           "SELECT ref22.com1 as byC, ref23.of as of, SUM(ref23.percent) as percent " +
-         s"FROM ${ScalaSQLTable.name(control)} as ref22, ${ScalaSQLTable.name(cshares)} as ref23 " +
+         s"FROM ${ScalaSQLTable.name(controlAcc)} as ref22, ${ScalaSQLTable.name(cshares)} as ref23 " +
            "WHERE ref23.byC = ref22.com2 " +
            "GROUP BY ref22.com1, ref23.of "
         )
@@ -139,7 +146,7 @@ class CompanyControlQuery extends QueryBenchmark {
         else
           db.values(fixAgg)
 
-        val controlRecur = cshares.select
+        val controlRecur = csharesAcc.select
           .filter(s => s.percent > 50)
           .map(s =>(s.byC, s.of))
 
@@ -147,7 +154,7 @@ class CompanyControlQuery extends QueryBenchmark {
 
 
     FixedPointQuery.scalaSQLSemiNaive2(set)(
-      db, (cc_delta1, cc_delta2), (cc_derived1, cc_derived2), (cc_tmp1, cc_tmp2)
+      db, (cc_delta1, cc_delta2), (cc_tmp1, cc_tmp2), (cc_derived1, cc_derived2)
     )(
       ((c: SharesSS[?]) => (c.byC, c.of, c.percent), (c: ResultSS[?]) => (c.com1, c.com2))
     )(

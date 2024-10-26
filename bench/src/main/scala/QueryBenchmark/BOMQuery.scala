@@ -121,7 +121,7 @@ class BOMQuery extends QueryBenchmark {
       } yield (assbl.part, wf.max)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, bom_delta, bom_derived, bom_tmp
+      db, bom_delta, bom_tmp, bom_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
 
     //    bom_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres

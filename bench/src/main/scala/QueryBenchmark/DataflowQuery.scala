@@ -130,7 +130,7 @@ class DataflowQuery extends QueryBenchmark {
       } yield (f1.a, f2.b)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, dataflow_delta, dataflow_derived, dataflow_tmp
+      db, dataflow_delta, dataflow_tmp, dataflow_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[JumpSS] => query.Select[Any, Any]])
 
 // Multi-join not working
@@ -141,7 +141,7 @@ class DataflowQuery extends QueryBenchmark {
 //        w <- dataflow_writeOp.join(_.opN === f.a).join(_.varN === r.varN)
 //      } yield (r.opN, w.opN)
 
-    val result = " SELECT readOp168.opN as r, writeOp169.opN as w " +
+    val result = "SELECT readOp168.opN as r, writeOp169.opN as w " +
     s"FROM ${ScalaSQLTable.name(dataflow_derived)} as recref13, ${ScalaSQLTable.name(dataflow_readOp)} as readOp168, ${ScalaSQLTable.name(dataflow_writeOp)} as writeOp169 " +
     "WHERE writeOp169.opN = recref13.a AND writeOp169.varN = readOp168.varN AND recref13.b = readOp168.opN "
     backupResultScalaSql = ddb.runQuery(result)

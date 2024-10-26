@@ -15,17 +15,19 @@ object FixedPointQuery {
       val res = if (set) then (acc ++ bases).distinct else acc ++ bases
       fix(set)(next, res)(fns)
 
-  final def multiFix[T <: Tuple, S <: Seq[?]](set: Boolean)(bases: T, acc: T)(fns: T => T): T =
-    val next = fns(bases)
+  @annotation.tailrec
+  final def multiFix[T <: Tuple, S <: Seq[?]](set: Boolean, targetIdx: Int = 0)(bases: T, acc: T)(fns: (T, T) => T): T =
+    val next = fns(bases, acc)
 
     val nextA = next.toList.asInstanceOf[List[S]]
     val basesA = bases.toList.asInstanceOf[List[S]]
     val accA = acc.toList.asInstanceOf[List[S]]
 
 
-    if (nextA.zip(accA).map(
+    val cmp = nextA.zip(accA).map(
       (n, a) => n.toSet.subsetOf(a.toSet)
-    ).forall(b => b))
+    ).forall(b => b)
+    if (cmp)
       val combo = accA.zip(basesA).map((a: S, b: S) => if (set) then (a ++ b).distinct else a ++ b)
       val res = Tuple.fromArray(combo.toArray).asInstanceOf[T]
       res
@@ -34,194 +36,173 @@ object FixedPointQuery {
       val res = Tuple.fromArray(combo.toArray).asInstanceOf[T]
       multiFix(set)(next, res)(fns)
 
+  @annotation.tailrec
   final def scalaSQLFix[P[_[_]]]
-    (bases: ScalaSQLTable[P], acc: ScalaSQLTable[P])
-    (fns: ScalaSQLTable[P] => ScalaSQLTable[P])
+    (bases: ScalaSQLTable[P], next: ScalaSQLTable[P], acc: ScalaSQLTable[P])
+    (fns: (ScalaSQLTable[P], ScalaSQLTable[P]) => Unit)
     (cmp: (ScalaSQLTable[P], ScalaSQLTable[P]) => Boolean)
-    (init: () => Unit)
+    (copyTo: (next: ScalaSQLTable[P], acc: ScalaSQLTable[P]) => ScalaSQLTable[P])
   : ScalaSQLTable[P] =
 
-    val delta = fns(bases)
+    fns(bases, next)
 
-    val isEmpty = cmp(delta, acc)
+    val isEmpty = cmp(next, acc)
     if (isEmpty)
       acc
+      copyTo(bases, acc)
     else
-      init()
-      scalaSQLFix(bases, acc)(fns)(cmp)(init)
+      val newNext = copyTo(bases, acc)
+      val newBase = next
+      scalaSQLFix(newBase, newNext, acc)(fns)(cmp)(copyTo)
 
   final def scalaSQLSemiNaive[Q, T >: Tuple, P[_[_]]](set: Boolean)
-                                                     (db: DbApi, delta: ScalaSQLTable[P], derived: ScalaSQLTable[P], tmp: ScalaSQLTable[P])
+                                                     (db: DbApi, bases_db: ScalaSQLTable[P], next_db: ScalaSQLTable[P], acc_db: ScalaSQLTable[P])
                                                      (toTuple: P[Expr] => Tuple)
                                                      (initBase: () => query.Select[T, Q])
                                                      (initRecur: ScalaSQLTable[P] => query.Select[T, Q])
-  : Unit = { //ScalaSQLTable[P] =
+  : Unit = {
 
-    db.run(delta.delete(_ => true))
-    db.run(derived.delete(_ => true))
-    db.run(tmp.delete(_ => true))
+    db.run(bases_db.delete(_ => true))
+    db.run(next_db.delete(_ => true))
+    db.run(acc_db.delete(_ => true))
 
-    db.run(delta.insert.select(
-      toTuple,
-      initBase()
-    ))
-    db.run(derived.insert.select(
+    db.run(bases_db.insert.select(
       toTuple,
       initBase()
     ))
 
-    val cmp: (ScalaSQLTable[P], ScalaSQLTable[P]) => Boolean = (currentDelta, acc) =>
-      val newly = currentDelta.select.asInstanceOf[query.Select[T, Q]].except(acc.select.asInstanceOf[query.Select[T, Q]])
+    val cmp: (ScalaSQLTable[P], ScalaSQLTable[P]) => Boolean = (next, acc) =>
+      val newly = next.select.asInstanceOf[query.Select[T, Q]].except(acc.select.asInstanceOf[query.Select[T, Q]])
       db.run(newly).isEmpty
 
-    val fixFn: ScalaSQLTable[P] => ScalaSQLTable[P] = recur => {
-      val query = initRecur(recur)
-
-      db.run(tmp.delete(_ => true))
-      db.run(tmp.insert.select( // need tmp because reads from delta
+    val fixFn: (ScalaSQLTable[P], ScalaSQLTable[P]) => Unit = (bases, next) => {
+      val query = initRecur(bases)
+      db.run(next.delete(_ => true))
+      db.run(next.insert.select(
         toTuple,
         query
       ))
-      db.run(delta.delete(_ => true))
-      val setStr = if (set) then " DISTINCT" else ""
-      db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(delta)} (SELECT$setStr * FROM ${ScalaSQLTable.name(tmp)})")
-      delta
     }
 
-    val init: () => Unit = () => {
+    val copyTo: (ScalaSQLTable[P], ScalaSQLTable[P]) => ScalaSQLTable[P] = (bases, acc) => {
       if (set)
-        db.run(tmp.delete(_ => true))
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(tmp)} (SELECT * FROM ${ScalaSQLTable.name(delta)} UNION SELECT * FROM ${ScalaSQLTable.name(derived)})")
-        db.run(derived.delete(_ => true))
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(derived)} (SELECT * FROM ${ScalaSQLTable.name(tmp)})")
+        val tmp = s"${ScalaSQLTable.name(bases)}_tmp"
+        db.updateRaw(s"CREATE TABLE $tmp AS SELECT * FROM ${ScalaSQLTable.name(bases)} LIMIT 0")
+        db.updateRaw(s"INSERT INTO $tmp (SELECT * FROM ${ScalaSQLTable.name(bases)} UNION SELECT * FROM ${ScalaSQLTable.name(acc)})")
+        db.run(acc.delete(_ => true))
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc)} (SELECT * FROM $tmp)")
+        db.updateRaw(s"DROP TABLE $tmp")
       else
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(derived)} (SELECT * FROM ${ScalaSQLTable.name(delta)})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc)} (SELECT * FROM ${ScalaSQLTable.name(bases)})")
+      bases
     }
 
-    scalaSQLFix(delta, derived)(fixFn)(cmp)(init)
-    init()
+    scalaSQLFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyTo)
   }
 
   // Mutually recursive relations
-  final def scalaSQLMultiFix[T](bases: T, acc: T, tmp: T)(fns: (T, T) => (T, T))(cmp: (T, T) => Boolean)(copyInto: (T, T, T) => T): T = {
+  @annotation.tailrec
+  final def scalaSQLMultiFix[T]
+    (bases: T, next: T, acc: T)
+    (fns: (T, T) => Unit)
+    (cmp: (T, T) => Boolean)
+    (copyTo: (T, T) => T)
+  : T = {
+//    println(s"----- start multifix ------")
 //    println(s"BASE=${ScalaSQLTable.name(bases.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
-//    println(s"TMP=${ScalaSQLTable.name(tmp.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
+//    println(s"NEXT=${ScalaSQLTable.name(next.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
 //    println(s"ACC=${ScalaSQLTable.name(acc.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
-    val (currentDelta, lastDelta) = fns(bases, tmp)
+    fns(bases, next)
 
-    val isEmpty = cmp(currentDelta, acc)
+    val isEmpty = cmp(next, acc)
     if (isEmpty)
+      copyTo(bases, acc)
       acc
     else
-      val newBase = copyInto(currentDelta, acc, lastDelta)
-      scalaSQLMultiFix(newBase, acc, lastDelta)(fns)(cmp)(copyInto)
+      val newNext = copyTo(bases, acc)
+      val newBase = next
+      scalaSQLMultiFix(newBase, newNext, acc)(fns)(cmp)(copyTo)
   }
 
-  var it = 0
   // this is silly but higher kinded types are mega painful to abstract
   final def scalaSQLSemiNaive2[Q1, Q2, T1 >: Tuple, T2 >: Tuple, P1[_[_]], P2[_[_]], Tables]
     (using Tables =:= (ScalaSQLTable[P1], ScalaSQLTable[P2]))
     (set: Boolean)
-    (db: DbApi, init_delta: Tables, init_derived: Tables, init_tmp: Tables)
+    (db: DbApi, bases_db: Tables, next_db: Tables, acc_db: Tables)
     (toTuple: (P1[Expr] => Tuple, P2[Expr] => Tuple))
     (initBase: () => (query.Select[T1, Q1], query.Select[T2, Q2]))
     (initRecur: Tables => (query.Select[T1, Q1], query.Select[T2, Q2]))
-  : Unit =
+  : Unit = {
 
-    db.run(init_delta._1.delete(_ => true))
-    db.run(init_derived._1.delete(_ => true))
-    db.run(init_tmp._1.delete(_ => true))
+    db.run(bases_db._1.delete(_ => true))
+    db.run(next_db._1.delete(_ => true))
+    db.run(acc_db._1.delete(_ => true))
 
-    db.run(init_delta._2.delete(_ => true))
-    db.run(init_derived._2.delete(_ => true))
-    db.run(init_tmp._2.delete(_ => true))
+    db.run(bases_db._2.delete(_ => true))
+    db.run(next_db._2.delete(_ => true))
+    db.run(acc_db._2.delete(_ => true))
 
     val (base1, base2) = initBase()
 
-    db.run(init_delta._1.insert.select(
+    db.run(bases_db._1.insert.select(
       toTuple._1,
       base1
     ))
-    db.run(init_derived._1.insert.select(
-      toTuple._1,
-      base1
-    ))
-    db.run(init_delta._2.insert.select(
-      toTuple._2,
-      base2
-    ))
-
-    db.run(init_derived._2.insert.select(
+    db.run(bases_db._2.insert.select(
       toTuple._2,
       base2
     ))
 
     def printTable(t: Tables, name: String): Unit =
-      println(s"${name}1(${ScalaSQLTable.name(t._1)})=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(t._1)}")}")
-      println(s"${name}2(${ScalaSQLTable.name(t._2)})=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(t._2)}")}")
+      println(s"${name}1(${ScalaSQLTable.name(t._1)})=${db.runRaw[(String)](s"SELECT * FROM ${ScalaSQLTable.name(t._1)}")}")
+      println(s"${name}2(${ScalaSQLTable.name(t._2)})=${db.runRaw[(String, Int)](s"SELECT * FROM ${ScalaSQLTable.name(t._2)}")}")
 
 
-    val cmp: (Tables, Tables) => Boolean = (currentDelta, acc) =>
-//      println("-----CMP-----")
-//      printTable(currentDelta, "currentDelta")
-//      printTable(acc, "acc")
-
+    val cmp: (Tables, Tables) => Boolean = (next, acc) => {
       val (newDelta1, newDelta2) = (
-        currentDelta._1.select.asInstanceOf[query.Select[T1, Q1]].except(acc._1.select.asInstanceOf[query.Select[T1, Q1]]),
-        currentDelta._2.select.asInstanceOf[query.Select[T2, Q2]].except(acc._2.select.asInstanceOf[query.Select[T2, Q2]])
+        next._1.select.asInstanceOf[query.Select[T1, Q1]].except(acc._1.select.asInstanceOf[query.Select[T1, Q1]]),
+        next._2.select.asInstanceOf[query.Select[T2, Q2]].except(acc._2.select.asInstanceOf[query.Select[T2, Q2]])
       )
-//      println(s"DIFF -->1:${db.run(newDelta1)}, 2:${db.run(newDelta1)}")
       db.run(newDelta1).isEmpty && db.run(newDelta2).isEmpty
+    }
 
-    val fixFn: (Tables, Tables) => (Tables, Tables) = (recur, temp) => {
-//      println(s"-----FIX $it-----")
-//      println(s"recur=${ScalaSQLTable.name(recur._1)}, temp=${ScalaSQLTable.name(temp._1)}")
-//      printTable(recur, "base")
-      val (query1, query2) = initRecur(recur)
-
-//      println(s"recur returns=${db.run(query1)}")
-//      println(s"recur returns=${db.run(query2)}")
-
-      db.run(temp._1.delete(_ => true))
-      db.run(temp._2.delete(_ => true))
-      db.run(temp._1.insert.select( // need tmp because reads from delta
+    val fixFn: (Tables, Tables) => Unit = (base, next) => {
+      val (query1, query2) = initRecur(base)
+      db.run(next._1.delete(_ => true))
+      db.run(next._2.delete(_ => true))
+      db.run(next._1.insert.select(
         toTuple._1,
         query1
       ))
-      db.run(temp._2.insert.select( // need tmp because reads from delta
+      db.run(next._2.insert.select(
         toTuple._2,
         query2
       ))
-//      printTable(temp, "RES-FIX")
-
-//      if (it > 1) System.exit(0)
-      it += 1
-
-      (temp, recur) // = newDelta, oldDelta
     }
 
-    val copyInto: (Tables, Tables, Tables) => Tables = (currentDelta, acc, temp) => {
-//      println("----CopyInto----")
-//      println(s"currentDelta=${ScalaSQLTable.name(currentDelta._1)}, acc=${ScalaSQLTable.name(acc._1)}, temp=${ScalaSQLTable.name(temp._1)}")
-//      printTable(currentDelta, "currentDelta")
-//      printTable(acc, "acc")
+    val copyInto: (Tables, Tables) => Tables = (base, acc) => {
+      val tmp = (s"${ScalaSQLTable.name(base._1)}_tmp", s"${ScalaSQLTable.name(base._2)}_tmp")
       if (set)
-        db.run(temp._1.delete(_ => true))
-        db.run(temp._2.delete(_ => true))
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(temp._1)} (SELECT * FROM ${ScalaSQLTable.name(currentDelta._1)} UNION SELECT * FROM ${ScalaSQLTable.name(acc._1)})")
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(temp._2)} (SELECT * FROM ${ScalaSQLTable.name(currentDelta._2)} UNION SELECT * FROM ${ScalaSQLTable.name(acc._2)})")
+        db.updateRaw(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
+        db.updateRaw(s"INSERT INTO ${tmp._1} (SELECT * FROM ${ScalaSQLTable.name(base._1)} UNION SELECT * FROM ${ScalaSQLTable.name(acc._1)})")
+
+        db.updateRaw(s"CREATE TABLE ${tmp._2} AS SELECT * FROM ${ScalaSQLTable.name(base._2)} LIMIT 0")
+        db.updateRaw(s"INSERT INTO ${tmp._2} (SELECT * FROM ${ScalaSQLTable.name(base._2)} UNION SELECT * FROM ${ScalaSQLTable.name(acc._2)})")
+
         db.run(acc._1.delete(_ => true))
         db.run(acc._2.delete(_ => true))
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${ScalaSQLTable.name(temp._1)})")
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${ScalaSQLTable.name(temp._2)})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${tmp._1})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${tmp._2})")
+        db.updateRaw(s"DROP TABLE ${tmp._1}")
+        db.updateRaw(s"DROP TABLE ${tmp._2}")
+
       else
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${ScalaSQLTable.name(currentDelta._1)})")
-        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${ScalaSQLTable.name(currentDelta._2)})")
-//      printTable(acc, "newAcc")
-//      printTable(currentDelta, "newBase")
-      currentDelta
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${ScalaSQLTable.name(base._1)})")
+        db.updateRaw(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${ScalaSQLTable.name(base._2)})")
+      base
     }
 
-    scalaSQLMultiFix(init_delta, init_derived, init_tmp)(fixFn)(cmp)(copyInto)
-//    copyInto()
+    scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
+  }
+
 }

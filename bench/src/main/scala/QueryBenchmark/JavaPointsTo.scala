@@ -146,15 +146,17 @@ class JavaPointsTo extends QueryBenchmark {
     val baseVPT = collectionsDB.newT.map(a => PointsToCC(x = a.x, y = a.y))
     val baseHPT = Seq[ProgramHeapCC]()
     var it = 0
-    val pt = FixedPointQuery.multiFix(set)((baseVPT, baseHPT), (Seq(), Seq()))((varPointsTo, heapPointsTo) =>
-      it+=1
+    val pt = FixedPointQuery.multiFix(set)((baseVPT, baseHPT), (Seq(), Seq()))((recur, acc) =>
+      val (varPointsTo, heapPointsTo) = recur
+      val (varPointsToAcc, heapPointsToAcc) = if (it == 0) (baseVPT, baseHPT) else acc
+      it += 1
       val vpt = collectionsDB.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           PointsToCC(x = a.x, y = p.y)
         )
       ).union(
         collectionsDB.loadT.flatMap(l =>
-          heapPointsTo.flatMap(hpt =>
+          heapPointsToAcc.flatMap(hpt =>
             varPointsTo
               .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
               .map(pt2 =>
@@ -164,8 +166,8 @@ class JavaPointsTo extends QueryBenchmark {
         )
       )
       val hpt = collectionsDB.store.flatMap(s =>
-        varPointsTo.flatMap(vpt1 =>
-          varPointsTo
+        varPointsToAcc.flatMap(vpt1 =>
+          varPointsToAcc
             .filter(vpt2 => s.x == vpt1.x && s.h == vpt2.x)
             .map(vpt2 =>
               ProgramHeapCC(x = vpt1.y, y = s.y, h = vpt2.y)
@@ -179,25 +181,24 @@ class JavaPointsTo extends QueryBenchmark {
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
-//    println(s"DB start=new=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_new)}")}")
-//    println(s"DB start=assign=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_assign)}")}")
-//    println(s"DB start=store=${db.runRaw[(String, String, String)](s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_store)}")}")
-//    println(s"DB start=load=${db.runRaw[(String, String, String)](s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_loadT)}")}")
 
     val initBase = () =>
       (javapointsto_new.select.map(c => (c.x, c.y)),
         javapointsto_hpt.select.map(c => (c.x, c.y, c.h)))
 
+    var it = 0
     val fixFn: ((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]) =
-      (recur) =>
+      recur =>
         val (varPointsTo, heapPointsTo) = recur
+        val (varPointsToAcc, heapPointsToAcc) = if it == 0 then (javapointsto_delta1, javapointsto_delta2) else (javapointsto_derived1, javapointsto_derived2)
+        it += 1
         val vpt1 = for {
           a <- javapointsto_assign.select
           p <- varPointsTo.join(_.x === a.y)
         } yield (a.x, p.y)
         val vpt2 = for {
           l <- javapointsto_loadT.select
-          h <- heapPointsTo.join(_.y === l.h)
+          h <- heapPointsToAcc.join(_.y === l.h)
           v <- varPointsTo.join(_.x === l.y)
           if v.y === h.x
         } yield (l.x, h.h)
@@ -205,14 +206,14 @@ class JavaPointsTo extends QueryBenchmark {
 
         val hpt = for {
           s <- javapointsto_store.select
-          v1 <- varPointsTo.join(_.x === s.x)
-          v2 <- varPointsTo.join(_.x === s.h)
+          v1 <- varPointsToAcc.join(_.x === s.x)
+          v2 <- varPointsToAcc.join(_.x === s.h)
         } yield (v1.y, s.y, v2.y)
 
         (vpt, hpt)
 
     FixedPointQuery.scalaSQLSemiNaive2(set)(
-      db, (javapointsto_delta1, javapointsto_delta2), (javapointsto_derived1, javapointsto_derived2), (javapointsto_tmp1, javapointsto_tmp2)
+      db, (javapointsto_delta1, javapointsto_delta2), (javapointsto_tmp1, javapointsto_tmp2), (javapointsto_derived1, javapointsto_derived2)
     )(
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))
     )(

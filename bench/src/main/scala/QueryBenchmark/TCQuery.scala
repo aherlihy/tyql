@@ -86,12 +86,18 @@ class TCQuery extends QueryBenchmark {
     val path = collectionsDB.edge
       .filter(p => p.x == 1)
       .map(e => ResultEdgeCC(e.x, e.y, Seq(e.x, e.y)))
+    var it = 0
     resultCollections = FixedPointQuery.fix(set)(path, Seq())(path =>
-      path.flatMap(p =>
+      println(s"***iteration $it")
+      it+=1
+      println(s"input: path=${path.mkString("[", ", ", "]")}")
+      val res = path.flatMap(p =>
         collectionsDB.edge
           .filter(e => p.endNode == e.x && !p.path.contains(e.y))
           .map(e => ResultEdgeCC(startNode = p.startNode, endNode = e.y, p.path :+ e.y))
       )//.distinct
+      println(s"output: path=${res.mkString("[", ", ", "]")}")
+      res
     ).sortBy(r => r.path.length).sortBy(_.startNode).sortBy(_.endNode)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -107,15 +113,22 @@ class TCQuery extends QueryBenchmark {
         .filter(_.x === Expr(1))
         .map(e => (e.x, e.y, initList(e.x, e.y)))
 
+    var it = 0
     val fixFn: ScalaSQLTable[ResultEdgeSS] => query.Select[(Expr[Int], Expr[Int], Expr[String]), (Int, Int, String)] = path =>
-      for {
+      println(s"***iteration $it")
+      it += 1
+      println(s"input: path=${db.runRaw[(Int, Int, String)](s"SELECT * FROM ${ScalaSQLTable.name(path)}").mkString("[", ", ", "]")}")
+      val res = for {
         p <- path.select
         e <- tc_edge.join(p.endNode === _.x)
         if !listContains(e.y, p.path)
       } yield (p.startNode, e.y, listAppend(e.y, p.path))
 
+      println(s"output: path=${db.run(res).mkString("[", ", ", "]")}")
+
+      res
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, tc_delta, tc_derived, tc_tmp
+      db, tc_delta, tc_tmp, tc_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]])
 
 

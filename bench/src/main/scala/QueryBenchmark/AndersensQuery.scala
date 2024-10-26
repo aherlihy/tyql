@@ -51,7 +51,7 @@ class AndersensQuery extends QueryBenchmark {
     ).toMap
     collectionsDB = CollectionsDB(tables("addressOf"), tables("assign"), tables("loadT"), tables("store"))
 
-  //   ScalaSQL data model
+  // ScalaSQL data model
   case class EdgeSS[T[_]](x: T[String], y: T[String])
 
   def fromSSRes(r: EdgeSS[?]): Seq[String] = Seq(
@@ -120,29 +120,29 @@ class AndersensQuery extends QueryBenchmark {
     val initBase: () => query.Select[(Expr[String], Expr[String]), (String, String)] =
       () => andersens_addressOf.select.map(a => (a.x, a.y))
 
-    val fixFn: ScalaSQLTable[EdgeSS] => query.Select[(Expr[String], Expr[String]), (String, String)] = (andersens_pointsTo) =>
+    val fixFn: ScalaSQLTable[EdgeSS] => query.Select[(Expr[String], Expr[String]), (String, String)] = (pointsTo) =>
       val innerQ1 = for {
-        pointsTo <- andersens_pointsTo.select
+        pointsTo <- pointsTo.select
         assign <- andersens_assign.join(_.y === pointsTo.x)
       } yield (assign.x, pointsTo.y)
 
       val innerQ2 = for {
-        pointsTo1 <- andersens_pointsTo.select
-        pointsTo2 <- andersens_pointsTo.join(pointsTo1.y === _.x)
+        pointsTo1 <- pointsTo.select
+        pointsTo2 <- pointsTo.join(pointsTo1.y === _.x)
         load <- andersens_loadT.join(_.y === pointsTo1.x)
       } yield (load.x, pointsTo2.y)
 
       val innerQ3 = for {
-        pointsTo1 <- andersens_pointsTo.select
-        pointsTo2 <- andersens_pointsTo.select.crossJoin()
+        pointsTo1 <- pointsTo.select
+        pointsTo2 <- pointsTo.select.crossJoin()
         store <- andersens_store.join(s => s.x === pointsTo1.x && s.y === pointsTo2.x)
       } yield (pointsTo1.y, pointsTo2.y)
 
-      innerQ1.union(innerQ2).union(innerQ3).except(andersens_derived.select.map(r => (r.x, r.y)))
+      innerQ1.union(innerQ2).union(innerQ3)
 
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, andersens_delta, andersens_derived, andersens_tmp
+      db, andersens_delta, andersens_tmp, andersens_derived
     )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]])
 
     val result = andersens_derived.select.sortBy(_.x)

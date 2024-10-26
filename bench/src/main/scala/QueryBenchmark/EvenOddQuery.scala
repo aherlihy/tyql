@@ -66,6 +66,7 @@ class EvenOddQuery extends QueryBenchmark {
   object evenodd_delta1 extends ScalaSQLTable[ResultSS]
   object evenodd_derived1 extends ScalaSQLTable[ResultSS]
   object evenodd_tmp1 extends ScalaSQLTable[ResultSS]
+  val (derived_even, derived_odd) = (evenodd_derived1, evenodd_derived2)
 
   // Result types for later printing
   var resultTyql: ResultSet = null
@@ -95,12 +96,16 @@ class EvenOddQuery extends QueryBenchmark {
     val evenBase = collectionsDB.numbers.filter(n => n.value == 0).map(n => ResultCC(value = n.value, typ = "even"))
     val oddBase = collectionsDB.numbers.filter(n => n.value == 1).map(n => ResultCC(value = n.value, typ = "odd"))
 
-    val (even, odd) = FixedPointQuery.multiFix(set)((evenBase, oddBase), ((Seq(), Seq())))((even, odd) =>
+    var it = 0
+    val (even, odd) = FixedPointQuery.multiFix(set)((evenBase, oddBase), (Seq(), Seq()))((recur, acc) =>
+      val (even, odd) = recur
+      val (evenDerived, oddDerived) = if it == 0 then (evenBase, oddBase) else acc
+      it += 1
       val evenResult = collectionsDB.numbers.flatMap(num =>
-        odd.filter(o => num.value == o.value + 1).map(o => ResultCC(value = num.value, typ = "even"))
+        oddDerived.filter(o => num.value == o.value + 1).map(o => ResultCC(value = num.value, typ = "even"))
       ).distinct
       val oddResult = collectionsDB.numbers.flatMap(num =>
-        even.filter(e => num.value == e.value + 1).map(e => ResultCC(value = num.value, typ ="odd"))
+        evenDerived.filter(e => num.value == e.value + 1).map(e => ResultCC(value = num.value, typ ="odd"))
       ).distinct
       (evenResult, oddResult)
     )
@@ -119,22 +124,32 @@ class EvenOddQuery extends QueryBenchmark {
         .map(n => ( n.value, Expr("odd")))
       (even, odd)
 
+    var it = 0
     val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)]) =
-      (recur) =>
+      recur =>
         val (even, odd) = recur
+        val (evenAcc, oddAcc) = if it == 0 then (evenodd_delta1, evenodd_delta2) else (derived_even, derived_odd)
+        it+=1
+
+//        println(s"***iteration $it")
+//        println(s"BASES:\n\teven : ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(even)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\todd: ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(odd)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
+//        println(s"DERIV:\n\teven : ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(derived_even)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\todd: ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(derived_odd)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
+
         val evenResult = for {
           n <- evenodd_numbers.select
-          o <- odd.join(n.value === _.value + 1)
+          o <- oddAcc.join(n.value === _.value + 1)
         } yield (n.value, Expr("even"))
 
         val oddResult = for {
           n <- evenodd_numbers.select
-          o <- even.join(n.value === _.value + 1)
+          o <- evenAcc.join(n.value === _.value + 1)
         } yield (n.value, Expr("odd"))
+
+//        println(s"output:\n\teven: ${db.run(evenResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\toddResult: ${db.run(oddResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         (evenResult, oddResult)
 
     FixedPointQuery.scalaSQLSemiNaive2(set)(
-      db, (evenodd_delta1, evenodd_delta2), (evenodd_derived1, evenodd_derived2), (evenodd_tmp1, evenodd_tmp2)
+      db, (evenodd_delta1, evenodd_delta2), (evenodd_tmp1, evenodd_tmp2), (evenodd_derived1, evenodd_derived2)
     )(
       (toTuple, toTuple)
     )(

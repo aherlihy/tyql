@@ -18,7 +18,7 @@ import Helpers.*
 @experimental
 class PointsToCountQuery extends QueryBenchmark {
   override def name = "pointstocount"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type ProgramHeapOp = (x: String, y: String, h: String)
@@ -146,15 +146,17 @@ class PointsToCountQuery extends QueryBenchmark {
     val baseVPT = collectionsDB.newT.map(a => PointsToCC(x = a.x, y = a.y))
     val baseHPT = collectionsDB.hpt
     var it = 0
-    val pt = FixedPointQuery.multiFix(set)((baseVPT, baseHPT), (Seq(), Seq()))((varPointsTo, heapPointsTo) =>
-      it+=1
+    val pt = FixedPointQuery.multiFix(set)((baseVPT, baseHPT), (Seq(), Seq()))((recur, acc) =>
+      val (varPointsTo, heapPointsTo) = recur
+      val (varPointsToAcc, heapPointsToAcc) = if it == 0 then (baseVPT, baseHPT) else acc
+      it += 1
       val vpt = collectionsDB.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           PointsToCC(x = a.x, y = p.y)
         )
       ).union(
         collectionsDB.loadT.flatMap(l =>
-          heapPointsTo.flatMap(hpt =>
+          heapPointsToAcc.flatMap(hpt =>
             varPointsTo
               .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
               .map(pt2 =>
@@ -164,8 +166,8 @@ class PointsToCountQuery extends QueryBenchmark {
         )
       )
       val hpt = collectionsDB.store.flatMap(s =>
-        varPointsTo.flatMap(vpt1 =>
-          varPointsTo
+        varPointsToAcc.flatMap(vpt1 =>
+          varPointsToAcc
             .filter(vpt2 => s.x == vpt1.x && s.h == vpt2.x)
             .map(vpt2 =>
               ProgramHeapCC(x = vpt1.y, y = s.y, h = vpt2.y)
@@ -179,18 +181,17 @@ class PointsToCountQuery extends QueryBenchmark {
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
-    println(s"DB start=new=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_new)}")}")
-    println(s"DB start=assign=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_assign)}")}")
-    println(s"DB start=store=${db.runRaw[(String, String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_store)}")}")
-    println(s"DB start=load=${db.runRaw[(String, String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_loadT)}")}")
 
     val initBase = () =>
       (pointstocount_new.select.map(c => (c.x, c.y)),
         pointstocount_hpt.select.map(c => (c.x, c.y, c.h)))
 
+    var it = 0
     val fixFn: ((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]) =
       recur =>
         val (varPointsTo, heapPointsTo) = recur
+        val (varPointsToAcc, heapPointsToAcc) = if it == 0 then (pointstocount_delta1, pointstocount_delta2) else (pointstocount_derived1, pointstocount_derived2)
+        it += 1
         val vpt1 = for {
           a <- pointstocount_assign.select
           p <- varPointsTo.crossJoin()
@@ -198,7 +199,7 @@ class PointsToCountQuery extends QueryBenchmark {
         } yield  (a.x, p.y)
         val vpt2 = for {
           l <- pointstocount_loadT.select
-          hpt <- heapPointsTo.crossJoin()
+          hpt <- heapPointsToAcc.crossJoin()
           vpt <- varPointsTo.crossJoin()
           if l.y === vpt.x && l.h === hpt.y && vpt.y === hpt.x
         } yield (l.x, hpt.h)
@@ -206,15 +207,15 @@ class PointsToCountQuery extends QueryBenchmark {
 
         val hpt = for {
           s <- pointstocount_store.select
-          vpt1 <- varPointsTo.crossJoin()
-          vpt2 <- varPointsTo.crossJoin()
+          vpt1 <- varPointsToAcc.crossJoin()
+          vpt2 <- varPointsToAcc.crossJoin()
           if s.x === vpt1.x && s.h === vpt2.x
         } yield (vpt1.y, s.y, vpt2.y)
 
         (vpt, hpt)
 
     FixedPointQuery.scalaSQLSemiNaive2(set)(
-      db, (pointstocount_delta1, pointstocount_delta2), (pointstocount_derived1, pointstocount_derived2), (pointstocount_tmp1, pointstocount_tmp2)
+      db, (pointstocount_delta1, pointstocount_delta2), (pointstocount_tmp1, pointstocount_tmp2), (pointstocount_derived1, pointstocount_derived2)
     )(
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))
     )(
