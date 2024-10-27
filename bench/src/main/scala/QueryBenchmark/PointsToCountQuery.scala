@@ -19,6 +19,7 @@ import Helpers.*
 class PointsToCountQuery extends QueryBenchmark {
   override def name = "pointstocount"
   override def set = true
+  if !set then ???
 
   // TYQL data model
   type ProgramHeapOp = (x: String, y: String, h: String)

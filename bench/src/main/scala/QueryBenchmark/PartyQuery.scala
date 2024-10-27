@@ -11,14 +11,14 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Table, Query}
-import tyql.Query.{unrestrictedBagFix}
+import tyql.Query.{unrestrictedBagFix, unrestrictedFix}
 import tyql.Expr.{IntLit, StringLit, count}
 import Helpers.*
 
 @experimental
 class PartyQuery extends QueryBenchmark {
   override def name = "party"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type Organizer = (orgName: String)
@@ -87,7 +87,8 @@ class PartyQuery extends QueryBenchmark {
     val baseAttend = tyqlDB.organizers.map(o => (person = o.orgName).toRow)
     val baseCntFriends = tyqlDB.counts
 
-    val (finalAttend, finalCntFriends) = unrestrictedBagFix(baseAttend, baseCntFriends)((attend, cntfriends) =>
+    val tyqlFix = if set then unrestrictedFix(baseAttend, baseCntFriends) else unrestrictedBagFix(baseAttend, baseCntFriends)
+    val (finalAttend, finalCntFriends) = tyqlFix((attend, cntfriends) =>
       val recurAttend = cntfriends
         .filter(cf => cf.nCount > 2)
         .map(cf => (person = cf.fName).toRow)

@@ -18,7 +18,7 @@ import Helpers.*
 @experimental
 class JavaPointsTo extends QueryBenchmark {
   override def name = "javapointsto"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type ProgramHeapOp = (x: String, y: String, h: String)
@@ -108,12 +108,15 @@ class JavaPointsTo extends QueryBenchmark {
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val baseVPT = tyqlDB.newT.map(a => (x = a.x, y = a.y).toRow)
     val baseHPT = tyqlDB.baseHPT
-    val pt = unrestrictedBagFix((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
-      val vpt = tyqlDB.assign.flatMap(a =>
+
+    val tyqlFix = if set then unrestrictedFix((baseVPT, baseHPT)) else unrestrictedBagFix((baseVPT, baseHPT))
+    val pt = tyqlFix((varPointsTo, heapPointsTo) => {
+      val vpt1 = tyqlDB.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           (x = a.x, y = p.y).toRow
         )
-      ).unionAll(
+      )
+      val vpt2 =
         tyqlDB.loadT.flatMap(l =>
           heapPointsTo.flatMap(hpt =>
             varPointsTo
@@ -123,7 +126,7 @@ class JavaPointsTo extends QueryBenchmark {
               )
           )
         )
-      )
+      val vpt = if set then vpt1.union(vpt2) else vpt1.unionAll(vpt2)
       val hpt = tyqlDB.store.flatMap(s =>
         varPointsTo.flatMap(vpt1 =>
           varPointsTo
@@ -131,11 +134,11 @@ class JavaPointsTo extends QueryBenchmark {
             .map(vpt2 =>
               (x = vpt1.y, y = s.y, h = vpt2.y).toRow
             )
+          )
         )
-      )
 
       (vpt, hpt)
-    )
+    })
 //    val query = pt._2.sort(_.x, Ord.ASC).sort(_.y, Ord.ASC)
     val query = pt._1.sort(_.x, Ord.ASC).sort(_.y, Ord.ASC)
 
@@ -150,11 +153,12 @@ class JavaPointsTo extends QueryBenchmark {
       val (varPointsTo, heapPointsTo) = recur
       val (varPointsToAcc, heapPointsToAcc) = if (it == 0) (baseVPT, baseHPT) else acc
       it += 1
-      val vpt = collectionsDB.assign.flatMap(a =>
+      val vpt1 = collectionsDB.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           PointsToCC(x = a.x, y = p.y)
         )
-      ).union(
+      )
+      val vpt2 =
         collectionsDB.loadT.flatMap(l =>
           heapPointsToAcc.flatMap(hpt =>
             varPointsTo
@@ -164,7 +168,7 @@ class JavaPointsTo extends QueryBenchmark {
               )
           )
         )
-      )
+      val vpt = if set then vpt1.union(vpt2) else vpt1 ++ vpt2
       val hpt = collectionsDB.store.flatMap(s =>
         varPointsToAcc.flatMap(vpt1 =>
           varPointsToAcc
@@ -202,7 +206,7 @@ class JavaPointsTo extends QueryBenchmark {
           v <- varPointsTo.join(_.x === l.y)
           if v.y === h.x
         } yield (l.x, h.h)
-        val vpt = vpt1.union(vpt2)
+        val vpt = if (set) vpt1.union(vpt2) else vpt1.unionAll(vpt2)
 
         val hpt = for {
           s <- javapointsto_store.select

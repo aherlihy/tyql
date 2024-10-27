@@ -18,6 +18,7 @@ import tyql.Expr.{IntLit, min}
 class AncestryQuery extends QueryBenchmark {
   override def name = "ancestry"
   override def set = true
+  if !set then ???
 
   // TYQL data model
   type Parent = (parent: String, child: String)

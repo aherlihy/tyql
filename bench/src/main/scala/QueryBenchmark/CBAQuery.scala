@@ -142,9 +142,9 @@ class CBAQuery extends QueryBenchmark {
 
     val ctrlVarBase = tyqlDB.baseCtrl
 
-    val fn = if set then unrestrictedFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)) else unrestrictedBagFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))
+    val tyqlFix = if set then unrestrictedFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)) else unrestrictedBagFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))
 
-    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = fn(
+    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = tyqlFix(
       (dataTerm, dataVar, ctrlTerm, ctrlVar) => {
         val dt1 =
           for
@@ -277,7 +277,9 @@ class CBAQuery extends QueryBenchmark {
             if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
           yield CtrlCC(x = abs.y, y = ct2.y)
 
-        (dt1 ++ dt2, dv, ct1 ++ ct2, cv)
+        val dt = if set then dt1.union(dt2) else dt1 ++ dt2
+        val ct = if set then ct1.union(ct2) else ct1 ++ ct2
+        (dt, dv, ct, cv)
       })
 
       resultCollections = Seq(dataTerm.distinct.size)
@@ -365,7 +367,9 @@ class CBAQuery extends QueryBenchmark {
           yield (abs.y, ct2.y)
 
         //        println(s"output:\n\teven: ${db.run(evenResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\toddResult: ${db.run(oddResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
-        (dataTerm1.unionAll(dataTerm2), dataVarResult, controlTerm1.unionAll(controlTerm2), controlVarResult)
+        val dataTermResult = if set then dataTerm1.union(dataTerm2) else dataTerm1.unionAll(dataTerm2)
+        val controlTermResult = if set then controlTerm1.union(controlTerm2) else controlTerm1.unionAll(controlTerm2)
+        (dataTermResult, dataVarResult, controlTermResult, controlVarResult)
       }
 
     FixedPointQuery.scalaSQLSemiNaiveFOUR(set)(

@@ -11,14 +11,14 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Table, Query}
-import tyql.Query.{unrestrictedBagFix}
+import tyql.Query.{unrestrictedBagFix, unrestrictedFix}
 import tyql.Expr.{IntLit, StringLit, count}
 import Helpers.*
 
 @experimental
 class TrustChainQuery extends QueryBenchmark {
   override def name = "trustchain"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type Friends = (person1: String, person2: String)
@@ -76,7 +76,8 @@ class TrustChainQuery extends QueryBenchmark {
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val baseFriends = tyqlDB.friends
 
-    val (trust, friends) = unrestrictedBagFix((baseFriends, baseFriends))((trust, friends) => {
+    val tyqlFix = if set then unrestrictedFix((baseFriends, baseFriends)) else unrestrictedBagFix((baseFriends, baseFriends))
+    val (trust, friends) = tyqlFix((trust, friends) => {
       val mutualTrustResult = friends.flatMap(f =>
         trust
           .filter(mt => mt.person2 == f.person1)

@@ -19,6 +19,7 @@ import Helpers.*
 class CompanyControlQuery extends QueryBenchmark {
   override def name = "cc"
   override def set = true
+  if !set then ???
 
   // TYQL data model
   type Shares = (byC: String, of: String, percent: Int)

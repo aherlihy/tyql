@@ -17,7 +17,7 @@ import tyql.Expr.max
 @experimental
 class BOMQuery extends QueryBenchmark {
   override def name = "bom"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type Assbl = (part: String, spart: String)
@@ -81,15 +81,27 @@ class BOMQuery extends QueryBenchmark {
   // Execute queries
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val waitFor = tyqlDB.basic
-    val query = waitFor.unrestrictedBagFix(waitFor =>
-        tyqlDB.assbl.flatMap(assbl =>
-          waitFor
-            .filter(wf => assbl.spart == wf.part)
-            .map(wf => (part = assbl.part, days = wf.days).toRow)))
-      .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
-      .groupBySource(wf => (part = wf._1.part).toRow)
-      .sort(_.part, Ord.ASC)
-      .sort(_.max, Ord.ASC)
+    val query =
+      if (set)
+        waitFor.unrestrictedBagFix(waitFor =>
+          tyqlDB.assbl.flatMap(assbl =>
+            waitFor
+              .filter(wf => assbl.spart == wf.part)
+              .map(wf => (part = assbl.part, days = wf.days).toRow)))
+        .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
+        .groupBySource(wf => (part = wf._1.part).toRow)
+        .sort(_.part, Ord.ASC)
+        .sort(_.max, Ord.ASC)
+      else
+        waitFor.unrestrictedFix(waitFor =>
+          tyqlDB.assbl.flatMap(assbl =>
+            waitFor
+              .filter(wf => assbl.spart == wf.part)
+              .map(wf => (part = assbl.part, days = wf.days).toRow)))
+        .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
+        .groupBySource(wf => (part = wf._1.part).toRow)
+        .sort(_.part, Ord.ASC)
+        .sort(_.max, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)

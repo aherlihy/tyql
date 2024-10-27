@@ -19,6 +19,7 @@ import Helpers.*
 class CSPAQuery extends QueryBenchmark {
   override def name = "cspa"
   override def set = true
+  if !set then ???
 
   // TYQL data model
   type Location = (p1: Int, p2: Int)

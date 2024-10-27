@@ -19,6 +19,7 @@ import Helpers.*
 class EvenOddQuery extends QueryBenchmark {
   override def name = "evenodd"
   override def set = true
+  if !set then ???
 
   // TYQL data model
   type Number = (id: Int, value: Int)

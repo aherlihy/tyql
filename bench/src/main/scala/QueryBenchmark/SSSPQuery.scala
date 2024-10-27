@@ -18,6 +18,7 @@ import tyql.Expr.min
 class SSSPQuery extends QueryBenchmark {
   override def name = "sssp"
   override def set = true
+  if !set then ???
 
   // TYQL data model
   type WeightedEdge = (src: Int, dst: Int, cost: Int)

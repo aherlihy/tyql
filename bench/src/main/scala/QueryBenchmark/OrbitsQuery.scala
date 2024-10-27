@@ -17,7 +17,7 @@ import tyql.Expr.max
 @experimental
 class OrbitsQuery extends QueryBenchmark {
   override def name = "orbits"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type Orbits = (x: String, y: String)
@@ -70,13 +70,24 @@ class OrbitsQuery extends QueryBenchmark {
   // Execute queries
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.base
-    val orbits = base.unrestrictedBagFix(orbits =>
-      orbits.flatMap(p =>
-        orbits
-          .filter(e => p.y == e.x)
-          .map(e => (x = p.x, y = e.y).toRow)
-      )
-    )
+    val orbits =
+      if (set)
+        base.unrestrictedBagFix(orbits =>
+          orbits.flatMap(p =>
+            orbits
+              .filter(e => p.y == e.x)
+              .map(e => (x = p.x, y = e.y).toRow)
+          )
+        )
+      else
+        base.unrestrictedFix(orbits =>
+          orbits.flatMap(p =>
+            orbits
+              .filter(e => p.y == e.x)
+              .map(e => (x = p.x, y = e.y).toRow)
+          )
+        )
+
 
     val query = orbits match
       case Query.MultiRecursive(_, _, orbitsRef) =>

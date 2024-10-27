@@ -17,7 +17,7 @@ import tyql.Expr.{IntLit, min}
 @experimental
 class DataflowQuery extends QueryBenchmark {
   override def name = "dataflow"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type Instruction = (opN: String, varN: String)
@@ -86,17 +86,31 @@ class DataflowQuery extends QueryBenchmark {
 
   // Execute queries
   def executeTyQL(ddb: DuckDBBackend): Unit =
-    val query = tyqlDB.jumpOp
-      .unrestrictedBagFix(flow =>
-        flow.flatMap(f1 =>
-          flow.filter(f2 => f1.b == f2.a).map(f2 =>
-            (a = f1.a, b = f2.b).toRow)))
-      .flatMap(f =>
-        tyqlDB.readOp.flatMap(r =>
-          tyqlDB.writeOp
-            .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
-            .map(w => (r = r.opN, w = w.opN).toRow)))
-      .sort(_.r, Ord.ASC).sort(_.w, Ord.ASC)
+    val query =
+      if (set)
+        tyqlDB.jumpOp
+          .unrestrictedFix(flow =>
+            flow.flatMap(f1 =>
+              flow.filter(f2 => f1.b == f2.a).map(f2 =>
+                (a = f1.a, b = f2.b).toRow)))
+          .flatMap(f =>
+            tyqlDB.readOp.flatMap(r =>
+              tyqlDB.writeOp
+                .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
+                .map(w => (r = r.opN, w = w.opN).toRow)))
+          .sort(_.r, Ord.ASC).sort(_.w, Ord.ASC)
+      else
+        tyqlDB.jumpOp
+          .unrestrictedBagFix(flow =>
+            flow.flatMap(f1 =>
+              flow.filter(f2 => f1.b == f2.a).map(f2 =>
+                (a = f1.a, b = f2.b).toRow)))
+          .flatMap(f =>
+            tyqlDB.readOp.flatMap(r =>
+              tyqlDB.writeOp
+                .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
+                .map(w => (r = r.opN, w = w.opN).toRow)))
+          .sort(_.r, Ord.ASC).sort(_.w, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)

@@ -18,6 +18,7 @@ import tyql.Expr.{IntLit, min}
 class AndersensQuery extends QueryBenchmark {
   override def name = "andersens"
   override def set = true
+  if !set then ???
 
   // TYQL data model
   type Edge = (x: String, y: String)
