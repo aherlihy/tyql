@@ -373,7 +373,7 @@ class CBAQuery extends QueryBenchmark {
       }
 
     FixedPointQuery.scalaSQLSemiNaiveFOUR(set)(
-      db, (cba_delta1, cba_delta2, cba_delta3, cba_delta4), (cba_tmp1, cba_tmp2, cba_tmp3, cba_tmp4), (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
+      ddb, (cba_delta1, cba_delta2, cba_delta3, cba_delta4), (cba_tmp1, cba_tmp2, cba_tmp3, cba_tmp4), (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
     )(
       (toTuple1, toTuple1, toTuple2, toTuple2)
     )(

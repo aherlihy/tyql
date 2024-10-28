@@ -143,7 +143,7 @@ class TOOrbitsQuery extends QueryBenchmark {
       } yield (p.x, e.y)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, orbits_delta, orbits_tmp, orbits_derived
+      ddb, orbits_delta, orbits_tmp, orbits_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[OrbitsSS] => query.Select[Any, Any]])
 
     //    orbits_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres

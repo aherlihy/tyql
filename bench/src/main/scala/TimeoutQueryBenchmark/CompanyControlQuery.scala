@@ -140,37 +140,40 @@ class TOCompanyControlQuery extends QueryBenchmark {
     val initBase = () =>
       (cc_shares.select.map(c => (c.byC, c.of, c.percent)), cc_control.select.map(c => (c.com1, c.com2)))
 
+    def gt50(v1: Expr[Int]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 > 50" }
     var it = 0
-    val fixFn: ((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[String], Expr[String], Expr[Int]), (String, String, Int)], query.Select[(Expr[String], Expr[String]), (String, String)]) =
+    val fixFn: ((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (String, String) =
       recur =>
         val (cshares, control) = recur
         val (csharesAcc, controlAcc) = if it == 0 then (cc_delta1, cc_delta2) else (cc_derived1, cc_derived2)
         it += 1
-        val fixAgg = db.runRaw[(String, String, Int)](
-          "SELECT ref22.com1 as byC, ref23.of as of, SUM(ref23.percent) as percent " +
+        val csharesRecur = "SELECT ref22.com1 as byC, ref23.of as of, SUM(ref23.percent) as percent " +
          s"FROM ${ScalaSQLTable.name(controlAcc)} as ref22, ${ScalaSQLTable.name(cshares)} as ref23 " +
            "WHERE ref23.byC = ref22.com2 " +
            "GROUP BY ref22.com1, ref23.of "
-        )
-        val csharesRecur = if (fixAgg.isEmpty) // workaround scalasql doesn't allow empty values
-          cc_empty_shares.select.map(c => (c.byC, c.of, c.percent))
-        else
-          db.values(fixAgg)
+//        )
+//        val csharesRecur = if (fixAgg.isEmpty) // workaround scalasql doesn't allow empty values
+//          cc_empty_shares.select.map(c => (c.byC, c.of, c.percent))
+//        else
+//          db.values(fixAgg)
 
-        val controlRecur = csharesAcc.select
-          .filter(s => s.percent > 50)
-          .map(s =>(s.byC, s.of))
+        val controlRecur = s"SELECT ref24.byC as com1, ref24.of as com2 " +
+          s"FROM ${ScalaSQLTable.name(csharesAcc)} as ref24 " +
+          s"WHERE ref24.percent > 50"
+//          csharesAcc.select
+//          .filter(s => gt50(s.percent))
+//          .map(s =>(s.byC, s.of))
 
         (csharesRecur, controlRecur)
 
 
-    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      db, (cc_delta1, cc_delta2), (cc_tmp1, cc_tmp2), (cc_derived1, cc_derived2)
+    FixedPointQuery.agg_scalaSQLSemiNaiveTWO(set)(
+      ddb, (cc_delta1, cc_delta2), (cc_tmp1, cc_tmp2), (cc_derived1, cc_derived2)
     )(
       ((c: SharesSS[?]) => (c.byC, c.of, c.percent), (c: ResultSS[?]) => (c.com1, c.com2))
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn)
 
     val result = cc_derived2.select.sortBy(_.com1).sortBy(_.com2)
     resultScalaSQL = db.run(result)

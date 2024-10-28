@@ -149,7 +149,7 @@ class EvenOddQuery extends QueryBenchmark {
         (evenResult, oddResult)
 
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      db, (evenodd_delta1, evenodd_delta2), (evenodd_tmp1, evenodd_tmp2), (evenodd_derived1, evenodd_derived2)
+      ddb, (evenodd_delta1, evenodd_delta2), (evenodd_tmp1, evenodd_tmp2), (evenodd_derived1, evenodd_derived2)
     )(
       (toTuple, toTuple)
     )(

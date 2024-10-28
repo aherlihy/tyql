@@ -155,7 +155,7 @@ class TODataflowQuery extends QueryBenchmark {
       } yield (f1.a, f2.b)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, dataflow_delta, dataflow_tmp, dataflow_derived
+      ddb, dataflow_delta, dataflow_tmp, dataflow_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[JumpSS] => query.Select[Any, Any]])
 
 // Multi-join not working

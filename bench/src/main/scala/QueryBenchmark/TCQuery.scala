@@ -132,7 +132,7 @@ class TCQuery extends QueryBenchmark {
 
       res
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, tc_delta, tc_tmp, tc_derived
+      ddb, tc_delta, tc_tmp, tc_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]])
 
 

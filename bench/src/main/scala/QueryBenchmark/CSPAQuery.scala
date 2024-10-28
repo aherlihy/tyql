@@ -285,7 +285,7 @@ class CSPAQuery extends QueryBenchmark {
       }
 
     FixedPointQuery.scalaSQLSemiNaiveTHREE(set)(
-      db, (cspa_delta1, cspa_delta2, cspa_delta3), (cspa_tmp1, cspa_tmp2, cspa_tmp3), (cspa_derived1, cspa_derived2, cspa_derived3)
+      ddb, (cspa_delta1, cspa_delta2, cspa_delta3), (cspa_tmp1, cspa_tmp2, cspa_tmp3), (cspa_derived1, cspa_derived2, cspa_derived3)
     )(
       (toTuple, toTuple, toTuple)
     )(

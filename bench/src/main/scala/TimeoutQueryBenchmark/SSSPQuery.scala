@@ -128,7 +128,7 @@ class TOSSSPQuery extends QueryBenchmark {
       } yield (edge.dst, s.cost + edge.cost)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, sssp_delta, sssp_tmp, sssp_derived
+      ddb, sssp_delta, sssp_tmp, sssp_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]])
 
     //    sssp_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres

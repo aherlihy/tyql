@@ -145,7 +145,7 @@ class AndersensQuery extends QueryBenchmark {
 
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, andersens_delta, andersens_tmp, andersens_derived
+      ddb, andersens_delta, andersens_tmp, andersens_derived
     )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]])
 
     val result = andersens_derived.select.sortBy(_.y).sortBy(_.x)

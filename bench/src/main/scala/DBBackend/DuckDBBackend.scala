@@ -51,6 +51,11 @@ class DuckDBBackend(timeout: Int = -1) {
     lastStmt.setQueryTimeout(timeout)
     lastStmt.executeQuery(sqlString)
 
+  def runUpdate(sqlString: String): Unit =
+    lastStmt = connection.createStatement()
+    lastStmt.setQueryTimeout(timeout)
+    lastStmt.executeUpdate(sqlString)
+
   def cancelStmt(): Unit =
     if lastStmt != null then lastStmt.cancel()
 

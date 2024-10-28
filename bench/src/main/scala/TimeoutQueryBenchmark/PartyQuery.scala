@@ -155,7 +155,7 @@ class TOPartyQuery extends QueryBenchmark {
       (attend, cntFriends)
 
     var it = 0
-    val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[CountsSS])) => (query.Select[(Expr[String]), (String)], query.Select[(Expr[String], Expr[Int]), (String, Int)]) = {
+    val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[CountsSS])) => (String, String) = {
       recur =>
         val (attend, cntFriends) = recur
         val (attendAcc, cntFriendsAcc) = if it == 0 then (party_delta1, party_delta2) else (party_derived1, party_derived2)
@@ -165,31 +165,22 @@ class TOPartyQuery extends QueryBenchmark {
 //        println(s"RES input:\n\tattend : ${db.runRaw[(String)](s"SELECT * FROM ${ScalaSQLTable.name(attend)}").map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.runRaw[(String, Int)](s"SELECT * FROM ${ScalaSQLTable.name(cntFriends)}").map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
 //        println(s"DER input:\n\tattend : ${db.runRaw[(String)](s"SELECT * FROM ${ScalaSQLTable.name(attendAcc)}").map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.runRaw[(String, Int)](s"SELECT * FROM ${ScalaSQLTable.name(cntFriendsAcc)}").map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
 
-        val recurAttend = for {
-          cf <- cntFriendsAcc.select
-          if cf.nCount > 2
-        } yield (cf.fName)
+        val recurAttend = s"SELECT f.fName as person FROM ${ScalaSQLTable.name(cntFriendsAcc)} as f WHERE f.nCount > 2"
 
-        val fixAgg = db.runRaw[(String, Int)](
-          s"SELECT f.pName as fName, COUNT(f.fName) as count FROM ${ScalaSQLTable.name(party_friends)} as f, ${ScalaSQLTable.name(attendAcc)} as a WHERE a.person = f.fName GROUP BY f.pName;"
-        )
-        val recurFriends = if (fixAgg.isEmpty) // workaround scalasql doesn't allow empty values
-          party_counts.select.map(c => (c.fName, c.nCount))
-        else
-          db.values(fixAgg)
+        val recurFriends = s"SELECT f.pName as fName, COUNT(f.fName) as count FROM ${ScalaSQLTable.name(party_friends)} as f, ${ScalaSQLTable.name(attendAcc)} as a WHERE a.person = f.fName GROUP BY f.pName"
 
 //        println(s"output:\n\tattend: ${db.run(recurAttend).map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.run(recurFriends).map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
 
         (recurAttend, recurFriends)
     }
 
-    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      db, (party_delta1, party_delta2), (party_tmp1, party_tmp2), (party_derived1, party_derived2)
+    FixedPointQuery.agg_scalaSQLSemiNaiveTWO(set)(
+      ddb, (party_delta1, party_delta2), (party_tmp1, party_tmp2), (party_derived1, party_derived2)
     )(
       (toTuple1.asInstanceOf[ResultSS[?] => Tuple], toTuple2)
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[ResultSS], ScalaSQLTable[CountsSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn)
 
     val result = party_derived1.select.distinct.sortBy(_.person)
     resultScalaSQL = db.run(result)

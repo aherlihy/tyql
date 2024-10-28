@@ -140,7 +140,7 @@ class ASPSQuery extends QueryBenchmark {
         db.values(fixAgg)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, asps_delta, asps_tmp, asps_derived
+      ddb, asps_delta, asps_tmp, asps_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WEdgeSS] => query.Select[Any, Any]])
 
     //  workaround since groupBy does not work with ScalaSQL + postgres

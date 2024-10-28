@@ -99,6 +99,7 @@ class TOAncestryQuery extends QueryBenchmark {
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: ResultSS[?]) => (c.name, c.gen)
+    def add1(v1: Expr[Int]): Expr[Int] = Expr { implicit ctx => sql"$v1 + 1" }
 
     val initBase = () =>
       ancestry_parents.select.filter(p => p.parent === "Alice").map(e => (e.child, Expr(1)))
@@ -107,10 +108,10 @@ class TOAncestryQuery extends QueryBenchmark {
       for {
         base <- parents.select
         parents <- ancestry_parents.join(base.name === _.parent)
-      } yield (parents.child, base.gen + 1)
+      } yield (parents.child, add1(base.gen))
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, ancestry_delta, ancestry_tmp, ancestry_derived
+      ddb, ancestry_delta, ancestry_tmp, ancestry_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
 
     val result = ancestry_derived.select

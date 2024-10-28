@@ -130,6 +130,9 @@ class TOEvenOddQuery extends QueryBenchmark {
         .map(n => ( n.value, Expr("odd")))
       (even, odd)
 
+    def add1(v1: Expr[Int]): Expr[Int] = Expr { implicit ctx => sql"$v1 + 1" }
+    def even1(v1: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"'even'" }
+    def odd1(v1: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"'odd'" }
     var it = 0
     val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)]) =
       recur =>
@@ -143,19 +146,19 @@ class TOEvenOddQuery extends QueryBenchmark {
 
         val evenResult = for {
           n <- evenodd_numbers.select
-          o <- oddAcc.join(n.value === _.value + 1)
-        } yield (n.value, Expr("even"))
+          o <- oddAcc.join(o1 => n.value === add1(o1.value))
+        } yield (n.value, even1(n.value))
 
         val oddResult = for {
           n <- evenodd_numbers.select
-          o <- evenAcc.join(n.value === _.value + 1)
-        } yield (n.value, Expr("odd"))
+          o <- evenAcc.join(o1 => n.value === add1(o1.value))
+        } yield (n.value, odd1(n.value))
 
 //        println(s"output:\n\teven: ${db.run(evenResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\toddResult: ${db.run(oddResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         (evenResult, oddResult)
 
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      db, (evenodd_delta1, evenodd_delta2), (evenodd_tmp1, evenodd_tmp2), (evenodd_derived1, evenodd_derived2)
+      ddb, (evenodd_delta1, evenodd_delta2), (evenodd_tmp1, evenodd_tmp2), (evenodd_derived1, evenodd_derived2)
     )(
       (toTuple, toTuple)
     )(

@@ -179,7 +179,7 @@ class PartyQuery extends QueryBenchmark {
     }
 
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      db, (party_delta1, party_delta2), (party_tmp1, party_tmp2), (party_derived1, party_derived2)
+      ddb, (party_delta1, party_delta2), (party_tmp1, party_tmp2), (party_derived1, party_derived2)
     )(
       (toTuple1.asInstanceOf[ResultSS[?] => Tuple], toTuple2)
     )(

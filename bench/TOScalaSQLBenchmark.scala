@@ -38,22 +38,22 @@ class TOScalaSQLBenchmark {
 
   var duckDB = DuckDBBackend(timeout = timeoutMillis / 1000)
   val benchmarks = Map(
-    "tc" -> TCQuery(),
-    "sssp" -> SSSPQuery(),
-    "ancestry" -> AncestryQuery(),
-    "andersens" -> AndersensQuery(),
-    "asps" -> ASPSQuery(),
-    "bom" -> BOMQuery(),
-    "orbits" -> OrbitsQuery(),
-    "dataflow" -> DataflowQuery(),
-    "evenodd" -> EvenOddQuery(),
-    "cc" -> CompanyControlQuery(),
-    "pointstocount" -> PointsToCountQuery(),
-    "javapointsto" -> JavaPointsTo(),
-    "trustchain" -> TrustChainQuery(),
-    "party" -> PartyQuery(),
-    "cspa" -> CSPAQuery(),
-    "cba" -> CBAQuery(),
+    "tc" -> TOTCQuery(),
+    "sssp" -> TOSSSPQuery(),
+    "ancestry" -> TOAncestryQuery(),
+    "andersens" -> TOAndersensQuery(),
+    "asps" -> TOASPSQuery(),
+    "bom" -> TOBOMQuery(),
+    "orbits" -> TOOrbitsQuery(),
+    "dataflow" -> TODataflowQuery(),
+    "evenodd" -> TOEvenOddQuery(),
+    "cc" -> TOCompanyControlQuery(),
+    "pointstocount" -> TOPointsToCountQuery(),
+    "javapointsto" -> TOJavaPointsTo(),
+    "trustchain" -> TOTrustChainQuery(),
+    "party" -> TOPartyQuery(),
+    "cspa" -> TOCSPAQuery(),
+    "cba" -> TOCBAQuery(),
   )
 
 

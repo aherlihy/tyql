@@ -105,7 +105,7 @@ class AncestryQuery extends QueryBenchmark {
       } yield (parents.child, base.gen + 1)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, ancestry_delta, ancestry_tmp, ancestry_derived
+      ddb, ancestry_delta, ancestry_tmp, ancestry_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
 
     val result = ancestry_derived.select

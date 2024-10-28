@@ -137,18 +137,19 @@ class TOASPSQuery extends QueryBenchmark {
       val initAgg = db.runRaw[(Int, Int, Int)](s"SELECT s.src, s.dst, MIN(s.cost) FROM ${ScalaSQLTable.name(asps_edge)} as s GROUP BY s.src, s.dst;")
       db.values(initAgg)
 
-    val fixFn: ScalaSQLTable[WEdgeSS] => query.Select[(Expr[Int], Expr[Int], Expr[Int]), (Int, Int, Int)] = path =>
-      val fixAgg = db.runRaw[(Int, Int, Int)](
-        s"SELECT path1.src, path2.dst, MIN(path1.cost + path2.cost) FROM ${ScalaSQLTable.name(path)} path1, ${ScalaSQLTable.name(path)} path2 WHERE path1.dst = path2.src GROUP BY path1.src, path2.dst;"
-      )
-      if (fixAgg.isEmpty) // workaround scalasql doesn't allow empty values
-         asps_tmp.select.map(c => (c.src, c.dst, c.cost))
-      else
-        db.values(fixAgg)
+    val fixFn: ScalaSQLTable[WEdgeSS] => String = path =>
+      s"SELECT path1.src, path2.dst, MIN(path1.cost + path2.cost) FROM ${ScalaSQLTable.name(path)} path1, ${ScalaSQLTable.name(path)} path2 WHERE path1.dst = path2.src GROUP BY path1.src, path2.dst"
+//      val fixAgg = db.runRaw[(Int, Int, Int)](
+//        s"SELECT path1.src, path2.dst, MIN(path1.cost + path2.cost) FROM ${ScalaSQLTable.name(path)} path1, ${ScalaSQLTable.name(path)} path2 WHERE path1.dst = path2.src GROUP BY path1.src, path2.dst;"
+//      )
+//      if (fixAgg.isEmpty) // workaround scalasql doesn't allow empty values
+//         asps_tmp.select.map(c => (c.src, c.dst, c.cost))
+//      else
+//        db.values(fixAgg)
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
-      db, asps_delta, asps_tmp, asps_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WEdgeSS] => query.Select[Any, Any]])
+    FixedPointQuery.agg_scalaSQLSemiNaive(set)(
+      ddb, asps_delta, asps_tmp, asps_derived
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WEdgeSS] => String])
 
     //  workaround since groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(s"SELECT s.src as src, s.dst as dst, MIN(s.cost) as cost " +

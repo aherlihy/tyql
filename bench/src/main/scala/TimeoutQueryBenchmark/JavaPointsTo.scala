@@ -230,7 +230,7 @@ class TOJavaPointsTo extends QueryBenchmark {
         (vpt, hpt)
 
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      db, (javapointsto_delta1, javapointsto_delta2), (javapointsto_tmp1, javapointsto_tmp2), (javapointsto_derived1, javapointsto_derived2)
+      ddb, (javapointsto_delta1, javapointsto_delta2), (javapointsto_tmp1, javapointsto_tmp2), (javapointsto_derived1, javapointsto_derived2)
     )(
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))
     )(

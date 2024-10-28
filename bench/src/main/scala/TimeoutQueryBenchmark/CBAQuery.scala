@@ -325,6 +325,8 @@ class TOCBAQuery extends QueryBenchmark {
       val ctrlVarBase = cba_baseCtrl.select.map(f => (f.x, f.y))
       (dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)
     }
+    def eqVar(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Var'" }
+    def eqApp(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'App'" }
 
     var it = 0
     val fixFn: ((ScalaSQLTable[DataSS], ScalaSQLTable[DataSS], ScalaSQLTable[CtrlSS], ScalaSQLTable[CtrlSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)]) =
@@ -340,7 +342,7 @@ class TOCBAQuery extends QueryBenchmark {
           for
             t <- cba_term.select
             dv <- dataVarAcc.crossJoin()
-            if t.y === "Var" && t.z === dv.x
+            if eqVar(t.y) && t.z === dv.x
           yield (t.x, dv.y)
 
         val dataTerm2 =
@@ -350,7 +352,7 @@ class TOCBAQuery extends QueryBenchmark {
             ct <- ctrlTerm.crossJoin()
             abs <- cba_abs.crossJoin()
             app <- cba_app.crossJoin()
-            if t.y === "App" && t.z === app.x && dt.x === abs.z && ct.x === app.y && ct.y === abs.x
+            if eqApp(t.y) && t.z === app.x && dt.x === abs.z && ct.x === app.y && ct.y === abs.x
           yield (t.x, dt.y)
 
         val dataVarResult =
@@ -366,7 +368,7 @@ class TOCBAQuery extends QueryBenchmark {
           for
             t <- cba_term.select
             cv <- ctrlVarAcc.crossJoin()
-            if t.y === "Var" && t.z === cv.x
+            if eqVar(t.y) && t.z === cv.x
           yield (t.x, cv.y)
         val controlTerm2 =
           for
@@ -375,7 +377,7 @@ class TOCBAQuery extends QueryBenchmark {
             ct2 <- ctrlTerm.crossJoin()
             abs <- cba_abs.crossJoin()
             app <- cba_app.crossJoin()
-            if t.y === "App" && t.z === app.x && ct1.x === abs.z && ct2.x === app.y && ct2.y === abs.x
+            if eqApp(t.y) && t.z === app.x && ct1.x === abs.z && ct2.x === app.y && ct2.y === abs.x
           yield (t.x, ct1.y)
 
         val controlVarResult =
@@ -394,7 +396,7 @@ class TOCBAQuery extends QueryBenchmark {
       }
 
     FixedPointQuery.scalaSQLSemiNaiveFOUR(set)(
-      db, (cba_delta1, cba_delta2, cba_delta3, cba_delta4), (cba_tmp1, cba_tmp2, cba_tmp3, cba_tmp4), (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
+      ddb, (cba_delta1, cba_delta2, cba_delta3, cba_delta4), (cba_tmp1, cba_tmp2, cba_tmp3, cba_tmp4), (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
     )(
       (toTuple1, toTuple1, toTuple2, toTuple2)
     )(
