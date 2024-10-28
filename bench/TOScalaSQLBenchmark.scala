@@ -32,6 +32,7 @@ class TOScalaSQLBenchmark {
         throw e
       //        println(s"Benchmark '$benchmarkName' encountered an exception: ${e.getMessage}")
     } finally {
+      duckDB.cancelStmt()
       executor.shutdownNow() // Ensure cleanup
     }
   }

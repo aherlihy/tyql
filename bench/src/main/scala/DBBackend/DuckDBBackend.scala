@@ -57,7 +57,11 @@ class DuckDBBackend(timeout: Int = -1) {
     lastStmt.executeUpdate(sqlString)
 
   def cancelStmt(): Unit =
-    if lastStmt != null then lastStmt.cancel()
+    try {
+      if lastStmt != null then lastStmt.cancel()
+    } catch {
+      case e: Exception => println(s"Error cancelling statement: $e")
+    }
 
   def close(): Unit =
     connection.close()

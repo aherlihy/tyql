@@ -100,9 +100,11 @@ class TOAncestryQuery extends QueryBenchmark {
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: ResultSS[?]) => (c.name, c.gen)
     def add1(v1: Expr[Int]): Expr[Int] = Expr { implicit ctx => sql"$v1 + 1" }
+    def eqAlice(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Alice'" }
+    def get1(): Expr[Int] = Expr { implicit ctx => sql"1" }
 
     val initBase = () =>
-      ancestry_parents.select.filter(p => p.parent === "Alice").map(e => (e.child, Expr(1)))
+      ancestry_parents.select.filter(p => eqAlice(p.parent)).map(e => (e.child, get1()))
 
     val fixFn: ScalaSQLTable[ResultSS] => query.Select[(Expr[String], Expr[Int]), (String, Int)] = parents =>
       for {

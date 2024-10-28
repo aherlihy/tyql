@@ -114,12 +114,13 @@ class TOTCQuery extends QueryBenchmark {
     def listAppend(v: Expr[Int], lst: Expr[String]): Expr[String] = Expr { implicit ctx => sql"list_append($lst, $v)" }
     def listContains(v: Expr[Int], lst: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"list_contains($lst, $v)" }
     def listLength(lst: Expr[String]): Expr[Int] = Expr { implicit ctx => sql"length($lst)" }
+    def eq1(v: Expr[Int]): Expr[Boolean] = Expr { implicit ctx => sql"$v = 1" }
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: ResultEdgeSS[?]) => (c.startNode, c.endNode, c.path)
 
     val initBase = () =>
       tc_edge.select
-        .filter(_.x === Expr(1))
+        .filter(t => eq1(t.x))
         .map(e => (e.x, e.y, initList(e.x, e.y)))
 
     var it = 0

@@ -307,6 +307,10 @@ class TOCBAQuery extends QueryBenchmark {
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    def eqVar(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Var'" }
+    def eqApp(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'App'" }
+    def eqLit(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Lit'" }
+    def eqAbs(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Abs'" }
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple1 = (c: DataSS[?]) => (c.x, c.y)
     val toTuple2 = (c: CtrlSS[?]) => (c.x, c.y)
@@ -315,18 +319,16 @@ class TOCBAQuery extends QueryBenchmark {
       val dataTermBase = for {
         t <- cba_term.select
         l <- cba_lits.crossJoin()
-        if l.x === t.z && t.y === Expr("Lit")
+        if l.x === t.z && eqLit(t.y)
       } yield (t.x, l.y)
 
       val dataVarBase = cba_baseData.select.map(f => (f.x, f.y))
 
-      val ctrlTermBase = cba_term.select.filter(t => t.y === Expr("Abs")).map(t => (t.x, t.z))
+      val ctrlTermBase = cba_term.select.filter(t => eqAbs(t.y)).map(t => (t.x, t.z))
 
       val ctrlVarBase = cba_baseCtrl.select.map(f => (f.x, f.y))
       (dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)
     }
-    def eqVar(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Var'" }
-    def eqApp(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'App'" }
 
     var it = 0
     val fixFn: ((ScalaSQLTable[DataSS], ScalaSQLTable[DataSS], ScalaSQLTable[CtrlSS], ScalaSQLTable[CtrlSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)]) =

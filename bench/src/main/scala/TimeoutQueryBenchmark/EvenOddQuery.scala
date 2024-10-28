@@ -118,21 +118,23 @@ class TOEvenOddQuery extends QueryBenchmark {
     resultCollections = odd.sortBy(_.value).sortBy(_.typ)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    def add1(v1: Expr[Int]): Expr[Int] = Expr { implicit ctx => sql"$v1 + 1" }
+    def even1(v1: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"'even'" }
+    def odd1(v1: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"'odd'" }
+    def eq0(v1: Expr[Int]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 0" }
+    def eq1(v1: Expr[Int]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 1" }
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: ResultSS[?]) => (c.value, c.typ)
 
     val initBase = () =>
       val even = evenodd_numbers.select
-        .filter(n => n.value === Expr(0))
-        .map(n => (n.value, Expr("even")))
+        .filter(n => eq0(n.value))
+        .map(n => (n.value, even1(n.value)))
       val odd = evenodd_numbers.select
-        .filter(n => n.value === Expr(1))
-        .map(n => ( n.value, Expr("odd")))
+        .filter(n => eq1(n.value))
+        .map(n => ( n.value, odd1(n.value)))
       (even, odd)
 
-    def add1(v1: Expr[Int]): Expr[Int] = Expr { implicit ctx => sql"$v1 + 1" }
-    def even1(v1: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"'even'" }
-    def odd1(v1: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"'odd'" }
     var it = 0
     val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)]) =
       recur =>

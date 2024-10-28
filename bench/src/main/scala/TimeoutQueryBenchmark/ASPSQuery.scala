@@ -134,8 +134,7 @@ class TOASPSQuery extends QueryBenchmark {
 
     val initBase = () =>
       //  workaround since groupBy does not work with ScalaSQL + postgres
-      val initAgg = db.runRaw[(Int, Int, Int)](s"SELECT s.src, s.dst, MIN(s.cost) FROM ${ScalaSQLTable.name(asps_edge)} as s GROUP BY s.src, s.dst;")
-      db.values(initAgg)
+      s"SELECT s.src, s.dst, MIN(s.cost) FROM ${ScalaSQLTable.name(asps_edge)} as s GROUP BY s.src, s.dst"
 
     val fixFn: ScalaSQLTable[WEdgeSS] => String = path =>
       s"SELECT path1.src, path2.dst, MIN(path1.cost + path2.cost) FROM ${ScalaSQLTable.name(path)} path1, ${ScalaSQLTable.name(path)} path2 WHERE path1.dst = path2.src GROUP BY path1.src, path2.dst"
@@ -149,7 +148,7 @@ class TOASPSQuery extends QueryBenchmark {
 
     FixedPointQuery.agg_scalaSQLSemiNaive(set)(
       ddb, asps_delta, asps_tmp, asps_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WEdgeSS] => String])
+    )(toTuple)(initBase)(fixFn)
 
     //  workaround since groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(s"SELECT s.src as src, s.dst as dst, MIN(s.cost) as cost " +

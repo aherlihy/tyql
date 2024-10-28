@@ -31,9 +31,8 @@ class TOTyQLBenchmark {
         throw e
               println(s"Benchmark '$benchmarkName' encountered an exception: ${e.getMessage}")
     } finally {
-      executor.shutdownNow() // Ensure cleanup
-//      duckDB.interrupt()
       duckDB.cancelStmt()
+      executor.shutdownNow() // Ensure cleanup
     }
   }
 
