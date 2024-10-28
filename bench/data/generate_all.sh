@@ -27,11 +27,27 @@ for dir in */; do
         mkdir -p "$target_dir"
     fi
 
+    acyclic=""
     if [[ "$dir" == *"sssp"* ]]; then
+        acyclic="--acyclic"
         base_csv_path="${target_dir}/base.csv"
         echo -e "dst,cost\n1,0" > "$base_csv_path"
         echo "    ---> Generated $base_csv_path"
     fi
+    base1=""
+    if [[ "$dir" == *"tc"* ]]; then
+        base1="--base1"
+    fi
+    baseName=""
+    if [[ "$dir" == *"ancestry"* ]]; then
+        baseName="--baseName"
+    fi
+    cba=""
+    if [[ "$dir" == *"cba"* ]]; then
+        cba="--cba"
+    fi
+
+
 
     # Check if 'csv_columns.txt' exists in the subdirectory
     csv_file="${dir}csv_columns.txt"
@@ -50,8 +66,8 @@ for dir in */; do
             # Change to the target directory and execute the Python command with `eval`
             (
                 cd "$target_dir"
-                echo "    python3 ../../generate.py --size $i --units $unit $line"
-                eval python3 ../../generate.py --size "$i" --units "$unit" $line
+                echo "    python3 ../../generate.py --size $i --units $unit $line $acyclic $base1 $baseName $cba"
+                eval python3 ../../generate.py --size "$i" --units "$unit" $line $acyclic $base1 $baseName $cba
             )
         done
     else

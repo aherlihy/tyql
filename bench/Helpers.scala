@@ -7,7 +7,7 @@ import java.io.{BufferedWriter, FileWriter}
 import java.sql.{ResultSet, ResultSetMetaData}
 
 object Helpers {
-  val currentData = "data"
+  val currentData = "data_1MB"
   val skip = Seq(
 //    "ancestry",
 //    "andersens",
@@ -22,7 +22,7 @@ object Helpers {
 //    "orbits",
 //    "party",
 //    "pointstocount",
-    "sssp",
+//    "sssp",
 //    "tc",
 //    "trustchain",
   )
