@@ -63,52 +63,26 @@ for dir in */; do
     all_equal=true
     differing_files=()
 
+
     # Compare files in pairs
     for ((i = 0; i < ${#existing_files[@]}; i++)); do
         for ((j = i + 1; j < ${#existing_files[@]}; j++)); do
             file1="${existing_files[i]}"
             file2="${existing_files[j]}"
+	    if diff -q "$out_dir/$file1" "$out_dir/$file2" > /dev/null; then
+		echo "    ok: $file1 $file2 same"
+	       continue  # Files are identical; skip further checks
+	    fi
+	    echo "  **diff NOT the same between $file1 and $file2"
 
-            # Find the first differing line between the files
-            diff_result=$(find_first_difference "$out_dir/$file1" "$out_dir/$file2")
-            if [ -n "$diff_result" ]; then
-                all_equal=false
-                differing_files+=("$file1|$file2|$diff_result")
-            fi
+	    diff_count=$(diff -U 0 "$out_dir/$file1" "$out_dir/$file2" | grep -c '^@') 
+            echo "  =$diff_count #"
+	   # Find the first differing line between the files
+           # diff_result=$(find_first_difference "$out_dir/$file1" "$out_dir/$file2")
+           #  if [ -n "$diff_result" ]; then
+           #     all_equal=false
+           #     differing_files+=("$file1|$file2|$diff_result")
+           # fi
         done
     done
-
-    # Output results based on comparison results
-    if $all_equal; then
-        echo "    ok"
-    else
-        if [ ${#differing_files[@]} -eq 3 ]; then
-            echo "    ALL FILES DIFFER IN $out_dir. Showing first differing line in each file:"
-            for diff in "${differing_files[@]}"; do
-                # Split the diff result using a custom delimiter
-                file1="${diff%%|*}"; rest="${diff#*|}"
-                file2="${rest%%|*}"; rest="${rest#*|}"
-                line_number="${rest%%|*}"; rest="${rest#*|}"
-                line1="${rest%%|*}"
-                line2="${rest#*|}"
-
-                echo "        $file1 (line $line_number): expected: $line1"
-                echo "        $file2 (line $line_number): actual: $line2"
-            done
-        else
-            # If only one file differs from two identical files
-            for diff in "${differing_files[@]}"; do
-                # Split the diff result using a custom delimiter
-                file1="${diff%%|*}"; rest="${diff#*|}"
-                file2="${rest%%|*}"; rest="${rest#*|}"
-                line_number="${rest%%|*}"; rest="${rest#*|}"
-                line1="${rest%%|*}"
-                line2="${rest#*|}"
-
-                echo "    $file2 DIFFERS FROM $file1 at line $line_number:"
-                echo "        $file1 expected: $line1"
-                echo "        $file2 actual: $line2"
-            done
-        fi
-    fi
 done

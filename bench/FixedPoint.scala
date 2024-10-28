@@ -8,6 +8,7 @@ object FixedPointQuery {
   val database = mutable.Map[String, Seq[constant]]()
   @annotation.tailrec
   final def fix[P](set: Boolean)(bases: Seq[P], acc: Seq[P])(fns: Seq[P] => Seq[P]): Seq[P] =
+    if (Thread.currentThread().isInterrupted) throw new Exception(s"timed out")
     val next = fns(bases)
     if (next.toSet.subsetOf(acc.toSet))
       if (set) then (acc ++ bases).distinct else acc ++ bases
@@ -17,6 +18,7 @@ object FixedPointQuery {
 
   @annotation.tailrec
   final def multiFix[T <: Tuple, S <: Seq[?]](set: Boolean, targetIdx: Int = 0)(bases: T, acc: T)(fns: (T, T) => T): T =
+    if (Thread.currentThread().isInterrupted) throw new Exception(s"timed out")
     val next = fns(bases, acc)
 
     val nextA = next.toList.asInstanceOf[List[S]]
@@ -43,6 +45,7 @@ object FixedPointQuery {
     (cmp: (ScalaSQLTable[P], ScalaSQLTable[P]) => Boolean)
     (copyTo: (next: ScalaSQLTable[P], acc: ScalaSQLTable[P]) => ScalaSQLTable[P])
   : ScalaSQLTable[P] =
+    if (Thread.currentThread().isInterrupted) throw new Exception(s"timed out")
 
     fns(bases, next)
 
@@ -112,6 +115,7 @@ object FixedPointQuery {
 //    println(s"BASE=${ScalaSQLTable.name(bases.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
 //    println(s"NEXT=${ScalaSQLTable.name(next.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
 //    println(s"ACC=${ScalaSQLTable.name(acc.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
+    if (Thread.currentThread().isInterrupted) throw new Exception(s"timed out")
     fns(bases, next)
 
     val isEmpty = cmp(next, acc)

@@ -9,9 +9,10 @@ import scalasql.{DbClient, Config}
 import scalasql.PostgresDialect._
 
 @experimental
-class DuckDBBackend {
+class DuckDBBackend(timeout: Int = -1) {
   var connection: Connection = null
   var scalaSqlDb: DbClient = null
+  var lastStmt: Statement = null
 
   def connect(): Unit =
     Class.forName("org.duckdb.DuckDBDriver")
@@ -20,6 +21,7 @@ class DuckDBBackend {
     scalaSqlDb = new scalasql.DbClient.Connection(connection, new Config{
       override def nameMapper(v: String) = v
       override def tableNameMapper(v: String) = s"${v.toLowerCase()}"
+      override def defaultQueryTimeoutSeconds: Int = timeout
     })
 
   def loadData(benchmark: String): Unit =
@@ -45,8 +47,12 @@ class DuckDBBackend {
     )
 
   def runQuery(sqlString: String): ResultSet =
-    val statement = connection.createStatement()
-    statement.executeQuery(sqlString)
+    lastStmt = connection.createStatement()
+    lastStmt.setQueryTimeout(timeout)
+    lastStmt.executeQuery(sqlString)
+
+  def cancelStmt(): Unit =
+    if lastStmt != null then lastStmt.cancel()
 
   def close(): Unit =
     connection.close()
