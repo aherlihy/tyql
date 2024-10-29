@@ -12,7 +12,7 @@ import Helpers.*
 @Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
-class CollectionsBenchmark {
+class CollectionsBenchmarkX {
   def run(bm: String) = benchmarks(bm).executeCollections()
   val benchmarks = Map(
     "tc" -> TCQuery(),

@@ -12,7 +12,7 @@ import Helpers.*
 @Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
-class ScalaSQLBenchmark {
+class ScalaSQLBenchmarkX {
   var duckDB = DuckDBBackend()
   val benchmarks = Map(
     "tc" -> TCQuery(),
