@@ -54,7 +54,7 @@ object Edge extends ScalaSQLTable[EdgeSS]
       statement.execute(ddl)
     )
 
-    statement.execute(s"COPY tc_edge FROM '${BuildInfo.baseDirectory}/bench/data/tc/edge.csv'")
+    statement.execute(s"COPY tc_edge FROM '${BuildInfo.baseDirectory}/bench/data/tc/data/edge.csv'")
 
     val resultSet: ResultSet = statement.executeQuery("SELECT * FROM tc_edge")
 
