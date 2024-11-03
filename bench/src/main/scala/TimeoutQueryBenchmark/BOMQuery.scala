@@ -121,7 +121,7 @@ class TOBOMQuery extends QueryBenchmark {
         )
       )
       .groupBy(_.part)
-      .mapValues(_.minBy(_.max))
+      .mapValues(_.maxBy(_.max))
       .values.toSeq
       .sortBy(_.part)
       .sortBy(_.max)
