@@ -17,7 +17,8 @@ object FixedPointQuery {
       if (set) then (acc ++ bases).distinct else acc ++ bases
     else
       val res = if (set) then (acc ++ bases).distinct else acc ++ bases
-      fix(set)(next, res)(fns)
+      val nextClean = next.filterNot(n => res.contains(n))
+      fix(set)(nextClean, res)(fns)
 
   @annotation.tailrec
   final def multiFix[T <: Tuple, S <: Seq[?]](set: Boolean, targetIdx: Int = 0)(bases: T, acc: T)(fns: (T, T) => T): T =
