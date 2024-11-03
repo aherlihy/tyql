@@ -39,8 +39,10 @@ object FixedPointQuery {
       res
     else
       val combo = accA.zip(basesA).map((a: S, b: S) => if (set) then (a ++ b).distinct else a ++ b)
-      val res = Tuple.fromArray(combo.toArray).asInstanceOf[T]
-      multiFix(set)(next, res)(fns)
+      val newAcc = Tuple.fromArray(combo.toArray).asInstanceOf[T]
+      val nextClean = nextA.zip(combo).map((n, r) => n.filterNot(n => r.contains(n)))
+      val newNext = Tuple.fromArray(nextClean.toArray).asInstanceOf[T]
+      multiFix(set)(newNext, newAcc)(fns)
 
   @annotation.tailrec
   final def scalaSQLFix[P[_[_]]]
@@ -123,7 +125,7 @@ object FixedPointQuery {
     (bases: T, next: T, acc: T)
     (fns: (T, T) => Unit)
     (cmp: (T, T) => Boolean)
-    (copyTo: (T, T) => T)
+    (copyTo: (T, T, T) => (T, T))
   : T = {
 //    println(s"----- start multifix ------")
 //    println(s"BASE=${ScalaSQLTable.name(bases.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
@@ -134,11 +136,10 @@ object FixedPointQuery {
 
     val isEmpty = cmp(next, acc)
     if (isEmpty)
-      copyTo(bases, acc)
+      copyTo(bases, acc, next)
       acc
     else
-      val newNext = copyTo(bases, acc)
-      val newBase = next
+      val (newNext, newBase) = copyTo(bases, acc, next)
       scalaSQLMultiFix(newBase, newNext, acc)(fns)(cmp)(copyTo)
   }
 
@@ -199,7 +200,7 @@ object FixedPointQuery {
       ddb.runUpdate(sqlString2)
     }
 
-    val copyInto: (Tables, Tables) => Tables = (base, acc) => {
+    val copyInto: (Tables, Tables, Tables) => (Tables, Tables) = (base, acc, next) => {
       val tmp = (s"${ScalaSQLTable.name(base._1)}_tmp", s"${ScalaSQLTable.name(base._2)}_tmp")
       if (set)
         ddb.runUpdate(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
@@ -218,7 +219,20 @@ object FixedPointQuery {
       else
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${ScalaSQLTable.name(base._1)})")
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${ScalaSQLTable.name(base._2)})")
-      base
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._1} (SELECT * FROM ${ScalaSQLTable.name(next._1)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._1)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._1)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._1)} (SELECT * FROM ${tmp._1})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._1}")
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._2} AS SELECT * FROM ${ScalaSQLTable.name(base._2)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._2} (SELECT * FROM ${ScalaSQLTable.name(next._2)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._2)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._2)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._2)} (SELECT * FROM ${tmp._2})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._2}")
+
+      (base, next)
     }
 
     scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
@@ -295,7 +309,7 @@ object FixedPointQuery {
       ddb.runUpdate(sqlString3)
     }
 
-    val copyInto: (Tables, Tables) => Tables = (base, acc) => {
+    val copyInto: (Tables, Tables, Tables) => (Tables, Tables) = (base, acc, next) => {
       val tmp = (s"${ScalaSQLTable.name(base._1)}_tmp", s"${ScalaSQLTable.name(base._2)}_tmp", s"${ScalaSQLTable.name(base._3)}_tmp")
       if (set)
         ddb.runUpdate(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
@@ -321,7 +335,26 @@ object FixedPointQuery {
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${ScalaSQLTable.name(base._1)})")
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${ScalaSQLTable.name(base._2)})")
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._3)} (SELECT * FROM ${ScalaSQLTable.name(base._3)})")
-      base
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._1} (SELECT * FROM ${ScalaSQLTable.name(next._1)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._1)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._1)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._1)} (SELECT * FROM ${tmp._1})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._1}")
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._2} AS SELECT * FROM ${ScalaSQLTable.name(base._2)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._2} (SELECT * FROM ${ScalaSQLTable.name(next._2)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._2)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._2)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._2)} (SELECT * FROM ${tmp._2})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._2}")
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._3} AS SELECT * FROM ${ScalaSQLTable.name(base._3)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._3} (SELECT * FROM ${ScalaSQLTable.name(next._3)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._3)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._3)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._3)} (SELECT * FROM ${tmp._3})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._3}")
+
+      (base, next)
     }
 
     scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
@@ -421,7 +454,7 @@ object FixedPointQuery {
       ddb.runUpdate(sqlString4)
     }
 
-    val copyInto: (Tables, Tables) => Tables = (base, acc) => {
+    val copyInto: (Tables, Tables, Tables) => (Tables, Tables) = (base, acc, next) => {
       val tmp = (s"${ScalaSQLTable.name(base._1)}_tmp", s"${ScalaSQLTable.name(base._2)}_tmp", s"${ScalaSQLTable.name(base._3)}_tmp", s"${ScalaSQLTable.name(base._4)}_tmp")
       if (set)
         ddb.runUpdate(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
@@ -456,7 +489,31 @@ object FixedPointQuery {
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${ScalaSQLTable.name(base._2)})")
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._3)} (SELECT * FROM ${ScalaSQLTable.name(base._3)})")
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._4)} (SELECT * FROM ${ScalaSQLTable.name(base._4)})")
-      base
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._1} (SELECT * FROM ${ScalaSQLTable.name(next._1)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._1)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._1)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._1)} (SELECT * FROM ${tmp._1})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._1}")
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._2} AS SELECT * FROM ${ScalaSQLTable.name(base._2)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._2} (SELECT * FROM ${ScalaSQLTable.name(next._2)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._2)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._2)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._2)} (SELECT * FROM ${tmp._2})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._2}")
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._3} AS SELECT * FROM ${ScalaSQLTable.name(base._3)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._3} (SELECT * FROM ${ScalaSQLTable.name(next._3)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._3)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._3)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._3)} (SELECT * FROM ${tmp._3})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._3}")
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._4} AS SELECT * FROM ${ScalaSQLTable.name(base._4)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._4} (SELECT * FROM ${ScalaSQLTable.name(next._4)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._4)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._4)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._4)} (SELECT * FROM ${tmp._4})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._4}")
+      (base, next)
     }
 
     scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
@@ -499,6 +556,7 @@ object FixedPointQuery {
         ddb.runUpdate(s"DROP TABLE $tmp")
       else
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc)} (SELECT * FROM ${ScalaSQLTable.name(bases)})")
+
       ddb.runUpdate(s"CREATE TABLE $tmp AS SELECT * FROM ${ScalaSQLTable.name(bases)} LIMIT 0")
       ddb.runUpdate(s"INSERT INTO $tmp (${ScalaSQLTable.name(next)} EXCEPT ${ScalaSQLTable.name(acc)})")
       ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next)}")
@@ -560,7 +618,7 @@ object FixedPointQuery {
       val sqlString2 = s"INSERT INTO ${ScalaSQLTable.name(next._2)} ($query2)"
       ddb.runUpdate(sqlString2)
     }
-    val copyInto: (Tables, Tables) => Tables = (base, acc) => {
+    val copyInto: (Tables, Tables, Tables) => (Tables, Tables) = (base, acc, next) => {
       val tmp = (s"${ScalaSQLTable.name(base._1)}_tmp", s"${ScalaSQLTable.name(base._2)}_tmp")
       if (set)
         ddb.runUpdate(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
@@ -579,7 +637,20 @@ object FixedPointQuery {
       else
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._1)} (SELECT * FROM ${ScalaSQLTable.name(base._1)})")
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc._2)} (SELECT * FROM ${ScalaSQLTable.name(base._2)})")
-      base
+
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._1} AS SELECT * FROM ${ScalaSQLTable.name(base._1)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._1} (SELECT * FROM ${ScalaSQLTable.name(next._1)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._1)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._1)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._1)} (SELECT * FROM ${tmp._1})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._1}")
+
+      ddb.runUpdate(s"CREATE TABLE ${tmp._2} AS SELECT * FROM ${ScalaSQLTable.name(base._2)} LIMIT 0")
+      ddb.runUpdate(s"INSERT INTO ${tmp._2} (SELECT * FROM ${ScalaSQLTable.name(next._2)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc._2)})")
+      ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next._2)}")
+      ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next._2)} (SELECT * FROM ${tmp._2})")
+      ddb.runUpdate(s"DROP TABLE ${tmp._2}")
+      (base, next)
     }
 
     scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
