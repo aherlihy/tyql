@@ -220,7 +220,7 @@ class CBAQuery extends QueryBenchmark {
     val ctrlVarBase = Seq[CtrlCC]()
 
     var it = 0
-    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = FixedPointQuery.multiFix(set)((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase), (Seq[DataCC](),Seq[DataCC](), Seq[CtrlCC](), Seq[CtrlCC]()))(
+    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = FixedPointQuery.multiFix(set, 0, name)((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase), (Seq[DataCC](),Seq[DataCC](), Seq[CtrlCC](), Seq[CtrlCC]()))(
       (recur, acc) => {
         val (dataTerm, dataVar, ctrlTerm, ctrlVar) = recur
         val (dataTermAcc, dataVarAcc, ctrlTermAcc, ctrlVarAcc) = if it == 0 then (dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase) else acc
@@ -372,7 +372,7 @@ class CBAQuery extends QueryBenchmark {
         (dataTermResult, dataVarResult, controlTermResult, controlVarResult)
       }
 
-    FixedPointQuery.scalaSQLSemiNaiveFOUR(set)(
+    FixedPointQuery.scalaSQLSemiNaiveFOUR(set, name)(
       ddb, (cba_delta1, cba_delta2, cba_delta3, cba_delta4), (cba_tmp1, cba_tmp2, cba_tmp3, cba_tmp4), (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
     )(
       (toTuple1, toTuple1, toTuple2, toTuple2)

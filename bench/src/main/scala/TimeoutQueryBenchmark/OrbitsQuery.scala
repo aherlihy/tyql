@@ -106,7 +106,7 @@ class TOOrbitsQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.base
-    val orbits = FixedPointQuery.fix(set)(base, Seq())(orbits =>
+    val orbits = FixedPointQuery.fix(set, 0, name)(base, Seq())(orbits =>
         orbits.flatMap(p =>
           if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
           orbits
@@ -142,7 +142,7 @@ class TOOrbitsQuery extends QueryBenchmark {
         e <- orbits.join(p.y === _.x)
       } yield (p.x, e.y)
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, orbits_delta, orbits_tmp, orbits_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[OrbitsSS] => query.Select[Any, Any]])
 

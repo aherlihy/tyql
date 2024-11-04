@@ -147,7 +147,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
     val baseVPT = collectionsDB.newT.map(a => PointsToCC(x = a.x, y = a.y))
     val baseHPT = collectionsDB.hpt
     var it = 0
-    val pt = FixedPointQuery.multiFix(set)((baseVPT, baseHPT), (Seq(), Seq()))((recur, acc) =>
+    val pt = FixedPointQuery.multiFix(set, 0, name)((baseVPT, baseHPT), (Seq(), Seq()))((recur, acc) =>
       val (varPointsTo, heapPointsTo) = recur
       val (varPointsToAcc, heapPointsToAcc) = if it == 0 then (baseVPT, baseHPT) else acc
       it += 1
@@ -228,7 +228,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
 
         (vpt, hpt)
 
-    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set, name)(
       ddb, (pointstocount_delta1, pointstocount_delta2), (pointstocount_tmp1, pointstocount_tmp2), (pointstocount_derived1, pointstocount_derived2)
     )(
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))

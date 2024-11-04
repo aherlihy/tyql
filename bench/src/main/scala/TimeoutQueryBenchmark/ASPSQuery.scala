@@ -104,7 +104,7 @@ class TOASPSQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.edge.groupBy(s => (s.src, s.dst)).mapValues(_.minBy(_.cost)).values.toSeq
-    resultCollections = FixedPointQuery.fix(set)(base, Seq())(path =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(base, Seq())(path =>
       path.flatMap(p =>
         if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
         path
@@ -146,7 +146,7 @@ class TOASPSQuery extends QueryBenchmark {
 //      else
 //        db.values(fixAgg)
 
-    FixedPointQuery.agg_scalaSQLSemiNaive(set)(
+    FixedPointQuery.agg_scalaSQLSemiNaive(set, name)(
       ddb, asps_delta, asps_tmp, asps_derived
     )(toTuple)(initBase)(fixFn)
 
@@ -154,7 +154,7 @@ class TOASPSQuery extends QueryBenchmark {
     backupResultScalaSql = ddb.runQuery(s"SELECT s.src as src, s.dst as dst, MIN(s.cost) as cost " +
       s"FROM ${ScalaSQLTable.name(asps_derived)} as s " +
       s"GROUP BY s.src, s.dst " +
-      s"ORDER BY cost, src, dst;")
+      s"ORDER BY cost, src, dst")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

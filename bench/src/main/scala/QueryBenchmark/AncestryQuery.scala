@@ -82,7 +82,7 @@ class AncestryQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.parents.filter(p => p.parent == "Alice").map(e => GenCC(name = e.child, gen = 1))
-    resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(base, Seq())(sp =>
         collectionsDB.parents.flatMap(parent =>
           sp
             .filter(g => parent.parent == g.name)
@@ -104,7 +104,7 @@ class AncestryQuery extends QueryBenchmark {
         parents <- ancestry_parents.join(base.name === _.parent)
       } yield (parents.child, base.gen + 1)
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, ancestry_delta, ancestry_tmp, ancestry_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
 

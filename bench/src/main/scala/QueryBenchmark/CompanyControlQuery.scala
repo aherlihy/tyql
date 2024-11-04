@@ -104,7 +104,7 @@ class CompanyControlQuery extends QueryBenchmark {
     val controlBase = collectionsDB.control
 
     var it = 0
-    val (shares, control) = FixedPointQuery.multiFix(set)((sharesBase, controlBase), (Seq(), Seq()))((recur, acc) =>
+    val (shares, control) = FixedPointQuery.multiFix(set, 0, name)((sharesBase, controlBase), (Seq(), Seq()))((recur, acc) =>
       val (cshares, ccontrol) = recur
       val (csharesAcc, controlAcc) = if it == 0 then (sharesBase, controlBase) else acc
       it += 1
@@ -154,7 +154,7 @@ class CompanyControlQuery extends QueryBenchmark {
         (csharesRecur, controlRecur)
 
 
-    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set, name)(
       ddb, (cc_delta1, cc_delta2), (cc_tmp1, cc_tmp2), (cc_derived1, cc_derived2)
     )(
       ((c: SharesSS[?]) => (c.byC, c.of, c.percent), (c: ResultSS[?]) => (c.com1, c.com2))

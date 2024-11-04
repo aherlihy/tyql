@@ -96,7 +96,7 @@ class SSSPQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.base
-    resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(base, Seq())(sp =>
         collectionsDB.edge.flatMap(edge =>
           sp
             .filter(s => s.dst == edge.src)
@@ -122,7 +122,7 @@ class SSSPQuery extends QueryBenchmark {
         edge <- sssp_edge.join(s.dst === _.src)
       } yield (edge.dst, s.cost + edge.cost)
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, sssp_delta, sssp_tmp, sssp_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]])
 

@@ -3,14 +3,37 @@ import scala.collection.mutable
 import scalasql.{Table as ScalaSQLTable, DbApi, query, Expr}
 import scalasql.dialects.PostgresDialect.*
 import scala.annotation.experimental
+import java.io.{File, FileWriter, BufferedWriter}
 
 
 type constant = String | Int | Double
 @experimental
 object FixedPointQuery {
-  val database = mutable.Map[String, Seq[constant]]()
+  def reportMemoryUsage(name: String, ctx: String, counter: Int): Unit = {
+    val runtime = Runtime.getRuntime()
+    import runtime.{totalMemory, freeMemory, maxMemory}
+    //    System.out.println(s"$name,$ctx,$counter,$totalMemory,$maxMemory,$freeMemory")
+    // Define the file path
+    val filePath = "memory_usage.csv"
+    val file = new File(filePath)
+
+    // Check if the file exists, if not, write the header
+    if (!file.exists()) {
+      val header = "benchmark,backend,counter,totalMemory,maxMemory,freeMemory\n"
+      val writer = new BufferedWriter(new FileWriter(file, true))
+      writer.write(header)
+      writer.close()
+    }
+    // Now write the line to the file
+    val writer = new BufferedWriter(new FileWriter(file, true))
+    writer.write(s"$name,$ctx,$counter,$totalMemory,$maxMemory,$freeMemory\n")
+    writer.close()
+  }
+
+
   @annotation.tailrec
-  final def fix[P](set: Boolean)(bases: Seq[P], acc: Seq[P])(fns: Seq[P] => Seq[P]): Seq[P] =
+  final def fix[P](set: Boolean, iterations: Int, name: String)(bases: Seq[P], acc: Seq[P])(fns: Seq[P] => Seq[P]): Seq[P] =
+    reportMemoryUsage(name, "collections", iterations)
     if (Thread.currentThread().isInterrupted) throw new Exception(s"timed out")
     val next = fns(bases)
     if (next.toSet.subsetOf(acc.toSet))
@@ -18,10 +41,11 @@ object FixedPointQuery {
     else
       val res = if (set) then (acc ++ bases).distinct else acc ++ bases
       val nextClean = next.filterNot(n => res.contains(n))
-      fix(set)(nextClean, res)(fns)
+      fix(set, iterations + 1, name)(nextClean, res)(fns)
 
   @annotation.tailrec
-  final def multiFix[T <: Tuple, S <: Seq[?]](set: Boolean, targetIdx: Int = 0)(bases: T, acc: T)(fns: (T, T) => T): T =
+  final def multiFix[T <: Tuple, S <: Seq[?]](set: Boolean, iterations: Int, name: String)(bases: T, acc: T)(fns: (T, T) => T): T =
+    reportMemoryUsage(name, "collections", iterations)
     if (Thread.currentThread().isInterrupted) throw new Exception(s"timed out")
     val next = fns(bases, acc)
 
@@ -42,15 +66,17 @@ object FixedPointQuery {
       val newAcc = Tuple.fromArray(combo.toArray).asInstanceOf[T]
       val nextClean = nextA.zip(combo).map((n, r) => n.filterNot(n => r.contains(n)))
       val newNext = Tuple.fromArray(nextClean.toArray).asInstanceOf[T]
-      multiFix(set)(newNext, newAcc)(fns)
+      multiFix(set, iterations + 1, name)(newNext, newAcc)(fns)
 
   @annotation.tailrec
   final def scalaSQLFix[P[_[_]]]
+    (iterations: Int, name: String)
     (bases: ScalaSQLTable[P], next: ScalaSQLTable[P], acc: ScalaSQLTable[P])
     (fns: (ScalaSQLTable[P], ScalaSQLTable[P]) => Unit)
     (cmp: (ScalaSQLTable[P], ScalaSQLTable[P]) => Boolean)
     (copyTo: (ScalaSQLTable[P], ScalaSQLTable[P], ScalaSQLTable[P]) => (ScalaSQLTable[P], ScalaSQLTable[P]))
   : ScalaSQLTable[P] =
+    reportMemoryUsage(name, "scalasql", iterations)
     if (Thread.currentThread().isInterrupted) throw new Exception(s"timed out")
 
     fns(bases, next)
@@ -61,9 +87,9 @@ object FixedPointQuery {
       copyTo(bases, acc, next)._1
     else
       val (newNext, newBase) = copyTo(bases, acc, next)
-      scalaSQLFix(newBase, newNext, acc)(fns)(cmp)(copyTo)
+      scalaSQLFix(iterations + 1, name)(newBase, newNext, acc)(fns)(cmp)(copyTo)
 
-  final def scalaSQLSemiNaive[Q, T >: Tuple, P[_[_]]](set: Boolean)
+  final def scalaSQLSemiNaive[Q, T >: Tuple, P[_[_]]](set: Boolean, name: String)
                                                      (ddb: DuckDBBackend, bases_db: ScalaSQLTable[P], next_db: ScalaSQLTable[P], acc_db: ScalaSQLTable[P])
                                                      (toTuple: P[Expr] => Tuple)
                                                      (initBase: () => query.Select[T, Q])
@@ -116,17 +142,19 @@ object FixedPointQuery {
       (bases, next)
     }
 
-    scalaSQLFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyTo)
+    scalaSQLFix(0, name)(bases_db, next_db, acc_db)(fixFn)(cmp)(copyTo)
   }
 
   // Mutually recursive relations
   @annotation.tailrec
   final def scalaSQLMultiFix[T]
+    (iterations: Int, name: String)
     (bases: T, next: T, acc: T)
     (fns: (T, T) => Unit)
     (cmp: (T, T) => Boolean)
     (copyTo: (T, T, T) => (T, T))
   : T = {
+    reportMemoryUsage(name, "scalasql", iterations)
 //    println(s"----- start multifix ------")
 //    println(s"BASE=${ScalaSQLTable.name(bases.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
 //    println(s"NEXT=${ScalaSQLTable.name(next.asInstanceOf[Tuple2[ScalaSQLTable[?], ScalaSQLTable[?]]]._1)}")
@@ -140,13 +168,13 @@ object FixedPointQuery {
       acc
     else
       val (newNext, newBase) = copyTo(bases, acc, next)
-      scalaSQLMultiFix(newBase, newNext, acc)(fns)(cmp)(copyTo)
+      scalaSQLMultiFix(iterations + 1, name)(newBase, newNext, acc)(fns)(cmp)(copyTo)
   }
 
   // this is silly but higher kinded types are mega painful to abstract
   final def scalaSQLSemiNaiveTWO[Q1, Q2, T1 >: Tuple, T2 >: Tuple, P1[_[_]], P2[_[_]], Tables]
     (using Tables =:= (ScalaSQLTable[P1], ScalaSQLTable[P2]))
-    (set: Boolean)
+    (set: Boolean, name: String)
     (ddb: DuckDBBackend, bases_db: Tables, next_db: Tables, acc_db: Tables)
     (toTuple: (P1[Expr] => Tuple, P2[Expr] => Tuple))
     (initBase: () => (query.Select[T1, Q1], query.Select[T2, Q2]))
@@ -235,12 +263,12 @@ object FixedPointQuery {
       (base, next)
     }
 
-    scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
+    scalaSQLMultiFix(0, name)(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
   }
 
   final def scalaSQLSemiNaiveTHREE[Q1, Q2, Q3, T1 >: Tuple, T2 >: Tuple, T3 >: Tuple, P1[_[_]], P2[_[_]], P3[_[_]], Tables]
     (using Tables =:= (ScalaSQLTable[P1], ScalaSQLTable[P2], ScalaSQLTable[P3]))
-    (set: Boolean)
+    (set: Boolean, name: String)
     (ddb: DuckDBBackend, bases_db: Tables, next_db: Tables, acc_db: Tables)
     (toTuple: (P1[Expr] => Tuple, P2[Expr] => Tuple, P3[Expr] => Tuple))
     (initBase: () => (query.Select[T1, Q1], query.Select[T2, Q2], query.Select[T3, Q3]))
@@ -357,12 +385,12 @@ object FixedPointQuery {
       (base, next)
     }
 
-    scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
+    scalaSQLMultiFix(0, name)(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
   }
 
   final def scalaSQLSemiNaiveFOUR[Q1, Q2, Q3, Q4, T1 >: Tuple, T2 >: Tuple, T3 >: Tuple, T4 >: Tuple, P1[_[_]], P2[_[_]], P3[_[_]], P4[_[_]], Tables]
     (using Tables =:= (ScalaSQLTable[P1], ScalaSQLTable[P2], ScalaSQLTable[P3], ScalaSQLTable[P4]))
-    (set: Boolean)
+    (set: Boolean, name: String)
     (ddb: DuckDBBackend, bases_db: Tables, next_db: Tables, acc_db: Tables)
     (toTuple: (P1[Expr] => Tuple, P2[Expr] => Tuple, P3[Expr] => Tuple, P4[Expr] => Tuple))
     (initBase: () => (query.Select[T1, Q1], query.Select[T2, Q2], query.Select[T3, Q3], query.Select[T4, Q4]))
@@ -516,10 +544,10 @@ object FixedPointQuery {
       (base, next)
     }
 
-    scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
+    scalaSQLMultiFix(0, name)(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
   }
 
-  final def agg_scalaSQLSemiNaive[Q, T >: Tuple, P[_[_]]](set: Boolean)
+  final def agg_scalaSQLSemiNaive[Q, T >: Tuple, P[_[_]]](set: Boolean, name: String)
                                                      (ddb: DuckDBBackend, bases_db: ScalaSQLTable[P], next_db: ScalaSQLTable[P], acc_db: ScalaSQLTable[P])
                                                      (toTuple: P[Expr] => Tuple)
                                                      (initBase: () => String)
@@ -566,11 +594,11 @@ object FixedPointQuery {
       (bases, next)
     }
 
-    scalaSQLFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyTo)
+    scalaSQLFix(0, name)(bases_db, next_db, acc_db)(fixFn)(cmp)(copyTo)
   }
   final def agg_scalaSQLSemiNaiveTWO[Q1, Q2, T1 >: Tuple, T2 >: Tuple, P1[_[_]], P2[_[_]], Tables]
     (using Tables =:= (ScalaSQLTable[P1], ScalaSQLTable[P2]))
-    (set: Boolean)
+    (set: Boolean, name: String)
     (ddb: DuckDBBackend, bases_db: Tables, next_db: Tables, acc_db: Tables)
     (toTuple: (P1[Expr] => Tuple, P2[Expr] => Tuple))
     (initBase: () => (query.Select[T1, Q1], query.Select[T2, Q2]))
@@ -653,6 +681,6 @@ object FixedPointQuery {
       (base, next)
     }
 
-    scalaSQLMultiFix(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
+    scalaSQLMultiFix(0, name)(bases_db, next_db, acc_db)(fixFn)(cmp)(copyInto)
   }
 }

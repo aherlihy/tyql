@@ -104,7 +104,7 @@ class ASPSQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.edge.groupBy(s => (s.src, s.dst)).mapValues(_.minBy(_.cost)).values.toSeq
-    resultCollections = FixedPointQuery.fix(set)(base, Seq())(path =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(base, Seq())(path =>
       path.flatMap(p =>
         path
           .filter(e => p.dst == e.src)
@@ -139,7 +139,7 @@ class ASPSQuery extends QueryBenchmark {
       else
         db.values(fixAgg)
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, asps_delta, asps_tmp, asps_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WEdgeSS] => query.Select[Any, Any]])
 

@@ -111,7 +111,7 @@ class PartyQuery extends QueryBenchmark {
     val baseCntFriends = Seq[CountsCC]()
 
     var it = 0
-    val (finalAttend, finalCntFriends) = FixedPointQuery.multiFix(set)((baseAttend, baseCntFriends), (Seq(), Seq()))((recur, acc) =>
+    val (finalAttend, finalCntFriends) = FixedPointQuery.multiFix(set, 0, name)((baseAttend, baseCntFriends), (Seq(), Seq()))((recur, acc) =>
       val (attend, cntfriends) = recur
       val (attendAcc, cntfriendsAcc) = if it == 0 then (baseAttend, baseCntFriends) else acc
       it+=1
@@ -178,7 +178,7 @@ class PartyQuery extends QueryBenchmark {
         (recurAttend, recurFriends)
     }
 
-    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set, name)(
       ddb, (party_delta1, party_delta2), (party_tmp1, party_tmp2), (party_derived1, party_derived2)
     )(
       (toTuple1.asInstanceOf[ResultSS[?] => Tuple], toTuple2)

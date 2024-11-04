@@ -149,7 +149,7 @@ class TOJavaPointsTo extends QueryBenchmark {
     val baseVPT = collectionsDB.newT.map(a => PointsToCC(x = a.x, y = a.y))
     val baseHPT = Seq[ProgramHeapCC]()
     var it = 0
-    val pt = FixedPointQuery.multiFix(set)((baseVPT, baseHPT), (Seq(), Seq()))((recur, acc) =>
+    val pt = FixedPointQuery.multiFix(set, 0, name)((baseVPT, baseHPT), (Seq(), Seq()))((recur, acc) =>
       val (varPointsTo, heapPointsTo) = recur
       val (varPointsToAcc, heapPointsToAcc) = if (it == 0) (baseVPT, baseHPT) else acc
       it += 1
@@ -229,7 +229,7 @@ class TOJavaPointsTo extends QueryBenchmark {
 
         (vpt, hpt)
 
-    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set, name)(
       ddb, (javapointsto_delta1, javapointsto_delta2), (javapointsto_tmp1, javapointsto_tmp2), (javapointsto_derived1, javapointsto_derived2)
     )(
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))

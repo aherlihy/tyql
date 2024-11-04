@@ -89,7 +89,7 @@ class TCQuery extends QueryBenchmark {
       .filter(p => p.x == 1)
       .map(e => ResultEdgeCC(e.x, e.y, Seq(e.x, e.y)))
     var it = 0
-    resultCollections = FixedPointQuery.fix(set)(path, Seq())(path =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(path, Seq())(path =>
 //      println(s"***iteration $it")
       it+=1
 //      println(s"input: path=${path.mkString("[", ", ", "]")}")
@@ -131,7 +131,7 @@ class TCQuery extends QueryBenchmark {
 //      println(s"output: path=${db.run(res).mkString("[", ", ", "]")}")
 
       res
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, tc_delta, tc_tmp, tc_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]])
 

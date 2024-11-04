@@ -97,7 +97,7 @@ class TOEvenOddQuery extends QueryBenchmark {
     val oddBase = collectionsDB.numbers.filter(n => n.value == 1).map(n => ResultCC(value = n.value, typ = "odd"))
 
     var it = 0
-    val (even, odd) = FixedPointQuery.multiFix(set)((evenBase, oddBase), (Seq(), Seq()))((recur, acc) =>
+    val (even, odd) = FixedPointQuery.multiFix(set, 0, name)((evenBase, oddBase), (Seq(), Seq()))((recur, acc) =>
       val (even, odd) = recur
       val (evenDerived, oddDerived) = if it == 0 then (evenBase, oddBase) else acc
       it += 1
@@ -159,7 +159,7 @@ class TOEvenOddQuery extends QueryBenchmark {
 //        println(s"output:\n\teven: ${db.run(evenResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\toddResult: ${db.run(oddResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         (evenResult, oddResult)
 
-    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set, name)(
       ddb, (evenodd_delta1, evenodd_delta2), (evenodd_tmp1, evenodd_tmp2), (evenodd_derived1, evenodd_derived2)
     )(
       (toTuple, toTuple)

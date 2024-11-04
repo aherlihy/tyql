@@ -104,7 +104,7 @@ class TrustChainQuery extends QueryBenchmark {
     val baseFriends = collectionsDB.friends
 
     var it = 0
-    val (trust, friends) = FixedPointQuery.multiFix(set)((baseFriends, baseFriends), (Seq(), Seq()))((recur, acc) => {
+    val (trust, friends) = FixedPointQuery.multiFix(set, 0, name)((baseFriends, baseFriends), (Seq(), Seq()))((recur, acc) => {
       val (trust, friends) = recur
       val (trustAcc, friendsAcc) = if it == 0 then (baseFriends, baseFriends) else acc
       it += 1
@@ -164,7 +164,7 @@ class TrustChainQuery extends QueryBenchmark {
         (trustRecur, friendRecur)
 
     // Fix point only on target result?
-    FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTWO(set, name)(
       ddb, (trustchain_delta1, trustchain_delta2), (trustchain_tmp1, trustchain_tmp2), (trustchain_derived1, trustchain_derived2)
     )(
       (toTuple, toTuple)

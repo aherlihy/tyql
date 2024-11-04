@@ -156,7 +156,7 @@ class CSPAQuery extends QueryBenchmark {
     val valueFlowBase = if set then (vf1 ++ vf2 ++ vf3).distinct else vf1 ++ vf2 ++ vf3
 
     var it = 0
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = FixedPointQuery.multiFix(true)((valueFlowBase, Seq[PairCC](), memoryAliasBase), (Seq(), Seq(), Seq()))(
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = FixedPointQuery.multiFix(set, 0, name)((valueFlowBase, Seq[PairCC](), memoryAliasBase), (Seq(), Seq(), Seq()))(
       (recur, acc) => {
         val (valueFlow, valueAlias, memoryAlias) = recur
         val (valueFlowAcc, valueAliasAcc, memoryAliasAcc) = if it == 0 then (valueFlowBase, Seq[PairCC](), memoryAliasBase) else acc
@@ -279,7 +279,7 @@ class CSPAQuery extends QueryBenchmark {
         (VF, MA, VA)
       }
 
-    FixedPointQuery.scalaSQLSemiNaiveTHREE(set)(
+    FixedPointQuery.scalaSQLSemiNaiveTHREE(set, name)(
       ddb, (cspa_delta1, cspa_delta2, cspa_delta3), (cspa_tmp1, cspa_tmp2, cspa_tmp3), (cspa_derived1, cspa_derived2, cspa_derived3)
     )(
       (toTuple, toTuple, toTuple)

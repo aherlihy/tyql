@@ -99,7 +99,7 @@ class TOAndersensQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.addressOf.map(a => EdgeCC(x = a.x, y = a.y))
-    resultCollections = FixedPointQuery.fix(set)(base, Seq())(pointsTo =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(base, Seq())(pointsTo =>
       collectionsDB.assign.flatMap(a =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
           pointsTo.filter(p =>
@@ -158,7 +158,7 @@ class TOAndersensQuery extends QueryBenchmark {
       innerQ1.union(innerQ2).union(innerQ3)
 
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, andersens_delta, andersens_tmp, andersens_derived
     )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]])
 

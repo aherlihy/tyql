@@ -108,7 +108,7 @@ class BOMQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.basic.map(b => ResultCC(part = b.part, max = b.days))
-    resultCollections = FixedPointQuery.fix(set)(base, Seq())(waitFor =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(base, Seq())(waitFor =>
         collectionsDB.assbl.flatMap(assbl =>
           waitFor
             .filter(wf => assbl.spart == wf.part)
@@ -134,7 +134,7 @@ class BOMQuery extends QueryBenchmark {
         assbl <- bom_assbl.join(_.spart === wf.part)
       } yield (assbl.part, wf.max)
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, bom_delta, bom_tmp, bom_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
 

@@ -117,7 +117,7 @@ class TODataflowQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.jumpOp
-    resultCollections = FixedPointQuery.fix(set)(base, Seq())(flow =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(base, Seq())(flow =>
       flow.flatMap(f1 =>
         if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
         flow
@@ -154,7 +154,7 @@ class TODataflowQuery extends QueryBenchmark {
         f2 <- flow.join(f1.b === _.a)
       } yield (f1.a, f2.b)
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, dataflow_delta, dataflow_tmp, dataflow_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[JumpSS] => query.Select[Any, Any]])
 

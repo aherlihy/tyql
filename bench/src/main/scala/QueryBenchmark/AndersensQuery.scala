@@ -99,9 +99,9 @@ class AndersensQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     val base = collectionsDB.addressOf.map(a => EdgeCC(x = a.x, y = a.y))
-    resultCollections = FixedPointQuery.fix(set)(base, Seq())(pointsTo =>
+    resultCollections = FixedPointQuery.fix(set, 0, name)(base, Seq())(pointsTo =>
       val v1 = collectionsDB.assign.flatMap(a =>
-          pointsTo.filter(p => a.y == p.x).map(p =>
+        pointsTo.filter(p => a.y == p.x).map(p =>
             EdgeCC(x = a.x, y = p.y)))
       val v2 = collectionsDB.loadT.flatMap(l =>
           pointsTo.flatMap(pt1 =>
@@ -146,7 +146,7 @@ class AndersensQuery extends QueryBenchmark {
       innerQ1.union(innerQ2).union(innerQ3)
 
 
-    FixedPointQuery.scalaSQLSemiNaive(set)(
+    FixedPointQuery.scalaSQLSemiNaive(set, name)(
       ddb, andersens_delta, andersens_tmp, andersens_derived
     )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]])
 
