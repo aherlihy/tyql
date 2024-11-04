@@ -34,6 +34,9 @@ for dir in */; do
         echo -e "dst,cost\n1,0" > "$base_csv_path"
         echo "    ---> Generated $base_csv_path"
     fi
+    if [[ "$dir" == *"bom"* ]]; then
+        acyclic="--acyclic"
+    fi
     base1=""
     if [[ "$dir" == *"tc"* ]]; then
         base1="--base1"
@@ -46,7 +49,6 @@ for dir in */; do
     if [[ "$dir" == *"cba"* ]]; then
         cba="--cba"
     fi
-
 
 
     # Check if 'csv_columns.txt' exists in the subdirectory

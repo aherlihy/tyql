@@ -1,2 +1,2 @@
---columns "(part, string5) (spart, string5)" --filename assbl.csv
---columns "(part, string5) (days, int)" --filename basic.csv
+--columns "(part, int) (spart, int)" --filename assbl.csv
+--columns "(part, int) (days, int)" --filename basic.csv
