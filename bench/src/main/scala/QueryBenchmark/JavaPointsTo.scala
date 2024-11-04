@@ -168,7 +168,7 @@ class JavaPointsTo extends QueryBenchmark {
               )
           )
         )
-      val vpt = if set then vpt1.union(vpt2) else vpt1 ++ vpt2
+      val vpt = if set then (vpt1 ++ vpt2).distinct else vpt1 ++ vpt2
       val hpt = collectionsDB.store.flatMap(s =>
         varPointsToAcc.flatMap(vpt1 =>
           varPointsToAcc

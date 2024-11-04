@@ -146,19 +146,14 @@ class CSPAQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
 
-    val memoryAliasBase =
-      collectionsDB.assign.map(a => PairCC(p1 = a.p2, p2 = a.p2))
-        .union(
-          collectionsDB.assign.map(a => PairCC(p1 = a.p1, p2 = a.p1))
-        )
+    val ma1 = collectionsDB.assign.map(a => PairCC(p1 = a.p2, p2 = a.p2))
+    val ma2 = collectionsDB.assign.map(a => PairCC(p1 = a.p1, p2 = a.p1))
+    val memoryAliasBase = if set then (ma1 ++ ma2).distinct else ma1 ++ ma2
 
-    val valueFlowBase =
-      collectionsDB.assign
-        .union(
-          collectionsDB.assign.map(a => PairCC(p1 = a.p1, p2 = a.p1))
-        ).union(
-          collectionsDB.assign.map(a => PairCC(p1 = a.p2, p2 = a.p2))
-        )
+    val vf1 = collectionsDB.assign
+    val vf2 = collectionsDB.assign.map(a => PairCC(p1 = a.p1, p2 = a.p1))
+    val vf3 = collectionsDB.assign.map(a => PairCC(p1 = a.p2, p2 = a.p2))
+    val valueFlowBase = if set then (vf1 ++ vf2 ++ vf3).distinct else vf1 ++ vf2 ++ vf3
 
     var it = 0
     val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = FixedPointQuery.multiFix(true)((valueFlowBase, Seq[PairCC](), memoryAliasBase), (Seq(), Seq(), Seq()))(
@@ -179,7 +174,7 @@ class CSPAQuery extends QueryBenchmark {
             vf2 <- valueFlow
             if vf1.p2 == vf2.p1
           yield PairCC(p1 = vf1.p1, p2 = vf2.p2)
-        val VF = valueFlowDef1.union(valueFlowDef2)
+        val VF = (valueFlowDef1 ++ valueFlowDef2).distinct
 
         val memoryAliasDef =
           for
@@ -203,7 +198,7 @@ class CSPAQuery extends QueryBenchmark {
             vf2 <- valueFlowAcc
             if vf1.p1 == m.p1 && vf2.p1 == m.p2
           yield PairCC(p1 = vf1.p2, p2 = vf2.p2)
-        val VA = valueAliasDef1.union(valueAliasDef2)
+        val VA = (valueAliasDef1 ++ valueAliasDef2).distinct
 
         (VF, MA, VA)
       }

@@ -151,12 +151,12 @@ class PointsToCountQuery extends QueryBenchmark {
       val (varPointsTo, heapPointsTo) = recur
       val (varPointsToAcc, heapPointsToAcc) = if it == 0 then (baseVPT, baseHPT) else acc
       it += 1
-      val vpt = collectionsDB.assign.flatMap(a =>
+      val vpt1 = collectionsDB.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           PointsToCC(x = a.x, y = p.y)
         )
-      ).union(
-        collectionsDB.loadT.flatMap(l =>
+      )
+      val vpt2 = collectionsDB.loadT.flatMap(l =>
           heapPointsToAcc.flatMap(hpt =>
             varPointsTo
               .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
@@ -165,7 +165,8 @@ class PointsToCountQuery extends QueryBenchmark {
               )
           )
         )
-      )
+
+      val vpt = (vpt1 ++ vpt2).distinct
       val hpt = collectionsDB.store.flatMap(s =>
         varPointsToAcc.flatMap(vpt1 =>
           varPointsToAcc

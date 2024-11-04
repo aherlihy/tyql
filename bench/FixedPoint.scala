@@ -558,7 +558,7 @@ object FixedPointQuery {
         ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(acc)} (SELECT * FROM ${ScalaSQLTable.name(bases)})")
 
       ddb.runUpdate(s"CREATE TABLE $tmp AS SELECT * FROM ${ScalaSQLTable.name(bases)} LIMIT 0")
-      ddb.runUpdate(s"INSERT INTO $tmp (${ScalaSQLTable.name(next)} EXCEPT ${ScalaSQLTable.name(acc)})")
+      ddb.runUpdate(s"INSERT INTO $tmp (SELECT * FROM ${ScalaSQLTable.name(next)} EXCEPT SELECT * FROM ${ScalaSQLTable.name(acc)})")
       ddb.runUpdate(s"DELETE FROM ${ScalaSQLTable.name(next)}")
       ddb.runUpdate(s"INSERT INTO ${ScalaSQLTable.name(next)} (SELECT * FROM $tmp)")
       ddb.runUpdate(s"DROP TABLE $tmp")
