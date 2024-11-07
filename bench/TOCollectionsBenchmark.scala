@@ -129,7 +129,6 @@ class TOCollectionsBenchmark {
 
   @Benchmark def cspa(blackhole: Blackhole): Unit = {
     runWithTimeout("cspa", blackhole)
-    runWithTimeout("cspa", blackhole)
   }
 
   @Benchmark def cba(blackhole: Blackhole): Unit = {
