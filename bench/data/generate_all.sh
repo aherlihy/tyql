@@ -43,7 +43,7 @@ for dir in */; do
     fi
     baseName=""
     if [[ "$dir" == *"ancestry"* ]]; then
-        baseName="--baseName"
+        baseName="--acyclic"
     fi
     cba=""
     if [[ "$dir" == *"cba"* ]]; then
@@ -55,6 +55,10 @@ for dir in */; do
     csv_file="${dir}csv_columns.txt"
     if [ -f "$csv_file" ]; then
 #        echo "    Found csv_columns.txt in $dir"
+        if [[ $dir != *"ancestry"* && $dir != *"tc"* && $dir != *"sssp"* ]]; then
+            echo "skipping"
+            continue
+        fi
 
         # Read the entire content of the file into a single variable
         file_content=$(<"$csv_file")

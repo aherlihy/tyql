@@ -17,6 +17,7 @@ import tyql.Expr.{IntLit, min}
 @experimental
 class TOAncestryQuery extends QueryBenchmark {
   override def name = "ancestry"
+  val parentName = "1"
   override def set = true
   if !set then ???
 
@@ -66,7 +67,7 @@ class TOAncestryQuery extends QueryBenchmark {
 
   // Execute queries
   def executeTyQL(ddb: DuckDBBackend): Unit =
-    val base = tyqlDB.parents.filter(p => p.parent == "Alice").map(e => (name = e.child, gen = IntLit(1)).toRow)
+    val base = tyqlDB.parents.filter(p => p.parent == parentName).map(e => (name = e.child, gen = IntLit(1)).toRow)
     val query = base.fix(gen =>
       tyqlDB.parents.flatMap(parent =>
         gen
@@ -82,7 +83,7 @@ class TOAncestryQuery extends QueryBenchmark {
 
   def executeCollections(): Unit =
     var it = 0
-    val base = collectionsDB.parents.filter(p => p.parent == "Alice").map(e => GenCC(name = e.child, gen = 1))
+    val base = collectionsDB.parents.filter(p => p.parent == parentName).map(e => GenCC(name = e.child, gen = 1))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
       it += 1
         collectionsDB.parents.flatMap(parent =>
@@ -103,11 +104,11 @@ class TOAncestryQuery extends QueryBenchmark {
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: ResultSS[?]) => (c.name, c.gen)
     def add1(v1: Expr[Int]): Expr[Int] = Expr { implicit ctx => sql"$v1 + 1" }
-    def eqAlice(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Alice'" }
+    def eqParent(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = '1'" }
     def get1(): Expr[Int] = Expr { implicit ctx => sql"1" }
 
     val initBase = () =>
-      ancestry_parents.select.filter(p => eqAlice(p.parent)).map(e => (e.child, get1()))
+      ancestry_parents.select.filter(p => eqParent(p.parent)).map(e => (e.child, get1()))
 
     val fixFn: ScalaSQLTable[ResultSS] => query.Select[(Expr[String], Expr[Int]), (String, Int)] = parents =>
       it += 1
