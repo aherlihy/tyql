@@ -145,6 +145,7 @@ class TOCSPAQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
 
     val memoryAliasBase =
       collectionsDB.assign.map(a => PairCC(p1 = a.p2, p2 = a.p2))
@@ -160,7 +161,6 @@ class TOCSPAQuery extends QueryBenchmark {
           collectionsDB.assign.map(a => PairCC(p1 = a.p2, p2 = a.p2))
         )
 
-    var it = 0
     val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = FixedPointQuery.multiFix(true)((valueFlowBase, Seq[PairCC](), memoryAliasBase), (Seq(), Seq(), Seq()))(
       (recur, acc) => {
         if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
@@ -223,9 +223,11 @@ class TOCSPAQuery extends QueryBenchmark {
       }
     )
     resultCollections = valueFlowFinal.sortBy(_.p2).sortBy(_.p1)
+    println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: PairSS[?]) => (c.p1, c.p2)
 
@@ -246,7 +248,6 @@ class TOCSPAQuery extends QueryBenchmark {
       (memoryAliasBase, cspa_empty.select.map(s => (s.p1, s.p2)), valueFlowBase)
     }
 
-    var it = 0
     val fixFn: ((ScalaSQLTable[PairSS], ScalaSQLTable[PairSS], ScalaSQLTable[PairSS])) => (query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)]) =
       recur => {
         val (valueFlow, valueAlias, memoryAlias) = recur
@@ -308,6 +309,7 @@ class TOCSPAQuery extends QueryBenchmark {
 
     val result = cspa_derived1.select.sortBy(_.p2).sortBy(_.p1)
     resultScalaSQL = db.run(result)
+    println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

@@ -146,9 +146,9 @@ class TOJavaPointsTo extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val baseVPT = collectionsDB.newT.map(a => PointsToCC(x = a.x, y = a.y))
     val baseHPT = Seq[ProgramHeapCC]()
-    var it = 0
     val pt = FixedPointQuery.multiFix(set)((baseVPT, baseHPT), (Seq(), Seq()))((recur, acc) =>
       val (varPointsTo, heapPointsTo) = recur
       val (varPointsToAcc, heapPointsToAcc) = if (it == 0) (baseVPT, baseHPT) else acc
@@ -195,15 +195,17 @@ class TOJavaPointsTo extends QueryBenchmark {
     )
 //    resultCollections = pt._2.sortBy(_.x).sortBy(_.y)
     resultCollections = pt._1.sortBy(_.x).sortBy(_.y)
+    println(s"\nIT,$name,collections,$it")
+
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
 
     val initBase = () =>
       (javapointsto_new.select.map(c => (c.x, c.y)),
         javapointsto_hpt.select.map(c => (c.x, c.y, c.h)))
 
-    var it = 0
     val fixFn: ((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]) =
       recur =>
         val (varPointsTo, heapPointsTo) = recur
@@ -239,6 +241,7 @@ class TOJavaPointsTo extends QueryBenchmark {
 
 //    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived2)} as r ORDER BY r.x, r.y")
     backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived1)} as r ORDER BY r.y, r.x")
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

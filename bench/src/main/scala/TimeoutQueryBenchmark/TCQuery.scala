@@ -85,10 +85,10 @@ class TOTCQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val path = collectionsDB.edge
       .filter(p => p.x == 1)
       .map(e => ResultEdgeCC(e.x, e.y, Seq(e.x, e.y)))
-    var it = 0
     resultCollections = FixedPointQuery.fix(set)(path, Seq())(path =>
 //      println(s"***iteration $it")
       it+=1
@@ -108,8 +108,11 @@ class TOTCQuery extends QueryBenchmark {
     ).sortBy(r => r.path.length)
       .sortBy(_.startNode)
       .sortBy(_.endNode)
+    println(s"\nIT,$name,collections,$it")
+
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     def initList(v1: Expr[Int], v2: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"[$v1, $v2]" }
     def listAppend(v: Expr[Int], lst: Expr[String]): Expr[String] = Expr { implicit ctx => sql"list_append($lst, $v)" }
     def listContains(v: Expr[Int], lst: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"list_contains($lst, $v)" }
@@ -123,7 +126,6 @@ class TOTCQuery extends QueryBenchmark {
         .filter(t => eq1(t.x))
         .map(e => (e.x, e.y, initList(e.x, e.y)))
 
-    var it = 0
     val fixFn: ScalaSQLTable[ResultEdgeSS] => query.Select[(Expr[Int], Expr[Int], Expr[String]), (Int, Int, String)] = path =>
 //      println(s"***iteration $it")
       it += 1
@@ -144,6 +146,7 @@ class TOTCQuery extends QueryBenchmark {
 
     val result = tc_derived.select.sortBy(_.path).sortBy(_.endNode).sortBy(_.startNode)
     resultScalaSQL = db.run(result)
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

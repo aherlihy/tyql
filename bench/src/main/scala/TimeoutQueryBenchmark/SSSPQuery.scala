@@ -95,8 +95,10 @@ class TOSSSPQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val base = collectionsDB.base
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
+        it += 1
         collectionsDB.edge.flatMap(edge =>
           if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
           sp
@@ -113,15 +115,18 @@ class TOSSSPQuery extends QueryBenchmark {
       .values.toSeq
       .sortBy(_.cost)
       .sortBy(_.dst)
+    println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: WResultEdgeSS[?]) => (c.dst, c.cost)
 
     val initBase = () => sssp_base.select.map(e => (e.dst, e.cost))
 
     val fixFn: ScalaSQLTable[WResultEdgeSS] => query.Select[(Expr[Int], Expr[Int]), (Int, Int)] = path =>
+      it += 1
       for {
         s <- path.select
         edge <- sssp_edge.join(s.dst === _.src)
@@ -133,6 +138,7 @@ class TOSSSPQuery extends QueryBenchmark {
 
     //    sssp_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst ORDER BY dst, cost")
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

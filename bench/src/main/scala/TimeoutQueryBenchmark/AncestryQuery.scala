@@ -81,8 +81,10 @@ class TOAncestryQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val base = collectionsDB.parents.filter(p => p.parent == "Alice").map(e => GenCC(name = e.child, gen = 1))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
+      it += 1
         collectionsDB.parents.flatMap(parent =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
           sp
@@ -94,9 +96,10 @@ class TOAncestryQuery extends QueryBenchmark {
               GenCC(name = parent.child, gen = g.gen + 1))
         ).distinct
     ).filter(g => g.gen == 2).map(g => ResultCC(name = g.name)).sortBy(_.name)
-
+    println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: ResultSS[?]) => (c.name, c.gen)
     def add1(v1: Expr[Int]): Expr[Int] = Expr { implicit ctx => sql"$v1 + 1" }
@@ -107,6 +110,7 @@ class TOAncestryQuery extends QueryBenchmark {
       ancestry_parents.select.filter(p => eqAlice(p.parent)).map(e => (e.child, get1()))
 
     val fixFn: ScalaSQLTable[ResultSS] => query.Select[(Expr[String], Expr[Int]), (String, Int)] = parents =>
+      it += 1
       for {
         base <- parents.select
         parents <- ancestry_parents.join(base.name === _.parent)
@@ -121,6 +125,7 @@ class TOAncestryQuery extends QueryBenchmark {
       .sortBy(_.name)
       .map(r => r.name)
     resultScalaSQL = db.run(result)
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

@@ -208,6 +208,7 @@ class TOCBAQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val dataTermBase = collectionsDB.term.flatMap(t =>
       collectionsDB.lits
         .filter(l => l.x == t.z && t.y == "Lit")
@@ -219,7 +220,6 @@ class TOCBAQuery extends QueryBenchmark {
 
     val ctrlVarBase = Seq[CtrlCC]()
 
-    var it = 0
     val (dataTerm, dataVar, ctrlTerm, ctrlVar) = FixedPointQuery.multiFix(set)((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase), (Seq[DataCC](),Seq[DataCC](), Seq[CtrlCC](), Seq[CtrlCC]()))(
       (recur, acc) => {
         if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
@@ -303,10 +303,11 @@ class TOCBAQuery extends QueryBenchmark {
         (dt, dv, ct, cv)
       })
 
-      resultCollections = Seq(dataTerm.distinct.size)
-
+    resultCollections = Seq(dataTerm.distinct.size)
+    println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     def eqVar(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Var'" }
     def eqApp(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'App'" }
     def eqLit(v1: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 = 'Lit'" }
@@ -330,7 +331,6 @@ class TOCBAQuery extends QueryBenchmark {
       (dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)
     }
 
-    var it = 0
     val fixFn: ((ScalaSQLTable[DataSS], ScalaSQLTable[DataSS], ScalaSQLTable[CtrlSS], ScalaSQLTable[CtrlSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)]) =
       recur => {
         val (dataTerm, dataVar, ctrlTerm, ctrlVar) = recur
@@ -407,6 +407,8 @@ class TOCBAQuery extends QueryBenchmark {
 
     val result = cba_derived1.select.distinct
     resultScalaSQL = Seq(db.run(result).size)
+
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

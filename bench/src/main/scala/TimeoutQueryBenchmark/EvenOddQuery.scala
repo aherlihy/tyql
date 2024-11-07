@@ -93,10 +93,10 @@ class TOEvenOddQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val evenBase = collectionsDB.numbers.filter(n => n.value == 0).map(n => ResultCC(value = n.value, typ = "even"))
     val oddBase = collectionsDB.numbers.filter(n => n.value == 1).map(n => ResultCC(value = n.value, typ = "odd"))
 
-    var it = 0
     val (even, odd) = FixedPointQuery.multiFix(set)((evenBase, oddBase), (Seq(), Seq()))((recur, acc) =>
       val (even, odd) = recur
       val (evenDerived, oddDerived) = if it == 0 then (evenBase, oddBase) else acc
@@ -116,8 +116,11 @@ class TOEvenOddQuery extends QueryBenchmark {
       (evenResult, oddResult)
     )
     resultCollections = odd.sortBy(_.value).sortBy(_.typ)
+    println(s"\nIT,$name,collections,$it")
+
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     def add1(v1: Expr[Int]): Expr[Int] = Expr { implicit ctx => sql"$v1 + 1" }
     def even1(v1: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"'even'" }
     def odd1(v1: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"'odd'" }
@@ -135,12 +138,11 @@ class TOEvenOddQuery extends QueryBenchmark {
         .map(n => ( n.value, odd1(n.value)))
       (even, odd)
 
-    var it = 0
     val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)]) =
       recur =>
         val (even, odd) = recur
         val (evenAcc, oddAcc) = if it == 0 then (evenodd_delta1, evenodd_delta2) else (evenodd_derived1, evenodd_derived2)
-        it+=1
+        it += 1
 
 //        println(s"***iteration $it")
 //        println(s"BASES:\n\teven : ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(even)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\todd: ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(odd)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
@@ -169,6 +171,7 @@ class TOEvenOddQuery extends QueryBenchmark {
 
     val result = evenodd_derived2.select.sortBy(_.value).sortBy(_.typ)
     resultScalaSQL = db.run(result)
+    println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

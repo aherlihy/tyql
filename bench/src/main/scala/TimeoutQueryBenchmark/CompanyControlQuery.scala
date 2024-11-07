@@ -99,11 +99,11 @@ class TOCompanyControlQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
 
     val sharesBase = collectionsDB.shares
     val controlBase = collectionsDB.control
 
-    var it = 0
     val (shares, control) = FixedPointQuery.multiFix(set)((sharesBase, controlBase), (Seq(), Seq()))((recur, acc) =>
       if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
       val (cshares, ccontrol) = recur
@@ -133,15 +133,17 @@ class TOCompanyControlQuery extends QueryBenchmark {
       (csharesRecur, controlRecur)
     )
     resultCollections = control.sortBy(_.com1).sortBy(_.com2)
+    println(s"\nIT,$name,collections,$it")
+
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
 
     val initBase = () =>
       (cc_shares.select.map(c => (c.byC, c.of, c.percent)), cc_control.select.map(c => (c.com1, c.com2)))
 
     def gt50(v1: Expr[Int]): Expr[Boolean] = Expr { implicit ctx => sql"$v1 > 50" }
-    var it = 0
     val fixFn: ((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (String, String) =
       recur =>
         val (cshares, control) = recur
@@ -177,6 +179,7 @@ class TOCompanyControlQuery extends QueryBenchmark {
 
     val result = cc_derived2.select.sortBy(_.com1).sortBy(_.com2)
     resultScalaSQL = db.run(result)
+    println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

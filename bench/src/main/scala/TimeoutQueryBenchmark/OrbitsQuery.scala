@@ -105,8 +105,10 @@ class TOOrbitsQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val base = collectionsDB.base
     val orbits = FixedPointQuery.fix(set)(base, Seq())(orbits =>
+      it += 1
         orbits.flatMap(p =>
           if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
           orbits
@@ -128,15 +130,18 @@ class TOOrbitsQuery extends QueryBenchmark {
         )
       )
     ).sortBy(_.x).sortBy(_.y)
+    println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: OrbitsSS[?]) => (c.x, c.y)
 
     val initBase = () => orbits_base.select.map(o => (o.x, o.y))
 
     val fixFn: ScalaSQLTable[OrbitsSS] => query.Select[(Expr[String], Expr[String]), (String, String)] = orbits =>
+      it += 1
       for {
         p <- orbits.select
         e <- orbits.join(p.y === _.x)
@@ -158,6 +163,7 @@ class TOOrbitsQuery extends QueryBenchmark {
       "     WHERE recref0.x = subquery9.x AND recref0.y = subquery9.y)" +
       " ORDER BY recref0.y, recref0.x"
     )
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =
