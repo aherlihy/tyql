@@ -1,0 +1,2 @@
+xs: data, stored on github
+"m_data" and "l_data" run "bash copy_into.sh" then "bash verify.sh m_data MB" to verify
