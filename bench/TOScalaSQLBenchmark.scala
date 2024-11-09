@@ -77,67 +77,67 @@ class TOScalaSQLBenchmark {
   }
 
   /*******************Boilerplate*****************/
-  @Benchmark def tc(blackhole: Blackhole): Unit = {
+  @Benchmark def tc_large(blackhole: Blackhole): Unit = {
     runWithTimeout("tc", blackhole)
   }
 
-  @Benchmark def sssp(blackhole: Blackhole): Unit = {
+  @Benchmark def sssp_large(blackhole: Blackhole): Unit = {
     runWithTimeout("sssp", blackhole)
   }
 
-  @Benchmark def ancestry(blackhole: Blackhole): Unit = {
+  @Benchmark def ancestry_large(blackhole: Blackhole): Unit = {
     runWithTimeout("ancestry", blackhole)
   }
 
-  @Benchmark def andersens(blackhole: Blackhole): Unit = {
+  @Benchmark def andersens_small(blackhole: Blackhole): Unit = {
     runWithTimeout("andersens", blackhole)
   }
 
-  @Benchmark def asps(blackhole: Blackhole): Unit = {
+  @Benchmark def asps_medium(blackhole: Blackhole): Unit = {
     runWithTimeout("asps", blackhole)
   }
 
-  @Benchmark def bom(blackhole: Blackhole): Unit = {
+  @Benchmark def bom_medium(blackhole: Blackhole): Unit = {
     runWithTimeout("bom", blackhole)
   }
 
-  @Benchmark def orbits(blackhole: Blackhole): Unit = {
+  @Benchmark def orbits_medium(blackhole: Blackhole): Unit = {
     runWithTimeout("orbits", blackhole)
   }
 
-  @Benchmark def dataflow(blackhole: Blackhole): Unit = {
+  @Benchmark def dataflow_small(blackhole: Blackhole): Unit = {
     runWithTimeout("dataflow", blackhole)
   }
 
-  @Benchmark def evenodd(blackhole: Blackhole): Unit = {
+  @Benchmark def evenodd_medium(blackhole: Blackhole): Unit = {
     runWithTimeout("evenodd", blackhole)
   }
 
-  @Benchmark def cc(blackhole: Blackhole): Unit = {
+  @Benchmark def cc_medium(blackhole: Blackhole): Unit = {
     runWithTimeout("cc", blackhole)
   }
 
-  @Benchmark def pointstocount(blackhole: Blackhole): Unit = {
+  @Benchmark def pointstocount_small(blackhole: Blackhole): Unit = {
     runWithTimeout("pointstocount", blackhole)
   }
 
-  @Benchmark def javapointsto(blackhole: Blackhole): Unit = {
+  @Benchmark def javapointsto_small(blackhole: Blackhole): Unit = {
     runWithTimeout("javapointsto", blackhole)
   }
 
-  @Benchmark def trustchain(blackhole: Blackhole): Unit = {
+  @Benchmark def trustchain_medium(blackhole: Blackhole): Unit = {
     runWithTimeout("trustchain", blackhole)
   }
 
-  @Benchmark def party(blackhole: Blackhole): Unit = {
+  @Benchmark def party_medium(blackhole: Blackhole): Unit = {
     runWithTimeout("party", blackhole)
   }
 
-  @Benchmark def cspa(blackhole: Blackhole): Unit = {
+  @Benchmark def cspa_medium(blackhole: Blackhole): Unit = {
     runWithTimeout("cspa", blackhole)
   }
 
-  @Benchmark def cba(blackhole: Blackhole): Unit = {
+  @Benchmark def cba_small(blackhole: Blackhole): Unit = {
     runWithTimeout("cba", blackhole)
   }
 }
