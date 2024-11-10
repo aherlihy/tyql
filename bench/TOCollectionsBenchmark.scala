@@ -15,7 +15,6 @@ import Helpers.*
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class TOCollectionsBenchmark {
-  val timeoutMillis = 300000
   private def runWithTimeout(benchmarkName: String, blackhole: Blackhole): Unit = {
     val executor = Executors.newSingleThreadExecutor()
     val future: Future[Unit] = executor.submit(() => {
@@ -24,7 +23,7 @@ class TOCollectionsBenchmark {
 
     try {
       // Await completion or timeout
-      future.get(timeoutMillis, TimeUnit.MILLISECONDS)
+      future.get(timeoutMins, TimeUnit.MINUTES)
     } catch {
       case e: InterruptedException => // New: Catch the interrupt signal
         println(s"Benchmark '$benchmarkName' was interrupted.")

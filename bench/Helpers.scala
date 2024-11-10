@@ -8,6 +8,7 @@ import java.sql.{ResultSet, ResultSetMetaData}
 
 object Helpers {
   val currentData = "data"
+  val timeoutMins = 10
   val skip = Seq(
 //    "ancestry",
 //    "andersens",

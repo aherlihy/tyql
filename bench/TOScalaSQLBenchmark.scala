@@ -14,7 +14,6 @@ import Helpers.*
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class TOScalaSQLBenchmark {
-  val timeoutMillis = 300000
   private def runWithTimeout(benchmarkName: String, blackhole: Blackhole): Unit = {
     val executor = Executors.newSingleThreadExecutor()
     val future: Future[Unit] = executor.submit(() => {
@@ -23,7 +22,7 @@ class TOScalaSQLBenchmark {
 
     try {
       // Await completion or timeout
-      future.get(timeoutMillis, TimeUnit.MILLISECONDS)
+      future.get(timeoutMins, TimeUnit.MINUTES)
     } catch {
       case e: InterruptedException => // New: Catch the interrupt signal
         println(s"Benchmark '$benchmarkName' was interrupted.")
@@ -37,7 +36,7 @@ class TOScalaSQLBenchmark {
     }
   }
 
-  var duckDB = DuckDBBackend(timeout = timeoutMillis / 1000)
+  var duckDB = DuckDBBackend(timeout = timeoutMins)
   val benchmarks = Map(
     "tc" -> TOTCQuery(),
     "sssp" -> TOSSSPQuery(),
