@@ -1,1 +1,1 @@
---columns "(parent, varstring) (child, varstring)" --filename parents.csv
+--columns "(parent, int) (child, int)" --filename parents.csv

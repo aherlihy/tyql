@@ -116,8 +116,10 @@ class TODataflowQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val base = collectionsDB.jumpOp
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(flow =>
+      it += 1
       flow.flatMap(f1 =>
         if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
         flow
@@ -139,9 +141,11 @@ class TODataflowQuery extends QueryBenchmark {
               if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
               ResultCC(r = r.opN, w = w.opN))))
       .sortBy(_.r).sortBy(_.w)
+    println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: JumpSS[?]) => (c.a, c.b)
 
@@ -149,6 +153,7 @@ class TODataflowQuery extends QueryBenchmark {
       dataflow_jumpOp.select.map(c => (c.a, c.b))
 
     val fixFn: ScalaSQLTable[JumpSS] => query.Select[(Expr[String], Expr[String]), (String, String)] = flow =>
+      it += 1
       for {
         f1 <- flow.select
         f2 <- flow.join(f1.b === _.a)
@@ -170,6 +175,8 @@ class TODataflowQuery extends QueryBenchmark {
     s"FROM ${ScalaSQLTable.name(dataflow_derived)} as recref13, ${ScalaSQLTable.name(dataflow_readOp)} as readOp168, ${ScalaSQLTable.name(dataflow_writeOp)} as writeOp169 " +
     "WHERE writeOp169.opN = recref13.a AND writeOp169.varN = readOp168.varN AND recref13.b = readOp168.opN ORDER BY w ASC, r ASC;"
     backupResultScalaSql = ddb.runQuery(result)
+
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

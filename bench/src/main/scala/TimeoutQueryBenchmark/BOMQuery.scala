@@ -107,8 +107,10 @@ class TOBOMQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val base = collectionsDB.basic.map(b => ResultCC(part = b.part, max = b.days))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(waitFor =>
+        it += 1
         collectionsDB.assbl.flatMap(assbl =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
           waitFor
@@ -121,19 +123,21 @@ class TOBOMQuery extends QueryBenchmark {
         )
       )
       .groupBy(_.part)
-      .mapValues(_.minBy(_.max))
+      .mapValues(_.maxBy(_.max))
       .values.toSeq
       .sortBy(_.part)
       .sortBy(_.max)
-
+    println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: ResultSS[?]) => (c.part, c.max)
 
     val initBase = () => bom_basic.select.map(e => (e.part, e.days))
 
     val fixFn: ScalaSQLTable[ResultSS] => query.Select[(Expr[String], Expr[Int]), (String, Int)] = waitFor =>
+      it += 1
       for {
         wf <- waitFor.select
         assbl <- bom_assbl.join(_.spart === wf.part)
@@ -145,6 +149,8 @@ class TOBOMQuery extends QueryBenchmark {
 
     //    bom_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(s"SELECT s.part as part, MAX(s.max) as max FROM ${ScalaSQLTable.name(bom_derived)} as s GROUP BY s.part ORDER BY max, part")
+
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

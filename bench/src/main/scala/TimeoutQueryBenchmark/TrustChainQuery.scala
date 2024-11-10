@@ -101,9 +101,9 @@ class TOTrustChainQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val baseFriends = collectionsDB.friends
 
-    var it = 0
     val (trust, friends) = FixedPointQuery.multiFix(set)((baseFriends, baseFriends), (Seq(), Seq()))((recur, acc) => {
       val (trust, friends) = recur
       val (trustAcc, friendsAcc) = if it == 0 then (baseFriends, baseFriends) else acc
@@ -139,10 +139,10 @@ class TOTrustChainQuery extends QueryBenchmark {
       .toSeq
 
     resultCollections = query.sortBy(_.name).sortBy(_.count)
-
-
+    println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: FriendsSS[?]) => (c.person1, c.person2)
 
@@ -151,7 +151,6 @@ class TOTrustChainQuery extends QueryBenchmark {
       val baseTrust = trustchain_friends.select.map(f => (f.person1, f.person2))
       (baseFriends, baseTrust)
 
-    var it = 0
     val fixFn: ((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String]), (String, String)]) =
       recur =>
         val (trust, friends) = recur
@@ -179,6 +178,7 @@ class TOTrustChainQuery extends QueryBenchmark {
     )(fixFn.asInstanceOf[((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
     backupResultScalaSql = ddb.runQuery(s"SELECT r.person2 as name, COUNT(r.person1) as count FROM ${ScalaSQLTable.name(trustchain_derived2)} as r GROUP BY r.person2 ORDER BY count, r.person2")
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

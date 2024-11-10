@@ -277,8 +277,8 @@ class CBAQuery extends QueryBenchmark {
             if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
           yield CtrlCC(x = abs.y, y = ct2.y)
 
-        val dt = if set then dt1.union(dt2) else dt1 ++ dt2
-        val ct = if set then ct1.union(ct2) else ct1 ++ ct2
+        val dt = if set then (dt1 ++ dt2).distinct else dt1 ++ dt2
+        val ct = if set then (ct1 ++ ct2).distinct else ct1 ++ ct2
         (dt, dv, ct, cv)
       })
 

@@ -107,10 +107,10 @@ class TOPartyQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val baseAttend = collectionsDB.organizers.map(o => ResultCC(person = o.orgName))
     val baseCntFriends = Seq[CountsCC]()
 
-    var it = 0
     val (finalAttend, finalCntFriends) = FixedPointQuery.multiFix(set)((baseAttend, baseCntFriends), (Seq(), Seq()))((recur, acc) =>
       val (attend, cntfriends) = recur
       val (attendAcc, cntfriendsAcc) = if it == 0 then (baseAttend, baseCntFriends) else acc
@@ -143,8 +143,11 @@ class TOPartyQuery extends QueryBenchmark {
       (recurAttend, recurCntFriends)
     )
     resultCollections = finalAttend.distinct.sortBy(_.person)
+    println(s"\nIT,$name,collections,$it")
+
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple1 = (c: ResultSS[?]) => c.person
     val toTuple2 = (c: CountsSS[?]) => (c.fName, c.nCount)
@@ -154,7 +157,6 @@ class TOPartyQuery extends QueryBenchmark {
       val cntFriends = party_counts.select.map(c => (c.fName, c.nCount))
       (attend, cntFriends)
 
-    var it = 0
     val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[CountsSS])) => (String, String) = {
       recur =>
         val (attend, cntFriends) = recur
@@ -184,6 +186,7 @@ class TOPartyQuery extends QueryBenchmark {
 
     val result = party_derived1.select.distinct.sortBy(_.person)
     resultScalaSQL = db.run(result)
+    println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

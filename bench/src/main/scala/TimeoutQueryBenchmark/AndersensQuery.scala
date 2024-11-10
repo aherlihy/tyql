@@ -98,8 +98,10 @@ class TOAndersensQuery extends QueryBenchmark {
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =
+    var it = 0
     val base = collectionsDB.addressOf.map(a => EdgeCC(x = a.x, y = a.y))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(pointsTo =>
+      it += 1
       collectionsDB.assign.flatMap(a =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
           pointsTo.filter(p =>
@@ -130,14 +132,18 @@ class TOAndersensQuery extends QueryBenchmark {
                 if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
                 EdgeCC(x = pt1.y, y = pt2.y))))))
       .sortBy(_.y).sortBy(_.x)
+      println(s"\nIT,$name,collections,$it")
+
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
 
     val initBase: () => query.Select[(Expr[String], Expr[String]), (String, String)] =
       () => andersens_addressOf.select.map(a => (a.x, a.y))
 
     val fixFn: ScalaSQLTable[EdgeSS] => query.Select[(Expr[String], Expr[String]), (String, String)] = (pointsTo) =>
+      it += 1
       val innerQ1 = for {
         pointsTo <- pointsTo.select
         assign <- andersens_assign.join(_.y === pointsTo.x)
@@ -164,8 +170,9 @@ class TOAndersensQuery extends QueryBenchmark {
 
     val result = andersens_derived.select.sortBy(_.y).sortBy(_.x)
     resultScalaSQL = db.run(result)
+    println(s"\nIT,$name,scalasql,$it")
 
-    // Write results to csv for checking
+  // Write results to csv for checking
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

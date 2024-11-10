@@ -56,7 +56,7 @@ def generate_csv(filename, size, unit, columns, acyclic, baseId, baseName, cba):
                 if cba and col_names[i] == "y" and "term" in filename:
                     cell = random.choice(["Lit", "Var", "Abs", "App"])
                 elif col_type == "varstring":
-                    if baseName and random.random() < 0.0001:
+                    if baseName and random.random() < 0.001:
                         cell = "Alice"
                     else:
                         cell = generate_varstring()

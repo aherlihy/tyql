@@ -103,8 +103,10 @@ class TOASPSQuery extends QueryBenchmark {
 
 
   def executeCollections(): Unit =
+    var it = 0
     val base = collectionsDB.edge.groupBy(s => (s.src, s.dst)).mapValues(_.minBy(_.cost)).values.toSeq
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(path =>
+      it += 1
       path.flatMap(p =>
         if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
         path
@@ -126,9 +128,10 @@ class TOASPSQuery extends QueryBenchmark {
       .sortBy(_.dst)
       .sortBy(_.src)
       .sortBy(_.cost)
-
+    println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
+    var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: WEdgeSS[?]) => (c.src, c.dst, c.cost)
 
@@ -137,6 +140,7 @@ class TOASPSQuery extends QueryBenchmark {
       s"SELECT s.src, s.dst, MIN(s.cost) FROM ${ScalaSQLTable.name(asps_edge)} as s GROUP BY s.src, s.dst"
 
     val fixFn: ScalaSQLTable[WEdgeSS] => String = path =>
+      it += 1
       s"SELECT path1.src, path2.dst, MIN(path1.cost + path2.cost) FROM ${ScalaSQLTable.name(path)} path1, ${ScalaSQLTable.name(path)} path2 WHERE path1.dst = path2.src GROUP BY path1.src, path2.dst"
 //      val fixAgg = db.runRaw[(Int, Int, Int)](
 //        s"SELECT path1.src, path2.dst, MIN(path1.cost + path2.cost) FROM ${ScalaSQLTable.name(path)} path1, ${ScalaSQLTable.name(path)} path2 WHERE path1.dst = path2.src GROUP BY path1.src, path2.dst;"
@@ -155,6 +159,8 @@ class TOASPSQuery extends QueryBenchmark {
       s"FROM ${ScalaSQLTable.name(asps_derived)} as s " +
       s"GROUP BY s.src, s.dst " +
       s"ORDER BY cost, src, dst;")
+
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

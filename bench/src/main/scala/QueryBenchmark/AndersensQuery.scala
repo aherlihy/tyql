@@ -100,21 +100,23 @@ class AndersensQuery extends QueryBenchmark {
   def executeCollections(): Unit =
     val base = collectionsDB.addressOf.map(a => EdgeCC(x = a.x, y = a.y))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(pointsTo =>
-      collectionsDB.assign.flatMap(a =>
+      val v1 = collectionsDB.assign.flatMap(a =>
           pointsTo.filter(p => a.y == p.x).map(p =>
             EdgeCC(x = a.x, y = p.y)))
-        .union(collectionsDB.loadT.flatMap(l =>
+      val v2 = collectionsDB.loadT.flatMap(l =>
           pointsTo.flatMap(pt1 =>
             pointsTo
               .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
               .map(pt2 =>
-                EdgeCC(x = l.x, y = pt2.y)))))
-        .union(collectionsDB.store.flatMap(s =>
+                EdgeCC(x = l.x, y = pt2.y))))
+      val v3 = collectionsDB.store.flatMap(s =>
           pointsTo.flatMap(pt1 =>
             pointsTo
               .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
               .map(pt2 =>
-                EdgeCC(x = pt1.y, y = pt2.y))))))
+                EdgeCC(x = pt1.y, y = pt2.y))))
+      if set then (v1 ++ v2 ++ v3).distinct else v1 ++ v2 ++ v3
+    )
       .sortBy(_.y).sortBy(_.x)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =

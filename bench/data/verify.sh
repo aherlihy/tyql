@@ -43,16 +43,24 @@ for dir in */; do
     # Check for the presence of each expected file
     for file in "${files[@]}"; do
         if [ -f "$out_dir/$file" ]; then
+            line_count=$(wc -l < "$out_dir/$file")
             existing_files+=("$file")
+            # Check if the line count is 1
+            if [[ "$line_count" -eq 1 ]]; then
+              echo "**Error: $file only has one line."
+            fi
         else
             missing_files+=("$file")
         fi
+
+
     done
 
     # Report any missing files
     if [ ${#missing_files[@]} -gt 0 ]; then
         echo "    *Missing files in $out_dir: ${missing_files[*]}"
     fi
+
 
     # If fewer than two files exist, skip further comparisons
     if [ ${#existing_files[@]} -lt 2 ]; then

@@ -1,1 +1,1 @@
---columns "(person1, varstring) (person2, varstring)" --filename friends.csv
+--columns "(person1, string4) (person2, string4)" --filename friends.csv
