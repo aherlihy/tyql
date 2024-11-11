@@ -6,7 +6,13 @@ inThisBuild(Seq(
   version := "0.0.1",
   libraryDependencies ++= Seq(
     "org.scalameta" %% "munit" % "1.0.0+24-ee555b1d-SNAPSHOT" % Test,
-    "org.duckdb" % "duckdb_jdbc" % "1.1.1",
+
+    // Replaced by locally built 1.1.3 with "-g3 -fno-omit-frame-pointer" added to the CC and CXX flags
+    // for the benefit of stack traces in async-profiler
+    // The build is available at http://guillaume.martres.me/duckdb_jdbc.jar
+    // and needs to be stored in bench/lib/
+    // "org.duckdb" % "duckdb_jdbc" % "1.1.1",
+
     "com.lihaoyi" %% "scalasql" % "0.1.11"
   )
 ))
