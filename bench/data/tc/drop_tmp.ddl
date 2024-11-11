@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS tc_delta;
+DROP TABLE IF EXISTS tc_derived;
+DROP TABLE IF EXISTS tc_tmp;

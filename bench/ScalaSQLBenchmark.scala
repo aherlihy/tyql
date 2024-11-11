@@ -49,6 +49,14 @@ class ScalaSQLBenchmarkX {
       bm.writeScalaSQLResult()
     )
     duckDB.close()
+    Helpers.cleanTmp()
+  }
+
+  @TearDown(Level.Iteration)
+  def dropData(): Unit = {
+    benchmarks.values.foreach(bm =>
+      if !Helpers.skip.contains(bm.name) then duckDB.dropData(bm.name)
+    )
   }
 
   /*******************Boilerplate*****************/

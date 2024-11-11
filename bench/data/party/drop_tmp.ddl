@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS party_delta1;
+DROP TABLE IF EXISTS party_derived1;
+DROP TABLE IF EXISTS party_tmp1;
+DROP TABLE IF EXISTS party_delta2;
+DROP TABLE IF EXISTS party_derived2;
+DROP TABLE IF EXISTS party_tmp2;

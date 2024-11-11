@@ -24,6 +24,17 @@ class DuckDBBackend(timeout: Int = -1) {
       override def defaultQueryTimeoutSeconds: Int = timeout
     })
 
+  def dropData(benchmark: String): Unit =
+    val datadir = s"${BuildInfo.baseDirectory}/bench/data/$benchmark/"
+    val ddl = s"${datadir}/drop_tmp.ddl"
+    val ddlCmds = readDDLFile(ddl)
+    val statement = connection.createStatement()
+
+    ddlCmds.foreach(ddl =>
+//      println(s"Executing DDL: $ddl")
+      statement.execute(ddl)
+    )
+
   def loadData(benchmark: String): Unit =
     val datadir = s"${BuildInfo.baseDirectory}/bench/data/$benchmark/"
 

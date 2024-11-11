@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS asps_delta;
+DROP TABLE IF EXISTS asps_derived;
+DROP TABLE IF EXISTS asps_tmp;

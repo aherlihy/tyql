@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS bom_delta;
+DROP TABLE IF EXISTS bom_derived;
+DROP TABLE IF EXISTS bom_tmp;

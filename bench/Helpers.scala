@@ -120,4 +120,21 @@ object Helpers {
         case e: Exception => println(s"Failed to delete file: ${e.getMessage}")
       }
     }
+
+  def cleanTmp(): Unit = {
+    val tmpdir = Paths.get(".tmp")
+    try {
+      Files.list(tmpdir).iterator().asScala
+        .filter(Files.isRegularFile(_)) // Only target regular files
+        .foreach { file =>
+          try {
+            Files.delete(file)
+          } catch {
+            case e: Exception => println(s"ERROR: Failed to delete file: $file")
+          }
+        }
+    } catch {
+      case e: Exception => {}
+    }
+  }
 }

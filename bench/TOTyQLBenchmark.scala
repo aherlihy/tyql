@@ -66,12 +66,20 @@ class TOTyQLBenchmark {
     )
   }
 
+  @TearDown(Level.Iteration)
+  def dropData(): Unit = {
+    benchmarks.values.foreach(bm =>
+      if !Helpers.skip.contains(bm.name) then duckDB.dropData(bm.name)
+    )
+  }
+
   @TearDown(Level.Trial)
   def close(): Unit = {
     benchmarks.values.foreach(bm =>
       bm.writeTyQLResult()
     )
     duckDB.close()
+    Helpers.cleanTmp()
   }
 
   /*******************Boilerplate*****************/

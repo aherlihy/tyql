@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS sssp_delta;
+DROP TABLE IF EXISTS sssp_derived;
+DROP TABLE IF EXISTS sssp_tmp;
