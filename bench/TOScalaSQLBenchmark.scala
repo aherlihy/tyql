@@ -72,9 +72,17 @@ class TOScalaSQLBenchmark {
     benchmarks.values.foreach(bm =>
       bm.writeScalaSQLResult()
     )
+    Helpers.cleanTmp()
     duckDB.close()
   }
 
+  @TearDown(Level.Iteration)
+  def dropData(): Unit = {
+    benchmarks.values.foreach(bm =>
+      if !Helpers.skip.contains(bm.name) then duckDB.dropData(bm.name)
+    )
+    duckDB.printTables()
+  }
   /*******************Boilerplate*****************/
   @Benchmark def tc_large(blackhole: Blackhole): Unit = {
     runWithTimeout("tc", blackhole)

@@ -23,6 +23,22 @@ class DuckDBBackend(timeout: Int = -1) {
       override def tableNameMapper(v: String) = s"${v.toLowerCase()}"
       override def defaultQueryTimeoutSeconds: Int = timeout
     })
+    val s = connection.createStatement()
+
+//    s.execute("PRAGMA enable_profiling='json'")
+//    s.execute("PRAGMA profiling_output='profiling_output.json'")
+
+
+  def dropData(benchmark: String): Unit =
+    val datadir = s"${BuildInfo.baseDirectory}/bench/data/$benchmark/"
+    val ddl = s"${datadir}/drop_tmp.ddl"
+    val ddlCmds = readDDLFile(ddl)
+    val statement = connection.createStatement()
+
+    ddlCmds.foreach(ddl =>
+//      println(s"Executing DDL: $ddl")
+      statement.execute(ddl)
+    )
 
   def loadData(benchmark: String): Unit =
     val datadir = s"${BuildInfo.baseDirectory}/bench/data/$benchmark/"
@@ -66,4 +82,24 @@ class DuckDBBackend(timeout: Int = -1) {
   def close(): Unit =
     connection.close()
 //    scalaSqlDb.close()
+
+  def printTables(): Unit = {
+    println("Current Tables")
+    val statement = connection.createStatement()
+    val query = "SELECT table_name, estimated_size FROM duckdb_tables();"
+
+    // Execute the query and print results
+    val resultSet: ResultSet = statement.executeQuery(query)
+    var tables = Seq[(String, String)]()
+    while resultSet.next() do
+      val tableName = resultSet.getString("table_name")
+      val size = resultSet.getLong("estimated_size")
+      tables = tables :+ (tableName, size.toString)
+
+    tables.filterNot(t => (t._1.contains("delta") || t._1.contains("derived") || t._1.contains("tmp"))).foreach(t => println(s"${t._1}\t\t\t${t._2}"))
+    tables.filter(t => (t._1.contains("delta") || t._1.contains("derived") || t._1.contains("tmp"))).foreach(t => println(s"\t${t._1}\t\t${t._2}"))
+    // Clean up resources
+    resultSet.close()
+    statement.close()
+  }
 }

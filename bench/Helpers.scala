@@ -7,25 +7,25 @@ import java.io.{BufferedWriter, FileWriter}
 import java.sql.{ResultSet, ResultSetMetaData}
 
 object Helpers {
-  val currentData = "data"
+  val currentData = "l_data"
   val timeoutMins = 10
   val skip = Seq(
-//    "ancestry",
+    "ancestry",
 //    "andersens",
-//    "asps",
-//    "bom",
-//    "cba",
-//    "cc",
-//    "cspa",
+    "asps",
+    "bom",
+    "cba",
+    "cc",
+    "cspa",
 //    "dataflow",
-//    "evenodd",
-//    "javapointsto",
-//    "orbits",
-//    "party",
-//    "pointstocount",
-//    "sssp",
-//    "tc",
-//    "trustchain",
+    "evenodd",
+    "javapointsto",
+    "orbits",
+    "party",
+    "pointstocount",
+    "sssp",
+    "tc",
+    "trustchain",
   )
   def readDDLFile(filePath: String): Seq[String] =
     val src = Source.fromFile(new File(filePath))
@@ -120,4 +120,21 @@ object Helpers {
         case e: Exception => println(s"Failed to delete file: ${e.getMessage}")
       }
     }
+
+  def cleanTmp(): Unit = {
+    val tmpdir = Paths.get(".tmp")
+    try {
+      Files.list(tmpdir).iterator().asScala
+        .filter(Files.isRegularFile(_)) // Only target regular files
+        .foreach { file =>
+          try {
+            Files.delete(file)
+          } catch {
+            case e: Exception => println(s"ERROR: Failed to delete file: $file")
+          }
+        }
+    } catch {
+      case e: Exception => {}
+    }
+  }
 }
