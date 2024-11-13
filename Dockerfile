@@ -30,10 +30,14 @@ RUN curl -L https://github.com/duckdb/duckdb/releases/download/v0.8.1/duckdb_cli
 RUN useradd -m -s /bin/bash appuser \
     && mkdir -p /app /test-results \
     && chown -R appuser:appuser /app /test-results
+
+USER appuser
+WORKDIR /app
+COPY --chown=appuser:appuser build.sbt ./
+COPY --chown=appuser:appuser project ./project
+RUN sbt update
 COPY --chown=appuser:appuser start.sh /start.sh
 RUN chmod +x /start.sh
-WORKDIR /app
-USER appuser
 
 CMD ["/start.sh"]
 

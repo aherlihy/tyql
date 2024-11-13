@@ -6,7 +6,11 @@ inThisBuild(Seq(
   version := "0.0.1",
   libraryDependencies ++= Seq(
     "org.scalameta" %% "munit" % "1.0.0+24-ee555b1d-SNAPSHOT" % Test,
-    "org.duckdb" % "duckdb_jdbc" % "1.1.1",
+    "org.postgresql" % "postgresql" % "42.7.4",
+    "mysql" % "mysql-connector-java" % "8.0.33",
+    "org.mariadb.jdbc" % "mariadb-java-client" % "3.5.0",
+    "org.xerial" % "sqlite-jdbc" % "3.47.0.0",
+    "org.duckdb" % "duckdb_jdbc" % "1.1.3",
     "com.lihaoyi" %% "scalasql" % "0.1.11"
   )
 ))
@@ -30,14 +34,6 @@ lazy val root = (project in file("."))
 //    Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
     buildInfoKeys := Seq[BuildInfoKey](baseDirectory),
     buildInfoPackage := "buildinfo",
-//    cleanFiles ++= Seq(
-//      baseDirectory.value / "bench/data/ancestry/out/collections.csv",
-//      baseDirectory.value / "bench/data/ancestry/out/tyql.csv",
-//      baseDirectory.value / "bench/data/ancestry/out/scalasql.csv",
-//      baseDirectory.value / "bench/data/andersens/out/collections.csv",
-//      baseDirectory.value / "bench/data/andersens/out/tyql.csv",
-//      baseDirectory.value / "bench/data/andersens/out/scalasql.csv",
-//    ),
     cleanFiles ++= Seq("tc",
       "ancestry",
       "andersens",
