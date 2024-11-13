@@ -142,7 +142,6 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 //        """
 //}
 
-
 class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
   def testDescription: String = "TC with project"
 
@@ -190,7 +189,6 @@ class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
           WHERE ref$Z.y = edges$C.x))) SELECT * FROM recursive$A as recref$X WHERE recref$X.x > 1
           """
 }
-
 
 class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
   def testDescription: String = "TC with filter + map"
@@ -378,50 +376,52 @@ class RecursiveCSPADistinctTest extends SQLStringQueryTest[CSPADB, Location] {
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         ).distinct
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
-        val VF =
-          // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
-          assign.flatMap(a =>
-            memoryAlias
-              .filter(m => a.p2 == m.p1)
-              .map(m => (p1 = a.p1, p2 = m.p2).toRow
-              )
-          ).unionAll(
-            // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
-            valueFlow.flatMap(vf1 =>
-              valueFlow
-                .filter(vf2 => vf1.p2 == vf2.p1)
-                .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
-            )
-          ).distinct
-        val MA =
-          // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-          dereference.flatMap(d1 =>
-            valueAlias.flatMap(va =>
-              dereference
-                .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
-                .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
-            )
-          ).distinct
-
-        val VA =
-          // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(
+      valueFlowBase,
+      testDB.tables.empty,
+      memoryAliasBase
+    )((valueFlow, valueAlias, memoryAlias) =>
+      val VF =
+        // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
+        assign.flatMap(a =>
+          memoryAlias
+            .filter(m => a.p2 == m.p1)
+            .map(m => (p1 = a.p1, p2 = m.p2).toRow)
+        ).unionAll(
+          // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
           valueFlow.flatMap(vf1 =>
             valueFlow
-              .filter(vf2 => vf1.p1 == vf2.p1)
-              .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
-          ).unionAll(
-            // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
-            valueFlow.flatMap(vf1 =>
-              memoryAlias.flatMap(m =>
-                valueFlow
-                  .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
-                  .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
-              )
+              .filter(vf2 => vf1.p2 == vf2.p1)
+              .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
+          )
+        ).distinct
+      val MA =
+        // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
+        dereference.flatMap(d1 =>
+          valueAlias.flatMap(va =>
+            dereference
+              .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
+              .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
+          )
+        ).distinct
+
+      val VA =
+        // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+        valueFlow.flatMap(vf1 =>
+          valueFlow
+            .filter(vf2 => vf1.p1 == vf2.p1)
+            .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+        ).unionAll(
+          // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+          valueFlow.flatMap(vf1 =>
+            memoryAlias.flatMap(m =>
+              valueFlow
+                .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
+                .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
             )
-          ).distinct
-        (VF, MA, VA)
+          )
+        ).distinct
+      (VF, MA, VA)
     )
     valueFlowFinal
 
@@ -489,50 +489,52 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
-        val VF =
-          // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
-          assign.flatMap(a =>
-            memoryAlias
-              .filter(m => a.p2 == m.p1)
-              .map(m => (p1 = a.p1, p2 = m.p2).toRow
-              )
-          ).union(
-            // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
-            valueFlow.flatMap(vf1 =>
-              valueFlow
-                .filter(vf2 => vf1.p2 == vf2.p1)
-                .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
-            )
-          )
-        val MA =
-          // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-          dereference.flatMap(d1 =>
-            valueAlias.flatMap(va =>
-              dereference
-                .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
-                .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
-            )
-          ).distinct
-
-        val VA =
-          // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(
+      valueFlowBase,
+      testDB.tables.empty,
+      memoryAliasBase
+    )((valueFlow, valueAlias, memoryAlias) =>
+      val VF =
+        // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
+        assign.flatMap(a =>
+          memoryAlias
+            .filter(m => a.p2 == m.p1)
+            .map(m => (p1 = a.p1, p2 = m.p2).toRow)
+        ).union(
+          // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
           valueFlow.flatMap(vf1 =>
             valueFlow
-              .filter(vf2 => vf1.p1 == vf2.p1)
-              .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
-          ).union(
-            // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
-            valueFlow.flatMap(vf1 =>
-              memoryAlias.flatMap(m =>
-                valueFlow
-                  .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
-                  .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
-              )
+              .filter(vf2 => vf1.p2 == vf2.p1)
+              .map(vf2 => (p1 = vf1.p1, p2 = vf2.p2).toRow)
+          )
+        )
+      val MA =
+        // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
+        dereference.flatMap(d1 =>
+          valueAlias.flatMap(va =>
+            dereference
+              .filter(d2 => d1.p1 == va.p1 && va.p2 == d2.p1)
+              .map(d2 => (p1 = d1.p2, p2 = d2.p2).toRow)
+          )
+        ).distinct
+
+      val VA =
+        // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+        valueFlow.flatMap(vf1 =>
+          valueFlow
+            .filter(vf2 => vf1.p1 == vf2.p1)
+            .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
+        ).union(
+          // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+          valueFlow.flatMap(vf1 =>
+            memoryAlias.flatMap(m =>
+              valueFlow
+                .filter(vf2 => vf1.p1 == m.p1 && vf2.p1 == m.p2)
+                .map(vf2 => (p1 = vf1.p2, p2 = vf2.p2).toRow)
             )
           )
-        (VF, MA, VA)
+        )
+      (VF, MA, VA)
     )
     valueFlowFinal
 
@@ -575,7 +577,6 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
     """
 }
 
-
 type FibNum = (recursionDepth: Int, fibonacciNumber: Int, nextNumber: Int)
 type FibNumDB = (base: FibNum, result: FibNum)
 
@@ -601,7 +602,13 @@ class RecursionFibTest extends SQLStringQueryTest[FibNumDB, (FibonacciNumberInde
     fib.fix(fib =>
       fib
         .filter(f => (f.recursionDepth + 1) < 10)
-        .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
+        .map(f =>
+          (
+            recursionDepth = f.recursionDepth + 1,
+            fibonacciNumber = f.nextNumber,
+            nextNumber = f.fibonacciNumber + f.nextNumber
+          ).toRow
+        )
         .distinct
     ).map(f => (FibonacciNumberIndex = f.recursionDepth, FibonacciNumber = f.fibonacciNumber).toRow)
   def expectedQueryPattern: String =
@@ -687,7 +694,7 @@ type ReachabilityDB = (edge: Edge)
 given ReachabilityDBs: TestDatabase[ReachabilityDB] with
   override def tables = (
     edge = Table[Edge]("edge")
-    )
+  )
 
   override def init(): String = """
     CREATE TABLE edge (x INTEGER, y INTEGER);
@@ -770,7 +777,7 @@ type ManagementDB = (reports: Report)
 given ManagementDBs: TestDatabase[ManagementDB] with
   override def tables = (
     reports = Table[Report]("reports")
-    )
+  )
 
   override def init(): String = """
     CREATE TABLE report (
@@ -859,7 +866,7 @@ type IntervalDB = (intervals: Interval)
 given IntervalDBs: TestDatabase[IntervalDB] with
   override def tables = (
     intervals = Table[Interval]("inter")
-    )
+  )
 
   override def init(): String =
     """
@@ -869,11 +876,10 @@ given IntervalDBs: TestDatabase[IntervalDB] with
       );
     """
 
-/** TODO: figure out how to do groupBy on join result.
- * Right now have unimplemented "mergeMap" method but probably better to extract all source relations from source
- * query and then supply them as arguments to the function arguments of groupBy, so the project/groupBy/having functions
- * can access the original, non-aggregated relations.
- */
+/** TODO: figure out how to do groupBy on join result. Right now have unimplemented "mergeMap" method but probably
+  * better to extract all source relations from source query and then supply them as arguments to the function arguments
+  * of groupBy, so the project/groupBy/having functions can access the original, non-aggregated relations.
+  */
 //class RecursionIntervalCoalesceTest extends SQLStringQueryTest[IntervalDB, (s: Int, e: Int)] {
 //  def testDescription: String = "Interval Coalesce query to find the smallest set of intervals that cover input intervals"
 //
@@ -1000,7 +1006,7 @@ type ParentChildDB = (parentChild: Edge)
 given ParentChildDBs: TestDatabase[ParentChildDB] with
   override def tables = (
     parentChild = Table[Edge]("parentChild")
-    )
+  )
 
   override def init(): String =
     """
@@ -1066,7 +1072,7 @@ type FriendshipDB = (friendship: Edge)
 given FriendshipDBs: TestDatabase[FriendshipDB] with
   override def tables = (
     friendship = Table[Edge]("friendship")
-    )
+  )
 
   override def init(): String =
     """
@@ -1095,26 +1101,27 @@ class MutualFriendsStratifiedTest extends SQLStringQueryTest[FriendshipDB, (x: I
     )
 
     // Define the mutually recursive fixpoint
-    val (totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, baseFriendships) { (totalFriendsCount, friendships) =>
-      val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
-        friendships
-          .filter(f => tf1.x == f.x)
-          .flatMap(f =>
-            directFriendsCount
-              .filter(dfCount => f.y == dfCount.x)
-              .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
-          )
-      ).distinct
+    val (totalFriendsResult, mutualFriendsResult) =
+      fix(directFriendsCount, baseFriendships) { (totalFriendsCount, friendships) =>
+        val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
+          friendships
+            .filter(f => tf1.x == f.x)
+            .flatMap(f =>
+              directFriendsCount
+                .filter(dfCount => f.y == dfCount.x)
+                .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
+            )
+        ).distinct
 
-      // Define the mutually recursive MutualFriends relation
-      val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
-        friendships
-          .filter(f => tfCount1.x <= f.x)
-          .map(f => (x = tfCount1.x, y = f.x).toRow)
-      )
+        // Define the mutually recursive MutualFriends relation
+        val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
+          friendships
+            .filter(f => tfCount1.x <= f.x)
+            .map(f => (x = tfCount1.x, y = f.x).toRow)
+        )
 
-      (recurTotalFriendsCount, recurFriendships.distinct)
-    }
+        (recurTotalFriendsCount, recurFriendships.distinct)
+      }
     mutualFriendsResult.groupBy(
       row => (x = row.x).toRow,
       row => (x = row.x, mutual_friend_count = count(row.y)).toRow
@@ -1146,8 +1153,10 @@ class MutualFriendsStratifiedTest extends SQLStringQueryTest[FriendshipDB, (x: I
 
 /* Currently passes, but by the definition of fix, should not define non-mutually recursive relation using fix
    (should be done outside of the function like in the previous test). However, would be nice to add a restriction to enforce this.*/
-class MutualFriendsStratifiedFutureFailTest extends SQLStringQueryTest[FriendshipDB, (x: Int, mutual_friend_count: Int)] {
-  def testDescription: String = "Mutually recursive query with stratified aggregation. Here define within recur the first result. Technically against the spec because by definition all arguments to fix must be mutually recursive."
+class MutualFriendsStratifiedFutureFailTest
+    extends SQLStringQueryTest[FriendshipDB, (x: Int, mutual_friend_count: Int)] {
+  def testDescription: String =
+    "Mutually recursive query with stratified aggregation. Here define within recur the first result. Technically against the spec because by definition all arguments to fix must be mutually recursive."
 
   def query() =
     val baseFriendships = testDB.tables.friendship
@@ -1159,26 +1168,27 @@ class MutualFriendsStratifiedFutureFailTest extends SQLStringQueryTest[Friendshi
     )
 
     // Define the mutually recursive fixpoint
-    val (dfC, totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, directFriendsCount, baseFriendships) { (dfC2, totalFriendsCount, friendships) =>
-      val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
-        friendships
-          .filter(f => tf1.x == f.x)
-          .flatMap(f =>
-            dfC2
-              .filter(dfCount => f.y == dfCount.x)
-              .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
-          )
-      ).distinct
+    val (dfC, totalFriendsResult, mutualFriendsResult) =
+      fix(directFriendsCount, directFriendsCount, baseFriendships) { (dfC2, totalFriendsCount, friendships) =>
+        val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
+          friendships
+            .filter(f => tf1.x == f.x)
+            .flatMap(f =>
+              dfC2
+                .filter(dfCount => f.y == dfCount.x)
+                .map(dfCount => (x = tf1.x, friend_count = dfCount.friend_count).toRow)
+            )
+        ).distinct
 
-      // Define the mutually recursive MutualFriends relation
-      val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
-        friendships
-          .filter(f => tfCount1.x <= f.x)
-          .map(f => (x = tfCount1.x, y = f.x).toRow)
-      )
+        // Define the mutually recursive MutualFriends relation
+        val recurFriendships = totalFriendsCount.flatMap(tfCount1 =>
+          friendships
+            .filter(f => tfCount1.x <= f.x)
+            .map(f => (x = tfCount1.x, y = f.x).toRow)
+        )
 
-      (dfC2, recurTotalFriendsCount, recurFriendships.distinct)
-    }
+        (dfC2, recurTotalFriendsCount, recurFriendships.distinct)
+      }
     mutualFriendsResult.groupBy(
       row => (x = row.x).toRow,
       row => (x = row.x, mutual_friend_count = count(row.y)).toRow
@@ -1217,7 +1227,7 @@ type CyclicGraphDB = (edges: CyclicEdge)
 given CyclicGraphDBs: TestDatabase[CyclicGraphDB] with
   override def tables = (
     edges = Table[CyclicEdge]("edges")
-    )
+  )
 
   override def init(): String =
     """
@@ -1300,10 +1310,11 @@ class RecursiveOrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
     val orbitsRef = orbits.$resultQuery
 
     orbits.filter(o =>
-        orbitsRef.flatMap(o1 => orbitsRef
-            .filter(o2 => o1.y == o2.x)
-            .map(o2 => (x = o1.x, y = o2.y).toRow)
-        ).filter(io => o.x == io.x && o.y == io.y)
+      orbitsRef.flatMap(o1 =>
+        orbitsRef
+          .filter(o2 => o1.y == o2.x)
+          .map(o2 => (x = o1.x, y = o2.y).toRow)
+      ).filter(io => o.x == io.x && o.y == io.y)
         .isEmpty
     )
 
@@ -1327,9 +1338,3 @@ class RecursiveOrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
     """
 
 }
-
-
-
-
-
-

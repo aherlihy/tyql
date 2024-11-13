@@ -25,7 +25,7 @@ class AncestryQuery extends QueryBenchmark {
   type AncestryDB = (parents: Parent)
   val tyqlDB = (
     parents = Table[Parent]("ancestry_parents")
-    )
+  )
 
   // Collections data model + initialization
   case class ParentCC(parent: String, child: String)
@@ -83,13 +83,12 @@ class AncestryQuery extends QueryBenchmark {
   def executeCollections(): Unit =
     val base = collectionsDB.parents.filter(p => p.parent == "Alice").map(e => GenCC(name = e.child, gen = 1))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
-        collectionsDB.parents.flatMap(parent =>
-          sp
-            .filter(g => parent.parent == g.name)
-            .map(g => GenCC(name = parent.child, gen = g.gen + 1))
-        ).distinct
+      collectionsDB.parents.flatMap(parent =>
+        sp
+          .filter(g => parent.parent == g.name)
+          .map(g => GenCC(name = parent.child, gen = g.gen + 1))
+      ).distinct
     ).filter(g => g.gen == 2).map(g => ResultCC(name = g.name)).sortBy(_.name)
-
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -105,8 +104,13 @@ class AncestryQuery extends QueryBenchmark {
       } yield (parents.child, base.gen + 1)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, ancestry_delta, ancestry_tmp, ancestry_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
+      ddb,
+      ancestry_delta,
+      ancestry_tmp,
+      ancestry_derived
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]]
+    )
 
     val result = ancestry_derived.select
       .filter(_.gen === 2)

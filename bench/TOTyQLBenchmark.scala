@@ -10,7 +10,7 @@ import Helpers.*
 @experimental
 @Fork(1)
 @Warmup(iterations = 0, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
+@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class TOTyQLBenchmark {
@@ -28,7 +28,7 @@ class TOTyQLBenchmark {
         Thread.currentThread().interrupt()
       case e: Exception =>
         throw e
-              println(s"Benchmark '$benchmarkName' encountered an exception: ${e.getMessage}")
+        println(s"Benchmark '$benchmarkName' encountered an exception: ${e.getMessage}")
     } finally {
       duckDB.cancelStmt()
       executor.shutdownNow() // Ensure cleanup
@@ -74,7 +74,8 @@ class TOTyQLBenchmark {
     duckDB.close()
   }
 
-  /*******************Boilerplate*****************/
+  /** *****************Boilerplate****************
+    */
   @Benchmark def tc_large(blackhole: Blackhole): Unit = {
     runWithTimeout("tc", blackhole)
   }

@@ -9,7 +9,7 @@ import Helpers.*
 @experimental
 @Fork(1)
 @Warmup(iterations = 0, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
+@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class CollectionsBenchmarkX {
@@ -47,7 +47,8 @@ class CollectionsBenchmarkX {
     )
   }
 
-  /*******************Boilerplate*****************/
+  /** *****************Boilerplate****************
+    */
   @Benchmark def tc(blackhole: Blackhole): Unit = {
     blackhole.consume(
       run("tc")

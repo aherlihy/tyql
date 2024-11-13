@@ -12,7 +12,8 @@ enum ResultTag[T]:
   case BoolTag extends ResultTag[Boolean]
   case LocalDateTag extends ResultTag[LocalDate]
   // names is a var to special case when we want to treat a named tuple like a regular tuple without going through type conversion
-  case NamedTupleTag[N <: Tuple, V <: Tuple](var names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
+  case NamedTupleTag[N <: Tuple, V <: Tuple](var names: List[String], types: List[ResultTag[?]])
+      extends ResultTag[NamedTuple[N, V]]
 //  case TupleTag[T <: Tuple](types: List[ResultTag[?]]) extends ResultTag[Tuple]
   case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]]) extends ResultTag[T]
   case ListTag[T](elementType: ResultTag[T]) extends ResultTag[List[T]]

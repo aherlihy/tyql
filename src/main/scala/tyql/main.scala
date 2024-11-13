@@ -43,7 +43,6 @@ object Edge extends ScalaSQLTable[EdgeSS]
 
   val connection: Connection = DriverManager.getConnection("jdbc:duckdb:")
 
-
   try {
     val ddl = s"${BuildInfo.baseDirectory}/bench/data/tc/schema.ddl"
     val ddlCmds = readDDLFile(ddl)
@@ -54,7 +53,7 @@ object Edge extends ScalaSQLTable[EdgeSS]
       statement.execute(ddl)
     )
 
-    statement.execute(s"COPY tc_edge FROM '${BuildInfo.baseDirectory}/bench/data/tc/edge.csv'")
+    statement.execute(s"COPY tc_edge FROM '${BuildInfo.baseDirectory}/bench/data/tc/data/edge.csv'")
 
     val resultSet: ResultSet = statement.executeQuery("SELECT * FROM tc_edge")
 
@@ -64,15 +63,17 @@ object Edge extends ScalaSQLTable[EdgeSS]
       val y = resultSet.getInt("y")
       println(s"x: $x, y: $y")
     }
-    val dbClient = scalasql.DbClient.Connection(connection, new scalasql.Config {
-      override def tableNameMapper(v: String) = s"tc_${v.toLowerCase()}"
-    })
+    val dbClient = scalasql.DbClient.Connection(
+      connection,
+      new scalasql.Config {
+        override def tableNameMapper(v: String) = s"tc_${v.toLowerCase()}"
+      }
+    )
     val db = dbClient.getAutoCommitClientConnection
     val query = Edge.select
     println(s"ScalaSQL query=${db.renderSql(query)}")
     val res = db.run(query)
     println(s"ScalaSQL result=$res")
-
 
   } finally {
     connection.close()

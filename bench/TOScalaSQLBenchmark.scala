@@ -10,7 +10,7 @@ import Helpers.*
 @experimental
 @Fork(1)
 @Warmup(iterations = 0, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
+@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class TOScalaSQLBenchmark {
@@ -56,7 +56,6 @@ class TOScalaSQLBenchmark {
     "cba" -> TOCBAQuery(),
   )
 
-
   def run(bm: String) = benchmarks(bm).executeScalaSQL(duckDB)
 
   @Setup(Level.Trial)
@@ -75,7 +74,8 @@ class TOScalaSQLBenchmark {
     duckDB.close()
   }
 
-  /*******************Boilerplate*****************/
+  /** *****************Boilerplate****************
+    */
   @Benchmark def tc_large(blackhole: Blackhole): Unit = {
     runWithTimeout("tc", blackhole)
   }

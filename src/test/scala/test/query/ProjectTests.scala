@@ -1,6 +1,6 @@
 package test.query.project
 import test.SQLStringQueryTest
-import test.query.{commerceDBs,  AllCommerceDBs, Product}
+import test.query.{commerceDBs, AllCommerceDBs, Product}
 
 import tyql.*
 import tyql.Expr.toRow
@@ -104,8 +104,8 @@ class Project2Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: St
   def testDescription = "Project: project to tuple, toRow"
   def query() =
     testDB.tables.products.map: c =>
-      (id = c.id, name = c.name, price =  c.price).toRow
-  def expectedQueryPattern: String ="""
+      (id = c.id, name = c.name, price = c.price).toRow
+  def expectedQueryPattern: String = """
   SELECT product$A.id as id, product$A.name as name, product$A.price as price
 FROM product as product$A
         """
@@ -123,7 +123,11 @@ FROM product as product$A
 //        """
 //}
 
-class Project4Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)] {
+class Project4Test
+    extends SQLStringQueryTest[
+      AllCommerceDBs,
+      (id: Int, name: String, price: Double, buyerId: Int, shippingDate: LocalDate)
+    ] {
   def testDescription = "Project: project to tuple with concat with another tuple"
   def query() =
     val tupleProd = testDB.tables.products
@@ -141,19 +145,17 @@ class Project4Test extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: St
   //      tupleShip.map: s =>
   //        s.concat(c)
 
-  def expectedQueryPattern: String ="""
+  def expectedQueryPattern: String = """
     SELECT subquery$A.*, subquery$B.* FROM
        (SELECT product$C.id as id, product$C.name as name, product$C.price as price FROM product as product$C) as subquery$A,
        (SELECT shippingInfo$D.buyerId as buyerId, shippingInfo$D.shippingDate as shippingDate FROM shippingInfo as shippingInfo$D) as subquery$B
         """
 }
 
-/** TODO:
- * Concat doesn't work on these tests because the original types are defined as case classes.
- * Should we have some automatic conversion from case class to named tuple, or generate a named
- * tuple from a case class + extra fields? Otherwise it's odd that you can't call concat on a
- * normal row.
- */
+/** TODO: Concat doesn't work on these tests because the original types are defined as case classes. Should we have some
+  * automatic conversion from case class to named tuple, or generate a named tuple from a case class + extra fields?
+  * Otherwise it's odd that you can't call concat on a normal row.
+  */
 
 //class ProjectConcatTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int, name: String, price: Double, extra: Int)] {
 //  def testDescription = "Project: project + concat literal"

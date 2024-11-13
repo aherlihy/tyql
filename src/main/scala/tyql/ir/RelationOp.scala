@@ -2,13 +2,12 @@ package tyql
 
 import tyql.SelectFlags.Final
 
-/**
- * Modifiers for query generation, e.g. queries at the expression level need surrounding parens.
- */
+/** Modifiers for query generation, e.g. queries at the expression level need surrounding parens.
+  */
 enum SelectFlags:
-  case Distinct   // used by select queries
-  case Final      // top-level final result, e.g. avoid extra parens or aliasing
-  case ExprLevel  // expression-level relation operation
+  case Distinct // used by select queries
+  case Final // top-level final result, e.g. avoid extra parens or aliasing
+  case ExprLevel // expression-level relation operation
 
 enum PositionFlag:
   case Project, Where, Subquery
@@ -22,51 +21,51 @@ class SymbolTable(val innerTable: Map[String, RelationOp] = Map.empty):
     if (innerTable.contains(alias))
       innerTable(alias)
     else
-      throw new Exception(s"Symbol $alias missing from symbol table. Contents: ${innerTable.keys.mkString("[", ", ", "]")}")
+      throw new Exception(
+        s"Symbol $alias missing from symbol table. Contents: ${innerTable.keys.mkString("[", ", ", "]")}"
+      )
 
-/**
- * Relation-level operations, e.g. a table, union of tables, SELECT query, etc.
- */
+/** Relation-level operations, e.g. a table, union of tables, SELECT query, etc.
+  */
 trait RelationOp extends QueryIRNode:
   var flags: Set[SelectFlags] = Set.empty
   def alias: String
   val carriedSymbols: List[(String, RecursiveIRVar)] = List.empty
 
-  /**
-   * Avoid overloading
-   * TODO: decide if we want to mutate, or copy + discard IR nodes. Right now its a mix, which should be improved
-   */
+  /** Avoid overloading TODO: decide if we want to mutate, or copy + discard IR nodes. Right now its a mix, which should
+    * be improved
+    */
   def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp
 
-  /**
-   * Equivalent to adding a .filter(w)
-   * @param w - predicate expression
-   */
+  /** Equivalent to adding a .filter(w)
+    * @param w
+    *   \- predicate expression
+    */
   def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp
 
-  /**
-   * Equivalent to adding a .map(p)
-   * @param p - a projection expression
-   */
+  /** Equivalent to adding a .map(p)
+    * @param p
+    *   \- a projection expression
+    */
   def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp
 
-  /**
-   * Add some extra metadata needed to generate "nice" SQL strings.
-   * Also used to handle edge cases, e.g. expression-level relation-ops should get aliases, etc.
-   * @param f - the flag
-   */
+  /** Add some extra metadata needed to generate "nice" SQL strings. Also used to handle edge cases, e.g.
+    * expression-level relation-ops should get aliases, etc.
+    * @param f
+    *   \- the flag
+    */
   def appendFlag(f: SelectFlags): RelationOp
   def appendFlags(f: Set[SelectFlags]): RelationOp =
     f.foldLeft(this)((r: RelationOp, f) => r.appendFlag(f))
 
   def wrapString(inner: String): String =
     val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    val aliasStr =
+      if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
     s"$open$inner$close$aliasStr"
 
-/**
- * Simple table read.
- */
+/** Simple table read.
+  */
 case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with QueryIRLeaf:
   val name = s"$tableName${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
@@ -113,14 +112,12 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
     q.flags = q.flags + f
     q
 
-/**
- * Select query, e.g. SELECT * FROM <Relations> WHERE <where?>
- * Separate from SelectQuery because SELECT * queries can be unnested
- */
-case class SelectAllQuery(from: Seq[RelationOp],
-                       where: Seq[QueryIRNode],
-                       overrideAlias: Option[String],
-                       ast: DatabaseAST[?]) extends RelationOp:
+/** Select query, e.g. SELECT * FROM <Relations> WHERE <where?> Separate from SelectQuery because SELECT * queries can
+  * be unnested
+  */
+case class SelectAllQuery
+  (from: Seq[RelationOp], where: Seq[QueryIRNode], overrideAlias: Option[String], ast: DatabaseAST[?])
+    extends RelationOp:
   val name = overrideAlias.getOrElse({
     val latestVar = s"subquery${QueryIRTree.idCount}"
     QueryIRTree.idCount += 1
@@ -162,7 +159,11 @@ case class SelectAllQuery(from: Seq[RelationOp],
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
     val whereStr = if where.nonEmpty then
-      s" WHERE ${if where.size == 1 then where.head.toSQLString() else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")}" else
+      s" WHERE ${
+          if where.size == 1 then where.head.toSQLString()
+          else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")
+        }"
+    else
       ""
     wrapString(
       s"SELECT $flagsStr* FROM $fromStr$whereStr"
@@ -170,16 +171,19 @@ case class SelectAllQuery(from: Seq[RelationOp],
 
   override def toString: String = // for debugging
     s"SelectAllQuery(\n\talias=$alias,\n\tfrom=$from,\n\twhere=$where\n)"
-/**
- * Select query, e.g. SELECT <Project> FROM <Relations> WHERE <where>
- * TODO: Eventually specialize join nodes, for now use Select with multiple FROM fields to indicate join.
- * Right now the AST only supports nested flatMaps, will eventually expand syntax to support specifying join type.
- */
-case class SelectQuery(project: QueryIRNode,
-                       from: Seq[RelationOp],
-                       where: Seq[QueryIRNode],
-                       overrideAlias: Option[String],
-                       ast: DatabaseAST[?]) extends RelationOp:
+
+/** Select query, e.g. SELECT <Project> FROM <Relations> WHERE <where> TODO: Eventually specialize join nodes, for now
+  * use Select with multiple FROM fields to indicate join. Right now the AST only supports nested flatMaps, will
+  * eventually expand syntax to support specifying join type.
+  */
+case class SelectQuery
+  (
+      project: QueryIRNode,
+      from: Seq[RelationOp],
+      where: Seq[QueryIRNode],
+      overrideAlias: Option[String],
+      ast: DatabaseAST[?]
+  ) extends RelationOp:
   val name = overrideAlias.getOrElse({
     val latestVar = s"subquery${QueryIRTree.idCount}"
     QueryIRTree.idCount += 1
@@ -196,10 +200,9 @@ case class SelectQuery(project: QueryIRNode,
     // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
     SelectQuery(p, Seq(this), Seq(), None, astOther).appendFlags(flags)
 
-
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: (TableLeaf  | RecursiveIRVar) =>
+      case t: (TableLeaf | RecursiveIRVar) =>
         SelectAllQuery(Seq(this, t), Seq(), None, astOther)
       case q: SelectAllQuery =>
         SelectAllQuery(this +: q.from, q.where, None, astOther)
@@ -219,16 +222,19 @@ case class SelectQuery(project: QueryIRNode,
     val projectStr = project.toSQLString()
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
     val whereStr = if where.nonEmpty then
-      s" WHERE ${if where.size == 1 then where.head.toSQLString() else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")}" else
+      s" WHERE ${
+          if where.size == 1 then where.head.toSQLString()
+          else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")
+        }"
+    else
       ""
     wrapString(s"SELECT $flagsStr$projectStr FROM $fromStr$whereStr")
 
   override def toString: String = // for debugging
     s"SelectQuery(\n\talias=$alias,\n\tproject=$project,\n\tfrom=$from,\n\twhere=$where\n)"
 
-/**
- * Query with ORDER BY clause
- */
+/** Query with ORDER BY clause
+  */
 case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast: DatabaseAST[?]) extends RelationOp:
   override def alias = query.alias
 
@@ -251,7 +257,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: (TableLeaf  | RecursiveIRVar) =>
+      case t: (TableLeaf | RecursiveIRVar) =>
         OrderedQuery(query.mergeWith(t, astOther), sortFn, ast)
       case q: SelectAllQuery =>
         SelectAllQuery(
@@ -273,14 +279,22 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
         val (newQ1, whereQ1) = query match
           case q1: SelectAllQuery =>
             (
-              OrderedQuery(SelectAllQuery(q1.from, Seq(), Some(q1.alias), q1.ast).appendFlag(SelectFlags.Final), sortFn, ast),
+              OrderedQuery(
+                SelectAllQuery(q1.from, Seq(), Some(q1.alias), q1.ast).appendFlag(SelectFlags.Final),
+                sortFn,
+                ast
+              ),
               q1.where
             )
           case _ => (this, Seq())
         val (newQ2, whereQ2) = o.query match
           case q2: SelectAllQuery =>
             (
-              OrderedQuery(SelectAllQuery(q2.from, Seq(), Some(q2.alias), q2.ast).appendFlag(SelectFlags.Final), o.sortFn, o.ast),
+              OrderedQuery(
+                SelectAllQuery(q2.from, Seq(), Some(q2.alias), q2.ast).appendFlag(SelectFlags.Final),
+                o.sortFn,
+                o.ast
+              ),
               q2.where
             )
           case _ => (this, Seq())
@@ -299,15 +313,14 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 
   override def toSQLString(): String =
     wrapString(s"${query.toSQLString()} ORDER BY ${sortFn.map(s =>
-      val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
-        case v: SelectExpr => v.attrName
-        case o => o.toSQLString()
-      s"$varStr ${s._2.toString}"
-    ).mkString("", ", ", "")}")
+        val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
+          case v: SelectExpr => v.attrName
+          case o             => o.toSQLString()
+        s"$varStr ${s._2.toString}"
+      ).mkString("", ", ", "")}")
 
-/**
- * N-ary relation-level operation
- */
+/** N-ary relation-level operation
+  */
 case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseAST[?]) extends RelationOp:
   val latestVar = s"subquery${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
@@ -332,7 +345,7 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t:(TableLeaf  | RecursiveIRVar) =>
+      case t: (TableLeaf | RecursiveIRVar) =>
         SelectAllQuery(
           Seq(this, r),
           Seq(),
@@ -369,25 +382,40 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
   override def toSQLString(): String =
     wrapString(children.map(_.toSQLString()).mkString(s" $op "))
 
-case class MultiRecursiveRelationOp(aliases: Seq[String],
-                                    query: Seq[RelationOp],
-                                    finalQ: RelationOp,
-                                    override val carriedSymbols: List[(String, RecursiveIRVar)],
-                                    ast: DatabaseAST[?]) extends RelationOp:
+case class MultiRecursiveRelationOp
+  (
+      aliases: Seq[String],
+      query: Seq[RelationOp],
+      finalQ: RelationOp,
+      override val carriedSymbols: List[(String, RecursiveIRVar)],
+      ast: DatabaseAST[?]
+  ) extends RelationOp:
   val alias = finalQ.alias
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendWhere(w, astOther), carriedSymbols, ast
+      aliases,
+      query,
+      finalQ.appendWhere(w, astOther),
+      carriedSymbols,
+      ast
     ).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendProject(p, astOther), carriedSymbols, ast
+      aliases,
+      query,
+      finalQ.appendProject(p, astOther),
+      carriedSymbols,
+      ast
     ).appendFlags(flags)
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.mergeWith(r, astOther).appendFlag(Final), carriedSymbols, ast
+      aliases,
+      query,
+      finalQ.mergeWith(r, astOther).appendFlag(Final),
+      carriedSymbols,
+      ast
     ).appendFlags(flags)
 
   override def appendFlag(f: SelectFlags): RelationOp =
@@ -403,9 +431,8 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
     val ctes = aliases.zip(query).map((a, q) => s"$a AS (${q.toSQLString()})").mkString(",\n")
     s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
 
-/**
- * A recursive variable that points to a table or subquery.
- */
+/** A recursive variable that points to a table or subquery.
+  */
 case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST[?]) extends RelationOp:
   override def toSQLString() = s"$pointsToAlias as $alias"
   override def toString: String = s"RVAR($alias->$pointsToAlias)"
@@ -413,7 +440,7 @@ case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST
   // TODO: for now reuse TableOp's methods
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: (TableLeaf  | RecursiveIRVar) =>
+      case t: (TableLeaf | RecursiveIRVar) =>
         SelectAllQuery(Seq(this, r), Seq(), None, astOther)
       case q: SelectAllQuery =>
         SelectAllQuery(this +: q.from, q.where, None, astOther)
@@ -445,12 +472,14 @@ case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST
     q.flags = q.flags + f
     q
 
-case class GroupByQuery(
-                   source: RelationOp,
-                   groupBy: QueryIRNode,
-                   having: Option[QueryIRNode],
-                   overrideAlias: Option[String],
-                   ast: DatabaseAST[?]) extends RelationOp:
+case class GroupByQuery
+  (
+      source: RelationOp,
+      groupBy: QueryIRNode,
+      having: Option[QueryIRNode],
+      overrideAlias: Option[String],
+      ast: DatabaseAST[?]
+  ) extends RelationOp:
   val name = overrideAlias.getOrElse({
     val latestVar = s"subquery${QueryIRTree.idCount}"
     QueryIRTree.idCount += 1
@@ -480,6 +509,7 @@ case class GroupByQuery(
     val sourceStr = source.toSQLString()
     val groupByStr = groupBy.toSQLString()
     val havingStr = if having.nonEmpty then
-      s" HAVING ${having.get.toSQLString()}" else
+      s" HAVING ${having.get.toSQLString()}"
+    else
       ""
     wrapString(s"$sourceStr GROUP BY $groupByStr$havingStr")

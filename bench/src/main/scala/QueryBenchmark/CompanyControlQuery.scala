@@ -84,9 +84,7 @@ class CompanyControlQuery extends QueryBenchmark {
         cshares
           .filter(cs => cs.byC == con.com2)
           .aggregate(cs => (byC = con.com1, of = cs.of, percent = sum(cs.percent)).toGroupingRow)
-      ).groupBySource(
-        (con, csh) => (byC = con.com1, of = csh.of).toRow
-      ).distinct
+      ).groupBySource((con, csh) => (byC = con.com1, of = csh.of).toRow).distinct
       val controlRecur = cshares
         .filter(s => s.percent > 50)
         .map(s => (com1 = s.byC, com2 = s.of).toRow)
@@ -131,16 +129,20 @@ class CompanyControlQuery extends QueryBenchmark {
       (cc_shares.select.map(c => (c.byC, c.of, c.percent)), cc_control.select.map(c => (c.com1, c.com2)))
 
     var it = 0
-    val fixFn: ((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[String], Expr[String], Expr[Int]), (String, String, Int)], query.Select[(Expr[String], Expr[String]), (String, String)]) =
+    val fixFn
+      : ((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (
+          query.Select[(Expr[String], Expr[String], Expr[Int]), (String, String, Int)],
+          query.Select[(Expr[String], Expr[String]), (String, String)]
+      ) =
       recur =>
         val (cshares, control) = recur
         val (csharesAcc, controlAcc) = if it == 0 then (cc_delta1, cc_delta2) else (cc_derived1, cc_derived2)
         it += 1
         val fixAgg = db.runRaw[(String, String, Int)](
           "SELECT ref22.com1 as byC, ref23.of as of, SUM(ref23.percent) as percent " +
-         s"FROM ${ScalaSQLTable.name(controlAcc)} as ref22, ${ScalaSQLTable.name(cshares)} as ref23 " +
-           "WHERE ref23.byC = ref22.com2 " +
-           "GROUP BY ref22.com1, ref23.of "
+            s"FROM ${ScalaSQLTable.name(controlAcc)} as ref22, ${ScalaSQLTable.name(cshares)} as ref23 " +
+            "WHERE ref23.byC = ref22.com2 " +
+            "GROUP BY ref22.com1, ref23.of "
         )
         val csharesRecur = if (fixAgg.isEmpty) // workaround scalasql doesn't allow empty values
           cc_empty_shares.select.map(c => (c.byC, c.of, c.percent))
@@ -149,22 +151,26 @@ class CompanyControlQuery extends QueryBenchmark {
 
         val controlRecur = csharesAcc.select
           .filter(s => s.percent > 50)
-          .map(s =>(s.byC, s.of))
+          .map(s => (s.byC, s.of))
 
         (csharesRecur, controlRecur)
 
-
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      ddb, (cc_delta1, cc_delta2), (cc_tmp1, cc_tmp2), (cc_derived1, cc_derived2)
+      ddb,
+      (cc_delta1, cc_delta2),
+      (cc_tmp1, cc_tmp2),
+      (cc_derived1, cc_derived2)
     )(
       ((c: SharesSS[?]) => (c.byC, c.of, c.percent), (c: ResultSS[?]) => (c.com1, c.com2))
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[SharesSS], ScalaSQLTable[ResultSS])) => (
+        query.Select[Any, Any],
+        query.Select[Any, Any]
+    )])
 
     val result = cc_derived2.select.sortBy(_.com1).sortBy(_.com2)
     resultScalaSQL = db.run(result)
-
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

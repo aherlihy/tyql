@@ -53,7 +53,8 @@ class BOMQuery extends QueryBenchmark {
         case _ => ???
       (name, loaded)
     ).toMap
-    collectionsDB = CollectionsDB(tables("assbl").asInstanceOf[Seq[AssblCC]], tables("basic").asInstanceOf[Seq[BasicCC]])
+    collectionsDB =
+      CollectionsDB(tables("assbl").asInstanceOf[Seq[AssblCC]], tables("basic").asInstanceOf[Seq[BasicCC]])
 
   //   ScalaSQL data model
   case class AssblSS[T[_]](part: T[String], spart: T[String])
@@ -87,21 +88,25 @@ class BOMQuery extends QueryBenchmark {
           tyqlDB.assbl.flatMap(assbl =>
             waitFor
               .filter(wf => assbl.spart == wf.part)
-              .map(wf => (part = assbl.part, days = wf.days).toRow)))
-        .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
-        .groupBySource(wf => (part = wf._1.part).toRow)
-        .sort(_.part, Ord.ASC)
-        .sort(_.max, Ord.ASC)
+              .map(wf => (part = assbl.part, days = wf.days).toRow)
+          )
+        )
+          .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
+          .groupBySource(wf => (part = wf._1.part).toRow)
+          .sort(_.part, Ord.ASC)
+          .sort(_.max, Ord.ASC)
       else
         waitFor.unrestrictedFix(waitFor =>
           tyqlDB.assbl.flatMap(assbl =>
             waitFor
               .filter(wf => assbl.spart == wf.part)
-              .map(wf => (part = assbl.part, days = wf.days).toRow)))
-        .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
-        .groupBySource(wf => (part = wf._1.part).toRow)
-        .sort(_.part, Ord.ASC)
-        .sort(_.max, Ord.ASC)
+              .map(wf => (part = assbl.part, days = wf.days).toRow)
+          )
+        )
+          .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
+          .groupBySource(wf => (part = wf._1.part).toRow)
+          .sort(_.part, Ord.ASC)
+          .sort(_.max, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -109,18 +114,17 @@ class BOMQuery extends QueryBenchmark {
   def executeCollections(): Unit =
     val base = collectionsDB.basic.map(b => ResultCC(part = b.part, max = b.days))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(waitFor =>
-        collectionsDB.assbl.flatMap(assbl =>
-          waitFor
-            .filter(wf => assbl.spart == wf.part)
-            .map(wf => ResultCC(part = assbl.part, max = wf.max))
-        )
+      collectionsDB.assbl.flatMap(assbl =>
+        waitFor
+          .filter(wf => assbl.spart == wf.part)
+          .map(wf => ResultCC(part = assbl.part, max = wf.max))
       )
+    )
       .groupBy(_.part)
       .mapValues(_.minBy(_.max))
       .values.toSeq
       .sortBy(_.part)
       .sortBy(_.max)
-
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -135,11 +139,18 @@ class BOMQuery extends QueryBenchmark {
       } yield (assbl.part, wf.max)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, bom_delta, bom_tmp, bom_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
+      ddb,
+      bom_delta,
+      bom_tmp,
+      bom_derived
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]]
+    )
 
     //    bom_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
-    backupResultScalaSql = ddb.runQuery(s"SELECT s.part as part, MAX(s.max) as max FROM ${ScalaSQLTable.name(bom_derived)} as s GROUP BY s.part ORDER BY max, part")
+    backupResultScalaSql = ddb.runQuery(
+      s"SELECT s.part as part, MAX(s.max) as max FROM ${ScalaSQLTable.name(bom_derived)} as s GROUP BY s.part ORDER BY max, part"
+    )
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

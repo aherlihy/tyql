@@ -55,7 +55,8 @@ class TOPartyQuery extends QueryBenchmark {
         case _ => ???
       (name, loaded)
     ).toMap
-    collectionsDB = CollectionsDB(tables("organizers").asInstanceOf[Seq[OrganizerCC]], tables("friends").asInstanceOf[Seq[FriendCC]])
+    collectionsDB =
+      CollectionsDB(tables("organizers").asInstanceOf[Seq[OrganizerCC]], tables("friends").asInstanceOf[Seq[FriendCC]])
 
   //   ScalaSQL data model
   case class OrganizerSS[T[_]](orgName: T[String])
@@ -87,7 +88,8 @@ class TOPartyQuery extends QueryBenchmark {
     val baseAttend = tyqlDB.organizers.map(o => (person = o.orgName).toRow)
     val baseCntFriends = tyqlDB.counts
 
-    val tyqlFix = if set then unrestrictedFix(baseAttend, baseCntFriends) else unrestrictedBagFix(baseAttend, baseCntFriends)
+    val tyqlFix =
+      if set then unrestrictedFix(baseAttend, baseCntFriends) else unrestrictedBagFix(baseAttend, baseCntFriends)
     val (finalAttend, finalCntFriends) = tyqlFix((attend, cntfriends) =>
       val recurAttend = cntfriends
         .filter(cf => cf.nCount > 2)
@@ -111,40 +113,42 @@ class TOPartyQuery extends QueryBenchmark {
     val baseAttend = collectionsDB.organizers.map(o => ResultCC(person = o.orgName))
     val baseCntFriends = Seq[CountsCC]()
 
-    val (finalAttend, finalCntFriends) = FixedPointQuery.multiFix(set)((baseAttend, baseCntFriends), (Seq(), Seq()))((recur, acc) =>
-      val (attend, cntfriends) = recur
-      val (attendAcc, cntfriendsAcc) = if it == 0 then (baseAttend, baseCntFriends) else acc
-      it+=1
+    val (finalAttend, finalCntFriends) = FixedPointQuery.multiFix(set)((baseAttend, baseCntFriends), (Seq(), Seq()))(
+      (recur, acc) =>
+        val (attend, cntfriends) = recur
+        val (attendAcc, cntfriendsAcc) = if it == 0 then (baseAttend, baseCntFriends) else acc
+        it += 1
 
 //      println(s"***iteration $it")
 //      println(s"\nRES input:\n\tattend  : ${attend.map(f => f.person).mkString("(", ",", ")")}\n\tfriendC: ${cntfriends.map(f => f.fName + "-" + f.nCount).mkString("(", ",", ")")}")
 //      println(s"\nDER input:\n\tattend  : ${attendAcc.map(f => f.person).mkString("(", ",", ")")}\n\tfriendC: ${cntfriendsAcc.map(f => f.fName + "-" + f.nCount).mkString("(", ",", ")")}")
 //      if (it > 2) then System.exit(0)
-      val recurAttend = cntfriendsAcc
-        .filter(cf => cf.nCount > 2)
-        .map(cf => ResultCC(person = cf.fName))
+        val recurAttend = cntfriendsAcc
+          .filter(cf => cf.nCount > 2)
+          .map(cf => ResultCC(person = cf.fName))
 
-      val recurCntFriends = collectionsDB.friends
-        .flatMap(friends =>
-          if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-          attendAcc
-            .filter(att =>
-              if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-              att.person == friends.fName)
-            .map(att =>
-              if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-              FriendCC(friends.pName, friends.fName))
-        )
-        .groupBy(_.pName)
-        .map((pName, pairs) => CountsCC(fName = pName, nCount = pairs.size))
-        .toSeq
+        val recurCntFriends = collectionsDB.friends
+          .flatMap(friends =>
+            if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
+            attendAcc
+              .filter(att =>
+                if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
+                att.person == friends.fName
+              )
+              .map(att =>
+                if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
+                FriendCC(friends.pName, friends.fName)
+              )
+          )
+          .groupBy(_.pName)
+          .map((pName, pairs) => CountsCC(fName = pName, nCount = pairs.size))
+          .toSeq
 
 //      println(s"output:\n\tRattend: ${recurAttend.map(f => f.person).mkString("(", ",", ")")}\n\tRfriends: ${recurCntFriends.map(f => f.fName + "=" + f.nCount).mkString("(", ",", ")")}")
-      (recurAttend, recurCntFriends)
+        (recurAttend, recurCntFriends)
     )
     resultCollections = finalAttend.distinct.sortBy(_.person)
     println(s"\nIT,$name,collections,$it")
-
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -160,8 +164,9 @@ class TOPartyQuery extends QueryBenchmark {
     val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[CountsSS])) => (String, String) = {
       recur =>
         val (attend, cntFriends) = recur
-        val (attendAcc, cntFriendsAcc) = if it == 0 then (party_delta1, party_delta2) else (party_derived1, party_derived2)
-        it+=1
+        val (attendAcc, cntFriendsAcc) =
+          if it == 0 then (party_delta1, party_delta2) else (party_derived1, party_derived2)
+        it += 1
 
 //        println(s"***iteration $it")
 //        println(s"RES input:\n\tattend : ${db.runRaw[(String)](s"SELECT * FROM ${ScalaSQLTable.name(attend)}").map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.runRaw[(String, Int)](s"SELECT * FROM ${ScalaSQLTable.name(cntFriends)}").map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
@@ -169,7 +174,8 @@ class TOPartyQuery extends QueryBenchmark {
 
         val recurAttend = s"SELECT f.fName as person FROM ${ScalaSQLTable.name(cntFriendsAcc)} as f WHERE f.nCount > 2"
 
-        val recurFriends = s"SELECT f.pName as fName, COUNT(f.fName) as count FROM ${ScalaSQLTable.name(party_friends)} as f, ${ScalaSQLTable.name(attendAcc)} as a WHERE a.person = f.fName GROUP BY f.pName"
+        val recurFriends =
+          s"SELECT f.pName as fName, COUNT(f.fName) as count FROM ${ScalaSQLTable.name(party_friends)} as f, ${ScalaSQLTable.name(attendAcc)} as a WHERE a.person = f.fName GROUP BY f.pName"
 
 //        println(s"output:\n\tattend: ${db.run(recurAttend).map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.run(recurFriends).map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
 
@@ -177,7 +183,10 @@ class TOPartyQuery extends QueryBenchmark {
     }
 
     FixedPointQuery.agg_scalaSQLSemiNaiveTWO(set)(
-      ddb, (party_delta1, party_delta2), (party_tmp1, party_tmp2), (party_derived1, party_derived2)
+      ddb,
+      (party_delta1, party_delta2),
+      (party_tmp1, party_tmp2),
+      (party_derived1, party_derived2)
     )(
       (toTuple1.asInstanceOf[ResultSS[?] => Tuple], toTuple2)
     )(
@@ -187,7 +196,6 @@ class TOPartyQuery extends QueryBenchmark {
     val result = party_derived1.select.distinct.sortBy(_.person)
     resultScalaSQL = db.run(result)
     println(s"\nIT,$name,scalasql,$it")
-
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =
