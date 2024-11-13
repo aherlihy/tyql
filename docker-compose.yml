@@ -10,7 +10,9 @@ services:
     network_mode: host
     volumes:
       - ./test-results:/test-results
-      - .:/app
+      - ./target:/app/target
+      - .:/app:ro
+    user: "1000:1000"
     depends_on:
       postgres:
         condition: service_healthy

@@ -15,6 +15,8 @@ import tyql.Query.{unrestrictedBagFix, unrestrictedFix}
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class CBAQuery extends QueryBenchmark {
   override def name = "cba"
@@ -86,7 +88,8 @@ class CBAQuery extends QueryBenchmark {
       tables("lits").asInstanceOf[Seq[LitsCC]],
       tables("vars").asInstanceOf[Seq[VarsCC]],
       tables("abs").asInstanceOf[Seq[AbsCC]],
-      tables("app").asInstanceOf[Seq[AppCC]])
+      tables("app").asInstanceOf[Seq[AppCC]]
+    )
 
   //   ScalaSQL data model
   case class TermSS[T[_]](x: T[Int], y: T[String], z: T[Int])
@@ -134,7 +137,8 @@ class CBAQuery extends QueryBenchmark {
     val dataTermBase = tyqlDB.term.flatMap(t =>
       tyqlDB.lits
         .filter(l => l.x == t.z && t.y == StringLit("Lit"))
-        .map(l => (x = t.x, y = l.y).toRow))
+        .map(l => (x = t.x, y = l.y).toRow)
+    )
 
     val dataVarBase = tyqlDB.baseData
 
@@ -142,66 +146,66 @@ class CBAQuery extends QueryBenchmark {
 
     val ctrlVarBase = tyqlDB.baseCtrl
 
-    val tyqlFix = if set then unrestrictedFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)) else unrestrictedBagFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))
+    val tyqlFix = if set then unrestrictedFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))
+    else unrestrictedBagFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))
 
-    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = tyqlFix(
-      (dataTerm, dataVar, ctrlTerm, ctrlVar) => {
-        val dt1 =
-          for
-            t <- tyqlDB.term
-            dv <- dataVar
-            if t.y == "Var" && t.z == dv.x
-          yield (x = t.x, y = dv.y).toRow
+    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = tyqlFix((dataTerm, dataVar, ctrlTerm, ctrlVar) => {
+      val dt1 =
+        for
+          t <- tyqlDB.term
+          dv <- dataVar
+          if t.y == "Var" && t.z == dv.x
+        yield (x = t.x, y = dv.y).toRow
 
-        val dt2 =
-          for
-            t <- tyqlDB.term
-            dt <- dataTerm
-            ct <- ctrlTerm
-            abs <- tyqlDB.abs
-            app <- tyqlDB.app
-            if t.y == "App" && t.z == app.x && dt.x == abs.z && ct.x == app.y && ct.y == abs.x
-          yield (x = t.x, y = dt.y).toRow
+      val dt2 =
+        for
+          t <- tyqlDB.term
+          dt <- dataTerm
+          ct <- ctrlTerm
+          abs <- tyqlDB.abs
+          app <- tyqlDB.app
+          if t.y == "App" && t.z == app.x && dt.x == abs.z && ct.x == app.y && ct.y == abs.x
+        yield (x = t.x, y = dt.y).toRow
 
-        val dv =
-          for
-            ct <- ctrlTerm
-            dt <- dataTerm
-            abs <- tyqlDB.abs
-            app <- tyqlDB.app
-            if ct.x == app.y && ct.y == abs.x && dt.x == app.z
-          yield (x = abs.y, y = dt.y).toRow
+      val dv =
+        for
+          ct <- ctrlTerm
+          dt <- dataTerm
+          abs <- tyqlDB.abs
+          app <- tyqlDB.app
+          if ct.x == app.y && ct.y == abs.x && dt.x == app.z
+        yield (x = abs.y, y = dt.y).toRow
 
-        val ct1 =
-          for
-            t <- tyqlDB.term
-            cv <- ctrlVar
-            if t.y == "Var" && t.z == cv.x
-          yield (x = t.x, y = cv.y).toRow
-        val ct2 =
-          for
-            t <- tyqlDB.term
-            ct1 <- ctrlTerm
-            ct2 <- ctrlTerm
-            abs <- tyqlDB.abs
-            app <- tyqlDB.app
-            if t.y == "App" && t.z == app.x && ct1.x == abs.z && ct2.x == app.y && ct2.y == abs.x
-          yield (x = t.x, y = ct1.y).toRow
+      val ct1 =
+        for
+          t <- tyqlDB.term
+          cv <- ctrlVar
+          if t.y == "Var" && t.z == cv.x
+        yield (x = t.x, y = cv.y).toRow
+      val ct2 =
+        for
+          t <- tyqlDB.term
+          ct1 <- ctrlTerm
+          ct2 <- ctrlTerm
+          abs <- tyqlDB.abs
+          app <- tyqlDB.app
+          if t.y == "App" && t.z == app.x && ct1.x == abs.z && ct2.x == app.y && ct2.y == abs.x
+        yield (x = t.x, y = ct1.y).toRow
 
-        val cv =
-          for
-            ct1 <- ctrlTerm
-            ct2 <- ctrlTerm
-            abs <- tyqlDB.abs
-            app <- tyqlDB.app
-            if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
-          yield (x = abs.y, y = ct2.y).toRow
+      val cv =
+        for
+          ct1 <- ctrlTerm
+          ct2 <- ctrlTerm
+          abs <- tyqlDB.abs
+          app <- tyqlDB.app
+          if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
+        yield (x = abs.y, y = ct2.y).toRow
 
-        val dt = if set then dt1.union(dt2) else dt1.unionAll(dt2)
-        val ct = if set then ct1.union(ct2) else ct1.unionAll(ct2)
+      val dt = if set then dt1.union(dt2) else dt1.unionAll(dt2)
+      val ct = if set then ct1.union(ct2) else ct1.unionAll(ct2)
 
-        (dt, dv, ct, cv)
-      })
+      (dt, dv, ct, cv)
+    })
 
     val query = dataTerm.distinct.size
     val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
@@ -211,7 +215,8 @@ class CBAQuery extends QueryBenchmark {
     val dataTermBase = collectionsDB.term.flatMap(t =>
       collectionsDB.lits
         .filter(l => l.x == t.z && t.y == "Lit")
-        .map(l => DataCC(x = t.x, y = l.y)))
+        .map(l => DataCC(x = t.x, y = l.y))
+    )
 
     val dataVarBase = Seq[DataCC]()
 
@@ -220,70 +225,72 @@ class CBAQuery extends QueryBenchmark {
     val ctrlVarBase = Seq[CtrlCC]()
 
     var it = 0
-    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = FixedPointQuery.multiFix(set)((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase), (Seq[DataCC](),Seq[DataCC](), Seq[CtrlCC](), Seq[CtrlCC]()))(
-      (recur, acc) => {
-        val (dataTerm, dataVar, ctrlTerm, ctrlVar) = recur
-        val (dataTermAcc, dataVarAcc, ctrlTermAcc, ctrlVarAcc) = if it == 0 then (dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase) else acc
-        it += 1
+    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = FixedPointQuery.multiFix(set)(
+      (dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase),
+      (Seq[DataCC](), Seq[DataCC](), Seq[CtrlCC](), Seq[CtrlCC]())
+    )((recur, acc) => {
+      val (dataTerm, dataVar, ctrlTerm, ctrlVar) = recur
+      val (dataTermAcc, dataVarAcc, ctrlTermAcc, ctrlVarAcc) =
+        if it == 0 then (dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase) else acc
+      it += 1
 
-        val dt1 =
-          for
-            t <- collectionsDB.term
-            dv <- dataVarAcc
-            if t.y == "Var" && t.z == dv.x
-          yield DataCC(x = t.x, y = dv.y)
+      val dt1 =
+        for
+          t <- collectionsDB.term
+          dv <- dataVarAcc
+          if t.y == "Var" && t.z == dv.x
+        yield DataCC(x = t.x, y = dv.y)
 
-        val dt2 =
-          for
-            t <- collectionsDB.term
-            dt <- dataTerm
-            ct <- ctrlTermAcc
-            abs <- collectionsDB.abs
-            app <- collectionsDB.app
-            if t.y == "App" && t.z == app.x && dt.x == abs.z && ct.x == app.y && ct.y == abs.x
-          yield DataCC(x = t.x, y = dt.y)
+      val dt2 =
+        for
+          t <- collectionsDB.term
+          dt <- dataTerm
+          ct <- ctrlTermAcc
+          abs <- collectionsDB.abs
+          app <- collectionsDB.app
+          if t.y == "App" && t.z == app.x && dt.x == abs.z && ct.x == app.y && ct.y == abs.x
+        yield DataCC(x = t.x, y = dt.y)
 
-        val dv =
-          for
-            ct <- ctrlTermAcc
-            dt <- dataTermAcc
-            abs <- collectionsDB.abs
-            app <- collectionsDB.app
-            if ct.x == app.y && ct.y == abs.x && dt.x == app.z
-          yield DataCC(x = abs.y, y = dt.y)
+      val dv =
+        for
+          ct <- ctrlTermAcc
+          dt <- dataTermAcc
+          abs <- collectionsDB.abs
+          app <- collectionsDB.app
+          if ct.x == app.y && ct.y == abs.x && dt.x == app.z
+        yield DataCC(x = abs.y, y = dt.y)
 
-        val ct1 =
-          for
-            t <- collectionsDB.term
-            cv <- ctrlVarAcc
-            if t.y == "Var" && t.z == cv.x
-          yield CtrlCC(x = t.x, y = cv.y)
-        val ct2 =
-          for
-            t <- collectionsDB.term
-            ct1 <- ctrlTerm
-            ct2 <- ctrlTerm
-            abs <- collectionsDB.abs
-            app <- collectionsDB.app
-            if t.y == "App" && t.z == app.x && ct1.x == abs.z && ct2.x == app.y && ct2.y == abs.x
-          yield CtrlCC(x = t.x, y = ct1.y)
+      val ct1 =
+        for
+          t <- collectionsDB.term
+          cv <- ctrlVarAcc
+          if t.y == "Var" && t.z == cv.x
+        yield CtrlCC(x = t.x, y = cv.y)
+      val ct2 =
+        for
+          t <- collectionsDB.term
+          ct1 <- ctrlTerm
+          ct2 <- ctrlTerm
+          abs <- collectionsDB.abs
+          app <- collectionsDB.app
+          if t.y == "App" && t.z == app.x && ct1.x == abs.z && ct2.x == app.y && ct2.y == abs.x
+        yield CtrlCC(x = t.x, y = ct1.y)
 
-        val cv =
-          for
-            ct1 <- ctrlTermAcc
-            ct2 <- ctrlTermAcc
-            abs <- collectionsDB.abs
-            app <- collectionsDB.app
-            if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
-          yield CtrlCC(x = abs.y, y = ct2.y)
+      val cv =
+        for
+          ct1 <- ctrlTermAcc
+          ct2 <- ctrlTermAcc
+          abs <- collectionsDB.abs
+          app <- collectionsDB.app
+          if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
+        yield CtrlCC(x = abs.y, y = ct2.y)
 
-        val dt = if set then (dt1 ++ dt2).distinct else dt1 ++ dt2
-        val ct = if set then (ct1 ++ ct2).distinct else ct1 ++ ct2
-        (dt, dv, ct, cv)
-      })
+      val dt = if set then (dt1 ++ dt2).distinct else dt1 ++ dt2
+      val ct = if set then (ct1 ++ ct2).distinct else ct1 ++ ct2
+      (dt, dv, ct, cv)
+    })
 
-      resultCollections = Seq(dataTerm.distinct.size)
-
+    resultCollections = Seq(dataTerm.distinct.size)
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -306,10 +313,18 @@ class CBAQuery extends QueryBenchmark {
     }
 
     var it = 0
-    val fixFn: ((ScalaSQLTable[DataSS], ScalaSQLTable[DataSS], ScalaSQLTable[CtrlSS], ScalaSQLTable[CtrlSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)]) =
+    val fixFn
+      : ((ScalaSQLTable[DataSS], ScalaSQLTable[DataSS], ScalaSQLTable[CtrlSS], ScalaSQLTable[CtrlSS])) => (
+          query.Select[(Expr[Int], Expr[String]), (Int, String)],
+          query.Select[(Expr[Int], Expr[String]), (Int, String)],
+          query.Select[(Expr[Int], Expr[Int]), (Int, Int)],
+          query.Select[(Expr[Int], Expr[Int]), (Int, Int)]
+      ) =
       recur => {
         val (dataTerm, dataVar, ctrlTerm, ctrlVar) = recur
-        val (dataTermAcc, dataVarAcc, ctrlTermAcc, ctrlVarAcc) = if it == 0 then (cba_delta1, cba_delta2, cba_delta3, cba_delta4) else (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
+        val (dataTermAcc, dataVarAcc, ctrlTermAcc, ctrlVarAcc) = if it == 0 then
+          (cba_delta1, cba_delta2, cba_delta3, cba_delta4)
+        else (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
         it += 1
 
         //        println(s"***iteration $it")
@@ -373,12 +388,22 @@ class CBAQuery extends QueryBenchmark {
       }
 
     FixedPointQuery.scalaSQLSemiNaiveFOUR(set)(
-      ddb, (cba_delta1, cba_delta2, cba_delta3, cba_delta4), (cba_tmp1, cba_tmp2, cba_tmp3, cba_tmp4), (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
+      ddb,
+      (cba_delta1, cba_delta2, cba_delta3, cba_delta4),
+      (cba_tmp1, cba_tmp2, cba_tmp3, cba_tmp4),
+      (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
     )(
       (toTuple1, toTuple1, toTuple2, toTuple2)
     )(
-      initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[DataSS], ScalaSQLTable[DataSS], ScalaSQLTable[CtrlSS], ScalaSQLTable[CtrlSS])) => (query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any])])
+      initBase.asInstanceOf[() => (
+          query.Select[Any, Any],
+          query.Select[Any, Any],
+          query.Select[Any, Any],
+          query.Select[Any, Any]
+      )]
+    )(fixFn.asInstanceOf[(
+        (ScalaSQLTable[DataSS], ScalaSQLTable[DataSS], ScalaSQLTable[CtrlSS], ScalaSQLTable[CtrlSS])
+    ) => (query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any])])
 
     val result = cba_derived1.select.distinct
     resultScalaSQL = Seq(db.run(result).size)

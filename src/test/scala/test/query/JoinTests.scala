@@ -1,6 +1,6 @@
 package test.query.join
 import test.SQLStringQueryTest
-import test.query.{commerceDBs,  AllCommerceDBs}
+import test.query.{commerceDBs, AllCommerceDBs}
 
 import tyql.*
 import tyql.Expr.*
@@ -8,6 +8,7 @@ import language.experimental.namedTuples
 import NamedTuple.*
 // import scala.language.implicitConversions
 
+import tyql.Dialect.ansi.given
 
 import java.time.LocalDate
 
@@ -42,7 +43,8 @@ class JoinSimple2Test extends SQLStringQueryTest[AllCommerceDBs, (newId: Int, ne
   SELECT product$A.id as newId, buyers$B.id as newId2 FROM buyers as buyers$B, product as product$A WHERE product$A.name = buyers$B.name
   """
 }
-class JoinSimple3Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple3Test
+    extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join on string literal comparison"
   def query() =
     for
@@ -57,11 +59,12 @@ class JoinSimple3Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: Str
       FROM
         buyers as buyers$B,
         product as product$P
-      WHERE buyers$B.name = "string constant"
+      WHERE buyers$B.name = 'string constant'
       """
 }
 
-class JoinSimple4Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple4Test
+    extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join with separate conditions"
   def query() =
     for
@@ -74,27 +77,26 @@ class JoinSimple4Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: Str
   def expectedQueryPattern: String = """
 SELECT buyers$A.name as buyerName, product$B.name as productName, product$B.price as price
 FROM buyers as buyers$A, product as product$B
-WHERE (buyers$A.name = "string constant" AND product$B.id = buyers$A.id)
+WHERE (buyers$A.name = 'string constant' AND product$B.id = buyers$A.id)
       """
 }
-// TODO: Not implemented yet, Join flavors, cross/left/etc
-//
-//class JoinSimple5Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
-//  def testDescription = "Join: two-table simple join with &&"
-//  def query() =
-//    for
-//      b <- testDB.tables.buyers
-//      pr <- testDB.tables.products
-//      if b.name == pr.name && pr.id == b.id
-//    yield (buyerName = b.name, productName = pr.name, price = pr.price).toRow
-//
-//  def expectedQueryPattern: String = """
-//SELECT b.name AS buyerName, p.name AS productName, p.price
-//FROM buyers b
-//JOIN products p ON (b.name = p.name AND p.id = b.id)
-//      """
-//}
-//
+
+class JoinSimple5Test
+    extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+  def testDescription = "Join: two-table simple join with &&"
+  def query() =
+    for
+      b <- testDB.tables.buyers
+      pr <- testDB.tables.products.joinOn(pr => b.name == pr.name && pr.id == b.id)
+    yield (buyerName = b.name, productName = pr.name, price = pr.price).toRow
+
+  def expectedQueryPattern: String = """
+SELECT buyers$A.name as buyerName, product$B.name as productName, product$B.price as price
+FROM buyers as buyers$A
+JOIN product as product$B ON buyers$A.name = product$B.name AND product$B.id = buyers$A.id
+     """
+}
+
 //class JoinSimple6Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
 //  def testDescription = "Join: two-table simple join with && and string literal"
 //  def query() =

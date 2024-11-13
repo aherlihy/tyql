@@ -1,12 +1,14 @@
 package test.query.aggregation
 import test.{SQLStringAggregationTest, SQLStringQueryTest}
-import test.query.{commerceDBs,  AllCommerceDBs}
+import test.query.{commerceDBs, AllCommerceDBs}
 
 import tyql.*
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 import Expr.{sum, avg, max}
+
+import tyql.Dialect.ansi.given
 
 // Expression-based aggregation:
 
@@ -42,18 +44,30 @@ class AggregateProjectAggregationExprTest extends SQLStringAggregationTest[AllCo
   def expectedQueryPattern: String = "SELECT SUM(product$A.price) as s FROM product as product$A"
 }
 
-// TODO: toRow
-//class AggregateProjectAggregationExprConvertTest extends SQLStringAggregationTest[AllCommerceDBs, (s: Double)] {
-//  def testDescription: String = "Aggregation: aggregate + expr.sum with named tuple, auto convert toRow"
-//
-//  def query() =
-//    testDB.tables.products
-//      .aggregate(p =>
-//        (s = sum(p.price))//.toRow
-//      )
-//
-//  def expectedQueryPattern: String = "SELECT SUM(product$A.price) as s FROM product as product$A"
-//}
+class AggregateProjectAggregationExprConvertTest extends SQLStringAggregationTest[AllCommerceDBs, (s: Double, j: Int)] {
+  def testDescription: String = "Aggregation: aggregate + expr.sum with named tuple, auto convert toRow"
+
+  def query() =
+    testDB.tables.products
+      .aggregate(p =>
+        (s = sum(p.price), j = tyql.lit(101))
+      )
+
+  def expectedQueryPattern: String = "SELECT SUM(product$A.price) as s, 101 as j FROM product as product$A"
+}
+
+class AggregateProjectAggregationExprConvertTestWithLiterals
+    extends SQLStringAggregationTest[AllCommerceDBs, (s: Double, j: Int, jj: Double)] {
+  def testDescription: String = "Aggregation: aggregate + expr.sum with named tuple, auto convert toRow"
+
+  def query() =
+    testDB.tables.products
+      .aggregate(p =>
+        (s = sum(p.price), j = tyql.lit(101), jj = tyql.lit(300.0))
+      )
+
+  def expectedQueryPattern: String = "SELECT SUM(product$A.price) as s, 101 as j, 300.0 as jj FROM product as product$A"
+}
 
 class AggregateMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Double, avg: Double)] {
   def testDescription: String = "Aggregation: filter then aggregate with named tuple, no subquery"
@@ -61,23 +75,24 @@ class AggregateMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDB
   def query() =
     testDB.tables.products
       .withFilter(p =>
-        p.price != 0
+        p.price != 0.0
       )
       .aggregate(p => (sum = sum(p.price), avg = avg(p.price)).toRow)
 
   def expectedQueryPattern: String =
-    """SELECT SUM(product$A.price) as sum, AVG(product$A.price) as avg FROM product as product$A WHERE product$A.price <> 0
-      """
+    """SELECT SUM(product$A.price) as sum, AVG(product$A.price) as avg FROM product as product$A WHERE product$A.price <> 0.0
+      """ // TODO should pass with just `0`
 }
 
-class AggregateMultiSubexpressionAggregateTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Boolean, avg: Boolean)] {
+class AggregateMultiSubexpressionAggregateTest
+    extends SQLStringAggregationTest[AllCommerceDBs, (sum: Boolean, avg: Boolean)] {
   def testDescription: String = "Aggregation: put aggregation in subexpression, stays as aggregation type"
 
   def query() =
     import AggregationExpr.toRow
     testDB.tables.products
       .aggregate(p =>
-        (sum = sum(p.price)==1 , avg = avg(p.price) > p.price).toRow
+        (sum = sum(p.price) == 1, avg = avg(p.price) > p.price).toRow
       )
 
   def expectedQueryPattern: String =
@@ -97,8 +112,7 @@ class AggregateMultiSubexpression2AggregateTest extends SQLStringAggregationTest
       )
 
   def expectedQueryPattern: String =
-    """SELECT AVG(product$A.price) > product$A.price = "true" as avg FROM product as product$A
-          """
+    """SELECT AVG(product$A.price) > product$A.price = TRUE as avg FROM product as product$A"""
 }
 
 // Query helper-method based aggregation:
@@ -114,13 +128,13 @@ class FilterAggregationQueryTest extends SQLStringAggregationTest[AllCommerceDBs
   def query() =
     testDB.tables.products
       .withFilter(p =>
-        p.price != 0
+        p.price != 0.0
       )
       .sum(p => p.price)
 
   def expectedQueryPattern: String = """
-  SELECT SUM(product$A.price) FROM product as product$A WHERE product$A.price <> 0
-      """
+  SELECT SUM(product$A.price) FROM product as product$A WHERE product$A.price <> 0.0
+      """ // TODO should pass with just `0`
 }
 
 class FilterAggregationProjectQueryTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Double)] {
@@ -128,27 +142,27 @@ class FilterAggregationProjectQueryTest extends SQLStringAggregationTest[AllComm
   def query() =
     testDB.tables.products
       .withFilter(p =>
-        p.price != 0
+        p.price != 0.0
       )
       .sum(p =>
         (sum = p.price).toRow
       )
 
   def expectedQueryPattern: String = """
-  SELECT SUM(product$A.price as sum) FROM product as product$A WHERE product$A.price <> 0
-      """
+  SELECT SUM(product$A.price as sum) FROM product as product$A WHERE product$A.price <> 0.0
+      """ // TODO should pass with just `0`
 }
 
 class FilterMapAggregationQuerySelectTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {
   def testDescription: String = "Aggregation: sum with map"
   def query() =
     testDB.tables.products
-      .withFilter(p => p.price != 0)
+      .withFilter(p => p.price != 0.0)
       .map(p => (newPrice = p.price).toRow)
       .sum(_.newPrice)
   def expectedQueryPattern: String = """
-SELECT SUM(subquery$A.newPrice) FROM (SELECT product$B.price as newPrice FROM product as product$B WHERE product$B.price <> 0) as subquery$A
-  """
+SELECT SUM(subquery$A.newPrice) FROM (SELECT product$B.price as newPrice FROM product as product$B WHERE product$B.price <> 0.0) as subquery$A
+  """ // TODO should pass with just `0`
 }
 
 class AggregationSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Boolean] {

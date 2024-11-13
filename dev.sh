@@ -16,7 +16,7 @@ case $command in
         ;;
     *)
         echo "Unknown command: $command"
-        echo "Usage: ./dev.sh [up|down|test]"
+        echo "Usage: ./dev.sh [db-start|db-stop|test [testClassName]]"
         exit 1
         ;;
 esac

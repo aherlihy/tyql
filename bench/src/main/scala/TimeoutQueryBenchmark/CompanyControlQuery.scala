@@ -15,6 +15,8 @@ import tyql.Query.{fix, unrestrictedFix}
 import tyql.Expr.{IntLit, StringLit, min, sum}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TOCompanyControlQuery extends QueryBenchmark {
   override def name = "cc"
@@ -84,9 +86,7 @@ class TOCompanyControlQuery extends QueryBenchmark {
         cshares
           .filter(cs => cs.byC == con.com2)
           .aggregate(cs => (byC = con.com1, of = cs.of, percent = sum(cs.percent)).toGroupingRow)
-      ).groupBySource(
-        (con, csh) => (byC = con.com1, of = csh.of).toRow
-      ).distinct
+      ).groupBySource((con, csh) => (byC = con.com1, of = csh.of).toRow).distinct
       val controlRecur = cshares
         .filter(s => s.percent > 50)
         .map(s => (com1 = s.byC, com2 = s.of).toRow)
@@ -114,16 +114,20 @@ class TOCompanyControlQuery extends QueryBenchmark {
         cshares
           .filter(cs =>
             if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-            cs.byC == con.com2)
+            cs.byC == con.com2
+          )
           .map(cs =>
             if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-            SharesCC(con.com1, cs.of, cs.percent))
+            SharesCC(con.com1, cs.of, cs.percent)
+          )
           .groupBy(csh =>
             if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-            (csh.byC, csh.of))
+            (csh.byC, csh.of)
+          )
           .map((k, v) =>
             if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-            SharesCC(k._1, k._2, v.map(s3 => s3.percent).sum))
+            SharesCC(k._1, k._2, v.map(s3 => s3.percent).sum)
+          )
           .toSeq
       )
 
@@ -134,7 +138,6 @@ class TOCompanyControlQuery extends QueryBenchmark {
     )
     resultCollections = control.sortBy(_.com1).sortBy(_.com2)
     println(s"\nIT,$name,collections,$it")
-
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -150,9 +153,9 @@ class TOCompanyControlQuery extends QueryBenchmark {
         val (csharesAcc, controlAcc) = if it == 0 then (cc_delta1, cc_delta2) else (cc_derived1, cc_derived2)
         it += 1
         val csharesRecur = "SELECT ref22.com1 as byC, ref23.of as of, SUM(ref23.percent) as percent " +
-         s"FROM ${ScalaSQLTable.name(controlAcc)} as ref22, ${ScalaSQLTable.name(cshares)} as ref23 " +
-           "WHERE ref23.byC = ref22.com2 " +
-           "GROUP BY ref22.com1, ref23.of "
+          s"FROM ${ScalaSQLTable.name(controlAcc)} as ref22, ${ScalaSQLTable.name(cshares)} as ref23 " +
+          "WHERE ref23.byC = ref22.com2 " +
+          "GROUP BY ref22.com1, ref23.of "
 //        )
 //        val csharesRecur = if (fixAgg.isEmpty) // workaround scalasql doesn't allow empty values
 //          cc_empty_shares.select.map(c => (c.byC, c.of, c.percent))
@@ -168,9 +171,11 @@ class TOCompanyControlQuery extends QueryBenchmark {
 
         (csharesRecur, controlRecur)
 
-
     FixedPointQuery.agg_scalaSQLSemiNaiveTWO(set)(
-      ddb, (cc_delta1, cc_delta2), (cc_tmp1, cc_tmp2), (cc_derived1, cc_derived2)
+      ddb,
+      (cc_delta1, cc_delta2),
+      (cc_tmp1, cc_tmp2),
+      (cc_derived1, cc_derived2)
     )(
       ((c: SharesSS[?]) => (c.byC, c.of, c.percent), (c: ResultSS[?]) => (c.com1, c.com2))
     )(
@@ -180,7 +185,6 @@ class TOCompanyControlQuery extends QueryBenchmark {
     val result = cc_derived2.select.sortBy(_.com1).sortBy(_.com2)
     resultScalaSQL = db.run(result)
     println(s"\nIT,$name,scalasql,$it")
-
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

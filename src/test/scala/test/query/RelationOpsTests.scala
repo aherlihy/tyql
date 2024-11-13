@@ -1,6 +1,6 @@
 package test.query.relationops
 import test.SQLStringQueryTest
-import test.query.{commerceDBs,  AllCommerceDBs, Product}
+import test.query.{commerceDBs, AllCommerceDBs, Product}
 
 import tyql.*
 import tyql.Expr.toRow
@@ -16,9 +16,8 @@ class RelationOpsUnionTest extends SQLStringQueryTest[AllCommerceDBs, (id: Int)]
         (id = prod.id).toRow
       .union(testDB.tables.purchases
         .map: purch =>
-          (id = purch.id).toRow
-      )
-  def expectedQueryPattern: String =  """
+          (id = purch.id).toRow)
+  def expectedQueryPattern: String = """
         (SELECT product$A.id as id
         FROM product as product$A)
         UNION
@@ -33,11 +32,11 @@ class RelationOpsUnion2Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
     testDB.tables.products
       .map(prod => prod)
       .union(testDB.tables.products.map(purch => purch))
-  def expectedQueryPattern: String =  """
-        (SELECT product$A
+  def expectedQueryPattern: String = """
+        (SELECT product$A.*
         FROM product as product$A)
         UNION
-        (SELECT product$B
+        (SELECT product$B.*
         FROM product as product$B)
       """
 }
@@ -53,13 +52,13 @@ class RelationOpsUnion3Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
 
   def expectedQueryPattern: String =
     """
-          (SELECT product$A
+          (SELECT product$A.*
           FROM product as product$A)
           UNION
-          (SELECT product$B
+          (SELECT product$B.*
           FROM product as product$B)
           UNION
-          (SELECT product$C
+          (SELECT product$C.*
           FROM product as product$C)
         """
 }
@@ -75,16 +74,16 @@ class RelationOpsUnion4Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
 
   def expectedQueryPattern: String =
     """
-            (SELECT product$A
+            (SELECT product$A.*
             FROM product as product$A)
             UNION
-            (SELECT product$B
+            (SELECT product$B.*
             FROM product as product$B)
             UNION
-            (SELECT product$C
+            (SELECT product$C.*
             FROM product as product$C)
             UNION
-            (SELECT product$D
+            (SELECT product$D.*
             FROM product as product$D)
           """
 }
@@ -101,16 +100,16 @@ class RelationOpsUnion5Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
 
   def expectedQueryPattern: String =
     """
-              (SELECT product$A
+              (SELECT product$A.*
               FROM product as product$A)
               UNION
-              (SELECT product$B
+              (SELECT product$B.*
               FROM product as product$B)
               UNION
-              (SELECT product$C
+              (SELECT product$C.*
               FROM product as product$C)
               UNION
-              (SELECT product$D
+              (SELECT product$D.*
               FROM product as product$D)
             """
 }
@@ -169,9 +168,8 @@ class RelationOpsUnionAllTest extends SQLStringQueryTest[AllCommerceDBs, (id: In
         (id = prod.id).toRow
       .unionAll(testDB.tables.purchases
         .map: purch =>
-          (id = purch.id).toRow
-      )
-  def expectedQueryPattern: String =  """
+          (id = purch.id).toRow)
+  def expectedQueryPattern: String = """
         (SELECT product$A.id as id
         FROM product as product$A)
         UNION ALL
@@ -188,9 +186,8 @@ class RelationOpsIntersectTest extends SQLStringQueryTest[AllCommerceDBs, (id: I
         (id = prod.id).toRow
       .intersect(testDB.tables.purchases
         .map: purch =>
-          (id = purch.id).toRow
-      )
-  def expectedQueryPattern: String =  """
+          (id = purch.id).toRow)
+  def expectedQueryPattern: String = """
         (SELECT product$A.id as id
         FROM product as product$A)
         INTERSECT
@@ -198,4 +195,3 @@ class RelationOpsIntersectTest extends SQLStringQueryTest[AllCommerceDBs, (id: I
         FROM purchase as purchase$B)
       """
 }
-
