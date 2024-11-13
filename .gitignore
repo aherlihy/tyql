@@ -75,3 +75,4 @@ cs
 
 # Coursier test product
 compiler/test-coursier/run/*.jar
+/test-results/
