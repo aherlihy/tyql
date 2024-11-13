@@ -20,8 +20,6 @@ scalacOptions ++= Seq(
 //resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
-
-
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
   .settings(
@@ -38,7 +36,8 @@ lazy val root = (project in file("."))
 //      baseDirectory.value / "bench/data/andersens/out/tyql.csv",
 //      baseDirectory.value / "bench/data/andersens/out/scalasql.csv",
 //    ),
-    cleanFiles ++= Seq("tc",
+    cleanFiles ++= Seq(
+      "tc",
       "ancestry",
       "andersens",
       "asps",
@@ -55,20 +54,22 @@ lazy val root = (project in file("."))
       "sssp",
       "tc",
       "trustchain",
-    ).flatMap(bm => Seq("collections", "tyql", "scalasql")
+    ).flatMap(bm =>
+      Seq("collections", "tyql", "scalasql")
         .map(ty =>
-          baseDirectory.value / s"bench/data/$bm/out/$ty.csv"))
-)
+          baseDirectory.value / s"bench/data/$bm/out/$ty.csv"
+        )
+    )
+  )
 lazy val bench = (project in file("bench"))
   .dependsOn(root)
   .enablePlugins(JmhPlugin)
   .settings(
-    Jmh/compile := (Jmh/compile).dependsOn(Test/compile).value,
-    Jmh/run := (Jmh/run).dependsOn(Jmh/compile).evaluated,
+    Jmh / compile := (Jmh / compile).dependsOn(Test / compile).value,
+    Jmh / run := (Jmh / run).dependsOn(Jmh / compile).evaluated,
 
     // sbt-jmh generates a ton of Java files, but they're never referenced by Scala files.
     // By enforcing this using `compileOrder`, we avoid having to run these generated files
     // through the Scala typechecker which has a significant impact on compile-time.
-    Jmh/compileOrder := CompileOrder.ScalaThenJava
-
+    Jmh / compileOrder := CompileOrder.ScalaThenJava
   )

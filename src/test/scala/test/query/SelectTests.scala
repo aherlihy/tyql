@@ -1,6 +1,6 @@
 package test.query.select
 import test.{SQLStringQueryTest, TestDatabase}
-import test.query.{commerceDBs,  AllCommerceDBs, Product}
+import test.query.{commerceDBs, AllCommerceDBs, Product}
 
 import tyql.*
 import language.experimental.namedTuples
@@ -16,7 +16,7 @@ type CityDB = (cities: CityT)
 given cityDB: TestDatabase[CityDB] with
   override def tables = (
     cities = Table[CityT]("cities")
-    )
+  )
 
 given TestDatabase[AllLocDBs] with
   override def tables = (
@@ -59,9 +59,9 @@ class SelectWithSelfNestTest extends SQLStringQueryTest[CityDB, CityT] {
       city <- testDB.tables.cities
       alt <- testDB.tables.cities
       if city.name == alt.name && city.zipCode != alt.zipCode
-    yield
-      city
-  def expectedQueryPattern: String = "SELECT cities$A FROM cities as cities$A, cities as cities$B WHERE cities$A.name = cities$B.name AND cities$A.zipCode <> cities$B.zipCode"
+    yield city
+  def expectedQueryPattern: String =
+    "SELECT cities$A FROM cities as cities$A, cities as cities$B WHERE cities$A.name = cities$B.name AND cities$A.zipCode <> cities$B.zipCode"
 }
 
 // TODO: Nested types require more thought
@@ -72,9 +72,9 @@ class SelectNested extends SQLStringQueryTest[AllLocDBs, CityT] {
       city <- testDB.tables.cities
       address <- testDB.tables.addresses
       if city == address.city
-    yield
-      city
-  def expectedQueryPattern: String =  "SELECT cities$A FROM cities as cities$A, addresses as addresses$B WHERE cities$A = addresses$B.city"
+    yield city
+  def expectedQueryPattern: String =
+    "SELECT cities$A FROM cities as cities$A, addresses as addresses$B WHERE cities$A = addresses$B.city"
 }
 
 class SelectWithProjectTestToRow extends SQLStringQueryTest[CityDB, (name: String, zipCode: Int)] {

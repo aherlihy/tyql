@@ -23,13 +23,14 @@ class TOJavaPointsTo extends QueryBenchmark {
   // TYQL data model
   type ProgramHeapOp = (x: String, y: String, h: String)
   type ProgramOp = (x: String, y: String)
-  type PointsToDB = (newT: ProgramOp, assign: ProgramOp, loadT: ProgramHeapOp, store: ProgramHeapOp, baseHPT: ProgramHeapOp)
+  type PointsToDB =
+    (newT: ProgramOp, assign: ProgramOp, loadT: ProgramHeapOp, store: ProgramHeapOp, baseHPT: ProgramHeapOp)
   val tyqlDB = (
     newT = Table[ProgramOp]("javapointsto_new"),
     assign = Table[ProgramOp]("javapointsto_assign"),
     loadT = Table[ProgramHeapOp]("javapointsto_loadT"),
     store = Table[ProgramHeapOp]("javapointsto_store"),
-    baseHPT= Table[ProgramHeapOp]("javapointsto_hpt")
+    baseHPT = Table[ProgramHeapOp]("javapointsto_hpt")
   )
 
   // Collections data model + initialization
@@ -37,7 +38,8 @@ class TOJavaPointsTo extends QueryBenchmark {
   case class PointsToCC(x: String, y: String)
   def toCollRow1(row: Seq[String]): PointsToCC = PointsToCC(row(0), row(1))
   def toCollRow2(row: Seq[String]): ProgramHeapCC = ProgramHeapCC(row(0), row(1), row(2))
-  case class CollectionsDB(newT: Seq[PointsToCC], assign: Seq[PointsToCC], loadT: Seq[ProgramHeapCC], store: Seq[ProgramHeapCC])
+  case class CollectionsDB
+    (newT: Seq[PointsToCC], assign: Seq[PointsToCC], loadT: Seq[ProgramHeapCC], store: Seq[ProgramHeapCC])
   def fromCollRes1(r: PointsToCC): Seq[String] = Seq(
     r.x.toString,
     r.y.toString
@@ -65,8 +67,10 @@ class TOJavaPointsTo extends QueryBenchmark {
       (name, loaded)
     ).toMap
     collectionsDB = CollectionsDB(
-      tables("new").asInstanceOf[Seq[PointsToCC]], tables("assign").asInstanceOf[Seq[PointsToCC]],
-      tables("loadT").asInstanceOf[Seq[ProgramHeapCC]], tables("store").asInstanceOf[Seq[ProgramHeapCC]]
+      tables("new").asInstanceOf[Seq[PointsToCC]],
+      tables("assign").asInstanceOf[Seq[PointsToCC]],
+      tables("loadT").asInstanceOf[Seq[ProgramHeapCC]],
+      tables("store").asInstanceOf[Seq[ProgramHeapCC]]
     )
 
   //   ScalaSQL data model
@@ -134,8 +138,8 @@ class TOJavaPointsTo extends QueryBenchmark {
             .map(vpt2 =>
               (x = vpt1.y, y = s.y, h = vpt2.y).toRow
             )
-          )
         )
+      )
 
       (vpt, hpt)
     })
@@ -157,7 +161,8 @@ class TOJavaPointsTo extends QueryBenchmark {
         if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
         varPointsTo.filter(p =>
           if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-          a.y == p.x).map(p =>
+          a.y == p.x
+        ).map(p =>
           PointsToCC(x = a.x, y = p.y)
         )
       )
@@ -169,7 +174,8 @@ class TOJavaPointsTo extends QueryBenchmark {
             varPointsTo
               .filter(vpt =>
                 if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-                l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
+                l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x
+              )
               .map(pt2 =>
                 if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
                 PointsToCC(x = l.x, y = hpt.h)
@@ -184,7 +190,8 @@ class TOJavaPointsTo extends QueryBenchmark {
           varPointsToAcc
             .filter(vpt2 =>
               if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-              s.x == vpt1.x && s.h == vpt2.x)
+              s.x == vpt1.x && s.h == vpt2.x
+            )
             .map(vpt2 =>
               if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
               ProgramHeapCC(x = vpt1.y, y = s.y, h = vpt2.y)
@@ -197,19 +204,22 @@ class TOJavaPointsTo extends QueryBenchmark {
     resultCollections = pt._1.sortBy(_.x).sortBy(_.y)
     println(s"\nIT,$name,collections,$it")
 
-
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
 
     val initBase = () =>
-      (javapointsto_new.select.map(c => (c.x, c.y)),
-        javapointsto_hpt.select.map(c => (c.x, c.y, c.h)))
+      (javapointsto_new.select.map(c => (c.x, c.y)), javapointsto_hpt.select.map(c => (c.x, c.y, c.h)))
 
-    val fixFn: ((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]) =
+    val fixFn
+      : ((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (
+          query.Select[(Expr[String], Expr[String]), (String, String)],
+          query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]
+      ) =
       recur =>
         val (varPointsTo, heapPointsTo) = recur
-        val (varPointsToAcc, heapPointsToAcc) = if it == 0 then (javapointsto_delta1, javapointsto_delta2) else (javapointsto_derived1, javapointsto_derived2)
+        val (varPointsToAcc, heapPointsToAcc) =
+          if it == 0 then (javapointsto_delta1, javapointsto_delta2) else (javapointsto_derived1, javapointsto_derived2)
         it += 1
         val vpt1 = for {
           a <- javapointsto_assign.select
@@ -232,15 +242,22 @@ class TOJavaPointsTo extends QueryBenchmark {
         (vpt, hpt)
 
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      ddb, (javapointsto_delta1, javapointsto_delta2), (javapointsto_tmp1, javapointsto_tmp2), (javapointsto_derived1, javapointsto_derived2)
+      ddb,
+      (javapointsto_delta1, javapointsto_delta2),
+      (javapointsto_tmp1, javapointsto_tmp2),
+      (javapointsto_derived1, javapointsto_derived2)
     )(
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (
+        query.Select[Any, Any],
+        query.Select[Any, Any]
+    )])
 
 //    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived2)} as r ORDER BY r.x, r.y")
-    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived1)} as r ORDER BY r.y, r.x")
+    backupResultScalaSql =
+      ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived1)} as r ORDER BY r.y, r.x")
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking

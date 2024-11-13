@@ -78,10 +78,9 @@ class GroupBy2Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
     testDB.tables.purchases
       .groupBy(
         p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .having(
-        p => avg(p.total) == 1
+        p => (avg = avg(p.total)).toRow
       )
+      .having(p => avg(p.total) == 1)
 
   def expectedQueryPattern: String =
     """SELECT AVG(purchase$0.total) as avg FROM purchase as purchase$0 GROUP BY purchase$0.count HAVING AVG(purchase$0.total) = 1"""
@@ -94,10 +93,9 @@ class GroupBy3Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
     testDB.tables.purchases
       .groupBy(
         p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .filter(
-        p => p.avg == 1
+        p => (avg = avg(p.total)).toRow
       )
+      .filter(p => p.avg == 1)
 
   def expectedQueryPattern: String =
     """SELECT * FROM (SELECT AVG(purchase$0.total) as avg FROM purchase as purchase$0 GROUP BY purchase$0.count) as subquery$1 WHERE subquery$1.avg = 1"""
@@ -111,10 +109,9 @@ class GroupBy4Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
       .filter(p => p.id > 10)
       .groupBy(
         p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .having(
-        p => p.count == 1
+        p => (avg = avg(p.total)).toRow
       )
+      .having(p => p.count == 1)
 
   def expectedQueryPattern: String =
     """SELECT AVG(purchase$0.total) as avg FROM purchase as purchase$0 WHERE purchase$0.id > 10 GROUP BY purchase$0.count HAVING purchase$0.count = 1"""
@@ -128,10 +125,9 @@ class GroupBy5Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
       .filter(p => p.id > 10)
       .groupBy(
         p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .having(
-        p => p.count == 1
-      ).distinct
+        p => (avg = avg(p.total)).toRow
+      )
+      .having(p => p.count == 1).distinct
 
   def expectedQueryPattern: String =
     """SELECT DISTINCT AVG(purchase$0.total) as avg FROM purchase as purchase$0 WHERE purchase$0.id > 10 GROUP BY purchase$0.count HAVING purchase$0.count = 1"""
@@ -145,10 +141,9 @@ class GroupBy6Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
       .filter(p => p.id > 10)
       .groupBy(
         p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
-      .having(
-        p => p.count == 1
-      ).distinct.sort(_.avg, Ord.ASC)
+        p => (avg = avg(p.total)).toRow
+      )
+      .having(p => p.count == 1).distinct.sort(_.avg, Ord.ASC)
 
   def expectedQueryPattern: String =
     """SELECT DISTINCT AVG(purchase$0.total) as avg FROM purchase as purchase$0 WHERE purchase$0.id > 10 GROUP BY purchase$0.count HAVING purchase$0.count = 1 ORDER BY avg ASC"""
@@ -161,7 +156,8 @@ class GroupBy7Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double)] {
     testDB.tables.purchases.sort(_.id, Ord.ASC)
       .groupBy(
         p => (count = p.count).toRow,
-        p => (avg = avg(p.total)).toRow)
+        p => (avg = avg(p.total)).toRow
+      )
 
   def expectedQueryPattern: String =
     """SELECT AVG(subquery$1.total) as avg FROM (SELECT * FROM purchase as purchase$0 ORDER BY id ASC) as subquery$1 GROUP BY subquery$1.count"""
@@ -179,9 +175,7 @@ class GroupBy8Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double, avgN
           agg.toRow
         }
       )
-      .having(
-        p => avg(p.total) == 1
-      )
+      .having(p => avg(p.total) == 1)
 
   def expectedQueryPattern: String =
     """SELECT AVG(purchase$0.total) as avg, purchase$0.count as avgNum FROM purchase as purchase$0 GROUP BY purchase$0.count HAVING AVG(purchase$0.total) = 1"""
@@ -199,9 +193,7 @@ class GroupBy9Test extends SQLStringQueryTest[AllCommerceDBs, (avg: Double, avgN
           agg.toRow
         }
       )
-      .having(
-        p => avg(p.total) == 1
-      )
+      .having(p => avg(p.total) == 1)
 
   def expectedQueryPattern: String =
     """SELECT AVG(purchase$0.total) as avg, purchase$0.count as avgNum FROM purchase as purchase$0 GROUP BY AVG(purchase$0.count) HAVING AVG(purchase$0.total) = 1"""
@@ -229,9 +221,8 @@ class JoinGroupByTest extends SQLStringQueryTest[AllCommerceDBs, (newId: Int, ne
       testDB.tables.shipInfos.aggregate(si =>
         (newId = sum(si.id), newName = b.name).toGroupingRow
       )
-    ).groupBySource(
-      (buy, ship) =>
-        (name = ship.shippingDate).toRow,
+    ).groupBySource((buy, ship) =>
+      (name = ship.shippingDate).toRow,
     )
 
   def expectedQueryPattern = """
@@ -246,9 +237,8 @@ class JoinGroupByTest1 extends SQLStringQueryTest[AllCommerceDBs, (newId: Int)] 
   def query() =
     testDB.tables.shipInfos.aggregate(si =>
       (newId = sum(si.id)).toGroupingRow
-    ).groupBySource(
-      p =>
-        (name = p._1.id).toRow,
+    ).groupBySource(p =>
+      (name = p._1.id).toRow,
     )
 
   def expectedQueryPattern = """
@@ -263,9 +253,8 @@ class JoinGroupByTest2 extends SQLStringQueryTest[AllCommerceDBs, (newId: Int)] 
   def query() =
     testDB.tables.shipInfos.aggregate(si =>
       (newId = sum(si.id)).toGroupingRow
-    ).groupBySource(
-      p =>
-        (name = sum(p._1.id)).toRow,
+    ).groupBySource(p =>
+      (name = sum(p._1.id)).toRow,
     )
 
   def expectedQueryPattern = """
@@ -282,9 +271,8 @@ class JoinGroupByTest3 extends SQLStringQueryTest[AllCommerceDBs, (newId1: Int, 
       testDB.tables.buyers.aggregate(b2 =>
         (newId1 = b1.id, newId2 = b2.id, min = min(b1.id + b2.id)).toGroupingRow
       )
-    ).groupBySource(
-      p =>
-        (g1 = p._1.id, g2 = p._2.id).toRow,
+    ).groupBySource(p =>
+      (g1 = p._1.id, g2 = p._2.id).toRow,
     )
 
   def expectedQueryPattern = """
@@ -302,9 +290,8 @@ class JoinGroupByTest4 extends SQLStringQueryTest[WeightedGraphDB, WeightedEdge]
       path
         .filter(e => p.dst == e.src)
         .aggregate(e => (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow)
-    ).groupBySource(
-      p =>
-        (g1 = p._1.src, g2 = p._2.dst).toRow
+    ).groupBySource(p =>
+      (g1 = p._1.src, g2 = p._2.dst).toRow
     )
 
   def expectedQueryPattern = """

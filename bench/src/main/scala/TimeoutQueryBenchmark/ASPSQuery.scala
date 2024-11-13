@@ -75,32 +75,39 @@ class TOASPSQuery extends QueryBenchmark {
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.edge
       .aggregate(e =>
-        (src = e.src, dst = e.dst, cost = min(e.cost)).toGroupingRow)
+        (src = e.src, dst = e.dst, cost = min(e.cost)).toGroupingRow
+      )
       .groupBySource(e =>
-        (src = e._1.src, dst = e._1.dst).toRow)
+        (src = e._1.src, dst = e._1.dst).toRow
+      )
 
     val asps = base.unrestrictedFix(path =>
       path.aggregate(p =>
-          path
-            .filter(e =>
-              p.dst == e.src)
-            .aggregate(e =>
-              (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow))
+        path
+          .filter(e =>
+            p.dst == e.src
+          )
+          .aggregate(e =>
+            (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow
+          )
+      )
         .groupBySource(p =>
-          (g1 = p._1.src, g2 = p._2.dst).toRow).distinct
+          (g1 = p._1.src, g2 = p._2.dst).toRow
+        ).distinct
     )
     val query = asps
       .aggregate(a =>
-        (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow)
+        (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow
+      )
       .groupBySource(p =>
-        (g1 = p._1.src, g2 = p._1.dst).toRow)
+        (g1 = p._1.src, g2 = p._1.dst).toRow
+      )
       .sort(_.dst, Ord.ASC)
       .sort(_.src, Ord.ASC)
       .sort(_.cost, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
-
 
   def executeCollections(): Unit =
     var it = 0
@@ -112,13 +119,16 @@ class TOASPSQuery extends QueryBenchmark {
         path
           .filter(e =>
             if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-            p.dst == e.src)
+            p.dst == e.src
+          )
           .map(e =>
             if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-            WEdgeCC(p.src, e.dst, p.cost + e.cost))
+            WEdgeCC(p.src, e.dst, p.cost + e.cost)
+          )
           .groupBy(w =>
             if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-            (w.src, w.dst))
+            (w.src, w.dst)
+          )
           .mapValues(_.minBy(_.cost))
           .values.toSeq
       )
@@ -151,7 +161,10 @@ class TOASPSQuery extends QueryBenchmark {
 //        db.values(fixAgg)
 
     FixedPointQuery.agg_scalaSQLSemiNaive(set)(
-      ddb, asps_delta, asps_tmp, asps_derived
+      ddb,
+      asps_delta,
+      asps_tmp,
+      asps_derived
     )(toTuple)(initBase)(fixFn)
 
     //  workaround since groupBy does not work with ScalaSQL + postgres
