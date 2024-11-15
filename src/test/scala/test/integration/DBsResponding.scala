@@ -1,6 +1,8 @@
 package test.integration.dbsresponding
 
 import munit.FunSuite
+import test.expensiveTest
+
 import java.sql.{Connection, DriverManager}
 
 class DBsResponding extends FunSuite {
@@ -14,7 +16,7 @@ class DBsResponding extends FunSuite {
     }
   }
 
-  test("PostgreSQL responds") {
+  test("PostgreSQL responds".tag(expensiveTest)) {
     withConnection(
       "jdbc:postgresql://localhost:5433/testdb",
       "testuser",
@@ -28,7 +30,7 @@ class DBsResponding extends FunSuite {
     }
   }
 
-  test("MySQL responds") {
+  test("MySQL responds".tag(expensiveTest)) {
     withConnection(
       "jdbc:mysql://localhost:3307/testdb",
       "testuser",
@@ -44,7 +46,7 @@ class DBsResponding extends FunSuite {
     }
   }
 
-  test("MariaDB responds") {
+  test("MariaDB responds".tag(expensiveTest)) {
     withConnection(
       "jdbc:mariadb://localhost:3308/testdb",
       "testuser",
@@ -62,7 +64,7 @@ class DBsResponding extends FunSuite {
     }
   }
 
-  test("SQLite responds with its unique json_each table-valued function") {
+  test("SQLite responds with its unique json_each table-valued function".tag(expensiveTest)) {
     withConnection("jdbc:sqlite::memory:") { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
@@ -76,7 +78,7 @@ class DBsResponding extends FunSuite {
     }
   }
 
-  test("DuckDB responds") {
+  test("DuckDB responds".tag(expensiveTest)) {
     withConnection("jdbc:duckdb:") { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
