@@ -11,6 +11,7 @@ inThisBuild(Seq(
     "org.mariadb.jdbc" % "mariadb-java-client" % "3.5.0",
     "org.xerial" % "sqlite-jdbc" % "3.47.0.0",
     "org.duckdb" % "duckdb_jdbc" % "1.1.3",
+    "com.h2database" % "h2" % "2.3.232",
     "com.lihaoyi" %% "scalasql" % "0.1.11"
   )
 ))

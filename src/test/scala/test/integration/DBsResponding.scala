@@ -64,7 +64,7 @@ class DBsResponding extends FunSuite {
     }
   }
 
-  test("SQLite responds with its unique json_each table-valued function".tag(expensiveTest)) {
+  test("SQLite responds".tag(expensiveTest)) {
     withConnection("jdbc:sqlite::memory:") { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
@@ -89,6 +89,18 @@ class DBsResponding extends FunSuite {
         result = result :+ rs.getInt(1)
       }
       assertEquals(result, List(1, 3, 5, 7))
+    }
+  }
+
+  test("H2 responds".tag(expensiveTest)) {
+    withConnection("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1") { conn =>
+      val stmt = conn.createStatement()
+      val rs = stmt.executeQuery(
+        """SELECT ARRAY_CONCAT(ARRAY[8, 0], ARRAY[1, 78]) as combined"""
+      )
+      assert(rs.next())
+      val arr = rs.getArray("combined").getArray().asInstanceOf[Array[Integer]]
+      assertEquals(arr.toList.map(_.toInt), List(8, 0, 1, 78))
     }
   }
 }
