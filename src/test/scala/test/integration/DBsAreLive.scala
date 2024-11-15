@@ -5,7 +5,7 @@ import test.expensiveTest
 
 import java.sql.{Connection, DriverManager}
 
-class DBsResponding extends FunSuite {
+class DBsAreLive extends FunSuite {
   def withConnection[A](url: String, user: String = "", password: String = "")(f: Connection => A): A = {
     var conn: Connection = null
     try {
