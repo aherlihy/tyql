@@ -95,12 +95,14 @@ class DBsAreLive extends FunSuite {
   test("H2 responds".tag(expensiveTest)) {
     withConnection("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1") { conn =>
       val stmt = conn.createStatement()
-      val rs = stmt.executeQuery(
-        """SELECT ARRAY_CONCAT(ARRAY[8, 0], ARRAY[1, 78]) as combined"""
-      )
-      assert(rs.next())
-      val arr = rs.getArray("combined").getArray().asInstanceOf[Array[Integer]]
-      assertEquals(arr.toList.map(_.toInt), List(8, 0, 1, 78))
+
+      val rs1 = stmt.executeQuery("""SELECT CASEWHEN(1=1, 'yes', 'no') as result""")
+      assert(rs1.next())
+      assertEquals(rs1.getString("result"), "yes")
+
+      val rs2 = stmt.executeQuery("""SELECT DECODE(1, 1, 'one', 'other') as result""")
+      assert(rs2.next())
+      assertEquals(rs2.getString("result"), "one")
     }
   }
 }
