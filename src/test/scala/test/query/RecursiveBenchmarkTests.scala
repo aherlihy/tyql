@@ -645,7 +645,7 @@ class AncestryTest extends SQLStringQueryTest[AncestryDB, (name: String)] {
         recursive$162 AS
           ((SELECT parents$162.child as name, 1 as gen
             FROM parents as parents$162
-            WHERE parents$162.parent = "Alice")
+            WHERE parents$162.parent = 'Alice')
             UNION
           ((SELECT parents$164.child as name, ref$86.gen + 1 as gen
             FROM parents as parents$164, recursive$162 as ref$86
@@ -685,19 +685,19 @@ class EvenOddTest extends SQLStringQueryTest[EvenOddDB, NumberType] {
     """
       WITH RECURSIVE
         recursive$1 AS
-          ((SELECT numbers$2.value as value, "even" as typ
+          ((SELECT numbers$2.value as value, 'even' as typ
             FROM numbers as numbers$2
             WHERE numbers$2.value = 0)
           UNION
-            ((SELECT numbers$4.value as value, "even" as typ
+            ((SELECT numbers$4.value as value, 'even' as typ
               FROM numbers as numbers$4, recursive$2 as ref$5
               WHERE numbers$4.value = ref$5.value + 1))),
          recursive$2 AS
-          ((SELECT numbers$8.value as value, "odd" as typ
+          ((SELECT numbers$8.value as value, 'odd' as typ
             FROM numbers as numbers$8
             WHERE numbers$8.value = 1)
               UNION
-          ((SELECT numbers$10.value as value, "odd" as typ
+          ((SELECT numbers$10.value as value, 'odd' as typ
             FROM numbers as numbers$10, recursive$1 as ref$8
             WHERE numbers$10.value = ref$8.value + 1)))
         SELECT * FROM recursive$2 as recref$1
@@ -806,15 +806,15 @@ class CBATest extends SQLStringAggregationTest[CBADB, Int] {
          recursive$40 AS
             ((SELECT term$43.x as x, lits$44.y as y
               FROM term as term$43, lits as lits$44
-              WHERE lits$44.x = term$43.z AND term$43.y = "Lit")
+              WHERE lits$44.x = term$43.z AND term$43.y = 'Lit')
                 UNION ALL
             ((SELECT term$47.x as x, ref$28.y as y
               FROM term as term$47, recursive$41 as ref$28
-              WHERE term$47.y = "Var" AND term$47.z = ref$28.x)
+              WHERE term$47.y = 'Var' AND term$47.z = ref$28.x)
                 UNION ALL
              (SELECT term$50.x as x, ref$31.y as y
               FROM term as term$50, recursive$40 as ref$31, recursive$42 as ref$32, abs as abs$51, app as app$52
-              WHERE term$50.y = "App" AND term$50.z = app$52.x AND ref$31.x = abs$51.z AND ref$32.x = app$52.y AND ref$32.y = abs$51.x))),
+              WHERE term$50.y = 'App' AND term$50.z = app$52.x AND ref$31.x = abs$51.z AND ref$32.x = app$52.y AND ref$32.y = abs$51.x))),
         recursive$41 AS
           ((SELECT * FROM baseData as baseData$60)
             UNION ALL
@@ -823,15 +823,15 @@ class CBATest extends SQLStringAggregationTest[CBADB, Int] {
             WHERE ref$36.x = app$63.y AND ref$36.y = abs$62.x AND ref$37.x = app$63.z))),
         recursive$42 AS
           ((SELECT term$69.x as x, term$69.z as y
-            FROM term as term$69 WHERE term$69.y = "Abs")
+            FROM term as term$69 WHERE term$69.y = 'Abs')
               UNION ALL
           ((SELECT term$71.x as x, ref$42.y as y
             FROM term as term$71, recursive$43 as ref$42
-            WHERE term$71.y = "Var" AND term$71.z = ref$42.x)
+            WHERE term$71.y = 'Var' AND term$71.z = ref$42.x)
               UNION ALL
            (SELECT term$74.x as x, ref$45.y as y
             FROM term as term$74, recursive$42 as ref$45, recursive$42 as ref$46, abs as abs$75, app as app$76
-            WHERE term$74.y = "App" AND term$74.z = app$76.x AND ref$45.x = abs$75.z AND ref$46.x = app$76.y AND ref$46.y = abs$75.x))),
+            WHERE term$74.y = 'App' AND term$74.z = app$76.x AND ref$45.x = abs$75.z AND ref$46.x = app$76.y AND ref$46.y = abs$75.x))),
         recursive$43 AS
           ((SELECT * FROM baseCtrl as baseCtrl$84)
             UNION ALL
@@ -1047,7 +1047,7 @@ class PointsToCountTest extends SQLStringAggregationTest[PointsToDB, Int] {
             ((SELECT ref$9.y as x, store$15.y as y, ref$10.y as h
               FROM store as store$15, recursive$1 as ref$9, recursive$1 as ref$10
               WHERE store$15.x = ref$9.x AND store$15.h = ref$10.x)))
-        SELECT COUNT(1) FROM recursive$1 as recref$0 WHERE recref$0.x = "r"
+        SELECT COUNT(1) FROM recursive$1 as recref$0 WHERE recref$0.x = 'r'
     """
 }
 

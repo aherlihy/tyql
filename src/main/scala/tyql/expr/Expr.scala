@@ -187,6 +187,7 @@ object Expr:
 
   case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr]
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
+  // TODO why does this break things?
 
   /** Should be able to rely on the implicit conversions, but not always.
    *  One approach is to overload, another is to provide a user-facing toExpr

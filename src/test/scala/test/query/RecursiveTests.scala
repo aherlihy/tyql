@@ -677,7 +677,7 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
               tag$64.id as id, tag$64.name as source, list_prepend(tag$64.name, ref$30.path) as path
             FROM recursive$62 as ref$30, tag as tag$64
             WHERE tag$64.subclassof = ref$30.id)))
-      SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = "Oasis"
+      SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = 'Oasis'
       """
 }
 

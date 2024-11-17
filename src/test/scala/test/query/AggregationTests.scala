@@ -97,8 +97,7 @@ class AggregateMultiSubexpression2AggregateTest extends SQLStringAggregationTest
       )
 
   def expectedQueryPattern: String =
-    """SELECT AVG(product$A.price) > product$A.price = "true" as avg FROM product as product$A
-          """
+    """SELECT AVG(product$A.price) > product$A.price = TRUE as avg FROM product as product$A"""
 }
 
 // Query helper-method based aggregation:

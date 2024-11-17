@@ -330,7 +330,7 @@ object QueryIRTree:
       )
     ProjectClause(children, p)
 
-  private def generateExpr(ast: Expr[?, ?], symbols: SymbolTable): QueryIRNode =
+  private def generateExpr(ast: Expr[?, ?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match
       case ref: Expr.Ref[?, ?] =>
         val name = ref.stringRef()
@@ -367,8 +367,8 @@ object QueryIRTree:
         )
       case l: Expr.DoubleLit => Literal(s"${l.$value}", l)
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
-      case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
-      case l: Expr.BooleanLit => Literal(s"\"${l.$value}\"", l)
+      case l: Expr.StringLit => Literal(d.quoteStringLiteral(l.$value, insideLikePattern=false), l) // TODO fix this for LIKE patterns
+      case l: Expr.BooleanLit => Literal(d.quoteBooleanLiteral(l.$value), l)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)

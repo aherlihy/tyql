@@ -57,7 +57,7 @@ class JoinSimple3Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: Str
       FROM
         buyers as buyers$B,
         product as product$P
-      WHERE buyers$B.name = "string constant"
+      WHERE buyers$B.name = 'string constant'
       """
 }
 
@@ -74,7 +74,7 @@ class JoinSimple4Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: Str
   def expectedQueryPattern: String = """
 SELECT buyers$A.name as buyerName, product$B.name as productName, product$B.price as price
 FROM buyers as buyers$A, product as product$B
-WHERE (buyers$A.name = "string constant" AND product$B.id = buyers$A.id)
+WHERE (buyers$A.name = 'string constant' AND product$B.id = buyers$A.id)
       """
 }
 // TODO: Not implemented yet, Join flavors, cross/left/etc
