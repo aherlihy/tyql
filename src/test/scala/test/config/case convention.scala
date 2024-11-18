@@ -58,7 +58,7 @@ class CaseConventionTests extends FunSuite {
 
         case class Tbl(id: Int, aaBb_Cc: String)
         val q = Table[Tbl](tableName).map(b => b.aaBb_Cc)
-        val stmt = conn.createStatement()      
+        val stmt = conn.createStatement()
         try {
           stmt.executeUpdate(s"drop table if exists ${escapedTableName};")
           stmt.executeUpdate(s"create table ${escapedTableName}(${escapedColunmName} int);")
