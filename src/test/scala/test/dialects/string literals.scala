@@ -39,35 +39,24 @@ class StringLiteralDBTest extends FunSuite {
 
     val underscorePattern = dialect.quoteStringLiteral("a_c", insideLikePattern=true)
     val literalUnderscorePattern = dialect.quoteStringLiteral(s"a${Dialect.literal_underscore}c", insideLikePattern=true)
-
-    val rs1 = stmt.executeQuery(s"SELECT 'abc' LIKE $underscorePattern as result")
-    assert(rs1.next())
-    assert(rs1.getBoolean("result"))
-    val rs2 = stmt.executeQuery(s"SELECT 'a_c' LIKE $underscorePattern as result")
-    assert(rs2.next())
-    assert(rs2.getBoolean("result"))
-    val rs3 = stmt.executeQuery(s"SELECT 'abc' LIKE $literalUnderscorePattern as result")
-    assert(rs3.next())
-    assert(!rs3.getBoolean("result"))
-    val rs4 = stmt.executeQuery(s"SELECT 'a_c' LIKE $literalUnderscorePattern as result")
-    assert(rs4.next())
-    assert(rs4.getBoolean("result"), "the pattern was " + s"SELECT 'a_c' LIKE $literalUnderscorePattern as result")
-
     val percentPattern = dialect.quoteStringLiteral("a%c", insideLikePattern=true)
     val literalPercentPattern = dialect.quoteStringLiteral(s"a${Dialect.literal_percent}c", insideLikePattern=true)
 
-    val rs5 = stmt.executeQuery(s"SELECT 'abc' LIKE $percentPattern as result")
-    assert(rs5.next())
-    assert(rs5.getBoolean("result"))
-    val rs6 = stmt.executeQuery(s"SELECT 'a%c' LIKE $percentPattern as result")
-    assert(rs6.next())
-    assert(rs6.getBoolean("result"))
-    val rs7 = stmt.executeQuery(s"SELECT 'abc' LIKE $literalPercentPattern as result")
-    assert(rs7.next())
-    assert(!rs7.getBoolean("result"))
-    val rs8 = stmt.executeQuery(s"SELECT 'a%c' LIKE $literalPercentPattern as result")
-    assert(rs8.next())
-    assert(rs8.getBoolean("result"))
+    def check(query: String, expectedResult: Boolean) = {
+      val rs = stmt.executeQuery(query + " as did_match")
+      assert(rs.next())
+      assertEquals(rs.getBoolean("did_match"), expectedResult)
+    }
+
+    check(s"SELECT 'abc' LIKE $underscorePattern", true);
+    check(s"SELECT 'a_c' LIKE $underscorePattern", true);
+    check(s"SELECT 'abc' LIKE $literalUnderscorePattern", false);
+    check(s"SELECT 'a_c' LIKE $literalUnderscorePattern", true);
+
+    check(s"SELECT 'abc' LIKE $percentPattern", true);
+    check(s"SELECT 'a%c' LIKE $percentPattern", true);
+    check(s"SELECT 'abc' LIKE $literalPercentPattern", false);
+    check(s"SELECT 'a%c' LIKE $literalPercentPattern", true);
   }
 
   test("PostgreSQL LIKE patterns".tag(expensiveTest)) {
