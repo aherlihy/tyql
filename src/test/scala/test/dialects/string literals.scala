@@ -59,71 +59,14 @@ class StringLiteralDBTest extends FunSuite {
     check(s"SELECT 'a%c' LIKE $literalPercentPattern", true);
   }
 
-  test("PostgreSQL LIKE patterns".tag(expensiveTest)) {
-    withDB.postgres( { conn =>
-      testLikePatterns(conn)
-    })
-  }
-
-  test("MySQL LIKE patterns".tag(expensiveTest)) {
-    withDB.mysql { conn =>
+  test("all DBs handle LIKE patterns".tag(expensiveTest)) {
+    withDB.all { conn =>
       testLikePatterns(conn)
     }
   }
 
-  test("MariaDB LIKE patterns".tag(expensiveTest)) {
-    withDB.mariadb { conn =>
-      testLikePatterns(conn)
-    }
-  }
-
-  test("SQLite LIKE patterns".tag(expensiveTest)) {
-    withDB.sqlite { conn =>
-      testLikePatterns(conn)
-    }
-  }
-
-  test("H2 LIKE patterns".tag(expensiveTest)) {
-    withDB.h2 { conn =>
-      testLikePatterns(conn)
-    }
-  }
-
-  test("DuckDB LIKE patterns".tag(expensiveTest)) {
-    withDB.duckdb { conn =>
-      testLikePatterns(conn)
-    }
-  }
-
-  test("PostgreSQL string literals".tag(expensiveTest)) {
-    withDB.postgres { conn =>
-      interestingStrings.foreach(input => testStringLiteral(conn, input))
-    }
-  }
-
-  test("MySQL and MariaDB string literals".tag(expensiveTest)) {
-    withDB.mysql { conn =>
-      interestingStrings.foreach(input => testStringLiteral(conn, input))
-    }
-    withDB.mariadb { conn =>
-      interestingStrings.foreach(input => testStringLiteral(conn, input))
-    }
-  }
-
-  test("SQLite string literals".tag(expensiveTest)) {
-    withDB.sqlite { conn =>
-      interestingStrings.foreach(input => testStringLiteral(conn, input))
-    }
-  }
-
-  test("H2 string literals".tag(expensiveTest)) {
-    withDB.h2 { conn =>
-      interestingStrings.foreach(input => testStringLiteral(conn, input))
-    }
-  }
-
-  test("DuckDB string literals".tag(expensiveTest)) {
-    withDB.duckdb { conn =>
+  test("all DBs handle string literals".tag(expensiveTest)) {
+    withDB.all { conn =>
       interestingStrings.foreach(input => testStringLiteral(conn, input))
     }
   }

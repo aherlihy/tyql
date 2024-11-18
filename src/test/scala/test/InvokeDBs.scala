@@ -63,6 +63,20 @@ object withDB:
       )(tyql.Dialect.h2.given_Dialect)(f)
   }
 
+  def all[A](f: Connection => Dialect ?=> A): Unit = {
+    postgres(f)
+    mysql(f)
+    mariadb(f)
+    sqlite(f)
+    duckdb(f)
+    h2(f)
+  }
+
+  def allmysql[A](f: Connection => Dialect ?=> A): Unit = {
+    mysql(f)
+    mariadb(f)
+  }
+
 class WithDBHelpersTest extends FunSuite {
   private def checkSelect10(conn: Connection) = {
     val stmt = conn.createStatement()
