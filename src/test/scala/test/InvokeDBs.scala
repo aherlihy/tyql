@@ -15,6 +15,16 @@ private def withConnection[A](url: String, user: String = "", password: String =
   }
 }
 
+private def withConnectionNoImplicits[A](url: String, user: String = "", password: String = "")(f: Connection => A): A = {
+  var conn: Connection = null
+  try {
+    conn = DriverManager.getConnection(url, user, password)
+    f(conn)
+  } finally {
+    if (conn != null) conn.close()
+  }
+}
+
 object withDB:
   def postgres[A](f: Connection => Dialect ?=> A): A = {
     withConnection(
@@ -77,6 +87,68 @@ object withDB:
     mariadb(f)
   }
 
+object withDBNoImplicits:
+  def postgres[A](f: Connection => A): A = {
+    withConnectionNoImplicits(
+        "jdbc:postgresql://localhost:5433/testdb",
+        "testuser",
+        "testpass"
+      )(f)
+  }
+
+  def mysql[A](f: Connection => A): A = {
+    given Dialect = tyql.Dialect.mysql.given_Dialect
+    withConnectionNoImplicits(
+        "jdbc:mysql://localhost:3307/testdb",
+        "testuser",
+        "testpass"
+      )(f)
+  }
+
+  def mariadb[A](f: Connection => A)(using Dialect): A = {
+    given Dialect = tyql.Dialect.mariadb.given_Dialect
+    withConnectionNoImplicits(
+        "jdbc:mariadb://localhost:3308/testdb",
+        "testuser",
+        "testpass"
+      )(f)
+  }
+
+  def sqlite[A](f: Connection => A)(using Dialect): A = {
+    given Dialect = tyql.Dialect.sqlite.given_Dialect
+    withConnectionNoImplicits(
+        "jdbc:sqlite::memory:"
+      )(f)
+  }
+
+  def duckdb[A](f: Connection => A): A = {
+    given Dialect = tyql.Dialect.duckdb.given_Dialect
+    withConnectionNoImplicits(
+        "jdbc:duckdb:"
+      )(f)
+  }
+
+  def h2[A](f: Connection => A): A = {
+    given Dialect = tyql.Dialect.h2.given_Dialect
+    withConnectionNoImplicits(
+        "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1"
+      )(f)
+  }
+
+  def all[A](f: Connection => A): Unit = {
+    postgres(f)
+    mysql(f)
+    mariadb(f)
+    sqlite(f)
+    duckdb(f)
+    h2(f)
+  }
+
+  def allmysql[A](f: Connection => A): Unit = {
+    mysql(f)
+    mariadb(f)
+  }
+
 class WithDBHelpersTest extends FunSuite {
   private def checkSelect10(conn: Connection) = {
     val stmt = conn.createStatement()
@@ -110,6 +182,13 @@ class WithDBHelpersTest extends FunSuite {
     withDB.duckdb { conn =>
       checkSelect10(conn)
       assertEquals(summon[Dialect].name(), "DuckDB Dialect")
+    }
+  }
+
+  test("withDBNoImplicits helper methods do not inject implicits".tag(needsDBs)) {
+    withDBNoImplicits.all { conn =>
+      checkSelect10(conn)
+      assertEquals(summon[Dialect].name(), "ANSI SQL Dialect")
     }
   }
 }
