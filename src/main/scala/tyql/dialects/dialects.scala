@@ -1,5 +1,7 @@
 package tyql
 
+// TODO which of these should be sealed? Do we support custom dialectes?
+
 trait Dialect:
   def name(): String
 
