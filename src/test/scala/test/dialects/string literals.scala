@@ -3,20 +3,11 @@ package test.integration.stringliteralescaping
 import munit.FunSuite
 import test.expensiveTest
 import tyql.Dialect
+import test.withDB
 import java.sql.{Connection, DriverManager}
 
 class StringLiteralDBTest extends FunSuite {
-  def withConnection[A](url: String, user: String = "", password: String = "")(f: Connection => A): A = {
-    var conn: Connection = null
-    try {
-      conn = DriverManager.getConnection(url, user, password)
-      f(conn)
-    } finally {
-      if (conn != null) conn.close()
-    }
-  }
-
-  private def testStringLiteral(dialect: Dialect, conn: Connection, input: String) = {
+  private def testStringLiteral(conn: Connection, input: String)(using dialect: Dialect) = {
     val quoted = dialect.quoteStringLiteral(input, insideLikePattern=false)
     val stmt = conn.createStatement()
     val rs = stmt.executeQuery(s"SELECT $quoted as str")
@@ -43,7 +34,7 @@ class StringLiteralDBTest extends FunSuite {
     assertEquals(Dialect.sqlite.given_Dialect.quoteStringLiteral("a\nb", insideLikePattern=false), "'a\nb'");
   }
 
-  private def testLikePatterns(dialect: Dialect, conn: Connection) = {
+  private def testLikePatterns(conn: Connection)(using dialect: Dialect) = {
     val stmt = conn.createStatement()
 
     val underscorePattern = dialect.quoteStringLiteral("a_c", insideLikePattern=true)
@@ -80,77 +71,71 @@ class StringLiteralDBTest extends FunSuite {
   }
 
   test("PostgreSQL LIKE patterns".tag(expensiveTest)) {
-    withConnection("jdbc:postgresql://localhost:5433/testdb", "testuser", "testpass") { conn =>
-      testLikePatterns(Dialect.postgresql.given_Dialect, conn)
-    }
+    withDB.postgres( { conn =>
+      testLikePatterns(conn)
+    })
   }
 
   test("MySQL LIKE patterns".tag(expensiveTest)) {
-    withConnection("jdbc:mysql://localhost:3307/testdb", "testuser", "testpass") { conn =>
-      testLikePatterns(Dialect.mysql.given_Dialect, conn)
+    withDB.mysql { conn =>
+      testLikePatterns(conn)
     }
   }
 
   test("MariaDB LIKE patterns".tag(expensiveTest)) {
-    withConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass") { conn =>
-      testLikePatterns(Dialect.mariadb.given_Dialect, conn)
+    withDB.mariadb { conn =>
+      testLikePatterns(conn)
     }
   }
 
   test("SQLite LIKE patterns".tag(expensiveTest)) {
-    withConnection("jdbc:sqlite::memory:") { conn =>
-      testLikePatterns(Dialect.sqlite.given_Dialect, conn)
+    withDB.sqlite { conn =>
+      testLikePatterns(conn)
     }
   }
 
   test("H2 LIKE patterns".tag(expensiveTest)) {
-    withConnection("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1") { conn =>
-      testLikePatterns(Dialect.h2.given_Dialect, conn)
+    withDB.h2 { conn =>
+      testLikePatterns(conn)
     }
   }
 
   test("DuckDB LIKE patterns".tag(expensiveTest)) {
-    withConnection("jdbc:duckdb:") { conn =>
-      testLikePatterns(Dialect.duckdb.given_Dialect, conn)
+    withDB.duckdb { conn =>
+      testLikePatterns(conn)
     }
   }
 
   test("PostgreSQL string literals".tag(expensiveTest)) {
-    withConnection("jdbc:postgresql://localhost:5433/testdb", "testuser", "testpass") { conn =>
-      val dialect = Dialect.postgresql.given_Dialect
-      interestingStrings.foreach(input => testStringLiteral(dialect, conn, input))
+    withDB.postgres { conn =>
+      interestingStrings.foreach(input => testStringLiteral(conn, input))
     }
   }
 
   test("MySQL and MariaDB string literals".tag(expensiveTest)) {
-    withConnection("jdbc:mysql://localhost:3307/testdb", "testuser", "testpass") { conn =>
-      val dialect = Dialect.mysql.given_Dialect
-      interestingStrings.foreach(input => testStringLiteral(dialect, conn, input))
+    withDB.mysql { conn =>
+      interestingStrings.foreach(input => testStringLiteral(conn, input))
     }
-    withConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass") { conn =>
-      val dialect = Dialect.mariadb.given_Dialect 
-      interestingStrings.foreach(input => testStringLiteral(dialect, conn, input))
+    withDB.mariadb { conn =>
+      interestingStrings.foreach(input => testStringLiteral(conn, input))
     }
   }
 
   test("SQLite string literals".tag(expensiveTest)) {
-    withConnection("jdbc:sqlite::memory:") { conn =>
-      val dialect = Dialect.sqlite.given_Dialect
-      interestingStrings.foreach(input => testStringLiteral(dialect, conn, input))
+    withDB.sqlite { conn =>
+      interestingStrings.foreach(input => testStringLiteral(conn, input))
     }
   }
 
   test("H2 string literals".tag(expensiveTest)) {
-    withConnection("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1") { conn =>
-      val dialect = Dialect.h2.given_Dialect
-      interestingStrings.foreach(input => testStringLiteral(dialect, conn, input))
+    withDB.h2 { conn =>
+      interestingStrings.foreach(input => testStringLiteral(conn, input))
     }
   }
 
   test("DuckDB string literals".tag(expensiveTest)) {
-    withConnection("jdbc:duckdb:") { conn =>
-      val dialect = Dialect.duckdb.given_Dialect
-      interestingStrings.foreach(input => testStringLiteral(dialect, conn, input))
+    withDB.duckdb { conn =>
+      interestingStrings.foreach(input => testStringLiteral(conn, input))
     }
   }
 }

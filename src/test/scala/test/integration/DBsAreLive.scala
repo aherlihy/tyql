@@ -4,6 +4,7 @@ import munit.FunSuite
 import test.expensiveTest
 
 import java.sql.{Connection, DriverManager}
+import test.withDB
 
 class DBsAreLive extends FunSuite {
   def withConnection[A](url: String, user: String = "", password: String = "")(f: Connection => A): A = {
@@ -17,11 +18,7 @@ class DBsAreLive extends FunSuite {
   }
 
   test("PostgreSQL responds".tag(expensiveTest)) {
-    withConnection(
-      "jdbc:postgresql://localhost:5433/testdb",
-      "testuser",
-      "testpass"
-    ) { conn =>
+    withDB.postgres { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery("SELECT ARRAY[5,10,3]::integer[] as arr")
       assert(rs.next())
@@ -31,11 +28,7 @@ class DBsAreLive extends FunSuite {
   }
 
   test("MySQL responds".tag(expensiveTest)) {
-    withConnection(
-      "jdbc:mysql://localhost:3307/testdb",
-      "testuser",
-      "testpass"
-    ) { conn =>
+    withDB.mysql { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
         """SELECT GROUP_CONCAT(n ORDER BY n SEPARATOR '-') as concat
@@ -47,11 +40,7 @@ class DBsAreLive extends FunSuite {
   }
 
   test("MariaDB responds".tag(expensiveTest)) {
-    withConnection(
-      "jdbc:mariadb://localhost:3308/testdb",
-      "testuser",
-      "testpass"
-    ) { conn =>
+    withDB.mariadb { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
         """SELECT seq FROM seq_1_to_4"""
@@ -65,7 +54,7 @@ class DBsAreLive extends FunSuite {
   }
 
   test("SQLite responds".tag(expensiveTest)) {
-    withConnection("jdbc:sqlite::memory:") { conn =>
+    withDB.sqlite { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
         """SELECT value FROM json_each('[5,55,3]') ORDER BY value"""
@@ -79,7 +68,7 @@ class DBsAreLive extends FunSuite {
   }
 
   test("DuckDB responds".tag(expensiveTest)) {
-    withConnection("jdbc:duckdb:") { conn =>
+    withDB.duckdb { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
         """SELECT * FROM generate_series(1, 7, 2) as g"""
@@ -93,7 +82,7 @@ class DBsAreLive extends FunSuite {
   }
 
   test("H2 responds".tag(expensiveTest)) {
-    withConnection("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1") { conn =>
+    withDB.h2 { conn =>
       val stmt = conn.createStatement()
 
       val rs1 = stmt.executeQuery("""SELECT CASEWHEN(1=1, 'yes', 'no') as result""")
