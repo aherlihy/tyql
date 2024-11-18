@@ -1,7 +1,7 @@
 package test.integration.dbsresponding
 
 import munit.FunSuite
-import test.expensiveTest
+import test.needsDBs
 
 import java.sql.{Connection, DriverManager}
 import test.withDB
@@ -17,7 +17,7 @@ class DBsAreLive extends FunSuite {
     }
   }
 
-  test("PostgreSQL responds".tag(expensiveTest)) {
+  test("PostgreSQL responds".tag(needsDBs)) {
     withDB.postgres { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery("SELECT ARRAY[5,10,3]::integer[] as arr")
@@ -27,7 +27,7 @@ class DBsAreLive extends FunSuite {
     }
   }
 
-  test("MySQL responds".tag(expensiveTest)) {
+  test("MySQL responds".tag(needsDBs)) {
     withDB.mysql { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
@@ -39,7 +39,7 @@ class DBsAreLive extends FunSuite {
     }
   }
 
-  test("MariaDB responds".tag(expensiveTest)) {
+  test("MariaDB responds".tag(needsDBs)) {
     withDB.mariadb { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
@@ -53,7 +53,7 @@ class DBsAreLive extends FunSuite {
     }
   }
 
-  test("SQLite responds".tag(expensiveTest)) {
+  test("SQLite responds".tag(needsDBs)) {
     withDB.sqlite { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
@@ -67,7 +67,7 @@ class DBsAreLive extends FunSuite {
     }
   }
 
-  test("DuckDB responds".tag(expensiveTest)) {
+  test("DuckDB responds".tag(needsDBs)) {
     withDB.duckdb { conn =>
       val stmt = conn.createStatement()
       val rs = stmt.executeQuery(
@@ -81,7 +81,7 @@ class DBsAreLive extends FunSuite {
     }
   }
 
-  test("H2 responds".tag(expensiveTest)) {
+  test("H2 responds".tag(needsDBs)) {
     withDB.h2 { conn =>
       val stmt = conn.createStatement()
 

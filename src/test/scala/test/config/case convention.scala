@@ -4,7 +4,7 @@ import munit.FunSuite
 import tyql.{Config, Dialect}
 import tyql.CaseConvention
 import test.withDB
-import test.expensiveTest
+import test.needsDBs
 
 import tyql.{Table, DatabaseAST, Query}
 import scala.language.experimental.namedTuples
@@ -49,7 +49,7 @@ class CaseConventionTests extends FunSuite {
     check()
   }
 
-  test("postgres handles it".tag(expensiveTest)) {
+  test("postgres handles it".tag(needsDBs)) {
     withDB.postgres{ conn =>
 
       def check(tableName: String, columnName: String)(using cnf: Config) = {

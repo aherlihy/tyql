@@ -2,4 +2,4 @@ package test
 
 import munit.Tag
 
-val expensiveTest = new munit.Tag("Expensive")
+val needsDBs = new munit.Tag("Expensive")

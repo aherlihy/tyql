@@ -1,7 +1,7 @@
 package test.integration.stringliteralescaping
 
 import munit.FunSuite
-import test.expensiveTest
+import test.needsDBs
 import tyql.Dialect
 import test.withDB
 import java.sql.{Connection, DriverManager}
@@ -59,13 +59,13 @@ class StringLiteralDBTest extends FunSuite {
     check(s"SELECT 'a%c' LIKE $literalPercentPattern", true);
   }
 
-  test("all DBs handle LIKE patterns".tag(expensiveTest)) {
+  test("all DBs handle LIKE patterns".tag(needsDBs)) {
     withDB.all { conn =>
       testLikePatterns(conn)
     }
   }
 
-  test("all DBs handle string literals".tag(expensiveTest)) {
+  test("all DBs handle string literals".tag(needsDBs)) {
     withDB.all { conn =>
       interestingStrings.foreach(input => testStringLiteral(conn, input))
     }

@@ -3,7 +3,7 @@ package test
 import munit.FunSuite
 import tyql.Dialect
 import java.sql.{Connection, DriverManager}
-import test.expensiveTest
+import test.needsDBs
 
 private def withConnection[A](url: String, user: String = "", password: String = "")(d: Dialect)(f: Connection => Dialect ?=> A): A = {
   var conn: Connection = null
@@ -86,7 +86,7 @@ class WithDBHelpersTest extends FunSuite {
     assertEquals(x, 10)
   }
 
-  test("dialect selection works with withDB helper methods".tag(expensiveTest)) {
+  test("dialect selection works with withDB helper methods".tag(needsDBs)) {
     withDB.postgres { conn =>
       checkSelect10(conn)
       assertEquals(summon[Dialect].name(), "PostgreSQL Dialect")

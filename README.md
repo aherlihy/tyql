@@ -4,8 +4,8 @@
 ### Running Tests
 Tests are untagged by default or tagged as expensive.
 ```scala
-import test.expensiveTest
-test("PostgreSQL responds".tag(expensiveTest)) { ??? }
+import test.needsDBs
+test("PostgreSQL responds".tag(needsDBs)) { ??? }
 ```
 
 ```bash
