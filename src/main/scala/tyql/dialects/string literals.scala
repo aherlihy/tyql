@@ -9,7 +9,7 @@ object StringLiteral:
     // ESCAPE is needed for ANSI, H2, DuckDB, not needed in PostgreSQL, SQLite
     // still, it's safer to emit since all these backend have configuration options
     // MySQL, MariaDB REJECT the ESCAPE keyword in LIKE patterns
-    if insideLikePattern && (in.contains(Dialect.literal_percent) || in.contains(Dialect.literal_underscore)) then
+    if insideLikePattern && in.exists(c => c == Dialect.literal_percent || c == Dialect.literal_underscore) then
       (in.replace(Dialect.literal_percent.toString, "\\%").replace(Dialect.literal_underscore.toString, "\\_"), true)
     else
       (in.replace(Dialect.literal_percent, '%').replace(Dialect.literal_underscore, '_'), false)
