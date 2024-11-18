@@ -19,14 +19,19 @@ class StringLiteralDBTest extends FunSuite {
     "a'b",
     "a\"b",
     "a\\b",
-    "a\bb",     // Backspace
+    "a\bb", // Backspace
     "a\fb",
     "a\nb",
     "a\rb",
     "a\tb",
     "a\u001Ab", // Ctrl+Z
     "a%b",      // LIKE wildcard %
-    "a_b"       // LIKE wildcard _
+    "a_b",      // LIKE wildcard _
+    "éèêëàâäôöûüùïîçæœ ÉÈÊËÀÂÄÔÖÛÜÙÏÎÇÆŒ", // French
+    "äöüßÄÖÜ",                             // German
+    "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ",                  // Polish
+    "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ", // Russian
+    "αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩάέήίόύώΆΈΉΊΌΎΏ",     // Greek
   )
 
   test("string literals are handled per dialect") {
