@@ -6,7 +6,7 @@ package tyql
 trait QueryIRNode:
   val ast: DatabaseAST[?] | Expr[?, ?] | Expr.Fun[?, ?, ?] // Best-effort, keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
 
-  def toSQLString(): String
+  def toSQLString(using d: Dialect)(using cnf: Config)(): String
 
 trait QueryIRLeaf extends QueryIRNode
 
@@ -14,21 +14,21 @@ trait QueryIRLeaf extends QueryIRNode
  * Single WHERE clause containing 1+ predicates
  */
 case class WhereClause(children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = if children.size == 1 then children.head.toSQLString() else  s"${children.map(_.toSQLString()).mkString("", " AND ", "")}"
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = if children.size == 1 then children.head.toSQLString() else  s"${children.map(_.toSQLString()).mkString("", " AND ", "")}"
 
 /**
  * Binary expression-level operation.
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
  */
 case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: (String, String) => String, ast: Expr[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = op(lhs.toSQLString(), rhs.toSQLString())
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = op(lhs.toSQLString(), rhs.toSQLString())
 
 /**
  * Unary expression-level operation.
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
  */
 case class UnaryExprOp(child: QueryIRNode, op: String => String, ast: Expr[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = op(s"${child.toSQLString()}")
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = op(s"${child.toSQLString()}")
 
 /**
  * Project clause, e.g. SELECT <...> FROM 
@@ -36,7 +36,7 @@ case class UnaryExprOp(child: QueryIRNode, op: String => String, ast: Expr[?, ?]
  * @param ast
  */
 case class ProjectClause(children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = children.map(_.toSQLString()).mkString("", ", ", "")
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = children.map(_.toSQLString()).mkString("", ", ", "")
 
 
 /**
@@ -48,34 +48,36 @@ case class AttrExpr(child: QueryIRNode, projectedName: Option[String], ast: Expr
   val asStr = projectedName match
     case Some(value) => s" as ${d.quoteIdentifier(value)}"
     case None => ""
-  override def toSQLString(): String = s"${child.toSQLString()}$asStr"
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = s"${child.toSQLString()}$asStr"
 
 /**
  * Attribute access expression, e.g. `table.rowName`.
  */
-case class SelectExpr(attrName: String, from: QueryIRNode, ast: Expr[?, ?])(using d: Dialect) extends QueryIRLeaf:
-  override def toSQLString(): String = s"${from.toSQLString()}.${d.quoteIdentifier(attrName)}"
+case class SelectExpr(attrName: String, from: QueryIRNode, ast: Expr[?, ?]) extends QueryIRLeaf:
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+    s"${from.toSQLString()}.${d.quoteIdentifier(cnf.caseConvention.convert(attrName))}"
 
 /**
  * A variable that points to a table or subquery.
  */
-case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?])(using d: Dialect) extends QueryIRLeaf:
-  override def toSQLString() = d.quoteIdentifier(toSub.alias)
+case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?]) extends QueryIRLeaf:
+  override def toSQLString(using d: Dialect)(using cnf: Config)() =
+    d.quoteIdentifier(cnf.caseConvention.convert(toSub.alias))
 
-  override def toString: String = s"VAR(${toSub.alias}.${d.quoteIdentifier(name)})"
+  override def toString: String = s"VAR(${toSub.alias}.${name})" // TODO what about this?
 
 /**
  * Literals.
  * TODO: can't assume stringRep is universal, need to specialize for DB backend.
  */
 case class Literal(stringRep: String, ast: Expr[?, ?]) extends QueryIRLeaf:
-  override def toSQLString(): String = stringRep
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = stringRep
 
 case class ListTypeExpr(elements: List[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = elements.map(_.toSQLString()).mkString("[", ", ", "]")
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = elements.map(_.toSQLString()).mkString("[", ", ", "]")
 
 /**
  * Empty leaf node, to avoid Options everywhere.
  */
 case class EmptyLeaf(ast: DatabaseAST[?] = null) extends QueryIRLeaf:
-  override def toSQLString(): String = ""
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = ""
