@@ -5,6 +5,7 @@ import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.deriving.*
 import scala.compiletime.{erasedValue, summonInline}
+import tyql.DialectFeature
 
 // TODO: probably seal
 trait ExprShape
@@ -46,9 +47,15 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
 object Expr:
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape](x: Expr[Int, S1])
-    def >[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
+    // def >[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
+    def >(y: Expr[Int, ScalarExpr]): Expr[Boolean, CalculatedShape[S1, ScalarExpr]] = Gt(x, y)
+    @targetName("gtIntNonscalar")
+    def >(y: Expr[Int, NonScalarExpr]): Expr[Boolean, CalculatedShape[S1, NonScalarExpr]] = Gt(x, y)
     def >(y: Int): Expr[Boolean, S1] = Gt[S1, NonScalarExpr](x, IntLit(y))
-    def <[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lt(x, y)
+    // def <[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lt(x, y)
+    def <(y: Expr[Int, ScalarExpr]): Expr[Boolean, CalculatedShape[S1, ScalarExpr]] = Lt(x, y)
+    @targetName("ltIntNonscalar")
+    def <(y: Expr[Int, NonScalarExpr]): Expr[Boolean, CalculatedShape[S1, NonScalarExpr]] = Lt(x, y)
     def <(y: Int): Expr[Boolean, S1] = Lt[S1, NonScalarExpr](x, IntLit(y))
     def <=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lte(x, y)
 
@@ -57,10 +64,10 @@ object Expr:
 
   // TODO: write for numerical
   extension [S1 <: ExprShape](x: Expr[Double, S1])
-    @targetName("gtDoubleExpr")
-    def >[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Boolean, CalculatedShape[S1, S2]] =
-      GtDouble(x, y)
-    @targetName("gtDoubleLit")
+    @targetName("gtDoubleScalar")
+    def >(y: Expr[Double, ScalarExpr]): Expr[Boolean, CalculatedShape[S1, ScalarExpr]] = GtDouble(x, y)
+    @targetName("gtDoubleNonScalar")
+    def >(y: Expr[Double, NonScalarExpr]): Expr[Boolean, CalculatedShape[S1, NonScalarExpr]] = GtDouble(x, y)
     def >(y: Double): Expr[Boolean, S1] = GtDouble[S1, NonScalarExpr](x, DoubleLit(y))
     def <(y: Double): Expr[Boolean, S1] = LtDouble[S1, NonScalarExpr](x, DoubleLit(y))
     @targetName("addDouble")
@@ -113,6 +120,10 @@ object Expr:
   case class Gt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class GtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class LtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+
+  case class FunctionCall0[R](name: String)(using ResultTag[R]) extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
+  case class FunctionCall1[A1, R, S1 <: ExprShape](name: String, $a1: Expr[A1, S1])(using ResultTag[R]) extends Expr[R, S1]
+  case class FunctionCall2[A1, A2, R, S1 <: ExprShape, S2 <: ExprShape](name: String, $a1: Expr[A1, S1], $a2: Expr[A2, S2])(using ResultTag[R]) extends Expr[R, CalculatedShape[S1, S2]]
 
   case class Plus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class Times[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
@@ -178,6 +189,7 @@ object Expr:
   case class IntLit($value: Int) extends Expr[Int, NonScalarExpr]
   /** Scala values can be lifted into literals by conversions */
   given Conversion[Int, IntLit] = IntLit(_)
+  // XXX maybe only from literals with FromDigits?
 
   case class StringLit($value: String) extends Expr[String, NonScalarExpr]
   given Conversion[String, StringLit] = StringLit(_)
@@ -188,6 +200,9 @@ object Expr:
   case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr]
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
   // TODO why does this break things?
+
+  def randomFloat(using r: DialectFeature.RandomFloat)(): Expr[Double, NonScalarExpr] =
+    FunctionCall0[Double](r.funName)
 
   /** Should be able to rely on the implicit conversions, but not always.
    *  One approach is to overload, another is to provide a user-facing toExpr

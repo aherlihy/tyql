@@ -30,6 +30,10 @@ case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: (String, String) =>
 case class UnaryExprOp(child: QueryIRNode, op: String => String, ast: Expr[?, ?]) extends QueryIRNode:
   override def toSQLString(using d: Dialect)(using cnf: Config)(): String = op(s"${child.toSQLString()}")
 
+case class FunctionCallOp(name: String, children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = s"$name(" + children.map(_.toSQLString()).mkString(", ") + ")"
+  // TODO does this need ()s sometimes?
+
 /**
  * Project clause, e.g. SELECT <...> FROM 
  * @param children

@@ -232,6 +232,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val ref = Ref[A, NonScalarExpr]()
     Query.Filter(this, Fun(ref, p(ref)))
 
+  // TODO what about filtering by multiple variables?
   def filter(p: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] = withFilter(p)
 
   def nonEmpty: Expr[Boolean, NonScalarExpr] =

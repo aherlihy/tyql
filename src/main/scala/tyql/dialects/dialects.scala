@@ -1,5 +1,8 @@
 package tyql
 
+import tyql.DialectFeature
+import tyql.DialectFeature.*
+
 // TODO which of these should be sealed? Do we support custom dialectes?
 
 trait Dialect:
@@ -34,6 +37,7 @@ object Dialect:
         with StringLiteral.PostgresqlBehavior
         with BooleanLiterals.UseTrueFalse:
       def name() = "PostgreSQL Dialect"
+    given RandomFloat = new RandomFloat("random") {}
 
   object mysql:
     given Dialect = new MySQLDialect
@@ -44,10 +48,14 @@ object Dialect:
         with BooleanLiterals.UseTrueFalse:
       def name() = "MySQL Dialect"
 
+    given RandomFloat = new RandomFloat("rand") {}
+
   object mariadb:
     // XXX MariaDB extends MySQL!
     given Dialect = new mysql.MySQLDialect with QuotingIdentifiers.MariadbBehavior:
       override def name() = "MariaDB Dialect"
+
+    given RandomFloat = mysql.given_RandomFloat
 
   object sqlite:
     given Dialect = new Dialect
@@ -65,6 +73,8 @@ object Dialect:
         with BooleanLiterals.UseTrueFalse:
       def name() = "H2 Dialect"
 
+    given RandomFloat = new RandomFloat("rand") {}
+
   object duckdb:
     given Dialect = new Dialect
         with QuotingIdentifiers.DuckdbBehavior
@@ -72,3 +82,5 @@ object Dialect:
         with StringLiteral.DuckdbBehavior
         with BooleanLiterals.UseTrueFalse:
       override def name(): String = "DuckDB Dialect"
+
+    given RandomFloat = new RandomFloat("random") {}
