@@ -121,6 +121,6 @@ When you use VSCode with Metals, there are directories `.metals`, `.bloop`, `pro
 ```sh
 rm -rf .metals .bloop project/.bloop
 ```
-and then restart VSCode and click 'Import project' again in the Metals popup. This takes around 35 seconds.
+and then restart VSCode and click 'Import build' again in the Metals popup. This takes around 35 seconds.
 
 This happens because the containers use the project directory, including its internal tooling directories via mounted volume and the IDE and Debian tests keep overwriting these settings.
