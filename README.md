@@ -104,3 +104,6 @@ SQLite, H2, DuckDB are in-memory, no auth. Postgres, MySQL, MariaDB are localhos
 - PostgreSQL: 5433 (and not 5432)
 - MariaDB: 3308 (and not 3306)
 
+This is what a correctly configured DataGrip looks like:
+![Correctly Configured DataGrip](documentation/correctly-configured-DataGrip.png)
+
