@@ -154,7 +154,7 @@ object Expr:
   case class ListLength[A]($list: Expr[List[A], NonScalarExpr])(using ResultTag[Int]) extends Expr[Int, NonScalarExpr]
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
-  // Todo: Make it strongly typed like the other cases
+  // TODO: Make it strongly typed like the other cases
   case class Select[A: ResultTag]($x: Expr[A, ?], $name: String) extends Expr[A, NonScalarExpr]
 
 //  case class Single[S <: String, A]($x: Expr[A])(using ResultTag[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]) extends Expr[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]
@@ -226,7 +226,7 @@ object Expr:
 
   def randomInt(a: Expr[Int, ?], b: Expr[Int, ?])(using r: DialectFeature.RandomIntegerInInclusiveRange): Expr[Int, NonScalarExpr] =
     // TODO maybe add a check for (a <= b) if we know both components at generation time?
-    // TODO what about parenehteses? Do we really not need them?
+    // TODO what about parentheses? Do we really not need them?
     val aStr = "A82139520369"
     val bStr = "B27604933360"
     RawSQLInsert[Int](r.expr(aStr, bStr), Map(aStr -> a, bStr -> b))
