@@ -158,6 +158,10 @@ object Expr:
   case class StringCharLength[S <: ExprShape]($x: Expr[String, S]) extends Expr[Int, S]
   case class StringByteLength[S <: ExprShape]($x: Expr[String, S]) extends Expr[Int, S]
 
+  case class RandomUUID() extends Expr[String, NonScalarExpr] // XXX NonScalarExpr?
+  case class RandomFloat() extends Expr[Double, NonScalarExpr] // XXX NonScalarExpr?
+  case class RandomInt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Int, CalculatedShape[S1, S2]]
+
   case class ListExpr[A]($elements: List[Expr[A, NonScalarExpr]])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr]
   extension [A, E <: Expr[A, NonScalarExpr]](x: List[E])
     def toExpr(using ResultTag[List[A]]): ListExpr[A] = ListExpr(x)
@@ -229,15 +233,10 @@ object Expr:
   //      time of writing the expression, the dialect needs to be selected, despite the fact that
   //      this feature is implemented across most dialects.
   def randomFloat(using r: DialectFeature.RandomFloat)(): Expr[Double, NonScalarExpr] =
-    if r.rawSQL.isDefined then
-      RawSQLInsert[Double](r.rawSQL.get)
-    else if r.funName.isDefined then
-      FunctionCall0[Double](r.funName.get)
-    else
-      assert(false, "RandomFloat dialect feature must have either a function name or raw SQL")
+    RandomFloat()
 
   def randomUUID(using r: DialectFeature.RandomUUID)(): Expr[String, NonScalarExpr] =
-    FunctionCall0[String](r.funName)
+    RandomUUID()
 
   def randomInt(a: Expr[Int, ?], b: Expr[Int, ?])(using r: DialectFeature.RandomIntegerInInclusiveRange): Expr[Int, NonScalarExpr] =
     // TODO maybe add a check for (a <= b) if we know both components at generation time?

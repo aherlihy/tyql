@@ -1,7 +1,7 @@
 package test.integration.random
 
 import munit.FunSuite
-import test.{withDBNoImplicits, checkExpr}
+import test.{withDB, checkExprDialect}
 import java.sql.{Connection, Statement, ResultSet}
 import tyql.{Dialect, Table, Expr}
 
@@ -14,27 +14,52 @@ class RandomTests extends FunSuite {
 
     {
       import Dialect.postgresql.given
-      checkExpr[Double](Expr.randomFloat(), checkValue)(withDBNoImplicits.postgres)
+      checkExprDialect[Double](Expr.randomFloat(), checkValue)(withDB.postgres)
     }
     {
       import Dialect.mysql.given
-      checkExpr[Double](Expr.randomFloat(), checkValue)(withDBNoImplicits.mysql)
+      checkExprDialect[Double](Expr.randomFloat(), checkValue)(withDB.mysql)
     }
     {
       import Dialect.mariadb.given
-      checkExpr[Double](Expr.randomFloat(), checkValue)(withDBNoImplicits.mariadb)
+      checkExprDialect[Double](Expr.randomFloat(), checkValue)(withDB.mariadb)
     }
     {
       import Dialect.duckdb.given
-      checkExpr[Double](Expr.randomFloat(), checkValue)(withDBNoImplicits.duckdb)
+      checkExprDialect[Double](Expr.randomFloat(), checkValue)(withDB.duckdb)
     }
     {
       import Dialect.h2.given
-      checkExpr[Double](Expr.randomFloat(), checkValue)(withDBNoImplicits.h2)
+      checkExprDialect[Double](Expr.randomFloat(), checkValue)(withDB.h2)
     }
     {
       import Dialect.sqlite.given
-      checkExpr[Double](Expr.randomFloat(), checkValue)(withDBNoImplicits.sqlite)
+      checkExprDialect[Double](Expr.randomFloat(), checkValue)(withDB.sqlite)
+    }
+  }
+
+  test("randomFloat late binding") {
+    val checkValue = { (rs: ResultSet) =>
+      val r = rs.getDouble(1)
+      assert(0 <= r && r <= 1)
+    }
+
+    var q: tyql.Expr[Double, tyql.NonScalarExpr] = null
+    {
+      // XXX you can program against a feature set, not any specific dialect!
+      // TODO but the syntax for now is ugly...
+      import tyql.DialectFeature.RandomFloat
+      given RandomFloat = new RandomFloat {}
+      q = Expr.randomFloat()
+    }
+
+    {
+      import Dialect.postgresql.given
+      checkExprDialect[Double](q, checkValue, s => assert(s.toLowerCase().contains("random(")))(withDB.postgres)
+    }
+    {
+      import Dialect.mysql.given
+      checkExprDialect[Double](q, checkValue, s => assert(s.toLowerCase().contains("rand(")))(withDB.mysql)
     }
   }
 
@@ -46,23 +71,46 @@ class RandomTests extends FunSuite {
 
     {
       import Dialect.postgresql.given
-      checkExpr[String](Expr.randomUUID(), checkValue)(withDBNoImplicits.postgres)
+      checkExprDialect[String](Expr.randomUUID(), checkValue)(withDB.postgres)
     }
     {
       import Dialect.mysql.given
-      checkExpr[String](Expr.randomUUID(), checkValue)(withDBNoImplicits.mysql)
+      checkExprDialect[String](Expr.randomUUID(), checkValue)(withDB.mysql)
     }
     {
       import Dialect.mariadb.given
-      checkExpr[String](Expr.randomUUID(), checkValue)(withDBNoImplicits.mariadb)
+      checkExprDialect[String](Expr.randomUUID(), checkValue)(withDB.mariadb)
     }
     {
       import Dialect.duckdb.given
-      checkExpr[String](Expr.randomUUID(), checkValue)(withDBNoImplicits.duckdb)
+      checkExprDialect[String](Expr.randomUUID(), checkValue)(withDB.duckdb)
     }
     {
       import Dialect.h2.given
-      checkExpr[String](Expr.randomUUID(), checkValue)(withDBNoImplicits.h2)
+      checkExprDialect[String](Expr.randomUUID(), checkValue)(withDB.h2)
+    }
+  }
+
+  test("randomUUID late binding") {
+    val checkValue = { (rs: ResultSet) =>
+      val r = rs.getString(1)
+      assert(r.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))
+    }
+
+    var q: tyql.Expr[String, tyql.NonScalarExpr] = null
+    {
+      import tyql.DialectFeature.RandomUUID
+      given RandomUUID = new RandomUUID {}
+      q = Expr.randomUUID()
+    }
+
+    {
+      import Dialect.postgresql.given
+      checkExprDialect[String](q, checkValue, s => assert(s.toLowerCase().contains("gen_random_uuid(")))(withDB.postgres)
+    }
+    {
+      import Dialect.mysql.given
+      checkExprDialect[String](q, checkValue, s => assert(s.toLowerCase().contains("uuid(")))(withDB.mysql)
     }
   }
 
@@ -81,33 +129,33 @@ class RandomTests extends FunSuite {
 
     {
       import Dialect.postgresql.given
-      checkExpr[Int](Expr.randomInt(0, 2), checkValue)(withDBNoImplicits.postgres)
-      checkExpr[Int](Expr.randomInt(44, 44), checkInclusion)(withDBNoImplicits.postgres)
+      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.postgres)
+      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.postgres)
     }
     {
       import Dialect.mysql.given
-      checkExpr[Int](Expr.randomInt(0, 2), checkValue)(withDBNoImplicits.mysql)
-      checkExpr[Int](Expr.randomInt(44, 44), checkInclusion)(withDBNoImplicits.mysql)
+      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.mysql)
+      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.mysql)
     }
     {
       import Dialect.mariadb.given
-      checkExpr[Int](Expr.randomInt(0, 2), checkValue)(withDBNoImplicits.mariadb)
-      checkExpr[Int](Expr.randomInt(44, 44), checkInclusion)(withDBNoImplicits.mariadb)
+      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.mariadb)
+      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.mariadb)
     }
     {
       import Dialect.duckdb.given
-      checkExpr[Int](Expr.randomInt(0, 2), checkValue)(withDBNoImplicits.duckdb)
-      checkExpr[Int](Expr.randomInt(44, 44), checkInclusion)(withDBNoImplicits.duckdb)
+      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.duckdb)
+      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.duckdb)
     }
     {
       import Dialect.h2.given
-      checkExpr[Int](Expr.randomInt(0, 2), checkValue)(withDBNoImplicits.h2)
-      checkExpr[Int](Expr.randomInt(44, 44), checkInclusion)(withDBNoImplicits.h2)
+      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.h2)
+      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.h2)
     }
     {
       import Dialect.sqlite.given
-      checkExpr[Int](Expr.randomInt(0, 2), checkValue)(withDBNoImplicits.sqlite)
-      checkExpr[Int](Expr.randomInt(44, 44), checkInclusion)(withDBNoImplicits.sqlite)
+      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.sqlite)
+      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.sqlite)
     }
   }
 }

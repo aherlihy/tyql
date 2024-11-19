@@ -356,6 +356,13 @@ object QueryIRTree:
       case f1: Expr.FunctionCall1[?, ?, ?] => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
       case f2: Expr.FunctionCall2[?, ?, ?, ?, ?] => FunctionCallOp(f2.name, Seq(f2.$a1, f2.$a1).map(generateExpr(_, symbols)), f2)
       case r: Expr.RawSQLInsert[?] => RawSQLInsertOp(r.sql, r.replacements.mapValues(generateExpr(_, symbols)).toMap, Precedence.Default, r) // TODO precedence?
+      case u: Expr.RandomUUID => FunctionCallOp(d.feature_RandomUUID_functionName, Seq(), u)
+      case f: Expr.RandomFloat =>
+        assert(d.feature_RandomFloat_functionName.isDefined != d.feature_RandomFloat_rawSQL.isDefined, "RandomFloat dialect feature must have either a function name or raw SQL")
+        if d.feature_RandomFloat_functionName.isDefined then
+          FunctionCallOp(d.feature_RandomFloat_functionName.get, Seq(), f)
+        else
+          RawSQLInsertOp(d.feature_RandomFloat_rawSQL.get, Map(), Precedence.Default, f) // TODO better precedence here
       case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", Precedence.Additive, a)
       case a: Expr.Minus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l - $r", Precedence.Additive, a)
       case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", Precedence.Multiplicative, a)

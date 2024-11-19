@@ -5,6 +5,9 @@ import tyql.DialectFeature.*
 
 // TODO which of these should be sealed? Do we support custom dialectes?
 
+private def unsupportedFeature(feature: String) =
+  throw new UnsupportedOperationException(s"$feature feature not supported in this dialect!")
+
 trait Dialect:
   def name(): String
 
@@ -20,6 +23,11 @@ trait Dialect:
   val stringLengthByBytes: Seq[String] = Seq("OCTET_LENGTH") // series of functions to nest, in order from inner to outer
 
   val xorOperatorSupportedNatively = false
+
+  def feature_RandomUUID_functionName: String = unsupportedFeature("RandomUUID")
+  def feature_RandomFloat_functionName: Option[String] = unsupportedFeature("RandomFloat")
+  def feature_RandomFloat_rawSQL: Option[String] = unsupportedFeature("RandomFloat")
+
 
 object Dialect:
   val literal_percent = '\uE000'
@@ -43,9 +51,12 @@ object Dialect:
         with BooleanLiterals.UseTrueFalse:
       def name() = "PostgreSQL Dialect"
       override val stringLengthByCharacters: String = "length"
+      override def feature_RandomUUID_functionName: String = "gen_random_uuid"
+      override def feature_RandomFloat_functionName: Option[String] = Some("random")
+      override def feature_RandomFloat_rawSQL: Option[String] = None
 
-    given RandomFloat = new RandomFloat(Some("random")) {}
-    given RandomUUID = new RandomUUID("gen_random_uuid") {}
+    given RandomFloat = new RandomFloat {}
+    given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}
 
@@ -58,9 +69,12 @@ object Dialect:
         with BooleanLiterals.UseTrueFalse:
       def name() = "MySQL Dialect"
       override val xorOperatorSupportedNatively = true
+      override def feature_RandomUUID_functionName: String = "UUID"
+      override def feature_RandomFloat_functionName: Option[String] = Some("rand")
+      override def feature_RandomFloat_rawSQL: Option[String] = None
 
-    given RandomFloat = new RandomFloat(Some("rand")) {}
-    given RandomUUID = new RandomUUID("UUID") {}
+    given RandomFloat = new RandomFloat {}
+    given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(rand() * ($b - $a + 1) + $a)") {}
 
@@ -82,9 +96,12 @@ object Dialect:
         with BooleanLiterals.UseTrueFalse:
       def name() = "SQLite Dialect"
       override val stringLengthByCharacters = "length"
+      override def feature_RandomFloat_functionName: Option[String] = None
+      // TODO now that we have precedence, fix the parenthesization rules for this!
+      override def feature_RandomFloat_rawSQL: Option[String] = Some("(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)")
 
     // TODO think about how quoting strings like this impacts simplifications and efficient generation
-    given RandomFloat = new RandomFloat(None, Some("(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)")) {}
+    given RandomFloat = new RandomFloat {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"cast(abs(random() % ($b - $a + 1) + $a) as integer)") {}
 
@@ -96,9 +113,12 @@ object Dialect:
         with BooleanLiterals.UseTrueFalse:
       def name() = "H2 Dialect"
       override val stringLengthByCharacters = "length"
+      override def feature_RandomUUID_functionName: String = "RANDOM_UUID"
+      override def feature_RandomFloat_functionName: Option[String] = Some("rand")
+      override def feature_RandomFloat_rawSQL: Option[String] = None
 
-    given RandomFloat = new RandomFloat(Some("rand")) {}
-    given RandomUUID = new RandomUUID("RANDOM_UUID") {}
+    given RandomFloat = new RandomFloat {}
+    given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(rand() * ($b - $a + 1) + $a)") {}
 
@@ -111,8 +131,11 @@ object Dialect:
       override def name(): String = "DuckDB Dialect"
       override val stringLengthByCharacters = "length"
       override val stringLengthByBytes = Seq("encode", "octet_length")
+      override def feature_RandomUUID_functionName: String = "uuid"
+      override def feature_RandomFloat_functionName: Option[String] = Some("random")
+      override def feature_RandomFloat_rawSQL: Option[String] = None
 
-    given RandomFloat = new RandomFloat(Some("random")) {}
-    given RandomUUID = new RandomUUID("uuid") {}
+    given RandomFloat = new RandomFloat {}
+    given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}

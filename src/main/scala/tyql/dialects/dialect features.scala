@@ -3,7 +3,7 @@ package tyql
 trait DialectFeature
 
 object DialectFeature:
-  trait RandomFloat(val funName: Option[String], val rawSQL: Option[String] = None) extends DialectFeature:
-    assert(funName.isDefined == !rawSQL.isDefined)
-  trait RandomUUID(val funName: String) extends DialectFeature
+  trait RandomFloat extends DialectFeature
+  trait RandomUUID extends DialectFeature
+  // TODO also refactor this one just like the above two are refactored to be late-binding
   trait RandomIntegerInInclusiveRange(val expr: (String, String) => String) extends DialectFeature // TODO later change it to not use raw SQL maybe?
