@@ -107,3 +107,20 @@ SQLite, H2, DuckDB are in-memory, no auth. Postgres, MySQL, MariaDB are localhos
 This is what a correctly configured DataGrip looks like:
 ![Correctly Configured DataGrip](documentation/correctly-configured-DataGrip.png)
 
+### Current tooling problems
+#### Missing Postgres driver (not urgent)
+All works perfectly inside the containers. But when the DBs are up and I invoke `sbt run test` directly from my laptop, the first attempt to connect to Postgres ends with this:
+```
+==> X test.integration.booleans.BooleanTests.boolean encoding  0.014s java.sql.SQLException: No suitable driver found for jdbc:postgresql://localhost:5433/testdb
+    at java.sql.DriverManager.getConnection(DriverManager.java:708)
+    at java.sql.DriverManager.getConnection(DriverManager.java:230)
+```
+
+### Containers break VSCode's integration (somewhat urgent)
+When you use VSCode with Metals, there are directories `.metals`, `.bloop`, `project/.bloop` which are being used. Of them the bloop directories are also used by the containerized tests. So after you run test in docker, you have to
+```sh
+rm -rf .metals .bloop project/.bloop
+```
+and then restart VSCode and click 'Import project' again in the Metals popup. This takes around 35 seconds.
+
+This happens because the containers use the project directory, including its internal tooling directories via mounted volume and the IDE and Debian tests keep overwriting these settings.
