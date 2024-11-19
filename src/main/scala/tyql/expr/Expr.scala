@@ -59,9 +59,21 @@ object Expr:
     def <(y: Int): Expr[Boolean, S1] = Lt[S1, NonScalarExpr](x, IntLit(y))
     def <=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lte(x, y)
     def >=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gte(x, y)
-
-    def +[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Int, CalculatedShape[S1, S2]] = Plus(x, y)
+    @targetName("addIntScalar")
+    def +(y: Expr[Int, ScalarExpr]): Expr[Int, CalculatedShape[S1, ScalarExpr]] = Plus(x, y)
+    @targetName("addIntNonScalar")
+    def +(y: Expr[Int, NonScalarExpr]): Expr[Int, CalculatedShape[S1, NonScalarExpr]] = Plus(x, y)
     def +(y: Int): Expr[Int, S1] = Plus[S1, NonScalarExpr, Int](x, IntLit(y))
+    @targetName("subtractIntScalar")
+    def -(y: Expr[Int, ScalarExpr]): Expr[Int, CalculatedShape[S1, ScalarExpr]] = Minus(x, y)
+    @targetName("subtractIntNonScalar")
+    def -(y: Expr[Int, NonScalarExpr]): Expr[Int, CalculatedShape[S1, NonScalarExpr]] = Minus(x, y)
+    def -(y: Int): Expr[Int, S1] = Minus[S1, NonScalarExpr, Int](x, IntLit(y))
+    @targetName("multiplyIntScalar")
+    def *(y: Expr[Int, ScalarExpr]): Expr[Int, CalculatedShape[S1, ScalarExpr]] = Times(x, y)
+    @targetName("multiplyIntNonScalar")
+    def *(y: Expr[Int, NonScalarExpr]): Expr[Int, CalculatedShape[S1, NonScalarExpr]] = Times(x, y)
+    def *(y: Int): Expr[Int, S1] = Times(x, IntLit(y))
 
   // TODO: write for numerical
   extension [S1 <: ExprShape](x: Expr[Double, S1])
@@ -134,6 +146,7 @@ object Expr:
   case class RawSQLInsert[R](sql: String, replacements: Map[String, Expr[?, ?]] = Map.empty)(using ResultTag[R]) extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
 
   case class Plus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
+  case class Minus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class Times[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class And[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Or[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]

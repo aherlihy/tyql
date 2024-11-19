@@ -357,6 +357,7 @@ object QueryIRTree:
       case f2: Expr.FunctionCall2[?, ?, ?, ?, ?] => FunctionCallOp(f2.name, Seq(f2.$a1, f2.$a1).map(generateExpr(_, symbols)), f2)
       case r: Expr.RawSQLInsert[?] => RawSQLInsertOp(r.sql, r.replacements.mapValues(generateExpr(_, symbols)).toMap, Precedence.Default, r) // TODO precedence?
       case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", Precedence.Additive, a)
+      case a: Expr.Minus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l - $r", Precedence.Additive, a)
       case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", Precedence.Multiplicative, a)
       case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", Precedence.Comparison, a)
       case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", Precedence.Comparison, a)
