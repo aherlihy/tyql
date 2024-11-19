@@ -125,7 +125,7 @@ object Expr:
   case class FunctionCall1[A1, R, S1 <: ExprShape](name: String, $a1: Expr[A1, S1])(using ResultTag[R]) extends Expr[R, S1]
   case class FunctionCall2[A1, A2, R, S1 <: ExprShape, S2 <: ExprShape](name: String, $a1: Expr[A1, S1], $a2: Expr[A2, S2])(using ResultTag[R]) extends Expr[R, CalculatedShape[S1, S2]]
 
-  case class RawSQLInsert[R](sql: String)(using ResultTag[R]) extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
+  case class RawSQLInsert[R](sql: String, replacements: Map[String, Expr[?, ?]] = Map.empty)(using ResultTag[R]) extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
 
   case class Plus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class Times[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
@@ -213,6 +213,13 @@ object Expr:
 
   def randomUUID(using r: DialectFeature.RandomUUID)(): Expr[String, NonScalarExpr] =
     FunctionCall0[String](r.funName)
+
+  def randomInt(a: Expr[Int, ?], b: Expr[Int, ?])(using r: DialectFeature.RandomIntegerInInclusiveRange): Expr[Int, NonScalarExpr] =
+    // TODO maybe add a check for (a <= b) if we know both components at generation time?
+    // TODO what about parenehteses? Do we really not need them?
+    val aStr = "A82139520369"
+    val bStr = "B27604933360"
+    RawSQLInsert[Int](r.expr(aStr, bStr), Map(aStr -> a, bStr -> b))
 
   /** Should be able to rely on the implicit conversions, but not always.
    *  One approach is to overload, another is to provide a user-facing toExpr

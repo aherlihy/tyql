@@ -93,4 +93,51 @@ class RandomTests extends FunSuite {
       check(t.map(_ => Expr.randomUUID()).toQueryIR.toSQLString(), checkValue)(withDBNoImplicits.h2)
     }
   }
+
+  test("randomInt test") {
+    import scala.language.implicitConversions
+
+    val checkValue = { (rs: ResultSet) =>
+      assert(rs.next())
+      val r = rs.getInt(1)
+      assert(0 <= r && r <= 2)
+    }
+
+    val checkInclusion = { (rs: ResultSet) =>
+      assert(rs.next())
+      val r = rs.getInt(1)
+      assert(r == 44)
+    }
+
+    {
+      import Dialect.postgresql.given
+      check(t.map(_ => Expr.randomInt(0, 2)).toQueryIR.toSQLString(), checkValue)(withDBNoImplicits.postgres)
+      check(t.map(_ => Expr.randomInt(44, 44)).toQueryIR.toSQLString(), checkInclusion)(withDBNoImplicits.postgres)
+    }
+    {
+      import Dialect.mysql.given
+      check(t.map(_ => Expr.randomInt(0, 2)).toQueryIR.toSQLString(), checkValue)(withDBNoImplicits.mysql)
+      check(t.map(_ => Expr.randomInt(44, 44)).toQueryIR.toSQLString(), checkInclusion)(withDBNoImplicits.mysql)
+    }
+    {
+      import Dialect.mariadb.given
+      check(t.map(_ => Expr.randomInt(0, 2)).toQueryIR.toSQLString(), checkValue)(withDBNoImplicits.mariadb)
+      check(t.map(_ => Expr.randomInt(44, 44)).toQueryIR.toSQLString(), checkInclusion)(withDBNoImplicits.mariadb)
+    }
+    {
+      import Dialect.duckdb.given
+      check(t.map(_ => Expr.randomInt(0, 2)).toQueryIR.toSQLString(), checkValue)(withDBNoImplicits.duckdb)
+      check(t.map(_ => Expr.randomInt(44, 44)).toQueryIR.toSQLString(), checkInclusion)(withDBNoImplicits.duckdb)
+    }
+    {
+      import Dialect.h2.given
+      check(t.map(_ => Expr.randomInt(0, 2)).toQueryIR.toSQLString(), checkValue)(withDBNoImplicits.h2)
+      check(t.map(_ => Expr.randomInt(44, 44)).toQueryIR.toSQLString(), checkInclusion)(withDBNoImplicits.h2)
+    }
+    {
+      import Dialect.sqlite.given
+      check(t.map(_ => Expr.randomInt(0, 2)).toQueryIR.toSQLString(), checkValue)(withDBNoImplicits.sqlite)
+      check(t.map(_ => Expr.randomInt(44, 44)).toQueryIR.toSQLString(), checkInclusion)(withDBNoImplicits.sqlite)
+    }
+  }
 }

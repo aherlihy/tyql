@@ -39,6 +39,7 @@ object Dialect:
       def name() = "PostgreSQL Dialect"
     given RandomFloat = new RandomFloat(Some("random")) {}
     given RandomUUID = new RandomUUID("gen_random_uuid") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}
 
   object mysql:
     given Dialect = new MySQLDialect
@@ -51,6 +52,7 @@ object Dialect:
 
     given RandomFloat = new RandomFloat(Some("rand")) {}
     given RandomUUID = new RandomUUID("UUID") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(rand() * ($b - $a + 1) + $a)") {}
 
   object mariadb:
     // XXX MariaDB extends MySQL
@@ -60,6 +62,7 @@ object Dialect:
 
     given RandomFloat = mysql.given_RandomFloat
     given RandomUUID = mysql.given_RandomUUID
+    given RandomIntegerInInclusiveRange = mysql.given_RandomIntegerInInclusiveRange
 
   object sqlite:
     given Dialect = new Dialect
@@ -70,6 +73,7 @@ object Dialect:
       def name() = "SQLite Dialect"
 
     given RandomFloat = new RandomFloat(None, Some("(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)")) {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"cast(abs(random() % ($b - $a + 1) + $a) as integer)") {} // TODO think about how this impacts simplifications and efficient generation
 
   object h2:
     given Dialect = new Dialect
@@ -81,6 +85,7 @@ object Dialect:
 
     given RandomFloat = new RandomFloat(Some("rand")) {}
     given RandomUUID = new RandomUUID("RANDOM_UUID") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(rand() * ($b - $a + 1) + $a)") {}
 
   object duckdb:
     given Dialect = new Dialect
@@ -92,3 +97,4 @@ object Dialect:
 
     given RandomFloat = new RandomFloat(Some("random")) {}
     given RandomUUID = new RandomUUID("uuid") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}
