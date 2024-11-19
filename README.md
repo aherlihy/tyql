@@ -117,7 +117,7 @@ All works perfectly inside the containers. But when the DBs are up and I invoke 
 ```
 
 #### Containers break VSCode's integration (somewhat urgent)
-When you use VSCode with Metals, there are directories `.metals`, `.bloop`, `project/.bloop` which are being used. Of them the bloop directories are also used by the containerized tests. So after you run test in docker, you have to
+When you use VSCode with Metals, there are directories `.metals`, `.bloop`, `project/.bloop` which are being used. Of them the bloop directories are also used by the containerized tests. So after you run test in docker, you have to close the VSCode,
 ```sh
 rm -rf .metals .bloop project/.bloop
 ```
