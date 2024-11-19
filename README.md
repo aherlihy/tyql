@@ -100,8 +100,8 @@ The containerized environment includes:
 ```
 
 SQLite, H2, DuckDB are in-memory, no auth. Postgres, MySQL, MariaDB are localhost testuser:testpass. Watch out for ports!
-- MySQL: 3307 (and not 3306)
 - PostgreSQL: 5433 (and not 5432)
+- MySQL: 3307 (and not 3306)
 - MariaDB: 3308 (and not 3306)
 
 This is what a correctly configured DataGrip looks like:
@@ -116,7 +116,7 @@ All works perfectly inside the containers. But when the DBs are up and I invoke 
     at java.sql.DriverManager.getConnection(DriverManager.java:230)
 ```
 
-### Containers break VSCode's integration (somewhat urgent)
+#### Containers break VSCode's integration (somewhat urgent)
 When you use VSCode with Metals, there are directories `.metals`, `.bloop`, `project/.bloop` which are being used. Of them the bloop directories are also used by the containerized tests. So after you run test in docker, you have to
 ```sh
 rm -rf .metals .bloop project/.bloop
