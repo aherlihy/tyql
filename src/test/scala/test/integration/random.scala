@@ -4,7 +4,6 @@ import munit.FunSuite
 import test.{withDBNoImplicits, checkExpr}
 import java.sql.{Connection, Statement, ResultSet}
 import tyql.{Dialect, Table, Expr}
-import tyql.Subset.a
 
 class RandomTests extends FunSuite {
   test("randomFloat test") {
