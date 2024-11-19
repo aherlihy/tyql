@@ -34,6 +34,9 @@ case class FunctionCallOp(name: String, children: Seq[QueryIRNode], ast: Expr[?,
   override def toSQLString(using d: Dialect)(using cnf: Config)(): String = s"$name(" + children.map(_.toSQLString()).mkString(", ") + ")"
   // TODO does this need ()s sometimes?
 
+case class RawSQLInsertOp(sql: String, ast: Expr[?, ?]) extends QueryIRNode:
+  override def toSQLString(using d: Dialect)(using cnf: Config)(): String = sql
+
 /**
  * Project clause, e.g. SELECT <...> FROM 
  * @param children

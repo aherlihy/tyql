@@ -55,5 +55,9 @@ class RandomTests extends FunSuite {
       import Dialect.h2.given
       check(t.map(_ => Expr.randomFloat()).toQueryIR.toSQLString())(withDBNoImplicits.h2)
     }
+    {
+      import Dialect.sqlite.given
+      check(t.map(_ => Expr.randomFloat()).toQueryIR.toSQLString())(withDBNoImplicits.sqlite)
+    }
   }
 }

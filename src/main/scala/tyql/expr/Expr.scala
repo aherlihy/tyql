@@ -125,6 +125,8 @@ object Expr:
   case class FunctionCall1[A1, R, S1 <: ExprShape](name: String, $a1: Expr[A1, S1])(using ResultTag[R]) extends Expr[R, S1]
   case class FunctionCall2[A1, A2, R, S1 <: ExprShape, S2 <: ExprShape](name: String, $a1: Expr[A1, S1], $a2: Expr[A2, S2])(using ResultTag[R]) extends Expr[R, CalculatedShape[S1, S2]]
 
+  case class RawSQLInsert[R](sql: String)(using ResultTag[R]) extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
+
   case class Plus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class Times[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class And[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
@@ -202,7 +204,12 @@ object Expr:
   // TODO why does this break things?
 
   def randomFloat(using r: DialectFeature.RandomFloat)(): Expr[Double, NonScalarExpr] =
-    FunctionCall0[Double](r.funName)
+    if r.rawSQL.isDefined then
+      RawSQLInsert[Double](r.rawSQL.get)
+    else if r.funName.isDefined then
+      FunctionCall0[Double](r.funName.get)
+    else
+      assert(false, "RandomFloat dialect feature must have either a function name or raw SQL")
 
   /** Should be able to rely on the implicit conversions, but not always.
    *  One approach is to overload, another is to provide a user-facing toExpr

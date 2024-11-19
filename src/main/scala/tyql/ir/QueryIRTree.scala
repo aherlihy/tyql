@@ -348,6 +348,7 @@ object QueryIRTree:
       case f0: Expr.FunctionCall0[?] => FunctionCallOp(f0.name, Seq(), f0)
       case f1: Expr.FunctionCall1[?, ?, ?] => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
       case f2: Expr.FunctionCall2[?, ?, ?, ?, ?] => FunctionCallOp(f2.name, Seq(f2.$a1, f2.$a1).map(generateExpr(_, symbols)), f2)
+      case r: Expr.RawSQLInsert[?] => RawSQLInsertOp(r.sql, r)
       case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", a)
       case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", a)
       case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", a)
