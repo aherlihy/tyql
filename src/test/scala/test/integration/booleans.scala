@@ -41,8 +41,7 @@ class BooleanTests extends FunSuite {
     checkExprDialect[Boolean](t ^ t, expect(false))(withDB.all)
   }
 
-  // TODO currently very broken!
-  test("precedence".ignore) {
+  test("precedence") {
     checkExprDialect[Boolean](t || (f && f), expect(true))(withDB.all)
     checkExprDialect[Boolean]((t || f) && f, expect(false))(withDB.all)
   }

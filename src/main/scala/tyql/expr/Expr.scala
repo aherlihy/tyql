@@ -58,6 +58,7 @@ object Expr:
     def <(y: Expr[Int, NonScalarExpr]): Expr[Boolean, CalculatedShape[S1, NonScalarExpr]] = Lt(x, y)
     def <(y: Int): Expr[Boolean, S1] = Lt[S1, NonScalarExpr](x, IntLit(y))
     def <=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lte(x, y)
+    def >=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gte(x, y)
 
     def +[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Int, CalculatedShape[S1, S2]] = Plus(x, y)
     def +(y: Int): Expr[Int, S1] = Plus[S1, NonScalarExpr, Int](x, IntLit(y))
@@ -121,6 +122,7 @@ object Expr:
   // Some sample constructors for Exprs
   case class Lt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Lte[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class Gte[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Gt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class GtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class LtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
