@@ -44,7 +44,6 @@ object Dialect:
       def name() = "PostgreSQL Dialect"
       override val stringLengthByCharacters: String = "length"
 
-
     given RandomFloat = new RandomFloat(Some("random")) {}
     given RandomUUID = new RandomUUID("gen_random_uuid") {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
