@@ -6,6 +6,7 @@ package tyql
 trait QueryIRNode:
   val ast: DatabaseAST[?] | Expr[?, ?] | Expr.Fun[?, ?, ?] // Best-effort, keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
 
+  // TODO WARNING if you add memoization here, what append when Dialect or Config changes?
   def toSQLString(using d: Dialect)(using cnf: Config)(): String
 
   val precedence: Int = Precedence.Default
