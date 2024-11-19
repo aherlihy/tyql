@@ -16,6 +16,9 @@ trait Dialect:
   def quoteStringLiteral(in: String, insideLikePattern: Boolean): String
   def quoteBooleanLiteral(in: Boolean): String
 
+  val stringLengthByCharacters: String = "CHAR_LENGTH"
+  val stringLengthByBytes: Seq[String] = Seq("OCTET_LENGTH")
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -37,6 +40,9 @@ object Dialect:
         with StringLiteral.PostgresqlBehavior
         with BooleanLiterals.UseTrueFalse:
       def name() = "PostgreSQL Dialect"
+      override val stringLengthByCharacters: String = "length"
+
+
     given RandomFloat = new RandomFloat(Some("random")) {}
     given RandomUUID = new RandomUUID("gen_random_uuid") {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}
@@ -71,6 +77,7 @@ object Dialect:
         with StringLiteral.AnsiSingleQuote
         with BooleanLiterals.UseTrueFalse:
       def name() = "SQLite Dialect"
+      override val stringLengthByCharacters: String = "length"
 
     given RandomFloat = new RandomFloat(None, Some("(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)")) {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"cast(abs(random() % ($b - $a + 1) + $a) as integer)") {} // TODO think about how this impacts simplifications and efficient generation
@@ -82,6 +89,7 @@ object Dialect:
         with StringLiteral.AnsiSingleQuote
         with BooleanLiterals.UseTrueFalse:
       def name() = "H2 Dialect"
+      override val stringLengthByCharacters: String = "length"
 
     given RandomFloat = new RandomFloat(Some("rand")) {}
     given RandomUUID = new RandomUUID("RANDOM_UUID") {}
@@ -94,6 +102,8 @@ object Dialect:
         with StringLiteral.DuckdbBehavior
         with BooleanLiterals.UseTrueFalse:
       override def name(): String = "DuckDB Dialect"
+      override val stringLengthByCharacters: String = "length"
+      override val stringLengthByBytes: Seq[String] = Seq("encode", "octet_length")
 
     given RandomFloat = new RandomFloat(Some("random")) {}
     given RandomUUID = new RandomUUID("uuid") {}
