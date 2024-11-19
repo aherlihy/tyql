@@ -331,6 +331,7 @@ object QueryIRTree:
     ProjectClause(children, p)
 
   private def generateExpr(ast: Expr[?, ?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
+    // TODO what about the ()s everywhere? Should we carry precedence information?
     ast match
       case ref: Expr.Ref[?, ?] =>
         val name = ref.stringRef()
@@ -344,7 +345,13 @@ object QueryIRTree:
       case g: Expr.GtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
       case g: Expr.LtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
       case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", a)
+      case a: Expr.Or[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l OR $r", a)
       case n: Expr.Not[?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", n)
+      case x: Expr.Xor[?] => BinExprOp(generateExpr(x.$x, symbols), generateExpr(x.$y, symbols), ((l, r) =>
+        d.xorOperatorSupportedNatively match
+          case true => s"$l XOR $r"
+          case false => s"($l = TRUE) <> ($r = TRUE)"
+        ), x)
       case f0: Expr.FunctionCall0[?] => FunctionCallOp(f0.name, Seq(), f0)
       case f1: Expr.FunctionCall1[?, ?, ?] => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
       case f2: Expr.FunctionCall2[?, ?, ?, ?, ?] => FunctionCallOp(f2.name, Seq(f2.$a1, f2.$a1).map(generateExpr(_, symbols)), f2)
