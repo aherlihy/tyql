@@ -13,7 +13,7 @@ trait QueryIRNode:
 trait QueryIRLeaf extends QueryIRNode
 
 // TODO can we source it from somewhere and not guess about this?
-// Current values were proposed by Claude Sonnet 3.5
+// Current values were proposed on 2024-11-19 by Claude Sonnet 3.5 v20241022, and somewhat modifier after
 object Precedence {
   val Literal        = 100  // literals, identifiers
   val ListOps        = 95   // list_append, list_prepend, list_contains

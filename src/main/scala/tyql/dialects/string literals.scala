@@ -15,7 +15,7 @@ object StringLiteral:
       (in.replace(Dialect.literal_percent, '%').replace(Dialect.literal_underscore, '_'), false)
 
   trait AnsiSingleQuote extends Dialect:
-    // last updated 2024-11-15
+    // last updated 2024-11-15 using Claude Sonnet 3.5 v20241022
     // https://www.sqlite.org/lang_expr.html
     // https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS
     override def quoteStringLiteral(lit: String, insideLikePattern: Boolean): String =
@@ -24,7 +24,7 @@ object StringLiteral:
       if shouldAddEscape then s"$out ESCAPE '\\'" else out
 
   trait PostgresqlBehavior extends Dialect:
-    // last updated 2024-11-15
+    // last updated 2024-11-15 using Claude Sonnet 3.5 v20241022
     // https://www.postgresql.org/docs/current/sql-syntax-lexical.html
     override def quoteStringLiteral(lit: String, insideLikePattern: Boolean): String =
       val (in, shouldAddEscape) = handleLiteralPatterns(insideLikePattern, lit)
@@ -32,7 +32,7 @@ object StringLiteral:
         "E'" + in.replace("\\", "\\\\")
                  .replace("'", "\\'")
                  .replace("\b", "\\b")
-                 .replace("\f", "\\f")  
+                 .replace("\f", "\\f")
                  .replace("\n", "\\n")
                  .replace("\r", "\\r")
                  .replace("\t", "\\t") + "'"
@@ -41,7 +41,7 @@ object StringLiteral:
       if shouldAddEscape then s"$out ESCAPE '\\'" else out
 
   trait MysqlBehavior extends Dialect:
-    // last updated 2024-11-15
+    // last updated 2024-11-15 using Claude Sonnet 3.5 v20241022
     // https://dev.mysql.com/doc/refman/8.4/en/string-literals.html
     // https://mariadb.com/kb/en/string-literals/
     // XXX _ and % have different meaning in LIKE strings. For now we never escape them,
@@ -51,7 +51,7 @@ object StringLiteral:
       val out = "'" + in.replace("\\", "\\\\")
                         .replace("\u0000", "\\0")
                         .replace("'", "\\'")
-                        .replace("\"", "\\\"") 
+                        .replace("\"", "\\\"")
                         .replace("\b", "\\b")
                         .replace("\n", "\\n")
                         .replace("\r", "\\r")
@@ -60,7 +60,7 @@ object StringLiteral:
       out // ignore `ESCAPE` since MySQL/MariaDB do not support it
 
   trait DuckdbBehavior extends Dialect:
-    // last updated 2024-11-15
+    // last updated 2024-11-15 using Claude Sonnet 3.5 v20241022
     // https://duckdb.org/docs/sql/data_types/literal_types.html#string-literals
     override def quoteStringLiteral(lit: String, insideLikePattern: Boolean): String =
       val (in, shouldAddEscape) = handleLiteralPatterns(insideLikePattern, lit)

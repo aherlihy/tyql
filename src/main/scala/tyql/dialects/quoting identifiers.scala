@@ -26,8 +26,8 @@ object QuotingIdentifiers:
 
 
   trait AnsiBehavior extends DoubleQuotes:
-    // keywords list is also maintained by PostgreSQL at // https://www.postgresql.org/docs/current/sql-keywords-appendix.html
-    // last updated 2024-11-15
+    // keywords list is also maintained by PostgreSQL at https://www.postgresql.org/docs/current/sql-keywords-appendix.html
+    // last extracted 2024-11-15 using Claude Sonnet 3.5 v20241022
     override protected val reservedKeywords: Set[String] = Set(
       "ABSOLUTE", "ACTION", "ADD", "ALL", "ALLOCATE", "ALTER", "AND", "ANY", "ARE", "AS",
       "ASC", "ASSERTION", "AT", "AUTHORIZATION", "AVG",
@@ -73,7 +73,7 @@ object QuotingIdentifiers:
 
   trait PostgresqlBehavior extends DoubleQuotes:
     // https://www.postgresql.org/docs/current/sql-keywords-appendix.html
-    // last updated 2024-11-15
+    // last extracted 2024-11-15 using Claude Sonnet 3.5 v20241022
     override protected val reservedKeywords: Set[String] = Set(
       "ANALYSE", "ANALYZE", // Note: both ANALYSE and ANALYZE are reserved in PostgreSQL
       "ALL", "AND", "ANY", "AS", "ASC", "ASYMMETRIC", "BOTH", "CASE", "CAST", "CHECK",
@@ -88,7 +88,7 @@ object QuotingIdentifiers:
 
   trait MysqlBehavior extends Backticks:
     // https://dev.mysql.com/doc/refman/8.0/en/keywords.html
-    // last updated 2024-11-15
+    // last extracted 2024-11-15 using Claude Sonnet 3.5 v20241022
     override protected val reservedKeywords: Set[String] = Set(
       "ACCESSIBLE", "ADD", "ALL", "ALTER", "ANALYZE", "AND", "AS", "ASC", "ASENSITIVE",
       "BEFORE", "BETWEEN", "BIGINT", "BINARY", "BLOB", "BOTH", "BY",
@@ -135,7 +135,7 @@ object QuotingIdentifiers:
 
   trait MariadbBehavior extends Backticks:
     // https://mariadb.com/kb/en/reserved-words/
-    // last updated 2024-11-15
+    // last extracted 2024-11-15 using Claude Sonnet 3.5 v20241022
     override protected val reservedKeywords: Set[String] = Set(
       "ACCESSIBLE", "ADD", "ALL", "ALTER", "ANALYZE", "AND", "AS", "ASC", "ASENSITIVE",
       "BEFORE", "BETWEEN", "BIGINT", "BINARY", "BLOB", "BOTH", "BY",
@@ -184,7 +184,7 @@ object QuotingIdentifiers:
 
   trait SqliteBehavior extends DoubleQuotes:
     // https://www.sqlite.org/lang_keywords.html
-    // last updated 2024-11-15
+    // last extracted 2024-11-15 using Claude Sonnet 3.5 v20241022
     override protected val reservedKeywords: Set[String] = Set(
       "ABORT", "ACTION", "ADD", "AFTER", "ALL", "ALTER", "ALWAYS", "ANALYZE", "AND", "AS",
       "ASC", "ATTACH", "AUTOINCREMENT", "BEFORE", "BEGIN", "BETWEEN", "BY", "CASCADE",
@@ -208,7 +208,7 @@ object QuotingIdentifiers:
 
   trait H2Behavior extends DoubleQuotes:
     // https://h2database.com/html/grammar.html
-    // last updated 2024-11-15
+    // last extracted 2024-11-15 using Claude Sonnet 3.5 v20241022
     override protected val reservedKeywords: Set[String] = Set(
       // Basic SQL keywords
       "ALL", "AND", "ANY", "ARRAY", "AS", "ASC", "BETWEEN", "BOTH", "CASE", "CAST",
@@ -220,24 +220,14 @@ object QuotingIdentifiers:
       "OFFSET", "ON", "OR", "ORDER", "PRIMARY", "QUALIFY", "REGEXP", "RIGHT", "ROW",
       "SELECT", "SYSDATE", "SYSTIME", "SYSTIMESTAMP", "TABLE", "TODAY", "TOP", "TRAILING",
       "TRUE", "UNION", "UNIQUE", "UNKNOWN", "USING", "VALUES", "WHERE", "WINDOW", "WITH",
-
-      // Data manipulation
       "DELETE", "INSERT", "MERGE", "REPLACE", "UPDATE", "UPSERT",
-
-      // Data definition
       "ADD", "ALTER", "COLUMN", "CREATE", "DATABASE", "DROP", "INDEX", "SCHEMA", "SET",
       "TABLE", "VIEW",
-
-      // Transaction control
       "COMMIT", "ROLLBACK", "SAVEPOINT", "START",
-
-      // H2-specific
       "_ROWID_", "AUTOCOMMIT", "CACHED", "CHECKPOINT", "EXCLUSIVE", "IGNORECASE",
       "IFEXISTS", "IFNOTEXISTS", "MEMORY", "MINUS", "NEXT", "OF", "OFF", "PASSWORD",
       "READONLY", "REFERENTIAL_INTEGRITY", "REUSE", "ROWNUM", "SEQUENCE", "TEMP",
       "TEMPORARY", "TRIGGER", "VALUE", "YEAR",
-
-      // Data types
       "BINARY", "BLOB", "BOOLEAN", "CHAR", "CHARACTER", "CLOB", "DATE", "DECIMAL",
       "DOUBLE", "FLOAT", "INT", "INTEGER", "LONG", "NUMBER", "NUMERIC", "REAL",
       "SMALLINT", "TIME", "TIMESTAMP", "TINYINT", "VARCHAR"
@@ -245,7 +235,7 @@ object QuotingIdentifiers:
 
   trait DuckdbBehavior extends DoubleQuotes:
     // SELECT keyword_name FROM duckdb_keywords() WHERE keyword_category IN ('reserved', 'type_function')
-    // last updated 2024-11-15
+    // last extracted 2024-11-15 from DuckDB REPL v1.1.3 19864453f7
     override protected val reservedKeywords: Set[String] = Set(
       "ALL", "ANALYSE", "ANALYZE", "AND", "ANY", "ARRAY", "AS", "ASC",
       "ASYMMETRIC", "BOTH", "CASE", "CAST", "CHECK", "COLLATE", "COLUMN",
