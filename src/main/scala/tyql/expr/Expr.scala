@@ -210,6 +210,9 @@ object Expr:
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
   // TODO why does this break things?
 
+  // TODO this precents an interesting choice, using the exact function names hare means that at the
+  //      time of writing the expression, the dialect needs to be selected, despite the fact that
+  //      this feature is implemented across most dialects.
   def randomFloat(using r: DialectFeature.RandomFloat)(): Expr[Double, NonScalarExpr] =
     if r.rawSQL.isDefined then
       RawSQLInsert[Double](r.rawSQL.get)
