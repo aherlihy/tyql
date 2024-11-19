@@ -76,7 +76,7 @@ class RandomTests extends FunSuite {
 
     val checkInclusion = { (rs: ResultSet) =>
       val r = rs.getInt(1)
-      assert(r == 44)
+      assertEquals(r, 44)
     }
 
     {

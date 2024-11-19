@@ -374,6 +374,7 @@ object QueryIRTree:
       case l: Expr.StringLit => Literal(d.quoteStringLiteral(l.$value, insideLikePattern=false), l) // TODO fix this for LIKE patterns
       case l: Expr.BooleanLit => Literal(d.quoteBooleanLiteral(l.$value), l)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
+      case l: Expr.Upper[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"UPPER($o)", l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)

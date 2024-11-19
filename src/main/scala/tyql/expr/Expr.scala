@@ -138,7 +138,7 @@ object Expr:
   case class Or[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Not[S1 <: ExprShape]($x: Expr[Boolean, S1]) extends Expr[Boolean, S1]
 
-  case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
+  case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S] // TODO XXX Do we keep this as separate AST nodes or do we just emit a function call here?
   case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
 
   case class ListExpr[A]($elements: List[Expr[A, NonScalarExpr]])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr]
