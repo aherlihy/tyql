@@ -38,6 +38,7 @@ object Dialect:
         with BooleanLiterals.UseTrueFalse:
       def name() = "PostgreSQL Dialect"
     given RandomFloat = new RandomFloat(Some("random")) {}
+    given RandomUUID = new RandomUUID("gen_random_uuid") {}
 
   object mysql:
     given Dialect = new MySQLDialect
@@ -49,6 +50,7 @@ object Dialect:
       def name() = "MySQL Dialect"
 
     given RandomFloat = new RandomFloat(Some("rand")) {}
+    given RandomUUID = new RandomUUID("UUID") {}
 
   object mariadb:
     // XXX MariaDB extends MySQL
@@ -57,6 +59,7 @@ object Dialect:
       override def name() = "MariaDB Dialect"
 
     given RandomFloat = mysql.given_RandomFloat
+    given RandomUUID = mysql.given_RandomUUID
 
   object sqlite:
     given Dialect = new Dialect
@@ -77,6 +80,7 @@ object Dialect:
       def name() = "H2 Dialect"
 
     given RandomFloat = new RandomFloat(Some("rand")) {}
+    given RandomUUID = new RandomUUID("RANDOM_UUID") {}
 
   object duckdb:
     given Dialect = new Dialect
@@ -87,3 +91,4 @@ object Dialect:
       override def name(): String = "DuckDB Dialect"
 
     given RandomFloat = new RandomFloat(Some("random")) {}
+    given RandomUUID = new RandomUUID("uuid") {}

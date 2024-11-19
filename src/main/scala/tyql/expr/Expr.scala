@@ -211,6 +211,9 @@ object Expr:
     else
       assert(false, "RandomFloat dialect feature must have either a function name or raw SQL")
 
+  def randomUUID(using r: DialectFeature.RandomUUID)(): Expr[String, NonScalarExpr] =
+    FunctionCall0[String](r.funName)
+
   /** Should be able to rely on the implicit conversions, but not always.
    *  One approach is to overload, another is to provide a user-facing toExpr
    *  function.
