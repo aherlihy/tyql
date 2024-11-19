@@ -118,6 +118,7 @@ object RestrictedQuery {
 
   /** Given a Tuple `(Query[A], Query[B], ...)`, return `(RestrictedQueryRef[A, _, 0], RestrictedQueryRef[B, _, 1], ...)` */
   type ToRestrictedQueryRef[QT <: Tuple] = Tuple.Map[ZipWithIndex[Elems[QT]], [T] =>> T match
-    case (elem, index) => RestrictedQueryRef[elem, SetResult, index]]
+    case (elem, index) => RestrictedQueryRef[elem, SetResult, index]
+  ]
 
 }
