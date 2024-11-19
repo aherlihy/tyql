@@ -47,6 +47,7 @@ object Dialect:
 
     given RandomFloat = new RandomFloat(Some("random")) {}
     given RandomUUID = new RandomUUID("gen_random_uuid") {}
+    // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}
 
   object mysql:
@@ -61,6 +62,7 @@ object Dialect:
 
     given RandomFloat = new RandomFloat(Some("rand")) {}
     given RandomUUID = new RandomUUID("UUID") {}
+    // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(rand() * ($b - $a + 1) + $a)") {}
 
   object mariadb:
@@ -82,8 +84,10 @@ object Dialect:
       def name() = "SQLite Dialect"
       override val stringLengthByCharacters = "length"
 
+    // TODO think about how quoting strings like this impacts simplifications and efficient generation
     given RandomFloat = new RandomFloat(None, Some("(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)")) {}
-    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"cast(abs(random() % ($b - $a + 1) + $a) as integer)") {} // TODO think about how this impacts simplifications and efficient generation
+    // TODO now that we have precedence, fix the parenthesization rules for this!
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"cast(abs(random() % ($b - $a + 1) + $a) as integer)") {}
 
   object h2:
     given Dialect = new Dialect
@@ -96,6 +100,7 @@ object Dialect:
 
     given RandomFloat = new RandomFloat(Some("rand")) {}
     given RandomUUID = new RandomUUID("RANDOM_UUID") {}
+    // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(rand() * ($b - $a + 1) + $a)") {}
 
   object duckdb:
@@ -110,4 +115,5 @@ object Dialect:
 
     given RandomFloat = new RandomFloat(Some("random")) {}
     given RandomUUID = new RandomUUID("uuid") {}
+    // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}
