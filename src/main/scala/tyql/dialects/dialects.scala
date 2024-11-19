@@ -17,7 +17,7 @@ trait Dialect:
   def quoteBooleanLiteral(in: Boolean): String
 
   val stringLengthByCharacters: String = "CHAR_LENGTH"
-  val stringLengthByBytes: Seq[String] = Seq("OCTET_LENGTH")
+  val stringLengthByBytes: Seq[String] = Seq("OCTET_LENGTH") // series of functions to nest, in order from inner to outer
 
 object Dialect:
   val literal_percent = '\uE000'
