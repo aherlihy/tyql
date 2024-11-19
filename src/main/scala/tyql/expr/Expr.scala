@@ -81,14 +81,12 @@ object Expr:
     def ||[S2 <: ExprShape] (y: Expr[Boolean, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Or(x, y)
     def unary_! = Not(x)
 
-  extension [S1 <: ExprShape](x: Expr[String, S1])(using d: Dialect)
+  extension [S1 <: ExprShape](x: Expr[String, S1])
     def toLowerCase: Expr[String, S1] = Expr.Lower(x)
     def toUpperCase: Expr[String, S1] = Expr.Upper(x)
+    def charLength: Expr[Int, S1] = Expr.StringCharLength(x)
     def length: Expr[Int, S1] = charLength
-    def charLength: Expr[Int, S1] = Expr.FunctionCall1[String, Int, S1](d.stringLengthByCharacters, x)
-    def byteLength: Expr[Int, S1] = d.stringLengthByBytes match
-      case Seq(f) => Expr.FunctionCall1[String, Int, S1](f, x)
-      case Seq(inner, outer) => Expr.FunctionCall1[String, Int, S1](outer, Expr.FunctionCall1[String, String, S1](inner, x))
+    def byteLength: Expr[Int, S1] = Expr.StringByteLength(x)
 
   extension [A](x: Expr[List[A], NonScalarExpr])(using ResultTag[List[A]])
     def prepend(elem: Expr[A, NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListPrepend(elem, x)
@@ -138,8 +136,10 @@ object Expr:
   case class Or[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Not[S1 <: ExprShape]($x: Expr[Boolean, S1]) extends Expr[Boolean, S1]
 
-  case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S] // TODO XXX Do we keep this as separate AST nodes or do we just emit a function call here?
+  case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
   case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
+  case class StringCharLength[S <: ExprShape]($x: Expr[String, S]) extends Expr[Int, S]
+  case class StringByteLength[S <: ExprShape]($x: Expr[String, S]) extends Expr[Int, S]
 
   case class ListExpr[A]($elements: List[Expr[A, NonScalarExpr]])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr]
   extension [A, E <: Expr[A, NonScalarExpr]](x: List[E])

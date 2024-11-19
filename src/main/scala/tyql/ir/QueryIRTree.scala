@@ -14,7 +14,7 @@ import NamedTupleDecomposition.*
  */
 object QueryIRTree:
 
-  def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
+  def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     generateQuery(ast, symbols).appendFlag(SelectFlags.Final) // ignore top-level parens
 
   var idCount = 0
@@ -41,7 +41,7 @@ object QueryIRTree:
    * e.g. table.flatMap(t1 => table2.flatMap(t2 => table3.map(t3 => (k1 = t1, k2 = t2, k3 = t3))) =>
    *    SELECT t1 as k1, t2 as k3, t3 as k3 FROM table1, table2, table3
    */
-  private def collapseFlatMap(sources: Seq[RelationOp], symbols: SymbolTable, body: Any): (Seq[RelationOp], QueryIRNode) =
+  private def collapseFlatMap(sources: Seq[RelationOp], symbols: SymbolTable, body: Any)(using d: Dialect): (Seq[RelationOp], QueryIRNode) =
     body match
       case map: Query.Map[?, ?] =>
         val actualParam = generateActualParam(map.$from, map.$query.$param, symbols)
@@ -118,7 +118,7 @@ object QueryIRTree:
    * @param symbols Symbol table, e.g. list of aliases in scope
    * @return
    */
-  private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
+  private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     import TreePrettyPrinter.*
 //    println(s"genQuery: ast=$ast")
     ast match
@@ -285,7 +285,7 @@ object QueryIRTree:
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
 
-  private def generateActualParam(from: DatabaseAST[?], formalParam: Expr.Ref[?, ?], symbols: SymbolTable): RelationOp =
+  private def generateActualParam(from: DatabaseAST[?], formalParam: Expr.Ref[?, ?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     lookupRecursiveRef(generateQuery(from, symbols), formalParam.stringRef())
   /**
    * Generate the actual parameter expression and bind it to the formal parameter in the symbol table, but
@@ -298,7 +298,7 @@ object QueryIRTree:
   /**
    * Compile the function body.
    */
-  private def finishGeneratingFun(funBody: Any, boundST: SymbolTable): QueryIRNode =
+  private def finishGeneratingFun(funBody: Any, boundST: SymbolTable)(using d: Dialect): QueryIRNode =
     funBody match
       //      case r: Expr.Ref[?] if r.stringRef() == fun.$param.stringRef() => SelectAllExpr() // special case identity function
       case e: Expr[?, ?] => generateExpr(e, boundST)
@@ -310,12 +310,12 @@ object QueryIRTree:
    * Sometimes, want to split this function into separate steps, for the cases where you want to collate multiple
    * function bodies within a single expression.
    */
-  private def generateFun(fun: Expr.Fun[?, ?, ?], appliedTo: RelationOp, symbols: SymbolTable): QueryIRNode =
+  private def generateFun(fun: Expr.Fun[?, ?, ?], appliedTo: RelationOp, symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     val (body, boundSymbols) = partiallyGenerateFun(fun, appliedTo, symbols)
     finishGeneratingFun(body, boundSymbols)
 
 
-  private def generateProjection(p: Expr.Project[?] | AggregationExpr.AggProject[?], symbols: SymbolTable): QueryIRNode =
+  private def generateProjection(p: Expr.Project[?] | AggregationExpr.AggProject[?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     val projectAST = p match
       case e: Expr.Project[?] => e.$a
       case a: AggregationExpr.AggProject[?] => a.$a
@@ -375,6 +375,12 @@ object QueryIRTree:
       case l: Expr.BooleanLit => Literal(d.quoteBooleanLiteral(l.$value), l)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case l: Expr.Upper[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"UPPER($o)", l)
+      case l: Expr.StringCharLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"${d.stringLengthByCharacters}($o)", l)
+      case l: Expr.StringByteLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o =>
+        (d.stringLengthByBytes match
+          case Seq(f) => s"$f($o)"
+          case Seq(inner, outer) => s"$outer($inner($o))"),
+        l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
@@ -386,7 +392,7 @@ object QueryIRTree:
       case p: Expr.IsEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"NOT EXISTS ($s)", p)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
-  private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable): QueryIRNode =
+  private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match
       case s: AggregationExpr.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
       case s: AggregationExpr.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)

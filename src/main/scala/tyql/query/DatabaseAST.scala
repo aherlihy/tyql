@@ -7,5 +7,5 @@ package tyql
 trait DatabaseAST[Result](using val qTag: ResultTag[Result]):
   def toSQLString(using d: Dialect)(using cnf: Config): String = toQueryIR.toSQLString()
 
-  def toQueryIR: QueryIRNode =
+  def toQueryIR(using d: Dialect): QueryIRNode =
     QueryIRTree.generateFullQuery(this, SymbolTable())
