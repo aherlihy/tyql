@@ -71,7 +71,7 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
   val name = s"$tableName${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
   override def alias = name
-  override def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     val escapedTableName = d.quoteIdentifier(cnf.caseConvention.convert(tableName))
     val escapedAlias = d.quoteIdentifier(cnf.caseConvention.convert(name)) // TODO does it break something? Think about it
     if (flags.contains(SelectFlags.Final))
@@ -160,7 +160,7 @@ case class SelectAllQuery(from: Seq[RelationOp],
     flags = flags + f
     this
 
-  override def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
     val whereStr = if where.nonEmpty then
@@ -216,7 +216,7 @@ case class SelectQuery(project: QueryIRNode,
     flags = flags + f
     this
 
-  override def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val projectStr = project.toSQLString()
     val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
@@ -299,7 +299,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
         flags = flags + f
     this
 
-  override def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     wrapString(s"${query.toSQLString()} ORDER BY ${sortFn.map(s =>
       val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
         case v: SelectExpr => v.attrName
@@ -368,7 +368,7 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
         flags = flags + f
         this
 
-  override def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     wrapString(children.map(_.toSQLString()).mkString(s" $op "))
 
 case class MultiRecursiveRelationOp(aliases: Seq[String],
@@ -400,7 +400,7 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
         flags = flags + f
     this
 
-  override def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     // NOTE: no parens or alias needed, since already defined
     val ctes = aliases.zip(query).map((a, q) => s"$a AS (${q.toSQLString()})").mkString(",\n")
     s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
@@ -409,7 +409,7 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
  * A recursive variable that points to a table or subquery.
  */
 case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST[?]) extends RelationOp:
-  override def toSQLString(using d: Dialect)(using cnf: Config)() = s"$pointsToAlias as $alias"
+  override def computeSQLString(using d: Dialect)(using cnf: Config)() = s"$pointsToAlias as $alias"
   override def toString: String = s"RVAR($alias->$pointsToAlias)"
 
   // TODO: for now reuse TableOp's methods
@@ -477,7 +477,7 @@ case class GroupByQuery(
         flags = flags + f
     this
 
-  override def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
     val sourceStr = source.toSQLString()
     val groupByStr = groupBy.toSQLString()
