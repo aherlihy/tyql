@@ -27,6 +27,7 @@ trait Dialect:
   def feature_RandomUUID_functionName: String = unsupportedFeature("RandomUUID")
   def feature_RandomFloat_functionName: Option[String] = unsupportedFeature("RandomFloat")
   def feature_RandomFloat_rawSQL: Option[String] = unsupportedFeature("RandomFloat")
+  def feature_RandomInt_rawSQL(a: String, b: String): String = unsupportedFeature("RandomInt")
 
 
 object Dialect:
@@ -54,11 +55,12 @@ object Dialect:
       override def feature_RandomUUID_functionName: String = "gen_random_uuid"
       override def feature_RandomFloat_functionName: Option[String] = Some("random")
       override def feature_RandomFloat_rawSQL: Option[String] = None
+      override def feature_RandomInt_rawSQL(a: String, b: String): String = s"floor(random() * ($b - $a + 1) + $a)::integer"
 
     given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
-    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
 
   object mysql:
     given Dialect = new MySQLDialect
@@ -72,11 +74,12 @@ object Dialect:
       override def feature_RandomUUID_functionName: String = "UUID"
       override def feature_RandomFloat_functionName: Option[String] = Some("rand")
       override def feature_RandomFloat_rawSQL: Option[String] = None
+      override def feature_RandomInt_rawSQL(a: String, b: String): String = s"floor(rand() * ($b - $a + 1) + $a)"
 
     given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
-    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(rand() * ($b - $a + 1) + $a)") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
 
   object mariadb:
     // XXX MariaDB extends MySQL
@@ -99,11 +102,12 @@ object Dialect:
       override def feature_RandomFloat_functionName: Option[String] = None
       // TODO now that we have precedence, fix the parenthesization rules for this!
       override def feature_RandomFloat_rawSQL: Option[String] = Some("(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)")
+      override def feature_RandomInt_rawSQL(a: String, b: String): String = s"cast(abs(random() % ($b - $a + 1) + $a) as integer)"
 
     // TODO think about how quoting strings like this impacts simplifications and efficient generation
     given RandomFloat = new RandomFloat {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
-    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"cast(abs(random() % ($b - $a + 1) + $a) as integer)") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
 
   object h2:
     given Dialect = new Dialect
@@ -116,11 +120,12 @@ object Dialect:
       override def feature_RandomUUID_functionName: String = "RANDOM_UUID"
       override def feature_RandomFloat_functionName: Option[String] = Some("rand")
       override def feature_RandomFloat_rawSQL: Option[String] = None
+      override def feature_RandomInt_rawSQL(a: String, b: String): String = s"floor(rand() * ($b - $a + 1) + $a)"
 
     given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
-    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(rand() * ($b - $a + 1) + $a)") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
 
   object duckdb:
     given Dialect = new Dialect
@@ -134,8 +139,9 @@ object Dialect:
       override def feature_RandomUUID_functionName: String = "uuid"
       override def feature_RandomFloat_functionName: Option[String] = Some("random")
       override def feature_RandomFloat_rawSQL: Option[String] = None
+      override def feature_RandomInt_rawSQL(a: String, b: String): String = s"floor(random() * ($b - $a + 1) + $a)::integer"
 
     given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
-    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange((a,b) => s"floor(random() * ($b - $a + 1) + $a)::integer") {}
+    given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}

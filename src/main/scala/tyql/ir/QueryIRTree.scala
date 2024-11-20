@@ -363,6 +363,14 @@ object QueryIRTree:
           FunctionCallOp(d.feature_RandomFloat_functionName.get, Seq(), f)
         else
           RawSQLInsertOp(d.feature_RandomFloat_rawSQL.get, Map(), Precedence.Default, f) // TODO better precedence here
+      case i: Expr.RandomInt[?, ?] =>
+        val aStr = "A82139520369"
+        val bStr = "B27604933360"
+        RawSQLInsertOp(
+          d.feature_RandomInt_rawSQL(aStr, bStr),
+          Map(aStr -> generateExpr(i.$x, symbols), bStr -> generateExpr(i.$y, symbols)),
+          Precedence.Unary,
+          i) // TODO better precedence here
       case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", Precedence.Additive, a)
       case a: Expr.Minus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l - $r", Precedence.Additive, a)
       case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", Precedence.Multiplicative, a)

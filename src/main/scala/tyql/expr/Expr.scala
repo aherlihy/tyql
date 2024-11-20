@@ -229,21 +229,16 @@ object Expr:
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
   // TODO why does this break things?
 
-  // TODO this presents an interesting choice, using the exact function names hare means that at the
-  //      time of writing the expression, the dialect needs to be selected, despite the fact that
-  //      this feature is implemented across most dialects.
   def randomFloat(using r: DialectFeature.RandomFloat)(): Expr[Double, NonScalarExpr] =
     RandomFloat()
 
   def randomUUID(using r: DialectFeature.RandomUUID)(): Expr[String, NonScalarExpr] =
     RandomUUID()
 
-  def randomInt(a: Expr[Int, ?], b: Expr[Int, ?])(using r: DialectFeature.RandomIntegerInInclusiveRange): Expr[Int, NonScalarExpr] =
+  def randomInt[S1 <: ExprShape, S2 <: ExprShape](a: Expr[Int, S1], b: Expr[Int, S2])(using r: DialectFeature.RandomIntegerInInclusiveRange): Expr[Int, CalculatedShape[S1, S2]] =
     // TODO maybe add a check for (a <= b) if we know both components at generation time?
     // TODO what about parentheses? Do we really not need them?
-    val aStr = "A82139520369"
-    val bStr = "B27604933360"
-    RawSQLInsert[Int](r.expr(aStr, bStr), Map(aStr -> a, bStr -> b))
+    RandomInt(a, b)
 
   /** Should be able to rely on the implicit conversions, but not always.
    *  One approach is to overload, another is to provide a user-facing toExpr

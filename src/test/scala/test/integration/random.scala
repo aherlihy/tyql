@@ -158,4 +158,27 @@ class RandomTests extends FunSuite {
       checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.sqlite)
     }
   }
+
+  test("randomInt late binding") {
+    val checkInclusion = { (rs: ResultSet) =>
+      val r = rs.getInt(1)
+      assertEquals(r, 101)
+    }
+
+    var q: tyql.Expr[Int, tyql.NonScalarExpr] = null
+    {
+      import tyql.DialectFeature.RandomIntegerInInclusiveRange
+      given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
+      q = Expr.randomInt(101, 101)
+    }
+
+    {
+      import Dialect.h2.given
+      checkExprDialect[Int](q, checkInclusion, s => assert(s.toLowerCase().contains("floor(")))(withDB.h2)
+    }
+    {
+      import Dialect.sqlite.given
+      checkExprDialect[Int](q, checkInclusion, s => assert(s.toLowerCase().contains("cast(")))(withDB.sqlite)
+    }
+  }
 }
