@@ -1,5 +1,8 @@
 # tyql
 
+<!-- does markdow handle commnets? -->
+<!-- if so, then we could put metadata inside comments and generate documentation from markdown -->
+
 ## Development
 ### Running Tests
 Tests are untagged by default or tagged as expensive.
