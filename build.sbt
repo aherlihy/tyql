@@ -2,10 +2,12 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 
 inThisBuild(Seq(
   organization := "ch.epfl.lamp",
-  scalaVersion := "3.5.1-RC1",
+  scalaVersion := "3.5.2",
   version := "0.0.1",
   libraryDependencies ++= Seq(
+    // TODO do we still need this? https://github.com/scalameta/munit/issues/791
     "org.scalameta" %% "munit" % "1.0.0+24-ee555b1d-SNAPSHOT" % Test,
+    // TODO later remove the dependency on all these drivers, they're large
     "org.postgresql" % "postgresql" % "42.7.4",
     "mysql" % "mysql-connector-java" % "8.0.33",
     "org.mariadb.jdbc" % "mariadb-java-client" % "3.5.0",
