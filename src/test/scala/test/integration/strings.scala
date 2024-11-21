@@ -77,28 +77,28 @@ class StringTests extends FunSuite {
     val s = lit("012345")
 
     checkExprDialect[String](
-      s.substr(1, 1),
+      s.substr(lit(1), lit(1)),
       (rs: ResultSet) => assertEquals(rs.getString(1), "0"),
     )(withDB.all)
     checkExprDialect[String](
-      s.substr(4, 2),
+      s.substr(lit(4), lit(2)),
       (rs: ResultSet) => assertEquals(rs.getString(1), "34")
     )(withDB.all)
     checkExprDialect[String](
-      s.substr(4, 3),
+      s.substr(lit(4), lit(3)),
       (rs: ResultSet) => assertEquals(rs.getString(1), "345")
     )(withDB.all)
 
     checkExprDialect[String](
-      s.substring(0, 1),
-      (rs: ResultSet) => assertEquals(rs.getString(1), "0"), println
+      s.substring(lit(0), lit(1)),
+      (rs: ResultSet) => assertEquals(rs.getString(1), "0")
     )(withDB.all)
     checkExprDialect[String](
-      s.substring(3, 5),
-      (rs: ResultSet) => assertEquals(rs.getString(1), "34"), println
+      s.substring(lit(3), lit(5)),
+      (rs: ResultSet) => assertEquals(rs.getString(1), "34")
     )(withDB.all)
     checkExprDialect[String](
-      s.substring(3, 6),
+      s.substring(lit(3), lit(6)),
       (rs: ResultSet) => assertEquals(rs.getString(1), "345")
     )(withDB.all)
   }
@@ -198,7 +198,7 @@ class StringTests extends FunSuite {
     def checkValue(expected: String)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
     checkExprDialect[String](lit("aB").repeat(lit(3)), checkValue("aBaBaB"))(withDB.all)
     checkExprDialect[String](lit("aB").repeat(lit(1)), checkValue("aB"))(withDB.all)
-    checkExprDialect[String](lit("aB").repeat(lit(0)), checkValue(""), println)(withDB.all)
+    checkExprDialect[String](lit("aB").repeat(lit(0)), checkValue(""))(withDB.all)
   }
 
   test("lpad rpad") {

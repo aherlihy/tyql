@@ -169,7 +169,7 @@ class RandomTests extends FunSuite {
     {
       import tyql.DialectFeature.RandomIntegerInInclusiveRange
       given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
-      q = Expr.randomInt(tyql.lit(101), 101)
+      q = Expr.randomInt(tyql.lit(101), tyql.lit(101))
     }
 
     {
