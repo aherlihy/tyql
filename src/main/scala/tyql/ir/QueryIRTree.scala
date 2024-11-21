@@ -433,6 +433,29 @@ object QueryIRTree:
             Literal("'x'", null),
             generateExpr(l.$s, symbols)
           ), l)
+      case l: Expr.StrLPad[?, ?] =>
+        if !d.needsStringLPadRPadPolyfill then
+          FunctionCallOp("LPAD", Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)), l)
+        else
+          val strStr = "STR3056960"
+          val padStr = "PAD2086613"
+          val numStr = "NUM1932354"
+          RawSQLInsertOp(s"substr(substr(replace(hex(zeroblob(NUM1932354)), '00', PAD2086613), 1, NUM1932354 - length(STR3056960)) || STR3056960, 1, NUM1932354)",
+                         Map("STR3056960" -> generateExpr(l.$s, symbols), "PAD2086613" -> generateExpr(l.$pad, symbols), "NUM1932354" -> generateExpr(l.$len, symbols)),
+                         Precedence.Additive,
+                         l)
+          // TODO check if this string replacement trick is nestable, it should be...
+      case l: Expr.StrRPad[?, ?] =>
+        if !d.needsStringLPadRPadPolyfill then
+          FunctionCallOp("RPAD", Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)), l)
+        else
+          val strStr = "STR6156335"
+          val padStr = "PAD250762"
+          val numStr = "NUM7165461"
+          RawSQLInsertOp(s"substr(STR6156335 || substr(replace(hex(zeroblob(NUM7165461)), '00', PAD250762), 1, NUM7165461 - length(STR6156335)), 1, NUM7165461)",
+                         Map("STR6156335" -> generateExpr(l.$s, symbols), "PAD250762" -> generateExpr(l.$pad, symbols), "NUM7165461" -> generateExpr(l.$len, symbols)),
+                         Precedence.Additive,
+                         l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)

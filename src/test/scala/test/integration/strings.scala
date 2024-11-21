@@ -195,7 +195,24 @@ class StringTests extends FunSuite {
   }
 
   test("repeat") {
+    // TODO check what happens on werird numbers
     def checkValue(expected: String)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
     checkExprDialect[String](lit("aB").repeat(lit(3)), checkValue("aBaBaB"))(withDB.all)
+  }
+
+  test("lpad rpad") {
+    def checkValue(expected: String)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
+    checkExprDialect[String](lit("1234").lpad(lit(7), lit("ZZ")), checkValue("ZZZ1234"))(withDB.all)
+    checkExprDialect[String](lit("1234").rpad(lit(7), lit("ZZ")), checkValue("1234ZZZ"))(withDB.all)
+
+    checkExprDialect[String](lit("1234").lpad(lit(4), lit("ZZ")), checkValue("1234"))(withDB.all)
+    checkExprDialect[String](lit("1234").rpad(lit(4), lit("ZZ")), checkValue("1234"))(withDB.all)
+
+    checkExprDialect[String](lit("1234").lpad(lit(2), lit("ZZ")), checkValue("12"))(withDB.all)
+    checkExprDialect[String](lit("1234").rpad(lit(2), lit("ZZ")), checkValue("12"))(withDB.all)
+    checkExprDialect[String](lit("1234").lpad(lit(0), lit("ZZ")), checkValue(""))(withDB.all)
+    checkExprDialect[String](lit("1234").rpad(lit(0), lit("ZZ")), checkValue(""))(withDB.all)
+
+    // -1 will give you '' or null depending on the DB
   }
 }

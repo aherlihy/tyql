@@ -136,6 +136,8 @@ object Expr:
     def `+`[S2 <: ExprShape](y: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrConcat(x, Seq(y))
     def reverse(using DialectFeature.ReversibleStrings): Expr[String, S1] = Expr.StrReverse(x)
     def repeat[S2 <: ExprShape](n: Expr[Int, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrRepeat(x, n)
+    def lpad[S2 <: ExprShape](len: Expr[Int, S2], pad: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrLPad(x, len, pad)
+    def rpad[S2 <: ExprShape](len: Expr[Int, S2], pad: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrRPad(x, len, pad)
 
   def concat[S <: ExprShape](strs: Seq[Expr[String, S]]): Expr[String, S] =
     assert(strs.nonEmpty, "concat requires at least one argument")
@@ -232,6 +234,8 @@ object Expr:
   case class StrConcatSeparator[S1 <: ExprShape, S3 <: ExprShape]($sep: Expr[String, S3], $x: Expr[String, S1], $xs: Seq[Expr[String, S1]]) extends Expr[String, CalculatedShape[S1, S3]]
   case class StrReverse[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
   case class StrRepeat[S1 <: ExprShape, S2 <: ExprShape]($s: Expr[String, S1], $n: Expr[Int, S2]) extends Expr[String, CalculatedShape[S1, S2]]
+  case class StrLPad[S1 <: ExprShape, S2 <: ExprShape]($s: Expr[String, S1], $len: Expr[Int, S2], $pad: Expr[String, S2]) extends Expr[String, CalculatedShape[S1, S2]]
+  case class StrRPad[S1 <: ExprShape, S2 <: ExprShape]($s: Expr[String, S1], $len: Expr[Int, S2], $pad: Expr[String, S2]) extends Expr[String, CalculatedShape[S1, S2]]
 
   case class RandomUUID() extends Expr[String, NonScalarExpr] // XXX NonScalarExpr?
   case class RandomFloat() extends Expr[Double, NonScalarExpr] // XXX NonScalarExpr?

@@ -30,6 +30,7 @@ trait Dialect:
   def feature_RandomInt_rawSQL(a: String, b: String): String = unsupportedFeature("RandomInt")
 
   def needsStringRepeatPolyfill: Boolean = false
+  def needsStringLPadRPadPolyfill: Boolean = false
 
 object Dialect:
   val literal_percent = '\uE000'
@@ -108,6 +109,7 @@ object Dialect:
       override def feature_RandomFloat_rawSQL: Option[String] = Some("(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)")
       override def feature_RandomInt_rawSQL(a: String, b: String): String = s"cast(abs(random() % ($b - $a + 1) + $a) as integer)"
       override def needsStringRepeatPolyfill: Boolean = true
+      override def needsStringLPadRPadPolyfill: Boolean = true
 
     // TODO think about how quoting strings like this impacts simplifications and efficient generation
     given RandomFloat = new RandomFloat {}
