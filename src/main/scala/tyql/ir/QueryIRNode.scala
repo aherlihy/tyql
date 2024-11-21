@@ -70,6 +70,21 @@ case class FunctionCallOp(name: String, children: Seq[QueryIRNode], ast: Expr[?,
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = s"$name(" + children.map(_.toSQLString()).mkString(", ") + ")"
   // TODO does this need ()s sometimes?
 
+case class SearchedCaseOp(whenClauses: Seq[(QueryIRNode, QueryIRNode)], elseClause: Option[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
+  override val precedence = Precedence.Literal
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
+    val whenStr = whenClauses.map { case (cond, res) => s"WHEN ${cond.toSQLString()} THEN ${res.toSQLString()}" }.mkString(" ")
+    val elseStr = elseClause.map(e => s" ELSE ${e.toSQLString()}").getOrElse("")
+    s"CASE $whenStr$elseStr END"
+
+case class SimpleCaseOp(expr: QueryIRNode, whenClauses: Seq[(QueryIRNode, QueryIRNode)], elseClause: Option[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
+  override val precedence = Precedence.Literal
+  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
+    val exprStr = expr.toSQLString()
+    val whenStr = whenClauses.map { case (cond, res) => s"WHEN ${cond.toSQLString()} THEN ${res.toSQLString()}" }.mkString(" ")
+    val elseStr = elseClause.map(e => s" ELSE ${e.toSQLString()}").getOrElse("")
+    s"CASE $exprStr $whenStr$elseStr END"
+
 case class RawSQLInsertOp(sql: String, replacements: Map[String, QueryIRNode], override val precedence: Int, ast: Expr[?, ?]) extends QueryIRNode:
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     replacements.foldLeft(sql) { case (acc, (k, v)) => acc.replace(k, v.toSQLString()) }

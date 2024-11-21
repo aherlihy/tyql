@@ -44,6 +44,21 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   @targetName("neqScalar")
   def != (other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
 
+  def cases[DestinationT: ResultTag, SV <: ExprShape](cases: (Expr[Result, Shape] | ElseToken, Expr[DestinationT, SV])*): Expr[DestinationT, SV] =
+    type FromT = Result
+    var mainCases: collection.mutable.ArrayBuffer[(Expr[FromT, Shape], Expr[DestinationT, SV])] = collection.mutable.ArrayBuffer.empty
+    var elseCase: Option[Expr[DestinationT, SV]] = None
+    if cases.isEmpty then assert(false, "cases must not be empty") // XXX maybe enforce via type system?
+    for (((condition, value), index) <- cases.zipWithIndex) {
+      condition match
+        case _: ElseToken =>
+          assert(index == cases.size - 1, "true condition must be last")
+          elseCase = Some(value)
+        case _: Expr[?, ?] =>
+          mainCases += ((condition.asInstanceOf[Expr[FromT, Shape]], value))
+    }
+    Expr.SimpleCase(this, mainCases.toList, elseCase)
+
 object Expr:
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape](x: Expr[Int, S1])
@@ -126,6 +141,25 @@ object Expr:
   def count(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
   @targetName("stringCnt")
   def count(x: Expr[String, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
+
+  // TODO aren't these types too restrictive?
+  def cases[T: ResultTag, SC <: ExprShape, SV <: ExprShape](cases: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV])*): Expr[T, SV] =
+    var mainCases: collection.mutable.ArrayBuffer[(Expr[Boolean, SC], Expr[T, SV])] = collection.mutable.ArrayBuffer.empty
+    var elseCase: Option[Expr[T, SV]] = None
+    if cases.isEmpty then assert(false, "cases must not be empty") // XXX maybe enforce via type system?
+    for (((condition, value), index) <- cases.zipWithIndex) {
+      condition match
+        case _: ElseToken =>
+          assert(index == cases.size - 1, "true condition must be last")
+          elseCase = Some(value)
+        case true =>
+          assert(index == cases.size - 1, "true condition must be last")
+          elseCase = Some(value)
+        case false => assert(false, "what do you mean, false?")
+        case _: Expr[?, ?] =>
+          mainCases += ((condition.asInstanceOf[Expr[Boolean, SC]], value))
+    }
+    SearchedCase(mainCases.toList, elseCase)
 
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
@@ -213,6 +247,10 @@ object Expr:
    */
   case class Fun[A, B, S <: ExprShape]($param: Ref[A, S], $body: B)
 
+  // TODO aren't these types too restrictive?
+  case class SearchedCase[T, SC <: ExprShape, SV <: ExprShape]($cases: List[(Expr[Boolean, SC], Expr[T, SV])], $else: Option[Expr[T, SV]])(using ResultTag[T]) extends Expr[T, SV]
+  case class SimpleCase[TE, TR, SE <: ExprShape, SR <: ExprShape]($expr: Expr[TE, SE], $cases: List[(Expr[TE, SE], Expr[TR, SR])], $else: Option[Expr[TR, SR]])(using ResultTag[TE], ResultTag[TR]) extends Expr[TR, SR]
+
   /** Literals are type-specific, tailored to the types that the DB supports */
   case class IntLit($value: Int) extends Expr[Int, NonScalarExpr]
   /** Scala values can be lifted into literals by conversions */
@@ -295,3 +333,5 @@ def lit(x: Double): Expr[Double, NonScalarExpr] = Expr.DoubleLit(x)
 def lit(x: String): Expr[String, NonScalarExpr] = Expr.StringLit(x)
 def True = Expr.BooleanLit(true)
 def False = Expr.BooleanLit(false)
+private case class ElseToken()
+val Else = new ElseToken()
