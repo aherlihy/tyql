@@ -9,11 +9,11 @@ class PrecedenceTests extends FunSuite {
   def expectB(expected: Boolean)(rs: ResultSet) = assertEquals(rs.getBoolean(1), expected)
   def expectI(expected: Int)(rs: ResultSet) = assertEquals(rs.getInt(1), expected)
 
-  val t = Expr.BooleanLit(true)
-  val f = Expr.BooleanLit(false)
-  val i1 = Expr.IntLit(1)
-  val i2 = Expr.IntLit(2)
-  val i3 = Expr.IntLit(3)
+  val t = tyql.True
+  val f = tyql.False
+  val i1 = tyql.lit(1)
+  val i2 = tyql.lit(2)
+  val i3 = tyql.lit(3)
 
   test("boolean precedence -- AND over OR") {
     checkExprDialect[Boolean](t || f && f, expectB(true))(withDB.all)

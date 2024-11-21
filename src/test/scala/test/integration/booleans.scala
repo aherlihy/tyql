@@ -5,9 +5,10 @@ import test.{withDBNoImplicits, withDB, checkExpr, checkExprDialect}
 import java.sql.{Connection, Statement, ResultSet}
 import tyql.{Dialect, Table, Expr}
 
+private val t = tyql.True
+private val f = tyql.False
+
 class BooleanTests extends FunSuite {
-  val t = Expr.BooleanLit(true)
-  val f = Expr.BooleanLit(false)
   def expect(expected: Boolean)(rs: ResultSet) = assertEquals(rs.getBoolean(1), expected)
 
   test("boolean encoding") {

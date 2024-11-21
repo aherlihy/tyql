@@ -11,9 +11,9 @@ class StringTests extends FunSuite {
 
     // XXX the expression is defined under ANSI SQL dialect, but toSQLQuery is run against a specific dialect and it works!
     assertEquals(summon[Dialect].name(), "ANSI SQL Dialect")
-    checkExprDialect[Int](Expr.StringLit("ałajć").length, checkValue(5))(withDB.all)
-    checkExprDialect[Int](Expr.StringLit("ałajć").charLength, checkValue(5))(withDB.all)
-    checkExprDialect[Int](Expr.StringLit("ałajć").byteLength, checkValue(7))(withDB.all)
+    checkExprDialect[Int](tyql.lit("ałajć").length, checkValue(5))(withDB.all)
+    checkExprDialect[Int](tyql.lit("ałajć").charLength, checkValue(5))(withDB.all)
+    checkExprDialect[Int](tyql.lit("ałajć").byteLength, checkValue(7))(withDB.all)
   }
 
   test("upper and lower work also with unicode") {
@@ -21,12 +21,12 @@ class StringTests extends FunSuite {
 
     for (r <- Seq(withDBNoImplicits.postgres[Unit], withDBNoImplicits.mariadb[Unit],
                   withDBNoImplicits.mysql[Unit], withDBNoImplicits.h2[Unit], withDBNoImplicits.duckdb[Unit])) {
-      checkExpr[String](Expr.StringLit("aŁaJć").toUpperCase, checkValue("AŁAJĆ"))(r)
-      checkExpr[String](Expr.StringLit("aŁaJć").toLowerCase, checkValue("ałajć"))(r)
+      checkExpr[String](tyql.lit("aŁaJć").toUpperCase, checkValue("AŁAJĆ"))(r)
+      checkExpr[String](tyql.lit("aŁaJć").toLowerCase, checkValue("ałajć"))(r)
     }
 
     // SQLite does not support unicode case folding by default unless compiled with ICU support
-    checkExpr[String](Expr.StringLit("A bRoWn fOX").toUpperCase, checkValue("A BROWN FOX"))(withDBNoImplicits.sqlite)
-    checkExpr[String](Expr.StringLit("A bRoWn fOX").toLowerCase, checkValue("a brown fox"))(withDBNoImplicits.sqlite)
+    checkExpr[String](tyql.lit("A bRoWn fOX").toUpperCase, checkValue("A BROWN FOX"))(withDBNoImplicits.sqlite)
+    checkExpr[String](tyql.lit("A bRoWn fOX").toLowerCase, checkValue("a brown fox"))(withDBNoImplicits.sqlite)
   }
 }

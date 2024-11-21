@@ -134,7 +134,7 @@ class RandomTests extends FunSuite {
     }
     {
       import Dialect.mysql.given
-      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.mysql)
+      checkExprDialect[Int](Expr.randomInt(tyql.lit(0), 2), checkValue)(withDB.mysql)
       checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.mysql)
     }
     {
@@ -145,7 +145,7 @@ class RandomTests extends FunSuite {
     {
       import Dialect.duckdb.given
       checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.duckdb)
-      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.duckdb)
+      checkExprDialect[Int](Expr.randomInt(44, tyql.lit(44)), checkInclusion)(withDB.duckdb)
     }
     {
       import Dialect.h2.given
@@ -169,7 +169,7 @@ class RandomTests extends FunSuite {
     {
       import tyql.DialectFeature.RandomIntegerInInclusiveRange
       given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
-      q = Expr.randomInt(101, 101)
+      q = Expr.randomInt(tyql.lit(101), 101)
     }
 
     {

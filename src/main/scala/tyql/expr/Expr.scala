@@ -288,3 +288,10 @@ object Expr:
 //  given [A <: AnyNamedTuple : IsTupleOfExpr](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, Expr.Project[A]] = Expr.Project(_)
 
 end Expr
+
+// TODO where should this be?
+def lit(x: Int): Expr[Int, NonScalarExpr] = Expr.IntLit(x)
+def lit(x: Double): Expr[Double, NonScalarExpr] = Expr.DoubleLit(x)
+def lit(x: String): Expr[String, NonScalarExpr] = Expr.StringLit(x)
+def True = Expr.BooleanLit(true)
+def False = Expr.BooleanLit(false)
