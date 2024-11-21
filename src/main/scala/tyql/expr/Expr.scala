@@ -134,6 +134,7 @@ object Expr:
         substr(Expr.Plus(Expr.IntLit(1), start).asInstanceOf[Expr[Int, S2]], null) // XXX how to avoid this cast
     def like[S2 <: ExprShape](pattern: Expr[String, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Expr.StrLike(x, pattern)
     def `+`[S2 <: ExprShape](y: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrConcat(x, Seq(y))
+    def reverse(using DialectFeature.ReversibleStrings): Expr[String, S1] = Expr.StrReverse(x)
 
   def concat[S <: ExprShape](strs: Seq[Expr[String, S]]): Expr[String, S] =
     assert(strs.nonEmpty, "concat requires at least one argument")
@@ -228,6 +229,7 @@ object Expr:
   case class StrConcat[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[String, S1], $xs: Seq[Expr[String, S2]]) extends Expr[String, CalculatedShape[S1, S2]] // First one has a different shape so you can use it as an opertor between two arguments that have different shapes
   case class StrConcatUniform[S1 <: ExprShape]($x: Expr[String, S1], $xs: Seq[Expr[String, S1]]) extends Expr[String, S1]
   case class StrConcatSeparator[S1 <: ExprShape, S3 <: ExprShape]($sep: Expr[String, S3], $x: Expr[String, S1], $xs: Seq[Expr[String, S1]]) extends Expr[String, CalculatedShape[S1, S3]]
+  case class StrReverse[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
 
   case class RandomUUID() extends Expr[String, NonScalarExpr] // XXX NonScalarExpr?
   case class RandomFloat() extends Expr[Double, NonScalarExpr] // XXX NonScalarExpr?

@@ -401,6 +401,7 @@ object QueryIRTree:
       case c: Expr.SimpleCase[?, ?, ?, ?] => SimpleCaseOp(generateExpr(c.$expr, symbols), c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))), c.$else.map(generateExpr(_, symbols)), c)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case l: Expr.Upper[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"UPPER($o)", l)
+      case l: Expr.StrReverse[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"REVERSE($o)", l)
       case l: Expr.Trim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"TRIM($o)", l)
       case l: Expr.LTrim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LTRIM($o)", l)
       case l: Expr.RTrim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"RTRIM($o)", l)

@@ -61,6 +61,7 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
+    given ReversibleStrings = new ReversibleStrings {}
 
   object mysql:
     given Dialect = new MySQLDialect
@@ -80,6 +81,7 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
+    given ReversibleStrings = new ReversibleStrings {}
 
   object mariadb:
     // XXX MariaDB extends MySQL
@@ -90,6 +92,7 @@ object Dialect:
     given RandomFloat = mysql.given_RandomFloat
     given RandomUUID = mysql.given_RandomUUID
     given RandomIntegerInInclusiveRange = mysql.given_RandomIntegerInInclusiveRange
+    given ReversibleStrings = mysql.given_ReversibleStrings
 
   object sqlite:
     given Dialect = new Dialect
@@ -108,6 +111,7 @@ object Dialect:
     given RandomFloat = new RandomFloat {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
+    given ReversibleStrings = new ReversibleStrings {}
 
   object h2:
     given Dialect = new Dialect
@@ -145,3 +149,4 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     // TODO now that we have precedence, fix the parenthesization rules for this!
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
+    given ReversibleStrings = new ReversibleStrings {}

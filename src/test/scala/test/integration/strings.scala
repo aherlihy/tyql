@@ -181,4 +181,16 @@ class StringTests extends FunSuite {
       Expr.concatWith(Seq(lit("a"), lit("b"), lit("CCCC")), lit("--")),
       checkValue("a--b--CCCC"))(withDB.all)
   }
+
+  test("reverse") {
+    def checkValue(expected: String)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
+    import tyql.DialectFeature.ReversibleStrings
+    given ReversibleStrings = new ReversibleStrings {}
+
+    checkExprDialect[String](lit("aBcł").reverse, checkValue("łcBa"))(withDB.postgres)
+    checkExprDialect[String](lit("aBcł").reverse, checkValue("łcBa"))(withDB.sqlite)
+    checkExprDialect[String](lit("aBcł").reverse, checkValue("łcBa"))(withDB.duckdb)
+    checkExprDialect[String](lit("aBcł").reverse, checkValue("łcBa"))(withDB.mysql)
+    checkExprDialect[String](lit("aBcł").reverse, checkValue("łcBa"))(withDB.mariadb)
+  }
 }
