@@ -7,16 +7,6 @@ import java.sql.{Connection, DriverManager}
 import test.withDB
 
 class DBsAreLive extends FunSuite {
-  def withConnection[A](url: String, user: String = "", password: String = "")(f: Connection => A): A = {
-    var conn: Connection = null
-    try {
-      conn = DriverManager.getConnection(url, user, password)
-      f(conn)
-    } finally {
-      if (conn != null) conn.close()
-    }
-  }
-
   test("PostgreSQL responds".tag(needsDBs)) {
     withDB.postgres { conn =>
       val stmt = conn.createStatement()
