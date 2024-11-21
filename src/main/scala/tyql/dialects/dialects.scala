@@ -29,6 +29,7 @@ trait Dialect:
   def feature_RandomFloat_rawSQL: Option[String] = unsupportedFeature("RandomFloat")
   def feature_RandomInt_rawSQL(a: String, b: String): String = unsupportedFeature("RandomInt")
 
+  def needsStringRepeatPolyfill: Boolean = false
 
 object Dialect:
   val literal_percent = '\uE000'
@@ -106,6 +107,7 @@ object Dialect:
       // TODO now that we have precedence, fix the parenthesization rules for this!
       override def feature_RandomFloat_rawSQL: Option[String] = Some("(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)")
       override def feature_RandomInt_rawSQL(a: String, b: String): String = s"cast(abs(random() % ($b - $a + 1) + $a) as integer)"
+      override def needsStringRepeatPolyfill: Boolean = true
 
     // TODO think about how quoting strings like this impacts simplifications and efficient generation
     given RandomFloat = new RandomFloat {}

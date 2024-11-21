@@ -193,4 +193,9 @@ class StringTests extends FunSuite {
     checkExprDialect[String](lit("aBcł").reverse, checkValue("łcBa"))(withDB.mysql)
     checkExprDialect[String](lit("aBcł").reverse, checkValue("łcBa"))(withDB.mariadb)
   }
+
+  test("repeat") {
+    def checkValue(expected: String)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
+    checkExprDialect[String](lit("aB").repeat(lit(3)), checkValue("aBaBaB"))(withDB.all)
+  }
 }

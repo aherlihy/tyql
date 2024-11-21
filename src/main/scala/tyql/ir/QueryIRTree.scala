@@ -424,6 +424,15 @@ object QueryIRTree:
           case Seq(f) => s"$f($o)"
           case Seq(inner, outer) => s"$outer($inner($o))"),
         l)
+      case l: Expr.StrRepeat[?, ?] =>
+        if !d.needsStringRepeatPolyfill then
+          FunctionCallOp("REPEAT", Seq(generateExpr(l.$s, symbols), generateExpr(l.$n, symbols)), l)
+        else
+          FunctionCallOp("REPLACE", Seq(
+            FunctionCallOp("PRINTF", Seq(Literal("'%.*c'", null), generateExpr(l.$n, symbols), Literal("'x'", null)), l),
+            Literal("'x'", null),
+            generateExpr(l.$s, symbols)
+          ), l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
