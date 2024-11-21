@@ -27,6 +27,9 @@ private def withConnectionNoImplicits[A](url: String, user: String = "", passwor
 
 object withDB:
   def postgres[A](f: Connection => Dialect ?=> A): A = {
+    // XXX postgres driver needs to be poked first
+    // https://github.com/pgjdbc/pgjdbc/pull/772
+    org.postgresql.Driver.isRegistered()
     withConnection(
         "jdbc:postgresql://localhost:5433/testdb",
         "testuser",
@@ -89,6 +92,9 @@ object withDB:
 
 object withDBNoImplicits:
   def postgres[A](f: Connection => A): A = {
+    // XXX postgres driver needs to be poked first
+    // https://github.com/pgjdbc/pgjdbc/pull/772
+    org.postgresql.Driver.isRegistered()
     withConnectionNoImplicits(
         "jdbc:postgresql://localhost:5433/testdb",
         "testuser",

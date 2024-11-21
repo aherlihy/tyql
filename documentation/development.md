@@ -1,14 +1,6 @@
 # Developer Documentation
 
 ## Current tooling problems
-#### Missing Postgres driver (not urgent)
-All works perfectly inside the containers. But when the DBs are up and I invoke `sbt run test` directly from my laptop, the first attempt to connect to Postgres ends with this:
-```
-==> X test.integration.booleans.BooleanTests.boolean encoding  0.014s java.sql.SQLException: No suitable driver found for jdbc:postgresql://localhost:5433/testdb
-    at java.sql.DriverManager.getConnection(DriverManager.java:708)
-    at java.sql.DriverManager.getConnection(DriverManager.java:230)
-```
-
 #### Containers break VSCode's integration (somewhat urgent)
 When you use VSCode with Metals, there are directories `.metals`, `.bloop`, `project/.bloop` which are being used. Of them the bloop directories are also used by the containerized tests. So after you run test in docker, you have to close the VSCode,
 ```sh
