@@ -44,15 +44,15 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   @targetName("neqScalar")
   def != (other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
 
-  def cases[DestinationT: ResultTag, SV <: ExprShape](cases: (Expr[Result, Shape] | ElseToken, Expr[DestinationT, SV])*): Expr[DestinationT, SV] =
+  def cases[DestinationT: ResultTag, SV <: ExprShape](firstCase: (Expr[Result, Shape] | ElseToken, Expr[DestinationT, SV]), restOfCases: (Expr[Result, Shape] | ElseToken, Expr[DestinationT, SV])*): Expr[DestinationT, SV] =
     type FromT = Result
     var mainCases: collection.mutable.ArrayBuffer[(Expr[FromT, Shape], Expr[DestinationT, SV])] = collection.mutable.ArrayBuffer.empty
     var elseCase: Option[Expr[DestinationT, SV]] = None
-    if cases.isEmpty then assert(false, "cases must not be empty") // XXX maybe enforce via type system?
+    val cases = Seq(firstCase) ++ restOfCases
     for (((condition, value), index) <- cases.zipWithIndex) {
       condition match
         case _: ElseToken =>
-          assert(index == cases.size - 1, "true condition must be last")
+          assert(index == cases.size - 1, "The default condition must be last")
           elseCase = Some(value)
         case _: Expr[?, ?] =>
           mainCases += ((condition.asInstanceOf[Expr[FromT, Shape]], value))
@@ -143,17 +143,17 @@ object Expr:
   def count(x: Expr[String, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
 
   // TODO aren't these types too restrictive?
-  def cases[T: ResultTag, SC <: ExprShape, SV <: ExprShape](cases: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV])*): Expr[T, SV] =
+  def cases[T: ResultTag, SC <: ExprShape, SV <: ExprShape](firstCase: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV]), restOfCases: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV])*): Expr[T, SV] =
     var mainCases: collection.mutable.ArrayBuffer[(Expr[Boolean, SC], Expr[T, SV])] = collection.mutable.ArrayBuffer.empty
     var elseCase: Option[Expr[T, SV]] = None
-    if cases.isEmpty then assert(false, "cases must not be empty") // XXX maybe enforce via type system?
+    val cases = Seq(firstCase) ++ restOfCases
     for (((condition, value), index) <- cases.zipWithIndex) {
       condition match
         case _: ElseToken =>
-          assert(index == cases.size - 1, "true condition must be last")
+          assert(index == cases.size - 1, "The default condition must be last")
           elseCase = Some(value)
         case true =>
-          assert(index == cases.size - 1, "true condition must be last")
+          assert(index == cases.size - 1, "The default condition must be last")
           elseCase = Some(value)
         case false => assert(false, "what do you mean, false?")
         case _: Expr[?, ?] =>
