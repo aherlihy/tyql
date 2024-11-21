@@ -428,11 +428,12 @@ object QueryIRTree:
         if !d.needsStringRepeatPolyfill then
           FunctionCallOp("REPEAT", Seq(generateExpr(l.$s, symbols), generateExpr(l.$n, symbols)), l)
         else
-          FunctionCallOp("REPLACE", Seq(
-            FunctionCallOp("PRINTF", Seq(Literal("'%.*c'", null), generateExpr(l.$n, symbols), Literal("'x'", null)), l),
-            Literal("'x'", null),
-            generateExpr(l.$s, symbols)
-          ), l)
+          val strStr = "STR1370031"
+          val numStr = "NUM6221709"
+          RawSQLInsertOp(s"SUBSTR(REPLACE(PRINTF('%.*c', $numStr, 'x'), 'x', $strStr), 1, length($strStr)*$numStr)",
+                         Map(strStr -> generateExpr(l.$s, symbols), numStr -> generateExpr(l.$n, symbols)),
+                         Precedence.Unary,
+                         l)
       case l: Expr.StrLPad[?, ?] =>
         if !d.needsStringLPadRPadPolyfill then
           FunctionCallOp("LPAD", Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)), l)
@@ -456,6 +457,10 @@ object QueryIRTree:
                          Map("STR6156335" -> generateExpr(l.$s, symbols), "PAD250762" -> generateExpr(l.$pad, symbols), "NUM7165461" -> generateExpr(l.$len, symbols)),
                          Precedence.Additive,
                          l)
+      case l: Expr.StrPositionIn[?, ?] => d.stringPositionFindingVia match
+        case "POSITION" => BinExprOp(generateExpr(l.$substr, symbols), generateExpr(l.$string, symbols), (l, r) => s"POSITION($l IN $r)", Precedence.Unary, l)
+        case "LOCATE" => FunctionCallOp("LOCATE", Seq(generateExpr(l.$substr, symbols), generateExpr(l.$string, symbols)), l)
+        case "INSTR" => FunctionCallOp("INSTR", Seq(generateExpr(l.$string, symbols), generateExpr(l.$substr, symbols)), l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)

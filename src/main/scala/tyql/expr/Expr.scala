@@ -138,6 +138,7 @@ object Expr:
     def repeat[S2 <: ExprShape](n: Expr[Int, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrRepeat(x, n)
     def lpad[S2 <: ExprShape](len: Expr[Int, S2], pad: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrLPad(x, len, pad)
     def rpad[S2 <: ExprShape](len: Expr[Int, S2], pad: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrRPad(x, len, pad)
+    def findPosition[S2 <: ExprShape](substr: Expr[String, S2]): Expr[Int, CalculatedShape[S1, S2]] = Expr.StrPositionIn(substr, x)
 
   def concat[S <: ExprShape](strs: Seq[Expr[String, S]]): Expr[String, S] =
     assert(strs.nonEmpty, "concat requires at least one argument")
@@ -236,6 +237,7 @@ object Expr:
   case class StrRepeat[S1 <: ExprShape, S2 <: ExprShape]($s: Expr[String, S1], $n: Expr[Int, S2]) extends Expr[String, CalculatedShape[S1, S2]]
   case class StrLPad[S1 <: ExprShape, S2 <: ExprShape]($s: Expr[String, S1], $len: Expr[Int, S2], $pad: Expr[String, S2]) extends Expr[String, CalculatedShape[S1, S2]]
   case class StrRPad[S1 <: ExprShape, S2 <: ExprShape]($s: Expr[String, S1], $len: Expr[Int, S2], $pad: Expr[String, S2]) extends Expr[String, CalculatedShape[S1, S2]]
+  case class StrPositionIn[S1 <: ExprShape, S2 <: ExprShape]($substr: Expr[String, S2], $string: Expr[String, S1]) extends Expr[Int, CalculatedShape[S1, S2]]
 
   case class RandomUUID() extends Expr[String, NonScalarExpr] // XXX NonScalarExpr?
   case class RandomFloat() extends Expr[Double, NonScalarExpr] // XXX NonScalarExpr?

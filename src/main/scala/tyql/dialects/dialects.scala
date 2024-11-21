@@ -32,6 +32,8 @@ trait Dialect:
   def needsStringRepeatPolyfill: Boolean = false
   def needsStringLPadRPadPolyfill: Boolean = false
 
+  def stringPositionFindingVia: String = "LOCATE"
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -58,6 +60,7 @@ object Dialect:
       override def feature_RandomFloat_functionName: Option[String] = Some("random")
       override def feature_RandomFloat_rawSQL: Option[String] = None
       override def feature_RandomInt_rawSQL(a: String, b: String): String = s"floor(random() * ($b - $a + 1) + $a)::integer"
+      override def stringPositionFindingVia: String = "POSITION"
 
     given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
@@ -110,6 +113,7 @@ object Dialect:
       override def feature_RandomInt_rawSQL(a: String, b: String): String = s"cast(abs(random() % ($b - $a + 1) + $a) as integer)"
       override def needsStringRepeatPolyfill: Boolean = true
       override def needsStringLPadRPadPolyfill: Boolean = true
+      override def stringPositionFindingVia: String = "INSTR"
 
     // TODO think about how quoting strings like this impacts simplifications and efficient generation
     given RandomFloat = new RandomFloat {}
@@ -148,6 +152,7 @@ object Dialect:
       override def feature_RandomFloat_functionName: Option[String] = Some("random")
       override def feature_RandomFloat_rawSQL: Option[String] = None
       override def feature_RandomInt_rawSQL(a: String, b: String): String = s"floor(random() * ($b - $a + 1) + $a)::integer"
+      override def stringPositionFindingVia: String = "POSITION"
 
     given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}

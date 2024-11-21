@@ -195,9 +195,10 @@ class StringTests extends FunSuite {
   }
 
   test("repeat") {
-    // TODO check what happens on werird numbers
     def checkValue(expected: String)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
     checkExprDialect[String](lit("aB").repeat(lit(3)), checkValue("aBaBaB"))(withDB.all)
+    checkExprDialect[String](lit("aB").repeat(lit(1)), checkValue("aB"))(withDB.all)
+    checkExprDialect[String](lit("aB").repeat(lit(0)), checkValue(""), println)(withDB.all)
   }
 
   test("lpad rpad") {
@@ -214,5 +215,17 @@ class StringTests extends FunSuite {
     checkExprDialect[String](lit("1234").rpad(lit(0), lit("ZZ")), checkValue(""))(withDB.all)
 
     // -1 will give you '' or null depending on the DB
+  }
+
+  test("string position") {
+    def checkValue(expected: Int)(rs: ResultSet) = assertEquals(rs.getInt(1), expected)
+    checkExprDialect[Int](lit("aBc").findPosition(lit("B")), checkValue(2))(withDB.all)
+    // TODO XXX now the case sensitivity is not handled at all and is DB-specific!
+    for (r <- Seq(withDB.postgres[Unit], withDB.h2[Unit], withDB.duckdb[Unit], withDB.sqlite[Unit])) {
+      checkExprDialect[Int](lit("abba aBba ABba").findPosition(lit("Bb")), checkValue(7))(r)
+    }
+    for (r <- Seq(withDB.mysql[Unit], withDB.mariadb[Unit])) {
+      checkExprDialect[Int](lit("abba aBba ABba").findPosition(lit("Bb")), checkValue(2))(r)
+    }
   }
 }
