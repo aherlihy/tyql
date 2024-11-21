@@ -116,6 +116,33 @@ object Expr:
     def charLength: Expr[Int, S1] = Expr.StringCharLength(x)
     def length: Expr[Int, S1] = charLength
     def byteLength: Expr[Int, S1] = Expr.StringByteLength(x)
+    def stripLeading: Expr[String, S1] = Expr.LTrim(x)  // Java naming
+    def stripTrailing: Expr[String, S1] = Expr.RTrim(x) // Java naming
+    def strip: Expr[String, S1] = Expr.Trim(x)          // Java naming
+    def ltrim: Expr[String, S1] = Expr.LTrim(x)         // SQL naming
+    def rtrim: Expr[String, S1] = Expr.RTrim(x)         // SQL naming
+    def trim: Expr[String, S1] = Expr.Trim(x)           // SQL naming
+    def replace[S2 <: ExprShape](from: Expr[String, S2], to: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrReplace(x, from, to)
+    // TODO maybe add assertions that len should be >= 0 and from >= 1 if we know them?
+    // SQL semantics (1-based indexing, start+length)
+    def substr[S2 <: ExprShape](from: Expr[Int, S2], len: Expr[Int, S2] = null): Expr[String, CalculatedShape[S1, S2]] = Expr.Substring(x, from, Option.fromNullable(len))
+    // Java semantics (0-based indexing, start+afterLast)
+    def substring[S2 <: ExprShape](start: Expr[Int, S2], afterLast: Expr[Int, S2] = null): Expr[String, CalculatedShape[S1, S2]] =
+      if afterLast != null then
+        substr(Expr.Plus(Expr.IntLit(1), start).asInstanceOf[Expr[Int, S2]], Expr.Minus(afterLast, start).asInstanceOf[Expr[Int, S2]]) // XXX how to avoid this cast
+      else
+        substr(Expr.Plus(Expr.IntLit(1), start).asInstanceOf[Expr[Int, S2]], null) // XXX how to avoid this cast
+    def like[S2 <: ExprShape](pattern: Expr[String, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Expr.StrLike(x, pattern)
+    def `+`[S2 <: ExprShape](y: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrConcat(x, Seq(y))
+
+  def concat[S <: ExprShape](strs: Seq[Expr[String, S]]): Expr[String, S] =
+    assert(strs.nonEmpty, "concat requires at least one argument")
+    StrConcatUniform(strs.head, strs.tail)
+
+  // TODO XXX this cannot be named concat since then Scala will never resolve it, it will always try for the first version without the sep parameter.
+  def concatWith[S <: ExprShape, SS <: ExprShape](strs: Seq[Expr[String, S]], sep: Expr[String, SS]): Expr[String, CalculatedShape[S, SS]] =
+    assert(strs.nonEmpty, "concatWith requires at least one argument")
+    StrConcatSeparator(sep, strs.head, strs.tail)
 
   extension [A](x: Expr[List[A], NonScalarExpr])(using ResultTag[List[A]])
     def prepend(elem: Expr[A, NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListPrepend(elem, x)
@@ -177,6 +204,7 @@ object Expr:
   case class FunctionCall1[A1, R, S1 <: ExprShape](name: String, $a1: Expr[A1, S1])(using ResultTag[R]) extends Expr[R, S1]
   case class FunctionCall2[A1, A2, R, S1 <: ExprShape, S2 <: ExprShape](name: String, $a1: Expr[A1, S1], $a2: Expr[A2, S2])(using ResultTag[R]) extends Expr[R, CalculatedShape[S1, S2]]
 
+  // TODO think about it again
   case class RawSQLInsert[R](sql: String, replacements: Map[String, Expr[?, ?]] = Map.empty)(using ResultTag[R]) extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
 
   case class Plus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
@@ -191,6 +219,15 @@ object Expr:
   case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
   case class StringCharLength[S <: ExprShape]($x: Expr[String, S]) extends Expr[Int, S]
   case class StringByteLength[S <: ExprShape]($x: Expr[String, S]) extends Expr[Int, S]
+  case class Trim[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
+  case class LTrim[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
+  case class RTrim[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
+  case class StrReplace[S <: ExprShape, S2 <: ExprShape]($s: Expr[String, S], $from: Expr[String, S2], $to: Expr[String, S2]) extends Expr[String, CalculatedShape[S, S2]]
+  case class Substring[S <: ExprShape, S2 <: ExprShape]($s: Expr[String, S], $from: Expr[Int, S2], $len: Option[Expr[Int, S2]]) extends Expr[String, CalculatedShape[S, S2]]
+  case class StrLike[S <: ExprShape, S2 <: ExprShape]($s: Expr[String, S], $pattern: Expr[String, S2]) extends Expr[Boolean, CalculatedShape[S, S2]] // NonScalar like StringLit
+  case class StrConcat[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[String, S1], $xs: Seq[Expr[String, S2]]) extends Expr[String, CalculatedShape[S1, S2]] // First one has a different shape so you can use it as an opertor between two arguments that have different shapes
+  case class StrConcatUniform[S1 <: ExprShape]($x: Expr[String, S1], $xs: Seq[Expr[String, S1]]) extends Expr[String, S1]
+  case class StrConcatSeparator[S1 <: ExprShape, S3 <: ExprShape]($sep: Expr[String, S3], $x: Expr[String, S1], $xs: Seq[Expr[String, S1]]) extends Expr[String, CalculatedShape[S1, S3]]
 
   case class RandomUUID() extends Expr[String, NonScalarExpr] // XXX NonScalarExpr?
   case class RandomFloat() extends Expr[Double, NonScalarExpr] // XXX NonScalarExpr?
@@ -257,7 +294,7 @@ object Expr:
   given Conversion[Int, IntLit] = IntLit(_)
   // XXX maybe only from literals with FromDigits?
 
-  case class StringLit($value: String) extends Expr[String, NonScalarExpr]
+  case class StringLit($value: String) extends Expr[String, NonScalarExpr] // TODO XXX why is this nonscalar?
   given Conversion[String, StringLit] = StringLit(_)
 
   case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr]

@@ -401,6 +401,22 @@ object QueryIRTree:
       case c: Expr.SimpleCase[?, ?, ?, ?] => SimpleCaseOp(generateExpr(c.$expr, symbols), c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))), c.$else.map(generateExpr(_, symbols)), c)
       case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
       case l: Expr.Upper[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"UPPER($o)", l)
+      case l: Expr.Trim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"TRIM($o)", l)
+      case l: Expr.LTrim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LTRIM($o)", l)
+      case l: Expr.RTrim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"RTRIM($o)", l)
+      case l: Expr.StrReplace[?, ?] => FunctionCallOp("REPLACE", Seq(generateExpr(l.$s, symbols), generateExpr(l.$from, symbols), generateExpr(l.$to, symbols)), l)
+      case l: Expr.StrLike[?, ?] =>
+        l.$pattern match
+          case Expr.StringLit(pattern) => BinExprOp(generateExpr(l.$s, symbols), Literal(d.quoteStringLiteral(pattern, insideLikePattern=true), l.$pattern), (l, r) => s"$l LIKE $r", Precedence.Comparison, l)
+          case _ => assert(false, "LIKE pattern must be a string literal")
+      case l: Expr.Substring[?, ?] =>
+        if l.$len.isEmpty then
+          FunctionCallOp("SUBSTRING", Seq(generateExpr(l.$s, symbols), generateExpr(l.$from, symbols)), l)
+        else
+          FunctionCallOp("SUBSTRING", Seq(generateExpr(l.$s, symbols), generateExpr(l.$from, symbols), generateExpr(l.$len.get, symbols)), l)
+      case l: Expr.StrConcat[?, ?] => FunctionCallOp("CONCAT", (Seq(l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
+      case l: Expr.StrConcatUniform[?] => FunctionCallOp("CONCAT", (Seq(l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
+      case l: Expr.StrConcatSeparator[?, ?] => FunctionCallOp("CONCAT_WS", (Seq(l.$sep, l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
       case l: Expr.StringCharLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"${d.stringLengthByCharacters}($o)", l)
       case l: Expr.StringByteLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o =>
         (d.stringLengthByBytes match
@@ -410,9 +426,9 @@ object QueryIRTree:
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
-      case p: Expr.ListPrepend[?] => BinExprOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), (l, r) => s"list_prepend($l, $r)", Precedence.ListOps, p)
-      case p: Expr.ListAppend[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_append($l, $r)", Precedence.ListOps, p)
-      case p: Expr.ListContains[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_contains($l, $r)", Precedence.ListOps, p)
+      case p: Expr.ListPrepend[?] => BinExprOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), (l, r) => s"list_prepend($l, $r)", Precedence.Unary, p)
+      case p: Expr.ListAppend[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_append($l, $r)", Precedence.Unary, p)
+      case p: Expr.ListContains[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_contains($l, $r)", Precedence.Unary, p)
       case p: Expr.ListLength[?] => UnaryExprOp(generateExpr(p.$list, symbols), s => s"length($s)", p)
       case p: Expr.NonEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"EXISTS ($s)", p)
       case p: Expr.IsEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"NOT EXISTS ($s)", p)
