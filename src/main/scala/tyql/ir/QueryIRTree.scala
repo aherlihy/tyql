@@ -356,22 +356,19 @@ object QueryIRTree:
       case f0: Expr.FunctionCall0[?] => FunctionCallOp(f0.name, Seq(), f0)
       case f1: Expr.FunctionCall1[?, ?, ?] => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
       case f2: Expr.FunctionCall2[?, ?, ?, ?, ?] => FunctionCallOp(f2.name, Seq(f2.$a1, f2.$a1).map(generateExpr(_, symbols)), f2)
-      case r: Expr.RawSQLInsert[?] => RawSQLInsertOp(r.sql, r.replacements.mapValues(generateExpr(_, symbols)).toMap, Precedence.Default, r) // TODO precedence?
       case u: Expr.RandomUUID => FunctionCallOp(d.feature_RandomUUID_functionName, Seq(), u)
       case f: Expr.RandomFloat =>
         assert(d.feature_RandomFloat_functionName.isDefined != d.feature_RandomFloat_rawSQL.isDefined, "RandomFloat dialect feature must have either a function name or raw SQL")
         if d.feature_RandomFloat_functionName.isDefined then
           FunctionCallOp(d.feature_RandomFloat_functionName.get, Seq(), f)
         else
-          RawSQLInsertOp(d.feature_RandomFloat_rawSQL.get, Map(), Precedence.Default, f) // TODO better precedence here
+          RawSQLInsertOp(d.feature_RandomFloat_rawSQL.get, Map(), d.feature_RandomFloat_rawSQL.get.precedence, f)
       case i: Expr.RandomInt[?, ?] =>
-        val aStr = "A82139520369"
-        val bStr = "B27604933360"
         RawSQLInsertOp(
-          d.feature_RandomInt_rawSQL(aStr, bStr),
-          Map(aStr -> generateExpr(i.$x, symbols), bStr -> generateExpr(i.$y, symbols)),
-          Precedence.Unary,
-          i) // TODO better precedence here
+          d.feature_RandomInt_rawSQL,
+          Map("a" -> generateExpr(i.$x, symbols), "b" -> generateExpr(i.$y, symbols)),
+          d.feature_RandomInt_rawSQL.precedence,
+          i)
       case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", Precedence.Additive, a)
       case a: Expr.Minus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l - $r", Precedence.Additive, a)
       case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", Precedence.Multiplicative, a)
@@ -396,7 +393,7 @@ object QueryIRTree:
         )
       case l: Expr.DoubleLit => Literal(s"${l.$value}", l)
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
-      case l: Expr.StringLit => Literal(d.quoteStringLiteral(l.$value, insideLikePattern=false), l) // TODO fix this for LIKE patterns
+      case l: Expr.StringLit => Literal(d.quoteStringLiteral(l.$value, insideLikePattern=false), l)
       case l: Expr.BooleanLit => Literal(d.quoteBooleanLiteral(l.$value), l)
       case c: Expr.SearchedCase[?, ?, ?] => SearchedCaseOp(c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))), c.$else.map(generateExpr(_, symbols)), c)
       case c: Expr.SimpleCase[?, ?, ?, ?] => SimpleCaseOp(generateExpr(c.$expr, symbols), c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))), c.$else.map(generateExpr(_, symbols)), c)
@@ -425,34 +422,33 @@ object QueryIRTree:
         if !d.needsStringRepeatPolyfill then
           FunctionCallOp("REPEAT", Seq(generateExpr(l.$s, symbols), generateExpr(l.$n, symbols)), l)
         else
-          val strStr = "STR1370031"
-          val numStr = "NUM6221709"
-          RawSQLInsertOp(s"SUBSTR(REPLACE(PRINTF('%.*c', $numStr, 'x'), 'x', $strStr), 1, length($strStr)*$numStr)",
-                         Map(strStr -> generateExpr(l.$s, symbols), numStr -> generateExpr(l.$n, symbols)),
+          val str = ("str", Precedence.Concat)
+          val num = ("num", Precedence.Multiplicative)
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"SUBSTR(REPLACE(PRINTF('%.*c', $num, 'x'), 'x', $str), 1, length($str)*$num)"),
+                         Map(str._1 -> generateExpr(l.$s, symbols), num._1 -> generateExpr(l.$n, symbols)),
                          Precedence.Unary,
                          l)
       case l: Expr.StrLPad[?, ?] =>
         if !d.needsStringLPadRPadPolyfill then
           FunctionCallOp("LPAD", Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)), l)
         else
-          val strStr = "STR3056960"
-          val padStr = "PAD2086613"
-          val numStr = "NUM1932354"
-          RawSQLInsertOp(s"substr(substr(replace(hex(zeroblob(NUM1932354)), '00', PAD2086613), 1, NUM1932354 - length(STR3056960)) || STR3056960, 1, NUM1932354)",
-                         Map("STR3056960" -> generateExpr(l.$s, symbols), "PAD2086613" -> generateExpr(l.$pad, symbols), "NUM1932354" -> generateExpr(l.$len, symbols)),
-                         Precedence.Additive,
+          val str = ("str", Precedence.Additive)
+          val pad = ("pad", Precedence.Concat)
+          val num = ("num", Precedence.Additive)
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"substr(substr(replace(hex(zeroblob($num)), '00', $pad), 1, $num - length($str)) || $str, 1, $num)"),
+                         Map(str._1 -> generateExpr(l.$s, symbols), pad._1 -> generateExpr(l.$pad, symbols), num._1 -> generateExpr(l.$len, symbols)),
+                         Precedence.Unary,
                          l)
-          // TODO check if this string replacement trick is nestable, it should be...
       case l: Expr.StrRPad[?, ?] =>
         if !d.needsStringLPadRPadPolyfill then
           FunctionCallOp("RPAD", Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)), l)
         else
-          val strStr = "STR6156335"
-          val padStr = "PAD250762"
-          val numStr = "NUM7165461"
-          RawSQLInsertOp(s"substr(STR6156335 || substr(replace(hex(zeroblob(NUM7165461)), '00', PAD250762), 1, NUM7165461 - length(STR6156335)), 1, NUM7165461)",
-                         Map("STR6156335" -> generateExpr(l.$s, symbols), "PAD250762" -> generateExpr(l.$pad, symbols), "NUM7165461" -> generateExpr(l.$len, symbols)),
-                         Precedence.Additive,
+          val str = ("str", Precedence.Additive)
+          val pad = ("pad", Precedence.Concat)
+          val num = ("num", Precedence.Additive)
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"substr($str || substr(replace(hex(zeroblob($num)), '00', $pad), 1, $num - length($str)), 1, $num)"),
+                         Map(str._1 -> generateExpr(l.$s, symbols), pad._1 -> generateExpr(l.$pad, symbols), num._1 -> generateExpr(l.$len, symbols)),
+                         Precedence.Unary,
                          l)
       case l: Expr.StrPositionIn[?, ?] => d.stringPositionFindingVia match
         case "POSITION" => BinExprOp(generateExpr(l.$substr, symbols), generateExpr(l.$string, symbols), (l, r) => s"POSITION($l IN $r)", Precedence.Unary, l)

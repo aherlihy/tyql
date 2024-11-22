@@ -85,9 +85,19 @@ case class SimpleCaseOp(expr: QueryIRNode, whenClauses: Seq[(QueryIRNode, QueryI
     val elseStr = elseClause.map(e => s" ELSE ${e.toSQLString()}").getOrElse("")
     s"CASE $exprStr $whenStr$elseStr END"
 
-case class RawSQLInsertOp(sql: String, replacements: Map[String, QueryIRNode], override val precedence: Int, ast: Expr[?, ?]) extends QueryIRNode:
+case class RawSQLInsertOp(snippet: SqlSnippet, replacements: Map[String, QueryIRNode], override val precedence: Int, ast: Expr[?, ?]) extends QueryIRNode:
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    replacements.foldLeft(sql) { case (acc, (k, v)) => acc.replace(k, v.toSQLString()) }
+    assert(replacements.keySet == snippet.sql.filter{ case (s: String) => false ; case (name: String, prec: Int) => true }.map{ case (name: String, prec: Int) => name ; case _ => assert(false) }.toSet)
+    assert(precedence == snippet.precedence)
+    snippet.sql.map {
+      case s: String => s
+      case (name: String, placementPrecedence: Int) =>
+        val innerPrecedence = replacements(name).precedence
+        if innerPrecedence <= placementPrecedence then
+          s"(${replacements(name).toSQLString()})"
+        else
+          replacements(name).toSQLString()
+    }.mkString
 
 /**
  * Project clause, e.g. SELECT <...> FROM

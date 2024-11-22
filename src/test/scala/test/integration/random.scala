@@ -3,7 +3,7 @@ package test.integration.random
 import munit.FunSuite
 import test.{withDB, checkExprDialect}
 import java.sql.{Connection, Statement, ResultSet}
-import tyql.{Dialect, Table, Expr}
+import tyql.{Dialect, Table, Expr, lit}
 
 class RandomTests extends FunSuite {
   test("randomFloat test") {
@@ -129,33 +129,33 @@ class RandomTests extends FunSuite {
 
     {
       import Dialect.postgresql.given
-      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.postgres)
-      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.postgres)
+      checkExprDialect[Int](Expr.randomInt(0, lit(1) + lit(1)), checkValue)(withDB.postgres)
+      checkExprDialect[Int](Expr.randomInt(lit(20) + lit(24), 44), checkInclusion)(withDB.postgres)
     }
     {
       import Dialect.mysql.given
-      checkExprDialect[Int](Expr.randomInt(tyql.lit(0), 2), checkValue)(withDB.mysql)
-      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.mysql)
+      checkExprDialect[Int](Expr.randomInt(tyql.lit(0), lit(1) + lit(1)), checkValue)(withDB.mysql)
+      checkExprDialect[Int](Expr.randomInt(lit(22) + lit(22), 44), checkInclusion)(withDB.mysql)
     }
     {
       import Dialect.mariadb.given
-      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.mariadb)
-      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.mariadb)
+      checkExprDialect[Int](Expr.randomInt(0, lit(1) + lit(1)), checkValue)(withDB.mariadb)
+      checkExprDialect[Int](Expr.randomInt(lit(20) + lit(24), 44), checkInclusion)(withDB.mariadb)
     }
     {
       import Dialect.duckdb.given
-      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.duckdb)
-      checkExprDialect[Int](Expr.randomInt(44, tyql.lit(44)), checkInclusion)(withDB.duckdb)
+      checkExprDialect[Int](Expr.randomInt(0, lit(1) + lit(1)), checkValue)(withDB.duckdb)
+      checkExprDialect[Int](Expr.randomInt(lit(20) + lit(24), tyql.lit(44)), checkInclusion)(withDB.duckdb)
     }
     {
       import Dialect.h2.given
-      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.h2)
-      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.h2)
+      checkExprDialect[Int](Expr.randomInt(0, lit(1) + lit(1)), checkValue)(withDB.h2)
+      checkExprDialect[Int](Expr.randomInt(lit(22) + lit(22), 44), checkInclusion)(withDB.h2)
     }
     {
       import Dialect.sqlite.given
-      checkExprDialect[Int](Expr.randomInt(0, 2), checkValue)(withDB.sqlite)
-      checkExprDialect[Int](Expr.randomInt(44, 44), checkInclusion)(withDB.sqlite)
+      checkExprDialect[Int](Expr.randomInt(0, lit(1) + lit(1)), checkValue)(withDB.sqlite)
+      checkExprDialect[Int](Expr.randomInt(lit(20) + lit(24), 44), checkInclusion)(withDB.sqlite)
     }
   }
 
