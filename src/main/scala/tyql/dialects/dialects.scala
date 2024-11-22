@@ -60,9 +60,9 @@ object Dialect:
       override def feature_RandomFloat_functionName: Option[String] = Some("random")
       override def feature_RandomFloat_rawSQL: Option[SqlSnippet] = None
       override def feature_RandomInt_rawSQL: SqlSnippet =
-        val a = ("a", Precedence.Additive)
-        val b = ("b", Precedence.Additive)
-        SqlSnippet(Precedence.Unary, snippet"floor(random() * ($b - $a + 1) + $a)::integer")
+        val a = ("a", Precedence.Concat)
+        val b = ("b", Precedence.Concat)
+        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)")
       override def stringPositionFindingVia: String = "POSITION"
 
     given RandomFloat = new RandomFloat {}
@@ -83,9 +83,9 @@ object Dialect:
       override def feature_RandomFloat_functionName: Option[String] = Some("rand")
       override def feature_RandomFloat_rawSQL: Option[SqlSnippet] = None
       override def feature_RandomInt_rawSQL: SqlSnippet =
-        val a = ("a", Precedence.Additive)
-        val b = ("b", Precedence.Additive)
-        SqlSnippet(Precedence.Unary, snippet"floor(rand() * ($b - $a + 1) + $a)")
+        val a = ("a", Precedence.Concat)
+        val b = ("b", Precedence.Concat)
+        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)")
 
     given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
@@ -114,9 +114,9 @@ object Dialect:
       override def feature_RandomFloat_functionName: Option[String] = None
       override def feature_RandomFloat_rawSQL: Option[SqlSnippet] = Some(SqlSnippet(Precedence.Unary, snippet"(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)"))
       override def feature_RandomInt_rawSQL: SqlSnippet =
-        val a = ("a", Precedence.Additive)
-        val b = ("b", Precedence.Additive)
-        SqlSnippet(Precedence.Unary, snippet"cast(abs(random() % ($b - $a + 1) + $a) as integer)")
+        val a = ("a", Precedence.Concat)
+        val b = ("b", Precedence.Concat)
+        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select cast(abs(random() % (b - a + 1) + a) as integer) from randomIntParameters)")
       override def needsStringRepeatPolyfill: Boolean = true
       override def needsStringLPadRPadPolyfill: Boolean = true
       override def stringPositionFindingVia: String = "INSTR"
@@ -137,9 +137,9 @@ object Dialect:
       override def feature_RandomFloat_functionName: Option[String] = Some("rand")
       override def feature_RandomFloat_rawSQL: Option[SqlSnippet] = None
       override def feature_RandomInt_rawSQL: SqlSnippet =
-        val a = ("a", Precedence.Additive)
-        val b = ("b", Precedence.Additive)
-        SqlSnippet(Precedence.Unary, snippet"floor(rand() * ($b - $a + 1) + $a)")
+        val a = ("a", Precedence.Concat)
+        val b = ("b", Precedence.Concat)
+        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)")
 
     given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
@@ -158,9 +158,9 @@ object Dialect:
       override def feature_RandomFloat_functionName: Option[String] = Some("random")
       override def feature_RandomFloat_rawSQL: Option[SqlSnippet] = None
       override def feature_RandomInt_rawSQL: SqlSnippet =
-        val a = ("a", Precedence.Additive)
-        val b = ("b", Precedence.Additive)
-        SqlSnippet(Precedence.Unary, snippet"floor(random() * ($b - $a + 1) + $a)::integer")
+        val a = ("a", Precedence.Concat)
+        val b = ("b", Precedence.Concat)
+        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)")
       override def stringPositionFindingVia: String = "POSITION"
 
     given RandomFloat = new RandomFloat {}

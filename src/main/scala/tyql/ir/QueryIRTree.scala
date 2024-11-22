@@ -423,8 +423,8 @@ object QueryIRTree:
           FunctionCallOp("REPEAT", Seq(generateExpr(l.$s, symbols), generateExpr(l.$n, symbols)), l)
         else
           val str = ("str", Precedence.Concat)
-          val num = ("num", Precedence.Multiplicative)
-          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"SUBSTR(REPLACE(PRINTF('%.*c', $num, 'x'), 'x', $str), 1, length($str)*$num)"),
+          val num = ("num", Precedence.Concat)
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"(with stringRepeatParameters as (select $str as str, $num as num) select SUBSTR(REPLACE(PRINTF('%.*c', num, 'x'), 'x', str), 1, length(str)*num) from stringRepeatParameters)"),
                          Map(str._1 -> generateExpr(l.$s, symbols), num._1 -> generateExpr(l.$n, symbols)),
                          Precedence.Unary,
                          l)
@@ -432,10 +432,10 @@ object QueryIRTree:
         if !d.needsStringLPadRPadPolyfill then
           FunctionCallOp("LPAD", Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)), l)
         else
-          val str = ("str", Precedence.Additive)
+          val str = ("str", Precedence.Concat)
           val pad = ("pad", Precedence.Concat)
-          val num = ("num", Precedence.Additive)
-          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"substr(substr(replace(hex(zeroblob($num)), '00', $pad), 1, $num - length($str)) || $str, 1, $num)"),
+          val num = ("num", Precedence.Concat)
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"(with lpadParameters as (select $str as str, $pad as pad, $num as num) select substr(substr(replace(hex(zeroblob(num)), '00', pad), 1, num - length(str)) || str, 1, num) from lpadParameters)"),
                          Map(str._1 -> generateExpr(l.$s, symbols), pad._1 -> generateExpr(l.$pad, symbols), num._1 -> generateExpr(l.$len, symbols)),
                          Precedence.Unary,
                          l)
@@ -443,10 +443,10 @@ object QueryIRTree:
         if !d.needsStringLPadRPadPolyfill then
           FunctionCallOp("RPAD", Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)), l)
         else
-          val str = ("str", Precedence.Additive)
+          val str = ("str", Precedence.Concat)
           val pad = ("pad", Precedence.Concat)
-          val num = ("num", Precedence.Additive)
-          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"substr($str || substr(replace(hex(zeroblob($num)), '00', $pad), 1, $num - length($str)), 1, $num)"),
+          val num = ("num", Precedence.Concat)
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"(with rpadParameters as (select $str as str, $pad as pad, $num as num) select substr(str || substr(replace(hex(zeroblob(num)), '00', pad), 1, num - length(str)), 1, num) from rpadParameters)"),
                          Map(str._1 -> generateExpr(l.$s, symbols), pad._1 -> generateExpr(l.$pad, symbols), num._1 -> generateExpr(l.$len, symbols)),
                          Precedence.Unary,
                          l)
