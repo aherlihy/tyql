@@ -6,6 +6,7 @@ import tyql.ResultTag.NamedTupleTag
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
 import NamedTupleDecomposition.*
+import org.checkerframework.checker.units.qual.m
 
 /**
  * Logical query plan tree.
@@ -419,11 +420,7 @@ object QueryIRTree:
       case l: Expr.StrConcatUniform[?] => FunctionCallOp("CONCAT", (Seq(l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
       case l: Expr.StrConcatSeparator[?, ?] => FunctionCallOp("CONCAT_WS", (Seq(l.$sep, l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
       case l: Expr.StringCharLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"${d.stringLengthByCharacters}($o)", l)
-      case l: Expr.StringByteLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o =>
-        (d.stringLengthByBytes match
-          case Seq(f) => s"$f($o)"
-          case Seq(inner, outer) => s"$outer($inner($o))"),
-        l)
+      case l: Expr.StringByteLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => if d.stringLengthBytesNeedsEncodeFirst then s"OCTET_LENGTH(ENCODE($o))" else s"OCTET_LENGTH($o)", l)
       case l: Expr.StrRepeat[?, ?] =>
         if !d.needsStringRepeatPolyfill then
           FunctionCallOp("REPEAT", Seq(generateExpr(l.$s, symbols), generateExpr(l.$n, symbols)), l)

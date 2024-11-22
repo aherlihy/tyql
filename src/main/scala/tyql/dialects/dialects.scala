@@ -20,7 +20,7 @@ trait Dialect:
   def quoteBooleanLiteral(in: Boolean): String
 
   val stringLengthByCharacters: String = "CHAR_LENGTH"
-  val stringLengthByBytes: Seq[String] = Seq("OCTET_LENGTH") // series of functions to nest, in order from inner to outer
+  val stringLengthBytesNeedsEncodeFirst: Boolean = false
 
   val xorOperatorSupportedNatively = false
 
@@ -147,7 +147,7 @@ object Dialect:
         with BooleanLiterals.UseTrueFalse:
       override def name(): String = "DuckDB Dialect"
       override val stringLengthByCharacters = "length"
-      override val stringLengthByBytes = Seq("encode", "octet_length")
+      override val stringLengthBytesNeedsEncodeFirst = true
       override def feature_RandomUUID_functionName: String = "uuid"
       override def feature_RandomFloat_functionName: Option[String] = Some("random")
       override def feature_RandomFloat_rawSQL: Option[String] = None
