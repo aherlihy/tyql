@@ -46,10 +46,6 @@ class RandomTests extends FunSuite {
 
     var q: tyql.Expr[Double, tyql.NonScalarExpr] = null
     {
-      // XXX you can program against a feature set, not any specific dialect!
-      // TODO but the syntax for now is ugly...
-      import tyql.DialectFeature.RandomFloat
-      given RandomFloat = new RandomFloat {}
       q = Expr.randomFloat()
     }
 
@@ -97,6 +93,8 @@ class RandomTests extends FunSuite {
       assert(r.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))
     }
 
+    // XXX you can program against a feature set, not any specific dialect!
+    // TODO but the syntax for now is ugly...
     var q: tyql.Expr[String, tyql.NonScalarExpr] = null
     {
       import tyql.DialectFeature.RandomUUID

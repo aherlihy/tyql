@@ -311,7 +311,7 @@ object Expr:
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
   // TODO why does this break things?
 
-  def randomFloat(using r: DialectFeature.RandomFloat)(): Expr[Double, NonScalarExpr] =
+  def randomFloat(): Expr[Double, NonScalarExpr] =
     RandomFloat()
 
   def randomUUID(using r: DialectFeature.RandomUUID)(): Expr[String, NonScalarExpr] =

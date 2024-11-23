@@ -25,8 +25,8 @@ trait Dialect:
   val xorOperatorSupportedNatively = false
 
   def feature_RandomUUID_functionName: String = unsupportedFeature("RandomUUID")
-  def feature_RandomFloat_functionName: Option[String] = unsupportedFeature("RandomFloat")
-  def feature_RandomFloat_rawSQL: Option[SqlSnippet] = unsupportedFeature("RandomFloat")
+  def feature_RandomFloat_functionName: Option[String] = throw new UnsupportedOperationException("RandomFloat")
+  def feature_RandomFloat_rawSQL: Option[SqlSnippet] = throw new UnsupportedOperationException("RandomFloat")
   def feature_RandomInt_rawSQL: SqlSnippet = unsupportedFeature("RandomInt")
 
   def needsStringRepeatPolyfill: Boolean = false
@@ -65,7 +65,6 @@ object Dialect:
         SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)")
       override def stringPositionFindingVia: String = "POSITION"
 
-    given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
@@ -87,7 +86,6 @@ object Dialect:
         val b = ("b", Precedence.Concat)
         SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)")
 
-    given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
@@ -98,7 +96,6 @@ object Dialect:
     given Dialect = new mysql.MySQLDialect with QuotingIdentifiers.MariadbBehavior:
       override def name() = "MariaDB Dialect"
 
-    given RandomFloat = mysql.given_RandomFloat
     given RandomUUID = mysql.given_RandomUUID
     given RandomIntegerInInclusiveRange = mysql.given_RandomIntegerInInclusiveRange
     given ReversibleStrings = mysql.given_ReversibleStrings
@@ -121,7 +118,6 @@ object Dialect:
       override def needsStringLPadRPadPolyfill: Boolean = true
       override def stringPositionFindingVia: String = "INSTR"
 
-    given RandomFloat = new RandomFloat {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
 
@@ -141,7 +137,6 @@ object Dialect:
         val b = ("b", Precedence.Concat)
         SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)")
 
-    given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
 
@@ -163,7 +158,6 @@ object Dialect:
         SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)")
       override def stringPositionFindingVia: String = "POSITION"
 
-    given RandomFloat = new RandomFloat {}
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
