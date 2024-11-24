@@ -389,6 +389,7 @@ def lit(x: String): Expr[String, NonScalarExpr] = Expr.StringLit(x)
 def True = Expr.BooleanLit(true)
 def False = Expr.BooleanLit(false)
 def Null = Expr.NullLit[scala.Null]()
+// TODO a good place for implicitNotFound
 def Null[T](using ResultTag[T]) = Expr.NullLit[T]()
 private case class ElseToken()
 val Else = new ElseToken()
