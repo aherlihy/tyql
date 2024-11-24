@@ -161,3 +161,6 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
+
+// TODO I currenly have no better idea for this, maybe some macro?
+var polyfillWasUsed: Function0[Unit] = () => ()

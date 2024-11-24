@@ -351,7 +351,9 @@ object QueryIRTree:
       case x: Expr.Xor[?] => BinExprOp(generateExpr(x.$x, symbols), generateExpr(x.$y, symbols), ((l, r) =>
         d.xorOperatorSupportedNatively match
           case true => s"$l XOR $r"
-          case false => s"($l = TRUE) <> ($r = TRUE)"
+          case false =>
+            polyfillWasUsed()
+            s"($l = TRUE) <> ($r = TRUE)"
         ), if d.xorOperatorSupportedNatively then 45 else 43, x) // TODO precedence?
       case f0: Expr.FunctionCall0[?] => FunctionCallOp(f0.name, Seq(), f0)
       case f1: Expr.FunctionCall1[?, ?, ?] => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
@@ -362,8 +364,10 @@ object QueryIRTree:
         if d.feature_RandomFloat_functionName.isDefined then
           FunctionCallOp(d.feature_RandomFloat_functionName.get, Seq(), f)
         else
+          polyfillWasUsed()
           RawSQLInsertOp(d.feature_RandomFloat_rawSQL.get, Map(), d.feature_RandomFloat_rawSQL.get.precedence, f)
       case i: Expr.RandomInt[?, ?] =>
+        polyfillWasUsed()
         RawSQLInsertOp(
           d.feature_RandomInt_rawSQL,
           Map("a" -> generateExpr(i.$x, symbols), "b" -> generateExpr(i.$y, symbols)),
@@ -424,6 +428,7 @@ object QueryIRTree:
         else
           val str = ("str", Precedence.Concat)
           val num = ("num", Precedence.Concat)
+          polyfillWasUsed()
           RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"(with stringRepeatParameters as (select $str as str, $num as num) select SUBSTR(REPLACE(PRINTF('%.*c', num, 'x'), 'x', str), 1, length(str)*num) from stringRepeatParameters)"),
                          Map(str._1 -> generateExpr(l.$s, symbols), num._1 -> generateExpr(l.$n, symbols)),
                          Precedence.Unary,
@@ -435,6 +440,7 @@ object QueryIRTree:
           val str = ("str", Precedence.Concat)
           val pad = ("pad", Precedence.Concat)
           val num = ("num", Precedence.Concat)
+          polyfillWasUsed()
           RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"(with lpadParameters as (select $str as str, $pad as pad, $num as num) select substr(substr(replace(hex(zeroblob(num)), '00', pad), 1, num - length(str)) || str, 1, num) from lpadParameters)"),
                          Map(str._1 -> generateExpr(l.$s, symbols), pad._1 -> generateExpr(l.$pad, symbols), num._1 -> generateExpr(l.$len, symbols)),
                          Precedence.Unary,
@@ -446,6 +452,7 @@ object QueryIRTree:
           val str = ("str", Precedence.Concat)
           val pad = ("pad", Precedence.Concat)
           val num = ("num", Precedence.Concat)
+          polyfillWasUsed()
           RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"(with rpadParameters as (select $str as str, $pad as pad, $num as num) select substr(str || substr(replace(hex(zeroblob(num)), '00', pad), 1, num - length(str)), 1, num) from rpadParameters)"),
                          Map(str._1 -> generateExpr(l.$s, symbols), pad._1 -> generateExpr(l.$pad, symbols), num._1 -> generateExpr(l.$len, symbols)),
                          Precedence.Unary,

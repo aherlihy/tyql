@@ -3,6 +3,7 @@
 //> using dep "ch.epfl.lamp::tyql:0.0.1"
 //> using dep "com.lihaoyi::os-lib-watch:0.11.3"
 //> using dep "com.lihaoyi::pprint:0.9.0"
+//> using dep "com.lihaoyi::ujson:4.0.2"
 
 import pprint.pprintln
 
@@ -12,10 +13,7 @@ import pprint.pprintln
   but we are building the infrastructure for generating it.
 
   TODO:
-  - have the snippets return some values that can be read back
-  - have the snippets return SQL
   - have the snippets return the results of running the SQL against the DB
-  - tracking of polyfills
   - generate markdown
   - generate HTML
 */
@@ -59,33 +57,55 @@ def testScript(dialectSnippet: String, codeSnippet: String) = "" +
 s"""//> using jvm "21"
 //> using options "-experimental"
 //> using dep "ch.epfl.lamp::tyql:0.0.1"
+//> using dep "com.lihaoyi::ujson:4.0.2"
 
 import tyql.*
 
 $dialectSnippet
 
+case class R(i: Int)
+val t = tyql.Table[R]("t")
+
+var wasPolyfillUsed = false
+var sql = ""
+var exception = false
+
 @main def main() = {
+  tyql.polyfillWasUsed = () => { wasPolyfillUsed = true }
   try {
-
-    $codeSnippet
-
+    sql = t.map(_ => ($codeSnippet)).toQueryIR.toSQLString()
   } catch {
-    case _ => println("exception")
+    case _ => exception = true
+  } finally {
+    val js = if exception then
+      ujson.Obj("exception" -> true)
+    else
+      ujson.Obj("exception" -> false, "sql" -> sql, "wasPolyfillUsed" -> wasPolyfillUsed)
+    println(ujson.write(js))
   }
 }
+
 """
 
 @main def main() = {
-  val NullOutput = os.ProcessOutput((_, _) => ())
   val matrix = dialect_features_uses.map { case (feature, codeSnippet) =>
+    println("FEATURE " + feature)
     val dialectResults = dialect_imports.map { case (dialect, dialectSnippet) =>
+      println("DIALECT " + dialect)
       val script = testScript(dialectSnippet, codeSnippet)
       val path = s"${directory}main.scala"
       os.write.over(os.Path(path), script)
       val compilationAndRunStatus =
         os.proc("scala-cli", path)
-          .call(cwd=os.Path(directory), check=false, stdout=NullOutput, stderr=NullOutput)
-      dialect -> (compilationAndRunStatus.exitCode == 0)
+          .call(cwd=os.Path(directory), check=false)
+      if (compilationAndRunStatus.exitCode != 0) {
+        dialect -> (compilationAndRunStatus.exitCode == 0)
+      } else {
+        val text = compilationAndRunStatus.out.text().trim()
+        val result = ujson.read(text.split("\n").last)
+        assert(result("exception").bool == false)
+        dialect -> (true, result("wasPolyfillUsed").bool, result("sql").str)
+      }
     }.toMap
 
     feature -> dialectResults
@@ -98,27 +118,51 @@ $dialectSnippet
 Map(
   "randomUUID" -> HashMap(
     "sqlite" -> false,
-    "postgresql" -> true,
-    "h2" -> true,
-    "mariadb" -> true,
-    "mysql" -> true,
-    "duckdb" -> true
+    "postgresql" -> (true, false, "SELECT gen_random_uuid() FROM t as t0"),
+    "h2" -> (true, false, "SELECT RANDOM_UUID() FROM t as t0"),
+    "mariadb" -> (true, false, "SELECT UUID() FROM t as t0"),
+    "mysql" -> (true, false, "SELECT UUID() FROM t as t0"),
+    "duckdb" -> (true, false, "SELECT uuid() FROM t as t0")
   ),
   "randomInt" -> HashMap(
-    "sqlite" -> true,
-    "postgresql" -> true,
-    "h2" -> true,
-    "mariadb" -> true,
-    "mysql" -> true,
-    "duckdb" -> true
+    "sqlite" -> (
+      true,
+      true,
+      "SELECT (with randomIntParameters as (select 0 as a, 1 + 1 as b) select cast(abs(random() % (b - a + 1) + a) as integer) from randomIntParameters) FROM t as t0"
+    ),
+    "postgresql" -> (
+      true,
+      true,
+      "SELECT (with randomIntParameters as (select 0 as a, 1 + 1 as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters) FROM t as t0"
+    ),
+    "h2" -> (
+      true,
+      true,
+      "SELECT (with randomIntParameters as (select 0 as a, 1 + 1 as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters) FROM t as t0"
+    ),
+    "mariadb" -> (
+      true,
+      true,
+      "SELECT (with randomIntParameters as (select 0 as a, 1 + 1 as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters) FROM t as t0"
+    ),
+    "mysql" -> (
+      true,
+      true,
+      "SELECT (with randomIntParameters as (select 0 as a, 1 + 1 as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters) FROM t as t0"
+    ),
+    "duckdb" -> (
+      true,
+      true,
+      "SELECT (with randomIntParameters as (select 0 as a, 1 + 1 as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters) FROM t as t0"
+    )
   ),
   "reversibleStrings" -> HashMap(
-    "sqlite" -> true,
-    "postgresql" -> true,
+    "sqlite" -> (true, false, "SELECT REVERSE('abc') FROM t as t0"),
+    "postgresql" -> (true, false, "SELECT REVERSE('abc') FROM t as t0"),
     "h2" -> false,
-    "mariadb" -> true,
-    "mysql" -> true,
-    "duckdb" -> true
+    "mariadb" -> (true, false, "SELECT REVERSE('abc') FROM t as t0"),
+    "mysql" -> (true, false, "SELECT REVERSE('abc') FROM t as t0"),
+    "duckdb" -> (true, false, "SELECT REVERSE('abc') FROM t as t0")
   )
 )
 */
