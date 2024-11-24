@@ -12,23 +12,26 @@ import NamedTuple.{NamedTuple, AnyNamedTuple}
 
 class CaseConventionTests extends FunSuite {
   private val expectations = Seq(
-    ("aa bb cc", "aa_bb_cc", "aaBbCc", "AaBbCc"),
-    ("aabbcc",   "aabbcc",   "aabbcc", "Aabbcc"),
-    ("aaBb_cc",  "aa_bb_cc", "aaBbCc", "AaBbCc"),
-    ("AaBbCc",   "aa_bb_cc", "aaBbCc", "AaBbCc"),
-    ("abc12",    "abc12",    "abc12",  "Abc12"),
-    ("abc_12",   "abc_12",   "abc12",  "Abc12"),
-    ("abC12",    "ab_c12",   "abC12",  "AbC12"),
-    ("ABC",      "a_b_c",    "aBC",    "ABC"),
+    ("aa bb cc", "aa_bb_cc", "aaBbCc", "AaBbCc", "AA_BB_CC", "aabbcc", "AABBCC"),
+    ("aabbcc",   "aabbcc",   "aabbcc", "Aabbcc", "AABBCC",   "aabbcc", "AABBCC"),
+    ("aaBb_cc",  "aa_bb_cc", "aaBbCc", "AaBbCc", "AA_BB_CC", "aabbcc", "AABBCC"),
+    ("AaBbCc",   "aa_bb_cc", "aaBbCc", "AaBbCc", "AA_BB_CC", "aabbcc", "AABBCC"),
+    ("abc12",    "abc12",    "abc12",  "Abc12",  "ABC12",    "abc12",  "ABC12"),
+    ("abc_12",   "abc_12",   "abc12",  "Abc12",  "ABC_12",   "abc12",  "ABC12"),
+    ("abC12",    "ab_c12",   "abC12",  "AbC12",  "AB_C12",   "abc12",  "ABC12"),
+    ("ABC",      "a_b_c",    "aBC",    "ABC",    "A_B_C",    "abc",    "ABC"),
   )
 
   test("expected case conversions") {
     for (e <- expectations) {
-      val (in, underscores, camelCase, pascalCase) = e
+      val (in, underscores, camelCase, pascalCase, capitalUnderscores, joined, joinedCapital) = e
       assertEquals(CaseConvention.Exact.convert(in), in)
       assertEquals(CaseConvention.Underscores.convert(in), underscores)
       assertEquals(CaseConvention.CamelCase.convert(in), camelCase)
       assertEquals(CaseConvention.PascalCase.convert(in), pascalCase)
+      assertEquals(CaseConvention.CapitalUnderscores.convert(in), capitalUnderscores)
+      assertEquals(CaseConvention.Joined.convert(in), joined)
+      assertEquals(CaseConvention.JoinedCapital.convert(in), joinedCapital)
     }
   }
 
@@ -52,9 +55,9 @@ class CaseConventionTests extends FunSuite {
   test("postgres handles it".tag(needsDBs)) {
     withDB.postgres{ conn =>
 
-      def check(tableName: String, columnName: String)(using cnf: Config) = {
-        val escapedTableName = summon[Dialect].quoteIdentifier(tableName)
-        val escapedColunmName = summon[Dialect].quoteIdentifier(columnName)
+      def check(tableName: String, columnName: String, postgresTableName: String = null, postgresColumnName: String = null)(using cnf: Config) = {
+        val escapedTableName = summon[Dialect].quoteIdentifier(Option(postgresTableName).getOrElse(tableName))
+        val escapedColunmName = summon[Dialect].quoteIdentifier(Option(postgresColumnName).getOrElse(columnName))
 
         case class Tbl(id: Int, aaBb_Cc: String)
         val q = Table[Tbl](tableName).map(b => b.aaBb_Cc)
@@ -78,6 +81,13 @@ class CaseConventionTests extends FunSuite {
       check("caseConventionTests19471", "aaBbCc")(using new Config(CaseConvention.CamelCase) {})
       check("CaseConventionTests19471", "AaBbCc")(using new Config(CaseConvention.PascalCase) {})
       check("case_convention_tests19471", "aa_bb_cc")(using new Config(CaseConvention.Underscores) {})
+      check("CaseConventionTests19471", "aaBb_Cc", postgresTableName="CASE_CONVENTION_TESTS19471", postgresColumnName="AA_BB_CC")(using new Config(CaseConvention.CapitalUnderscores) {}) // XXX AA_BB_CC would be interpreted as a_a_b_c !
+      check("caseconventiontests19471", "aabbcc")(using new Config(CaseConvention.Joined) {})
+      check("CaseConventionTests19471", "aaBb_Cc", postgresTableName="CASECONVENTIONTESTS19471", postgresColumnName="AABBCC")(using new Config(CaseConvention.JoinedCapital) {}) // XXX AA_BB_CC would be interpreted as a_a_b_c !
+      // TODO document this weird (?) behavior, or maybe change it?
+      // In the Scala code you must use `_`s or capital letters as separators, and the config
+      //   changes only what is ouputted to the DB, so you cannot use something like ABC as the column name from
+      //   the Scala code since it will be interpreted as a compound name ['a', 'b', 'c'].
     }
   }
 }
