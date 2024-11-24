@@ -44,6 +44,9 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   @targetName("neqScalar")
   def != (other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
 
+  def isNull[S <: ExprShape]: Expr[Boolean, Shape] = Expr.IsNull(this)
+  def nullIf[S <: ExprShape](other: Expr[Result, S]): Expr[Result, CalculatedShape[Shape, S]] = Expr.NullIf(this, other)
+
   def cases[DestinationT: ResultTag, SV <: ExprShape](firstCase: (Expr[Result, Shape] | ElseToken, Expr[DestinationT, SV]), restOfCases: (Expr[Result, Shape] | ElseToken, Expr[DestinationT, SV])*): Expr[DestinationT, SV] =
     type FromT = Result
     var mainCases: collection.mutable.ArrayBuffer[(Expr[FromT, Shape], Expr[DestinationT, SV])] = collection.mutable.ArrayBuffer.empty
@@ -139,6 +142,9 @@ object Expr:
     def lpad[S2 <: ExprShape](len: Expr[Int, S2], pad: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrLPad(x, len, pad)
     def rpad[S2 <: ExprShape](len: Expr[Int, S2], pad: Expr[String, S2]): Expr[String, CalculatedShape[S1, S2]] = Expr.StrRPad(x, len, pad)
     def findPosition[S2 <: ExprShape](substr: Expr[String, S2]): Expr[Int, CalculatedShape[S1, S2]] = Expr.StrPositionIn(substr, x)
+
+  def coalesce[T, S1 <: ExprShape](x: Expr[T, S1], y: Expr[T, S1], xs: Expr[T, S1]*)(using ResultTag[T]): Expr[T, S1] = Coalesce(x, y, xs)
+  def nullIf[T, S1 <: ExprShape, S2 <: ExprShape](x: Expr[T, S1], y: Expr[T, S2])(using ResultTag[T]): Expr[T, CalculatedShape[S1, S2]] = NullIf(x, y)
 
   def concat[S <: ExprShape](strs: Seq[Expr[String, S]]): Expr[String, S] =
     assert(strs.nonEmpty, "concat requires at least one argument")
@@ -295,6 +301,11 @@ object Expr:
   case class SearchedCase[T, SC <: ExprShape, SV <: ExprShape]($cases: List[(Expr[Boolean, SC], Expr[T, SV])], $else: Option[Expr[T, SV]])(using ResultTag[T]) extends Expr[T, SV]
   case class SimpleCase[TE, TR, SE <: ExprShape, SR <: ExprShape]($expr: Expr[TE, SE], $cases: List[(Expr[TE, SE], Expr[TR, SR])], $else: Option[Expr[TR, SR]])(using ResultTag[TE], ResultTag[TR]) extends Expr[TR, SR]
 
+  case class NullLit[A]()(using ResultTag[A]) extends Expr[A, NonScalarExpr]
+  case class IsNull[A, S <: ExprShape]($x: Expr[A, S]) extends Expr[Boolean, S]
+  case class Coalesce[A, S1 <: ExprShape]($x1: Expr[A, S1], $x2: Expr[A, S1], $xs: Seq[Expr[A, S1]])(using ResultTag[A]) extends Expr[A, S1]
+  case class NullIf[A, S1 <: ExprShape, S2 <: ExprShape]($x: Expr[A, S1], $y: Expr[A, S2])(using ResultTag[A]) extends Expr[A, CalculatedShape[S1, S2]]
+
   /** Literals are type-specific, tailored to the types that the DB supports */
   case class IntLit($value: Int) extends Expr[Int, NonScalarExpr]
   /** Scala values can be lifted into literals by conversions */
@@ -377,5 +388,7 @@ def lit(x: Double): Expr[Double, NonScalarExpr] = Expr.DoubleLit(x)
 def lit(x: String): Expr[String, NonScalarExpr] = Expr.StringLit(x)
 def True = Expr.BooleanLit(true)
 def False = Expr.BooleanLit(false)
+def Null = Expr.NullLit[scala.Null]()
+def Null[T](using ResultTag[T]) = Expr.NullLit[T]()
 private case class ElseToken()
 val Else = new ElseToken()

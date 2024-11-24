@@ -347,6 +347,7 @@ object QueryIRTree:
       case g: Expr.LtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", Precedence.Comparison, g)
       case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", Precedence.And, a)
       case a: Expr.Or[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l OR $r", Precedence.Or, a)
+      case Expr.Not(inner: Expr.IsNull[?, ?]) => UnaryExprOp(generateExpr(inner.$x, symbols), o => s"$o IS NOT NULL", ast)
       case n: Expr.Not[?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", n)
       case x: Expr.Xor[?] => BinExprOp(generateExpr(x.$x, symbols), generateExpr(x.$y, symbols), ((l, r) =>
         d.xorOperatorSupportedNatively match
@@ -395,6 +396,10 @@ object QueryIRTree:
           Precedence.Concat,
           a
         )
+      case n: Expr.NullLit[?] => Literal("NULL", n)
+      case i: Expr.IsNull[?, ?] => UnaryExprOp(generateExpr(i.$x, symbols), o => s"$o IS NULL", i)
+      case c: Expr.Coalesce[?, ?] => FunctionCallOp("COALESCE", (Seq(c.$x1, c.$x2) ++ c.$xs).map(generateExpr(_, symbols)), c)
+      case i: Expr.NullIf[?, ?, ?] => FunctionCallOp("NULLIF", Seq(generateExpr(i.$x, symbols), generateExpr(i.$y, symbols)), i)
       case l: Expr.DoubleLit => Literal(s"${l.$value}", l)
       case l: Expr.IntLit => Literal(s"${l.$value}", l)
       case l: Expr.StringLit => Literal(d.quoteStringLiteral(l.$value, insideLikePattern=false), l)

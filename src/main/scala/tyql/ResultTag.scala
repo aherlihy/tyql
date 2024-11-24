@@ -6,6 +6,7 @@ import scala.compiletime.{constValue, constValueTuple, summonAll}
 import scala.deriving.Mirror
 
 enum ResultTag[T]:
+  case NullTag extends ResultTag[scala.Null]
   case IntTag extends ResultTag[Int]
   case DoubleTag extends ResultTag[Double]
   case StringTag extends ResultTag[String]
@@ -19,6 +20,7 @@ enum ResultTag[T]:
   case AnyTag extends ResultTag[Any]
 // TODO: Add more types, specialize for DB backend
 object ResultTag:
+  given ResultTag[scala.Null] = ResultTag.NullTag
   given ResultTag[Int] = ResultTag.IntTag
   given ResultTag[String] = ResultTag.StringTag
   given ResultTag[Boolean] = ResultTag.BoolTag
