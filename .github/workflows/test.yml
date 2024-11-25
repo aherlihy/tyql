@@ -18,12 +18,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Create directories and set permissions
+        run: |
+          mkdir -p test-results
+          mkdir -p target
+          sudo chown -R 1000:1000 test-results
+          sudo chown -R 1000:1000 target
+          sudo chmod -R 777 test-results
+          sudo chmod -R 777 target
+
       - name: Build and run tests
         run: |
-          # Create test-results directory
-          mkdir -p test-results
-
-          # Start databases and run tests
           docker compose --profile dbs --profile tests up \
             --build \
             --exit-code-from main \
