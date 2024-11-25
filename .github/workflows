@@ -1,0 +1,45 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - better-containerization
+  pull_request:
+    branches:
+      - better-containerization
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and run tests
+        run: |
+          # Create test-results directory
+          mkdir -p test-results
+
+          # Start databases and run tests
+          docker-compose --profile dbs --profile tests up \
+            --build \
+            --exit-code-from main \
+            --abort-on-container-exit
+
+      - name: Upload test results
+        if: always()  # Run even if tests fail
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 14
+
+      - name: Check test output for failures
+        run: |
+          if grep -i "failed" test-results/test-output_*.log; then
+            exit 1
+          fi
+
