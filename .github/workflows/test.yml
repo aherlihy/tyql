@@ -44,7 +44,11 @@ jobs:
 
       - name: Check test output for failures
         run: |
-          if grep -i "failed" test-results/test-output_*.log; then
+          if grep -q "Passed: Total .*, Failed 0, Errors 0," test-results/test-output_*.log; then
+            echo "All tests passed!"
+            exit 0
+          else
+            echo "Tests failed!"
             exit 1
           fi
 
