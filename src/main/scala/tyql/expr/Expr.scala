@@ -69,31 +69,17 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
 object Expr:
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape](x: Expr[Int, S1])
-    @targetName("addIntScalar")
-    def +(y: Expr[Int, ScalarExpr]): Expr[Int, CalculatedShape[S1, ScalarExpr]] = Plus(x, y)
-    @targetName("addIntNonScalar")
-    def +(y: Expr[Int, NonScalarExpr]): Expr[Int, CalculatedShape[S1, NonScalarExpr]] = Plus(x, y)
-    def +(y: Int): Expr[Int, S1] = Plus[S1, NonScalarExpr, Int](x, IntLit(y))
-    @targetName("multiplyIntScalar")
-    def *(y: Expr[Int, ScalarExpr]): Expr[Int, CalculatedShape[S1, ScalarExpr]] = Times(x, y)
-    @targetName("multiplyIntNonScalar")
-    def *(y: Expr[Int, NonScalarExpr]): Expr[Int, CalculatedShape[S1, NonScalarExpr]] = Times(x, y)
-    def *(y: Int): Expr[Int, S1] = Times(x, IntLit(y))
     def %[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Int, CalculatedShape[S1, S2]] = Modulo(x, y)
-
-  // TODO: write for numerical
-  extension [S1 <: ExprShape](x: Expr[Double, S1])
-    @targetName("addDouble")
-    def +[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] = Plus(x, y)
-    @targetName("multipleDouble")
-    def *[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] = Times(x, y)
-    def *(y: Double): Expr[Double, S1] = Times[S1, NonScalarExpr, Double](x, DoubleLit(y))
 
   extension [T: Numeric, S1 <: ExprShape](x: Expr[T, S1])(using ResultTag[T])
     def <[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lt(x, y)
     def <=[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lte(x, y)
     def >[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
     def >=[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gte(x, y)
+
+    def +[S2 <: ExprShape](y: Expr[T, S2]): Expr[T, CalculatedShape[S1, S2]] = Plus(x, y)
+    def -[S2 <: ExprShape](y: Expr[T, S2]): Expr[T, CalculatedShape[S1, S2]] = Minus(x, y)
+    def *[S2 <: ExprShape](y: Expr[T, S2]): Expr[T, CalculatedShape[S1, S2]] = Times(x, y)
 
     def abs: Expr[T, S1] = Abs(x)
     def sqrt: Expr[Double, S1] = Sqrt(x)
@@ -107,7 +93,6 @@ object Expr:
     def log(base: Expr[T, S1]): Expr[Double, CalculatedShape[S1, S1]] = Log(base, x)
     def log10: Expr[Double, S1] = Log(IntLit(10), x).asInstanceOf[Expr[Double, S1]] // TODO cast?
     def log2: Expr[Double, S1] = Log(IntLit(2), x).asInstanceOf[Expr[Double, S1]] // TODO cast?
-    def -[S2 <: ExprShape](y: Expr[T, S2]): Expr[T, CalculatedShape[S1, S2]] = Minus(x, y)
 
   def exp[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Exp(x)
   def sin[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Sin(x)
@@ -226,6 +211,7 @@ object Expr:
   case class Plus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class Minus[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
   case class Times[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[T, CalculatedShape[S1, S2]]
+
   case class And[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Or[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Not[S1 <: ExprShape]($x: Expr[Boolean, S1]) extends Expr[Boolean, S1]

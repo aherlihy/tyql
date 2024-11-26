@@ -11,7 +11,7 @@ object TreePrettyPrinter {
   import Expr.*
   import AggregationExpr.*
 
-  private def indent(level: Int): String = "  " * level
+  private def indent(level: Int): String = scala.collection.StringOps("  ") * level // TODO this broke for some reason
   private def indentWithKey(level: Int, key: String, value: String): String = s"${indent(level)}$key=${value.stripLeading()}"
   private def indentListWithKey(level: Int, key: String, values: Seq[String]): String =
     if (values.isEmpty)
