@@ -30,27 +30,44 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def selectDynamic(fieldName: String) = Expr.Select(this, fieldName)
 
   /** Member methods to implement universal equality on Expr level. */
-  @targetName("eqNonScalar")
-  def ==(other: Expr[?, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Eq[Shape, NonScalarExpr](this, other)
-  @targetName("eqScalar")
-  def ==(other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Eq[Shape, ScalarExpr](this, other)
+  // @targetName("eqNonScalar")
+  // def ==(other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Eq[Shape, NonScalarExpr](this, other)
+  // @targetName("eqScalar")
+  // def ==(other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Eq[Shape, ScalarExpr](this, other)
+  @targetName("eqNonScalarUniversal")
+  def ==[T](other: Expr[T, NonScalarExpr])(using ResultTag[T]/*, tyql.DialectFeature.WeaklyTypedEquality*/): Expr[Boolean, Shape] = Expr.Eq[Shape, NonScalarExpr](this, other)
+  @targetName("eqScalarUniversal")
+  def ==[T](other: Expr[T, ScalarExpr])(using ResultTag[T]/*, tyql.DialectFeature.WeaklyTypedEquality*/): Expr[Boolean, ScalarExpr] = Expr.Eq[Shape, ScalarExpr](this, other)
   @targetName("nullSafeEqNonScalar")
-  def ===(other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.NullSafeEq[Shape, NonScalarExpr, Result](this, other)
+  def ===(other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.NullSafeEq[Shape, NonScalarExpr](this, other)
   @targetName("nullSafeEqScalar")
-  def ===(other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.NullSafeEq[Shape, ScalarExpr, Result](this, other)
+  def ===(other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.NullSafeEq[Shape, ScalarExpr](this, other)
+  @targetName("nullSafeEqNonScalarUniversal")
+  def ===[T](other: Expr[T, NonScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, Shape] = Expr.NullSafeEq[Shape, NonScalarExpr](this, other)
+  @targetName("nullSafeEqScalarUniversal")
+  def ===[T](other: Expr[T, ScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, ScalarExpr] = Expr.NullSafeEq[Shape, ScalarExpr](this, other)
 //  def == [S <: ScalarExpr](other: Expr[?, S]): Expr[Boolean, CalculatedShape[Shape, S]] = Expr.Eq(this, other)
   def ==(other: String): Expr[Boolean, Shape] = Expr.Eq(this, Expr.StringLit(other))
   def ==(other: Int): Expr[Boolean, Shape] = Expr.Eq(this, Expr.IntLit(other))
   def ==(other: Boolean): Expr[Boolean, Shape] = Expr.Eq(this, Expr.BooleanLit(other))
 
-  @targetName("neqNonScalar")
-  def != (other: Expr[?, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Ne[Shape, NonScalarExpr](this, other)
-  @targetName("neqScalar")
-  def != (other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
+  // @targetName("neqNonScalar")
+  // def != (other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Ne[Shape, NonScalarExpr](this, other)
+  // @targetName("neqScalar")
+  // def != (other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
+  @targetName("neqNonScalarUniversal")
+  def != [T](other: Expr[T, NonScalarExpr])(using ResultTag[T]/*, tyql.DialectFeature.WeaklyTypedEquality*/): Expr[Boolean, Shape] = Expr.Ne[Shape, NonScalarExpr](this, other)
+  @targetName("neqScalarUniversal")
+  def != [T](other: Expr[T, ScalarExpr])(using ResultTag[T]/*, tyql.DialectFeature.WeaklyTypedEquality*/): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
   @targetName("nullSafeNeqNonScalar")
-  def !== (other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.NullSafeNe[Shape, NonScalarExpr, Result](this, other)
+  def !== (other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.NullSafeNe[Shape, NonScalarExpr](this, other)
   @targetName("nullSafeNeqScalar")
-  def !== (other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.NullSafeNe[Shape, ScalarExpr, Result](this, other)
+  def !== (other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.NullSafeNe[Shape, ScalarExpr](this, other)
+  @targetName("nullSafeNeqNonScalarUniveral")
+  def !== [T](other: Expr[T, NonScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, Shape] = Expr.NullSafeNe[Shape, NonScalarExpr](this, other)
+  @targetName("nullSafeNeqScalarUniveral")
+  def !== [T](other: Expr[T, ScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, ScalarExpr] = Expr.NullSafeNe[Shape, ScalarExpr](this, other)
+
 
   def isNull[S <: ExprShape]: Expr[Boolean, Shape] = Expr.IsNull(this)
   def nullIf[S <: ExprShape](other: Expr[Result, S]): Expr[Result, CalculatedShape[Shape, S]] = Expr.NullIf(this, other)
@@ -305,7 +322,7 @@ object Expr:
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // TODO: Make it strongly typed like the other cases
-  case class Select[A: ResultTag]($x: Expr[A, ?], $name: String) extends Expr[A, NonScalarExpr]
+  case class Select[A: ResultTag]($x: Expr[A, ?], $name: String) extends Expr[A, NonScalarExpr] // TODO is this type correct? X is of type A and it's child under `name` is also of type A?
 
 //  case class Single[S <: String, A]($x: Expr[A])(using ResultTag[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]) extends Expr[NamedTuple[S *: EmptyTuple, A *: EmptyTuple]]
 
@@ -320,8 +337,8 @@ object Expr:
   // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Ne[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class NullSafeEq[S1 <: ExprShape, S2 <: ExprShape, T]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class NullSafeNe[S1 <: ExprShape, S2 <: ExprShape, T]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class NullSafeEq[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class NullSafeNe[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
 
   // Expressions resulting from queries
   // Cannot use Contains with an aggregation

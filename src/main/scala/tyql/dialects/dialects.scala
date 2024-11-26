@@ -92,6 +92,7 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
+    given WeaklyTypedEquality = new WeaklyTypedEquality {}
 
   object mariadb:
     // XXX MariaDB extends MySQL
@@ -102,6 +103,7 @@ object Dialect:
     given RandomUUID = mysql.given_RandomUUID
     given RandomIntegerInInclusiveRange = mysql.given_RandomIntegerInInclusiveRange
     given ReversibleStrings = mysql.given_ReversibleStrings
+    given WeaklyTypedEquality = mysql.given_WeaklyTypedEquality
 
   object sqlite:
     given Dialect = new Dialect
@@ -123,6 +125,7 @@ object Dialect:
 
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
+    given WeaklyTypedEquality = new WeaklyTypedEquality {}
 
   object h2:
     given Dialect = new Dialect
@@ -142,6 +145,7 @@ object Dialect:
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
+    given WeaklyTypedEquality = new WeaklyTypedEquality {}
 
   object duckdb:
     given Dialect = new Dialect

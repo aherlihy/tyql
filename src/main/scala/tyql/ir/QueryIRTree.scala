@@ -379,7 +379,7 @@ object QueryIRTree:
       case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", Precedence.Multiplicative, a)
       case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", Precedence.Comparison, a)
       case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", Precedence.Comparison, a)
-      case e: Expr.NullSafeEq[?, ?, ?] =>
+      case e: Expr.NullSafeEq[?, ?] =>
         val a = ("a", Precedence.Comparison)
         val b = ("b", Precedence.Comparison)
         RawSQLInsertOp(SqlSnippet(Precedence.Comparison,
@@ -389,7 +389,7 @@ object QueryIRTree:
               snippet"$a IS NOT DISTINCT FROM $b"
           ),
           Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)), Precedence.Comparison, e)
-      case e: Expr.NullSafeNe[?, ?, ?] =>
+      case e: Expr.NullSafeNe[?, ?] =>
         val a = ("a", Precedence.Comparison)
         val b = ("b", Precedence.Comparison)
         if d.nullSafeEqualityViaSpecialOperator then
