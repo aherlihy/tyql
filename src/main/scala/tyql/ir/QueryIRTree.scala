@@ -379,6 +379,23 @@ object QueryIRTree:
       case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", Precedence.Multiplicative, a)
       case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", Precedence.Comparison, a)
       case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", Precedence.Comparison, a)
+      case a: Expr.Modulo[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l % $r", Precedence.Multiplicative, a)
+      case r: Expr.Round[?, ?] => FunctionCallOp("ROUND", Seq(generateExpr(r.$x, symbols)), r)
+      case r: Expr.RoundWithPrecision[?, ?, ?] => FunctionCallOp("ROUND", Seq(generateExpr(r.$x, symbols), generateExpr(r.$precision, symbols)), r)
+      case c: Expr.Ceil[?, ?] => FunctionCallOp("CEIL", Seq(generateExpr(c.$x, symbols)), c)
+      case f: Expr.Floor[?, ?] => FunctionCallOp("FLOOR", Seq(generateExpr(f.$x, symbols)), f)
+      case p: Expr.Power[?, ?, ?, ?] => FunctionCallOp("POWER", Seq(generateExpr(p.$x, symbols), generateExpr(p.$y, symbols)), p)
+      case s: Expr.Sqrt[?, ?] => FunctionCallOp("SQRT", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Sign[?, ?] => FunctionCallOp("SIGN", Seq(generateExpr(s.$x, symbols)), s)
+      case l: Expr.LogNatural[?, ?] => FunctionCallOp("LN", Seq(generateExpr(l.$x, symbols)), l)
+      case l: Expr.Log[?, ?, ?, ?] => FunctionCallOp("LOG", Seq(generateExpr(l.$base, symbols), generateExpr(l.$x, symbols)), l)
+      case e: Expr.Exp[?, ?] => FunctionCallOp("EXP", Seq(generateExpr(e.$x, symbols)), e)
+      case s: Expr.Sin[?, ?] => FunctionCallOp("SIN", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Cos[?, ?] => FunctionCallOp("COS", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Tan[?, ?] => FunctionCallOp("TAN", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Asin[?, ?] => FunctionCallOp("ASIN", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Acos[?, ?] => FunctionCallOp("ACOS", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Atan[?, ?] => FunctionCallOp("ATAN", Seq(generateExpr(s.$x, symbols)), s)
       case a: Expr.Concat[?, ?, ?, ?] =>
         val lhsIR = generateExpr(a.$x, symbols) match
           case p: ProjectClause => p

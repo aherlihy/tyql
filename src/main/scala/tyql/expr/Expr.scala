@@ -82,16 +82,12 @@ object Expr:
     @targetName("addIntNonScalar")
     def +(y: Expr[Int, NonScalarExpr]): Expr[Int, CalculatedShape[S1, NonScalarExpr]] = Plus(x, y)
     def +(y: Int): Expr[Int, S1] = Plus[S1, NonScalarExpr, Int](x, IntLit(y))
-    @targetName("subtractIntScalar")
-    def -(y: Expr[Int, ScalarExpr]): Expr[Int, CalculatedShape[S1, ScalarExpr]] = Minus(x, y)
-    @targetName("subtractIntNonScalar")
-    def -(y: Expr[Int, NonScalarExpr]): Expr[Int, CalculatedShape[S1, NonScalarExpr]] = Minus(x, y)
-    def -(y: Int): Expr[Int, S1] = Minus[S1, NonScalarExpr, Int](x, IntLit(y))
     @targetName("multiplyIntScalar")
     def *(y: Expr[Int, ScalarExpr]): Expr[Int, CalculatedShape[S1, ScalarExpr]] = Times(x, y)
     @targetName("multiplyIntNonScalar")
     def *(y: Expr[Int, NonScalarExpr]): Expr[Int, CalculatedShape[S1, NonScalarExpr]] = Times(x, y)
     def *(y: Int): Expr[Int, S1] = Times(x, IntLit(y))
+    def %[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Int, CalculatedShape[S1, S2]] = Modulo(x, y)
 
   // TODO: write for numerical
   extension [S1 <: ExprShape](x: Expr[Double, S1])
@@ -106,6 +102,29 @@ object Expr:
     @targetName("multipleDouble")
     def *[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] = Times(x, y)
     def *(y: Double): Expr[Double, S1] = Times[S1, NonScalarExpr, Double](x, DoubleLit(y))
+
+  extension [T: Numeric, S1 <: ExprShape](x: Expr[T, S1])(using ResultTag[T])
+    def abs: Expr[T, S1] = Abs(x)
+    def sqrt: Expr[Double, S1] = Sqrt(x)
+    def round: Expr[Int, S1] = Round(x)
+    def round[S2 <: ExprShape](precision: Expr[Int, S2]): Expr[Double, CalculatedShape[S1, S2]] = RoundWithPrecision(x, precision)
+    def ceil: Expr[Int, S1] = Ceil(x)
+    def floor: Expr[Int, S1] = Floor(x)
+    def power[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] = Power(x, y)
+    def sign: Expr[Int, S1] = Sign(x)
+    def ln: Expr[Double, S1] = LogNatural(x)
+    def log(base: Expr[T, S1]): Expr[Double, CalculatedShape[S1, S1]] = Log(base, x)
+    def log10: Expr[Double, S1] = Log(IntLit(10), x).asInstanceOf[Expr[Double, S1]] // TODO cast?
+    def log2: Expr[Double, S1] = Log(IntLit(2), x).asInstanceOf[Expr[Double, S1]] // TODO cast?
+    def -[S2 <: ExprShape](y: Expr[T, S2]): Expr[T, CalculatedShape[S1, S2]] = Minus(x, y)
+
+  def exp[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Exp(x)
+  def sin[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Sin(x)
+  def cos[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Cos(x)
+  def tan[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Tan(x)
+  def asin[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Asin(x)
+  def acos[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Acos(x)
+  def atan[T: Numeric, S <: ExprShape](x: Expr[T, S])(using ResultTag[T]): Expr[Double, S] = Atan(x)
 
   extension [S1 <: ExprShape](x: Expr[Boolean, S1])
     def &&[S2 <: ExprShape] (y: Expr[Boolean, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = And(x, y)
@@ -241,6 +260,26 @@ object Expr:
   case class StrLPad[S1 <: ExprShape, S2 <: ExprShape]($s: Expr[String, S1], $len: Expr[Int, S2], $pad: Expr[String, S2]) extends Expr[String, CalculatedShape[S1, S2]]
   case class StrRPad[S1 <: ExprShape, S2 <: ExprShape]($s: Expr[String, S1], $len: Expr[Int, S2], $pad: Expr[String, S2]) extends Expr[String, CalculatedShape[S1, S2]]
   case class StrPositionIn[S1 <: ExprShape, S2 <: ExprShape]($substr: Expr[String, S2], $string: Expr[String, S1]) extends Expr[Int, CalculatedShape[S1, S2]]
+
+  case class Modulo[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Int, CalculatedShape[S1, S2]]
+  // TODO actually, it's unclear for now what types should be here, the input to ROUND() in most DBs can be any numeric and the ouput is usually of the same type as the input
+  case class Round[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Int, S1]
+  case class RoundWithPrecision[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $precision: Expr[Int, S2])(using ResultTag[T]) extends Expr[Double, CalculatedShape[S1, S2]]
+  case class Ceil[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Int, S1]
+  case class Floor[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Int, S1]
+  case class Power[S1 <: ExprShape, S2 <: ExprShape, T1: Numeric, T2: Numeric]($x: Expr[T1, S1], $y: Expr[T2, S2])(using ResultTag[T1], ResultTag[T2]) extends Expr[Double, CalculatedShape[S1, S2]]
+  case class Sqrt[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
+  case class Abs[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[T, S1]
+  case class Sign[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Int, S1]
+  case class LogNatural[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
+  case class Log[S1 <: ExprShape, S2 <: ExprShape, T1: Numeric, T2: Numeric]($base: Expr[T1, S1], $x: Expr[T2, S2])(using ResultTag[T1], ResultTag[T2]) extends Expr[Double, CalculatedShape[S1, S2]]
+  case class Exp[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
+  case class Sin[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
+  case class Cos[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
+  case class Tan[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
+  case class Asin[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
+  case class Acos[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
+  case class Atan[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
 
   case class RandomUUID() extends Expr[String, NonScalarExpr] // XXX NonScalarExpr?
   case class RandomFloat() extends Expr[Double, NonScalarExpr] // XXX NonScalarExpr?
