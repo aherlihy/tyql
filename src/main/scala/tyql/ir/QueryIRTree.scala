@@ -379,6 +379,23 @@ object QueryIRTree:
       case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", Precedence.Multiplicative, a)
       case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", Precedence.Comparison, a)
       case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", Precedence.Comparison, a)
+      case e: Expr.NullSafeEq[?, ?, ?] =>
+        val a = ("a", Precedence.Comparison)
+        val b = ("b", Precedence.Comparison)
+        RawSQLInsertOp(SqlSnippet(Precedence.Comparison,
+            if d.nullSafeEqualityViaSpecialOperator then
+              snippet"$a <=> $b"
+            else
+              snippet"$a IS NOT DISTINCT FROM $b"
+          ),
+          Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)), Precedence.Comparison, e)
+      case e: Expr.NullSafeNe[?, ?, ?] =>
+        val a = ("a", Precedence.Comparison)
+        val b = ("b", Precedence.Comparison)
+        if d.nullSafeEqualityViaSpecialOperator then
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"NOT($a <=> $b)"), Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)), Precedence.Unary, e)
+        else
+          RawSQLInsertOp(SqlSnippet(Precedence.Comparison, snippet"$a IS DISTINCT FROM $b"), Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)), Precedence.Comparison, e)
       case a: Expr.Modulo[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l % $r", Precedence.Multiplicative, a)
       case r: Expr.Round[?, ?] => FunctionCallOp("ROUND", Seq(generateExpr(r.$x, symbols)), r)
       case r: Expr.RoundWithPrecision[?, ?, ?] => FunctionCallOp("ROUND", Seq(generateExpr(r.$x, symbols), generateExpr(r.$precision, symbols)), r)

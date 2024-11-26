@@ -34,6 +34,10 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def ==(other: Expr[?, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Eq[Shape, NonScalarExpr](this, other)
   @targetName("eqScalar")
   def ==(other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Eq[Shape, ScalarExpr](this, other)
+  @targetName("nullSafeEqNonScalar")
+  def ===(other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.NullSafeEq[Shape, NonScalarExpr, Result](this, other)
+  @targetName("nullSafeEqScalar")
+  def ===(other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.NullSafeEq[Shape, ScalarExpr, Result](this, other)
 //  def == [S <: ScalarExpr](other: Expr[?, S]): Expr[Boolean, CalculatedShape[Shape, S]] = Expr.Eq(this, other)
   def ==(other: String): Expr[Boolean, Shape] = Expr.Eq(this, Expr.StringLit(other))
   def ==(other: Int): Expr[Boolean, Shape] = Expr.Eq(this, Expr.IntLit(other))
@@ -43,6 +47,10 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def != (other: Expr[?, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Ne[Shape, NonScalarExpr](this, other)
   @targetName("neqScalar")
   def != (other: Expr[?, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
+  @targetName("nullSafeNeqNonScalar")
+  def !== (other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.NullSafeNe[Shape, NonScalarExpr, Result](this, other)
+  @targetName("nullSafeNeqScalar")
+  def !== (other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.NullSafeNe[Shape, ScalarExpr, Result](this, other)
 
   def isNull[S <: ExprShape]: Expr[Boolean, Shape] = Expr.IsNull(this)
   def nullIf[S <: ExprShape](other: Expr[Result, S]): Expr[Result, CalculatedShape[Shape, S]] = Expr.NullIf(this, other)
@@ -312,6 +320,8 @@ object Expr:
   // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Ne[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class NullSafeEq[S1 <: ExprShape, S2 <: ExprShape, T]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class NullSafeNe[S1 <: ExprShape, S2 <: ExprShape, T]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T]) extends Expr[Boolean, CalculatedShape[S1, S2]]
 
   // Expressions resulting from queries
   // Cannot use Contains with an aggregation

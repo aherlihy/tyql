@@ -34,6 +34,8 @@ trait Dialect:
 
   def stringPositionFindingVia: String = "LOCATE"
 
+  val nullSafeEqualityViaSpecialOperator: Boolean = false
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -85,6 +87,7 @@ object Dialect:
         val a = ("a", Precedence.Concat)
         val b = ("b", Precedence.Concat)
         SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)")
+      override val nullSafeEqualityViaSpecialOperator: Boolean = true
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
