@@ -145,7 +145,6 @@ object Dialect:
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
-    given WeaklyTypedEquality = new WeaklyTypedEquality {}
 
   object duckdb:
     given Dialect = new Dialect
