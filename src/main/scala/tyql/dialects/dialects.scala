@@ -49,6 +49,7 @@ object Dialect:
 
   object ansi:
     given Dialect = Dialect.given_Dialect
+    given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
 
   object postgresql:
     given Dialect = new Dialect
@@ -70,6 +71,11 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
+    given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
+    // TODO later support more options here (?)
+    given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
+    given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
+
 
   object mysql:
     given Dialect = new MySQLDialect
@@ -92,7 +98,7 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
-    given WeaklyTypedEquality = new WeaklyTypedEquality {}
+    given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
 
   object mariadb:
     // XXX MariaDB extends MySQL
@@ -103,7 +109,7 @@ object Dialect:
     given RandomUUID = mysql.given_RandomUUID
     given RandomIntegerInInclusiveRange = mysql.given_RandomIntegerInInclusiveRange
     given ReversibleStrings = mysql.given_ReversibleStrings
-    given WeaklyTypedEquality = mysql.given_WeaklyTypedEquality
+    given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
 
   object sqlite:
     given Dialect = new Dialect
@@ -125,7 +131,7 @@ object Dialect:
 
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
-    given WeaklyTypedEquality = new WeaklyTypedEquality {}
+    given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
 
   object h2:
     given Dialect = new Dialect
@@ -145,6 +151,11 @@ object Dialect:
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
+    given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
+    // TODO later support more options here (?)
+    given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
+    given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
+
 
   object duckdb:
     given Dialect = new Dialect
@@ -167,6 +178,10 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
+    given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
+    // TODO later support more options here (?)
+    given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
+    given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
 
 // TODO I currenly have no better idea for this, maybe some macro?
 var polyfillWasUsed: Function0[Unit] = () => ()

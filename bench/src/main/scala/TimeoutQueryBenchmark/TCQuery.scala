@@ -13,6 +13,8 @@ import scalasql.{Table as ScalaSQLTable, Expr, query}
 import scalasql.PostgresDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TOTCQuery extends QueryBenchmark {
   override def name = "tc"

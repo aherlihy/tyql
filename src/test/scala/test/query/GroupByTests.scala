@@ -9,6 +9,8 @@ import NamedTuple.*
 import scala.language.implicitConversions
 import tyql.Expr.{avg, min, sum}
 
+import tyql.Dialect.ansi.given
+
 class GroupByTest extends SQLStringQueryTest[AllCommerceDBs, (total: Double)] {
   def testDescription = "GroupBy: simple"
 

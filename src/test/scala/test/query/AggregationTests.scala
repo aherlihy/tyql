@@ -8,6 +8,8 @@ import NamedTuple.*
 import scala.language.implicitConversions
 import Expr.{sum, avg, max}
 
+import tyql.Dialect.ansi.given
+
 // Expression-based aggregation:
 
 class AggregateAggregationExprTest extends SQLStringAggregationTest[AllCommerceDBs, Double] {

@@ -15,6 +15,8 @@ import tyql.Query.unrestrictedFix
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class CSPAQuery extends QueryBenchmark {
   override def name = "cspa"

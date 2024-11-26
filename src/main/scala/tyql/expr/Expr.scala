@@ -16,6 +16,8 @@ type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
   case ScalarExpr => S2
   case NonScalarExpr => S1
 
+trait CanBeEqualed[T1, T2]
+
 /** The type of expressions in the query language */
 trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends Selectable:
   /** This type is used to support selection with any of the field names
@@ -30,43 +32,20 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def selectDynamic(fieldName: String) = Expr.Select(this, fieldName)
 
   /** Member methods to implement universal equality on Expr level. */
-  @targetName("eqNonScalar")
-  def ==(other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Eq[Shape, NonScalarExpr](this, other)
-  @targetName("eqScalar")
-  def ==(other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Eq[Shape, ScalarExpr](this, other)
-  @targetName("eqNonScalarUniversal")
-  def ==[T](other: Expr[T, NonScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, Shape] = Expr.Eq[Shape, NonScalarExpr](this, other)
-  @targetName("eqScalarUniversal")
-  def ==[T](other: Expr[T, ScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, ScalarExpr] = Expr.Eq[Shape, ScalarExpr](this, other)
-  @targetName("nullSafeEqNonScalar")
-  def ===(other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.NullSafeEq[Shape, NonScalarExpr](this, other)
-  @targetName("nullSafeEqScalar")
-  def ===(other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.NullSafeEq[Shape, ScalarExpr](this, other)
-  @targetName("nullSafeEqNonScalarUniversal")
-  def ===[T](other: Expr[T, NonScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, Shape] = Expr.NullSafeEq[Shape, NonScalarExpr](this, other)
-  @targetName("nullSafeEqScalarUniversal")
-  def ===[T](other: Expr[T, ScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, ScalarExpr] = Expr.NullSafeEq[Shape, ScalarExpr](this, other)
-//  def == [S <: ScalarExpr](other: Expr[?, S]): Expr[Boolean, CalculatedShape[Shape, S]] = Expr.Eq(this, other)
+  def ==[T, S <: ExprShape](other: Expr[T, S])(using CanBeEqualed[Result, T]): Expr[Boolean, CalculatedShape[Shape, S]] = Expr.Eq[Shape, S](this, other)
+  def ===[T, S <: ExprShape](other: Expr[T, S])(using CanBeEqualed[Result, T]): Expr[Boolean, CalculatedShape[Shape, S]] = Expr.NullSafeEq[Shape, S](this, other)
   def ==(other: String): Expr[Boolean, Shape] = Expr.Eq(this, Expr.StringLit(other))
   def ==(other: Int): Expr[Boolean, Shape] = Expr.Eq(this, Expr.IntLit(other))
   def ==(other: Boolean): Expr[Boolean, Shape] = Expr.Eq(this, Expr.BooleanLit(other))
 
   @targetName("neqNonScalar")
-  def != (other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.Ne[Shape, NonScalarExpr](this, other)
+  def != [T](other: Expr[T, NonScalarExpr])(using CanBeEqualed[Result, T]): Expr[Boolean, Shape] = Expr.Ne[Shape, NonScalarExpr](this, other)
   @targetName("neqScalar")
-  def != (other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
-  @targetName("neqNonScalarUniversal")
-  def != [T](other: Expr[T, NonScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, Shape] = Expr.Ne[Shape, NonScalarExpr](this, other)
-  @targetName("neqScalarUniversal")
-  def != [T](other: Expr[T, ScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
+  def != [T](other: Expr[T, ScalarExpr])(using CanBeEqualed[Result, T]): Expr[Boolean, ScalarExpr] = Expr.Ne[Shape, ScalarExpr](this, other)
   @targetName("nullSafeNeqNonScalar")
-  def !== (other: Expr[Result, NonScalarExpr]): Expr[Boolean, Shape] = Expr.NullSafeNe[Shape, NonScalarExpr](this, other)
+  def !== [T](other: Expr[T, NonScalarExpr])(using CanBeEqualed[Result, T]): Expr[Boolean, Shape] = Expr.NullSafeNe[Shape, NonScalarExpr](this, other)
   @targetName("nullSafeNeqScalar")
-  def !== (other: Expr[Result, ScalarExpr]): Expr[Boolean, ScalarExpr] = Expr.NullSafeNe[Shape, ScalarExpr](this, other)
-  @targetName("nullSafeNeqNonScalarUniveral")
-  def !== [T](other: Expr[T, NonScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, Shape] = Expr.NullSafeNe[Shape, NonScalarExpr](this, other)
-  @targetName("nullSafeNeqScalarUniveral")
-  def !== [T](other: Expr[T, ScalarExpr])(using ResultTag[T], tyql.DialectFeature.WeaklyTypedEquality): Expr[Boolean, ScalarExpr] = Expr.NullSafeNe[Shape, ScalarExpr](this, other)
+  def !== [T](other: Expr[T, ScalarExpr])(using CanBeEqualed[Result, T]): Expr[Boolean, ScalarExpr] = Expr.NullSafeNe[Shape, ScalarExpr](this, other)
 
 
   def isNull[S <: ExprShape]: Expr[Boolean, Shape] = Expr.IsNull(this)

@@ -14,6 +14,8 @@ import scala.NamedTuple.*
 import tyql.{Ord, Table}
 import tyql.Expr.min
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class SSSPQuery extends QueryBenchmark {
   override def name = "sssp"

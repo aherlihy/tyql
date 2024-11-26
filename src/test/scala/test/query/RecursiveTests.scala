@@ -12,6 +12,8 @@ type Edge = (x: Int, y: Int)
 type Edge2 = (z: Int, q: Int)
 type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
 
+import tyql.Dialect.ansi.given
+
 given TCDBs: TestDatabase[TCDB] with
   override def tables = (
     edges = Table[Edge]("edges"),

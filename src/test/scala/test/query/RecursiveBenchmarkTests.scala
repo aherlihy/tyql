@@ -11,6 +11,8 @@ import NamedTuple.*
 type WeightedEdge = (src: Int, dst: Int, cost: Int)
 type WeightedGraphDB = (edge: WeightedEdge, base: (dst: Int, cost: Int))
 
+import tyql.Dialect.ansi.given
+
 given WeightedGraphDBs: TestDatabase[WeightedGraphDB] with
   override def tables = (
     edge = Table[WeightedEdge]("edge"),

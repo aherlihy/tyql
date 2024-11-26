@@ -15,6 +15,8 @@ import tyql.Query.fix
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class EvenOddQuery extends QueryBenchmark {
   override def name = "evenodd"

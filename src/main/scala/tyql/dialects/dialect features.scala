@@ -7,5 +7,3 @@ object DialectFeature:
   trait RandomIntegerInInclusiveRange extends DialectFeature
 
   trait ReversibleStrings extends DialectFeature
-
-  trait WeaklyTypedEquality extends DialectFeature

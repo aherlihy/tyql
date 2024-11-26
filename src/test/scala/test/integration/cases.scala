@@ -7,6 +7,8 @@ import tyql.{lit, True, False, Else}
 import java.sql.ResultSet
 import tyql.NonScalarExpr
 
+import tyql.Dialect.ansi.given
+
 class CaseTests extends FunSuite {
   def expectI(expected: Int)(rs: ResultSet) = assertEquals(rs.getInt(1), expected)
   def expectB(expected: Boolean)(rs: ResultSet) = assertEquals(rs.getBoolean(1), expected)

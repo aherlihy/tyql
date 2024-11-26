@@ -15,6 +15,8 @@ import tyql.Query.{unrestrictedBagFix, unrestrictedFix}
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TOCBAQuery extends QueryBenchmark {
   override def name = "cba"

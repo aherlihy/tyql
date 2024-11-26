@@ -6,6 +6,8 @@ import tyql.*
 import test.{checkExpr, checkExprDialect, withDBNoImplicits, withDB}
 import scala.language.implicitConversions
 
+import tyql.Dialect.ansi.given
+
 class NullSafeEqualityTest extends FunSuite {
   def expectN(expected: String | scala.Null)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
   def expectB(expected: Boolean)(rs: ResultSet) = assertEquals(rs.getBoolean(1), expected)
@@ -51,7 +53,6 @@ class NullSafeEqualityTest extends FunSuite {
     t.filter(p => p.kiki == 10)
     // t.filter(p => p.kiki !== "a")
     // t.filter(p => p.kiki != "a")
-    // t.filter(p => p.kiki == 1.0) // (!) currently this is also unsupported because Int != Double
   }
 
   test("this still works with filters (mysql)") {
@@ -62,5 +63,23 @@ class NullSafeEqualityTest extends FunSuite {
     t.filter(p => p.kiki == 10)
     t.filter(p => p.kiki !== "a")
     t.filter(p => p.kiki != "a")
+  }
+
+  test("postgres/duckdb/h2 despite not having universal equality can still compare different numeric types") {
+    {
+      import Dialect.postgresql.given
+      checkExprDialect[Boolean](lit(10) === 10.0, expectB(true))(withDB.postgres)
+      checkExprDialect[Boolean](lit(10.0) === 10, expectB(true))(withDB.postgres)
+    }
+    {
+      import Dialect.duckdb.given
+      checkExprDialect[Boolean](lit(10) === 10.0, expectB(true))(withDB.duckdb)
+      checkExprDialect[Boolean](lit(10.0) === 10, expectB(true))(withDB.duckdb)
+    }
+    {
+      import Dialect.h2.given
+      checkExprDialect[Boolean](lit(10) === 10.0, expectB(true))(withDB.h2)
+      checkExprDialect[Boolean](lit(10.0) === 10, expectB(true))(withDB.h2)
+    }
   }
 }

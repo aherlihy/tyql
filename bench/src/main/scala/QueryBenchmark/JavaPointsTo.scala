@@ -15,6 +15,8 @@ import tyql.Query.{fix, unrestrictedFix, unrestrictedBagFix}
 import tyql.Expr.{IntLit, StringLit, min, sum}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class JavaPointsTo extends QueryBenchmark {
   override def name = "javapointsto"

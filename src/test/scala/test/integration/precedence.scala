@@ -5,6 +5,8 @@ import test.{withDB, checkExprDialect}
 import java.sql.ResultSet
 import tyql.Expr
 
+import tyql.Dialect.ansi.given
+
 class PrecedenceTests extends FunSuite {
   def expectB(expected: Boolean)(rs: ResultSet) = assertEquals(rs.getBoolean(1), expected)
   def expectI(expected: Int)(rs: ResultSet) = assertEquals(rs.getInt(1), expected)

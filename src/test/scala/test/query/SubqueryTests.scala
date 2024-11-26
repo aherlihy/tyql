@@ -11,6 +11,8 @@ import NamedTuple.*
 
 import java.time.LocalDate
 
+import tyql.Dialect.ansi.given
+
 class SortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeJoin"
   def query() =

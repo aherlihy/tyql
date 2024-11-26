@@ -8,6 +8,7 @@ import language.experimental.namedTuples
 import NamedTuple.*
 // import scala.language.implicitConversions
 
+import tyql.Dialect.ansi.given
 
 import java.time.LocalDate
 
