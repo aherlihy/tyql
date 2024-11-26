@@ -69,18 +69,6 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
 object Expr:
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape](x: Expr[Int, S1])
-    // def >[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
-    def >(y: Expr[Int, ScalarExpr]): Expr[Boolean, CalculatedShape[S1, ScalarExpr]] = Gt(x, y)
-    @targetName("gtIntNonscalar")
-    def >(y: Expr[Int, NonScalarExpr]): Expr[Boolean, CalculatedShape[S1, NonScalarExpr]] = Gt(x, y)
-    def >(y: Int): Expr[Boolean, S1] = Gt[S1, NonScalarExpr](x, IntLit(y))
-    // def <[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lt(x, y)
-    def <(y: Expr[Int, ScalarExpr]): Expr[Boolean, CalculatedShape[S1, ScalarExpr]] = Lt(x, y)
-    @targetName("ltIntNonscalar")
-    def <(y: Expr[Int, NonScalarExpr]): Expr[Boolean, CalculatedShape[S1, NonScalarExpr]] = Lt(x, y)
-    def <(y: Int): Expr[Boolean, S1] = Lt[S1, NonScalarExpr](x, IntLit(y))
-    def <=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lte(x, y)
-    def >=[S2 <: ExprShape] (y: Expr[Int, S2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gte(x, y)
     @targetName("addIntScalar")
     def +(y: Expr[Int, ScalarExpr]): Expr[Int, CalculatedShape[S1, ScalarExpr]] = Plus(x, y)
     @targetName("addIntNonScalar")
@@ -95,12 +83,6 @@ object Expr:
 
   // TODO: write for numerical
   extension [S1 <: ExprShape](x: Expr[Double, S1])
-    @targetName("gtDoubleScalar")
-    def >(y: Expr[Double, ScalarExpr]): Expr[Boolean, CalculatedShape[S1, ScalarExpr]] = GtDouble(x, y)
-    @targetName("gtDoubleNonScalar")
-    def >(y: Expr[Double, NonScalarExpr]): Expr[Boolean, CalculatedShape[S1, NonScalarExpr]] = GtDouble(x, y)
-    def >(y: Double): Expr[Boolean, S1] = GtDouble[S1, NonScalarExpr](x, DoubleLit(y))
-    def <(y: Double): Expr[Boolean, S1] = LtDouble[S1, NonScalarExpr](x, DoubleLit(y))
     @targetName("addDouble")
     def +[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] = Plus(x, y)
     @targetName("multipleDouble")
@@ -108,6 +90,11 @@ object Expr:
     def *(y: Double): Expr[Double, S1] = Times[S1, NonScalarExpr, Double](x, DoubleLit(y))
 
   extension [T: Numeric, S1 <: ExprShape](x: Expr[T, S1])(using ResultTag[T])
+    def <[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lt(x, y)
+    def <=[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] = Lte(x, y)
+    def >[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gt(x, y)
+    def >=[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] = Gte(x, y)
+
     def abs: Expr[T, S1] = Abs(x)
     def sqrt: Expr[Double, S1] = Sqrt(x)
     def round: Expr[Int, S1] = Round(x)
@@ -227,12 +214,10 @@ object Expr:
   // a name in the domain model instead.
 
   // Some sample constructors for Exprs
-  case class Lt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class Lte[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class Gte[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class Gt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class GtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class LtDouble[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Double, S1], $y: Expr[Double, S2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class Lt[T1: Numeric, T2: Numeric, S1 <: ExprShape, S2 <: ExprShape]($x: Expr[T1, S1], $y: Expr[T2, S2])(using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class Lte[T1: Numeric, T2: Numeric,S1 <: ExprShape, S2 <: ExprShape]($x: Expr[T1, S1], $y: Expr[T2, S2])(using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class Gt[T1: Numeric, T2: Numeric,S1 <: ExprShape, S2 <: ExprShape]($x: Expr[T1, S1], $y: Expr[T2, S2])(using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class Gte[T1: Numeric, T2: Numeric,S1 <: ExprShape, S2 <: ExprShape]($x: Expr[T1, S1], $y: Expr[T2, S2])(using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
 
   case class FunctionCall0[R](name: String)(using ResultTag[R]) extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
   case class FunctionCall1[A1, R, S1 <: ExprShape](name: String, $a1: Expr[A1, S1])(using ResultTag[R]) extends Expr[R, S1]

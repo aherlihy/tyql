@@ -8,6 +8,8 @@ import tyql.*
 import language.experimental.namedTuples
 import NamedTuple.*
 
+import scala.language.implicitConversions
+
 class AbstractOverValuesHostTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "Support for abstracting over values in the host language"
   def query() =

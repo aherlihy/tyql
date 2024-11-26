@@ -10,6 +10,7 @@ import NamedTuple.*
 // import scala.language.implicitConversions
 
 import tyql.Dialect.ansi.given
+import scala.language.implicitConversions
 
 class ScopeTest extends SQLStringQueryTest[AllCommerceDBs, Int] {
   def testDescription = "No subquery, filter/map one relation"
