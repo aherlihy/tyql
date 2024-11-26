@@ -43,10 +43,24 @@ class NullSafeEqualityTest extends FunSuite {
     }
   }
 
-  test("this still works with filters") {
+  test("this still works with filters (postgresql)") {
     import Dialect.postgresql.given
     case class R(kiki: Int)
     val t = Table[R]("table")
     t.filter(p => p.kiki === 10)
+    t.filter(p => p.kiki == 10)
+    // t.filter(p => p.kiki !== "a")
+    // t.filter(p => p.kiki != "a")
+    // t.filter(p => p.kiki == 1.0) // (!) currently this is also unsupported because Int != Double
+  }
+
+  test("this still works with filters (mysql)") {
+    import Dialect.mysql.given
+    case class R(kiki: Int)
+    val t = Table[R]("table")
+    t.filter(p => p.kiki === 10)
+    t.filter(p => p.kiki == 10)
+    t.filter(p => p.kiki !== "a")
+    t.filter(p => p.kiki != "a")
   }
 }

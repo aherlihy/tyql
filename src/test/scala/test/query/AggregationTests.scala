@@ -61,7 +61,7 @@ class AggregateMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDB
   def query() =
     testDB.tables.products
       .withFilter(p =>
-        p.price != 0
+        p.price != 0.0
       )
       .aggregate(p => (sum = sum(p.price), avg = avg(p.price)).toRow)
 
@@ -113,7 +113,7 @@ class FilterAggregationQueryTest extends SQLStringAggregationTest[AllCommerceDBs
   def query() =
     testDB.tables.products
       .withFilter(p =>
-        p.price != 0
+        p.price != 0.0
       )
       .sum(p => p.price)
 
@@ -127,7 +127,7 @@ class FilterAggregationProjectQueryTest extends SQLStringAggregationTest[AllComm
   def query() =
     testDB.tables.products
       .withFilter(p =>
-        p.price != 0
+        p.price != 0.0
       )
       .sum(p =>
         (sum = p.price).toRow
@@ -142,7 +142,7 @@ class FilterMapAggregationQuerySelectTest extends SQLStringAggregationTest[AllCo
   def testDescription: String = "Aggregation: sum with map"
   def query() =
     testDB.tables.products
-      .withFilter(p => p.price != 0)
+      .withFilter(p => p.price != 0.0)
       .map(p => (newPrice = p.price).toRow)
       .sum(_.newPrice)
   def expectedQueryPattern: String = """
