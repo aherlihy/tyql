@@ -18,6 +18,9 @@ type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
 
 trait CanBeEqualed[T1, T2]
 
+private[tyql] enum CastTarget:
+  case CInt, CString, CDouble, CBool
+
 /** The type of expressions in the query language */
 trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends Selectable:
   /** This type is used to support selection with any of the field names
@@ -50,6 +53,17 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
 
   def isNull[S <: ExprShape]: Expr[Boolean, Shape] = Expr.IsNull(this)
   def nullIf[S <: ExprShape](other: Expr[Result, S]): Expr[Result, CalculatedShape[Shape, S]] = Expr.NullIf(this, other)
+
+  // TODO unclear what casts are useful/needed
+  // TODO why do we need these `asInstanceOf`?
+  @targetName("castToInt")
+  def as[T](using T =:= Int): Expr[Int, Shape] = Expr.Cast(this, CastTarget.CInt)(using ResultTag.IntTag.asInstanceOf[ResultTag[Int]])
+  @targetName("castToString")
+  def as[T](using T =:= String): Expr[String, Shape] = Expr.Cast[Result, String, Shape](this, CastTarget.CString)(using ResultTag.StringTag.asInstanceOf[ResultTag[String]])
+  @targetName("castToDouble")
+  def as[T](using T =:= Double): Expr[Double, Shape] = Expr.Cast[Result, Double, Shape](this, CastTarget.CDouble)(using ResultTag.DoubleTag.asInstanceOf[ResultTag[Double]])
+  @targetName("castToBoolean")
+  def as[T](using T =:= Boolean): Expr[Boolean, Shape] = Expr.Cast[Result, Boolean, Shape](this, CastTarget.CBool)(using ResultTag.BoolTag.asInstanceOf[ResultTag[Boolean]])
 
   def cases[DestinationT: ResultTag, SV <: ExprShape](firstCase: (Expr[Result, Shape] | ElseToken, Expr[DestinationT, SV]), restOfCases: (Expr[Result, Shape] | ElseToken, Expr[DestinationT, SV])*): Expr[DestinationT, SV] =
     type FromT = Result
@@ -328,6 +342,8 @@ object Expr:
 
   case class OptionMap[A, B, S <: ExprShape]($x: Expr[Option[A], S], $f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr])(using ResultTag[A], ResultTag[B]) extends Expr[Option[B], S]
 
+  case class Cast[A, B, S <: ExprShape]($x: Expr[A, S], resultType: CastTarget)(using ResultTag[B]) extends Expr[B, S]
+
   case class NullLit[A]()(using ResultTag[A]) extends Expr[A, NonScalarExpr]
   case class IsNull[A, S <: ExprShape]($x: Expr[A, S]) extends Expr[Boolean, S]
   case class Coalesce[A, S1 <: ExprShape]($x1: Expr[A, S1], $x2: Expr[A, S1], $xs: Seq[Expr[A, S1]])(using ResultTag[A]) extends Expr[A, S1]
@@ -413,6 +429,7 @@ end Expr
 def lit(x: Int): Expr[Int, NonScalarExpr] = Expr.IntLit(x)
 def lit(x: Double): Expr[Double, NonScalarExpr] = Expr.DoubleLit(x)
 def lit(x: String): Expr[String, NonScalarExpr] = Expr.StringLit(x)
+def lit(x: Boolean): Expr[Boolean, NonScalarExpr] = Expr.BooleanLit(x)
 def True = Expr.BooleanLit(true)
 def False = Expr.BooleanLit(false)
 def Null = Expr.NullLit[scala.Null]()

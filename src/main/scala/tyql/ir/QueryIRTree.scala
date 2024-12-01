@@ -339,6 +339,12 @@ object QueryIRTree:
         QueryIRVar(sub, name, ref) // TODO: singleton?
       case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
       case p: Expr.Project[?] => generateProjection(p, symbols)
+      case c: Expr.Cast[?, ?, ?] =>
+        c.resultType match
+          case CastTarget.CString => UnaryExprOp(generateExpr(c.$x, symbols), o => s"CAST($o AS ${d.stringCast})", c)
+          case CastTarget.CBool => UnaryExprOp(generateExpr(c.$x, symbols), o => s"CAST($o AS ${d.booleanCast})", c)
+          case CastTarget.CDouble => UnaryExprOp(generateExpr(c.$x, symbols), o => s"CAST($o AS ${d.doubleCast})", c)
+          case CastTarget.CInt => UnaryExprOp(generateExpr(c.$x, symbols), o => s"CAST($o AS ${d.integerCast})", c)
       case g: Expr.Gt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", Precedence.Comparison, g)
       case g: Expr.Lt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", Precedence.Comparison, g)
       case g: Expr.Lte[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", Precedence.Comparison, g)

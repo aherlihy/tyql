@@ -36,6 +36,11 @@ trait Dialect:
 
   val nullSafeEqualityViaSpecialOperator: Boolean = false
 
+  val booleanCast: String = "BOOLEAN"
+  val integerCast: String = "INTEGER"
+  val doubleCast: String = "DOUBLE PRECISION"
+  val stringCast: String = "VARCHAR"
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -94,6 +99,10 @@ object Dialect:
         val b = ("b", Precedence.Concat)
         SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)")
       override val nullSafeEqualityViaSpecialOperator: Boolean = true
+      override val booleanCast: String = "SIGNED"
+      override val integerCast: String = "DECIMAL"
+      override val doubleCast: String = "DOUBLE"
+      override val stringCast: String = "CHAR"
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
