@@ -23,6 +23,16 @@ class DB(conn: Connection) {
         case ResultTag.DoubleTag => rs.getDouble(1)
         case ResultTag.StringTag => rs.getString(1)
         case ResultTag.BoolTag => rs.getBoolean(1)
+        case ResultTag.OptionalTag(e) => {
+          val got = rs.getObject(1)
+          if got == null then None
+          else e match
+            case ResultTag.IntTag => Some(got.asInstanceOf[Int])
+            case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+            case ResultTag.StringTag => Some(got.asInstanceOf[String])
+            case ResultTag.BoolTag => Some(got.asInstanceOf[Boolean])
+            case _ => assert(false, "Unsupported type")
+        }
         case ResultTag.ProductTag(_, fields, m) => {
           val kkk = fields.asInstanceOf[ResultTag.NamedTupleTag[?,?]]
           val fieldValues = kkk.names.zip(kkk.types).map { (name, tag) =>
@@ -32,6 +42,16 @@ class DB(conn: Connection) {
               case ResultTag.DoubleTag => rs.getDouble(casedName)
               case ResultTag.StringTag => rs.getString(casedName)
               case ResultTag.BoolTag => rs.getBoolean(casedName)
+              case ResultTag.OptionalTag(e) => {
+                val got = rs.getObject(casedName)
+                if got == null then None
+                else e match
+                  case ResultTag.IntTag => Some(got.asInstanceOf[Int])
+                  case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+                  case ResultTag.StringTag => Some(got.asInstanceOf[String])
+                  case ResultTag.BoolTag => Some(got.asInstanceOf[Boolean])
+                  case _ => assert(false, "Unsupported type")
+              }
               case _ => assert(false, "Unsupported type")
           }
           m.fromProduct(Tuple.fromArray(fieldValues.toArray))
@@ -66,24 +86,22 @@ class DB(conn: Connection) {
   }
 }
 
-
-
 def driverMain(): Unit = {
   import scala.language.implicitConversions
   val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
   val db = DB(conn)
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores) {}
-  case class Flowers(name: String, flowerSize: Int, cost: Double, likes: Int)
+  case class Flowers(name: Option[String], flowerSize: Int, cost: Option[Double], likes: Int)
   val t = new tyql.Table[Flowers]("flowers")
 
   println("------------1------------")
-  val zzz = db.run(t.filter(t => t.flowerSize >= 10))
+  val zzz = db.run(t.filter(t => t.flowerSize.isNull || t.flowerSize >= 2))
   println("received:")
   pprintln(zzz)
   println("likes are " + zzz.head.likes.toString())
 
   println("------------2------------")
-  val zzz2 = db.run(t.map(_.name)).map(_ + "!!!") // TODO if this map is inside then we generate incorrect SQL due to incorrect subquery field naming :(
+  val zzz2 = db.run(t.map(_.name.getOrElse("UNKNOWN")))
   println("received:")
   pprintln(zzz2)
 

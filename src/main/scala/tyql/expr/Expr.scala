@@ -108,6 +108,16 @@ object Expr:
     def unary_! = Not(x)
     def ^(y: Expr[Boolean, S1]): Expr[Boolean, S1] = Xor(x, y)
 
+  extension [S1 <: ExprShape, T](x: Expr[Option[T], S1])(using ResultTag[T])
+    def isEmpty: Expr[Boolean, S1] = Expr.IsNull(x)
+    def isDefined: Expr[Boolean, S1] = Not(Expr.IsNull(x))
+    def get: Expr[T, S1] = x.asInstanceOf[Expr[T, S1]] // TODO should this error silently?
+    def getOrElse(default: Expr[T, S1]): Expr[T, S1] = coalesce(x.asInstanceOf[Expr[T, S1]], default)
+    def map[U: ResultTag, S2 <: ExprShape](f: Expr[T, S1] => Expr[U, S2]): Expr[Option[U], CalculatedShape[S1, S2]] = ???
+    // TODO unclear how to implement map
+    // TODO unclear how to implement flatMap
+    // TODO somehow use options in aggregations
+
   extension [S1 <: ExprShape](x: Expr[String, S1])
     def toLowerCase: Expr[String, S1] = Expr.Lower(x)
     def toUpperCase: Expr[String, S1] = Expr.Upper(x)

@@ -17,6 +17,7 @@ enum ResultTag[T]:
 //  case TupleTag[T <: Tuple](types: List[ResultTag[?]]) extends ResultTag[Tuple]
   case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]], m: Mirror.ProductOf[T]) extends ResultTag[T]
   case ListTag[T](elementType: ResultTag[T]) extends ResultTag[List[T]]
+  case OptionalTag[T](elementType: ResultTag[T]) extends ResultTag[Option[T]]
   case AnyTag extends ResultTag[Any]
 // TODO: Add more types, specialize for DB backend
 object ResultTag:
@@ -26,6 +27,7 @@ object ResultTag:
   given ResultTag[Boolean] = ResultTag.BoolTag
   given ResultTag[Double] = ResultTag.DoubleTag
   given ResultTag[LocalDate] = ResultTag.LocalDateTag
+  given [T](using e: ResultTag[T]): ResultTag[Option[T]] = ResultTag.OptionalTag(e)
 //  inline given [T <: Tuple]: ResultTag[Tuple] =
 //    val tpes = summonAll[Tuple.Map[T, ResultTag]]
 //    TupleTag(tpes.toList.asInstanceOf[List[ResultTag[?]]])
