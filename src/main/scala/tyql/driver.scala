@@ -11,7 +11,7 @@ class DB(conn: Connection) {
                                           dialect: tyql.Dialect,
                                           config: tyql.Config): List[T] = {
     val sqlString = dbast.toQueryIR.toSQLString()
-    println("SQL STRING WAS " + sqlString)
+    println("SQL << " + sqlString + " >>")
     val stmt = conn.createStatement()
     val rs = stmt.executeQuery(sqlString)
     val metadata = rs.getMetaData()
@@ -68,7 +68,7 @@ class DB(conn: Connection) {
                                                dialect: tyql.Dialect,
                                                config: tyql.Config): List[Map[String, Any]] = {
     val sqlString = dbast.toQueryIR.toSQLString()
-    println("SQL STRING WAS " + sqlString)
+    println("SQL << " + sqlString + " >>")
     val stmt = conn.createStatement()
     val rs = stmt.executeQuery(sqlString)
     val metadata = rs.getMetaData()
