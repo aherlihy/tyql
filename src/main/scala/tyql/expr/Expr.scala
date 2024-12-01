@@ -113,8 +113,7 @@ object Expr:
     def isDefined: Expr[Boolean, S1] = Not(Expr.IsNull(x))
     def get: Expr[T, S1] = x.asInstanceOf[Expr[T, S1]] // TODO should this error silently?
     def getOrElse(default: Expr[T, S1]): Expr[T, S1] = coalesce(x.asInstanceOf[Expr[T, S1]], default)
-    def map[U: ResultTag, S2 <: ExprShape](f: Expr[T, S1] => Expr[U, S2]): Expr[Option[U], CalculatedShape[S1, S2]] = ???
-    // TODO unclear how to implement map
+    def map[U: ResultTag, S2 <: ExprShape](f: Ref[T, NonScalarExpr] => Expr[U, NonScalarExpr]): Expr[Option[U], S1] = OptionMap(x, f)
     // TODO unclear how to implement flatMap
     // TODO somehow use options in aggregations
 
@@ -326,6 +325,8 @@ object Expr:
   // TODO aren't these types too restrictive?
   case class SearchedCase[T, SC <: ExprShape, SV <: ExprShape]($cases: List[(Expr[Boolean, SC], Expr[T, SV])], $else: Option[Expr[T, SV]])(using ResultTag[T]) extends Expr[T, SV]
   case class SimpleCase[TE, TR, SE <: ExprShape, SR <: ExprShape]($expr: Expr[TE, SE], $cases: List[(Expr[TE, SE], Expr[TR, SR])], $else: Option[Expr[TR, SR]])(using ResultTag[TE], ResultTag[TR]) extends Expr[TR, SR]
+
+  case class OptionMap[A, B, S <: ExprShape]($x: Expr[Option[A], S], $f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr])(using ResultTag[A], ResultTag[B]) extends Expr[Option[B], S]
 
   case class NullLit[A]()(using ResultTag[A]) extends Expr[A, NonScalarExpr]
   case class IsNull[A, S <: ExprShape]($x: Expr[A, S]) extends Expr[Boolean, S]
