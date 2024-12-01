@@ -6,7 +6,6 @@ import tyql.ResultTag.NamedTupleTag
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
 import NamedTupleDecomposition.*
-import org.checkerframework.checker.units.qual.m
 
 /**
  * Logical query plan tree.
