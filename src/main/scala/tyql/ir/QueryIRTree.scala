@@ -342,7 +342,7 @@ object QueryIRTree:
       case g: Expr.Gt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", Precedence.Comparison, g)
       case g: Expr.Lt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", Precedence.Comparison, g)
       case g: Expr.Lte[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", Precedence.Comparison, g)
-      case g: Expr.Gte[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", Precedence.Comparison, g)
+      case g: Expr.Gte[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l >= $r", Precedence.Comparison, g)
       case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", Precedence.And, a)
       case a: Expr.Or[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l OR $r", Precedence.Or, a)
       case Expr.Not(inner: Expr.IsNull[?, ?]) => UnaryExprOp(generateExpr(inner.$x, symbols), o => s"$o IS NOT NULL", ast)
