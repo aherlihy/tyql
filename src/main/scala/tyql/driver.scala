@@ -34,16 +34,16 @@ class DB(conn: Connection) {
             case _ => assert(false, "Unsupported type")
         }
         case ResultTag.ProductTag(_, fields, m) => {
-          val kkk = fields.asInstanceOf[ResultTag.NamedTupleTag[?,?]]
-          val fieldValues = kkk.names.zip(kkk.types).map { (name, tag) =>
-            val casedName = config.caseConvention.convert(name)
+          val nt = fields.asInstanceOf[ResultTag.NamedTupleTag[?,?]]
+          val fieldValues = nt.names.zip(nt.types).zipWithIndex.map { case ((name, tag), idx) =>
+            val col = idx + 1 // XXX if you want to use `name` here, you must case-convert it
             tag match
-              case ResultTag.IntTag => rs.getInt(casedName)
-              case ResultTag.DoubleTag => rs.getDouble(casedName)
-              case ResultTag.StringTag => rs.getString(casedName)
-              case ResultTag.BoolTag => rs.getBoolean(casedName)
+              case ResultTag.IntTag => rs.getInt(col)
+              case ResultTag.DoubleTag => rs.getDouble(col)
+              case ResultTag.StringTag => rs.getString(col)
+              case ResultTag.BoolTag => rs.getBoolean(col)
               case ResultTag.OptionalTag(e) => {
-                val got = rs.getObject(casedName)
+                val got = rs.getObject(col)
                 if got == null then None
                 else e match
                   case ResultTag.IntTag => Some(got.asInstanceOf[Int])
