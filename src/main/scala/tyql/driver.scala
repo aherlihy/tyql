@@ -92,7 +92,7 @@ def driverMain(): Unit = {
   val db = DB(conn)
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores) {}
   case class Flowers(name: Option[String], flowerSize: Int, cost: Option[Double], likes: Int)
-  val t = new tyql.Table[Flowers]("flowers")
+  val t = tyql.Table[Flowers]()
 
   println("------------1------------")
   val zzz = db.run(t.filter(t => t.flowerSize.isNull || t.flowerSize >= 2))
