@@ -98,7 +98,7 @@ def driverMain(): Unit = {
   val zzz = db.run(t.filter(t => t.flowerSize.isNull || t.flowerSize >= 2))
   println("received:")
   pprintln(zzz)
-  println("likes are " + zzz.head.likes.toString())
+  // println("likes are " + zzz.head.likes.toString())
 
   println("------------2------------")
   val zzz2 = db.run(t.map(_.name.getOrElse("UNKNOWN")))
