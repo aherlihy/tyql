@@ -8,4 +8,5 @@ trait DatabaseAST[Result](using val qTag: ResultTag[Result]):
   def toSQLString(using d: Dialect)(using cnf: Config): String = toQueryIR.toSQLString()
 
   def toQueryIR(using d: Dialect): QueryIRNode =
+    println(qTag.toString)
     QueryIRTree.generateFullQuery(this, SymbolTable())

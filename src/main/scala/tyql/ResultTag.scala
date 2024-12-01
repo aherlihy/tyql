@@ -15,7 +15,7 @@ enum ResultTag[T]:
   // names is a var to special case when we want to treat a named tuple like a regular tuple without going through type conversion
   case NamedTupleTag[N <: Tuple, V <: Tuple](var names: List[String], types: List[ResultTag[?]]) extends ResultTag[NamedTuple[N, V]]
 //  case TupleTag[T <: Tuple](types: List[ResultTag[?]]) extends ResultTag[Tuple]
-  case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]]) extends ResultTag[T]
+  case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]], m: Mirror.ProductOf[T]) extends ResultTag[T]
   case ListTag[T](elementType: ResultTag[T]) extends ResultTag[List[T]]
   case AnyTag extends ResultTag[Any]
 // TODO: Add more types, specialize for DB backend
@@ -39,6 +39,6 @@ object ResultTag:
   // Alternatively if we don't care about the case class name we could use only `fields`.
   inline given [T](using m: Mirror.ProductOf[T], fields: ResultTag[NamedTuple.From[T]]): ResultTag[T] =
     val productName = constValue[m.MirroredLabel]
-    ProductTag(productName, fields)
+    ProductTag(productName, fields, m)
 
   inline given [T](using elementType: ResultTag[T]): ResultTag[List[T]] = ResultTag.ListTag(elementType)
