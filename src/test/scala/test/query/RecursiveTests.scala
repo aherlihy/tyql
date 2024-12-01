@@ -12,6 +12,8 @@ type Edge = (x: Int, y: Int)
 type Edge2 = (z: Int, q: Int)
 type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
 
+import tyql.Dialect.ansi.given
+
 given TCDBs: TestDatabase[TCDB] with
   override def tables = (
     edges = Table[Edge]("edges"),
@@ -639,17 +641,16 @@ given TagDBs: TestDatabase[TagDB] with
       (6, 'Rap',    7),
       (7, 'Music',  9),
       (8, 'Movies', 9),
-      (9, 'Art', -1);
+      (9, 'Art',    NULL);
     """
 
 class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
   def testDescription: String = "Tag tree example from duckdb docs"
 
   def query() =
-    // For now encode NULL as -1, TODO: implement nulls
     import Expr.{toRow, toExpr}
     val tagHierarchy0 = testDB.tables.tag
-      .filter(t => t.subclassof == -1)
+      .filter(t => t.subclassof.isNull)
       .map(t =>
         val initListPath: Expr.ListExpr[String] = List(t.name).toExpr
         (id = t.id, source = t.name, path = initListPath).toRow
@@ -671,13 +672,13 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
           ((SELECT
               tag$62.id as id, tag$62.name as source, [tag$62.name] as path
            FROM tag as tag$62
-           WHERE tag$62.subclassof = -1)
+           WHERE tag$62.subclassof IS NULL)
                 UNION
            ((SELECT
               tag$64.id as id, tag$64.name as source, list_prepend(tag$64.name, ref$30.path) as path
             FROM recursive$62 as ref$30, tag as tag$64
             WHERE tag$64.subclassof = ref$30.id)))
-      SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = "Oasis"
+      SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = 'Oasis'
       """
 }
 

@@ -14,6 +14,8 @@ import scala.NamedTuple.*
 import tyql.{Ord, Table}
 import tyql.Expr.max
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TOBOMQuery extends QueryBenchmark {
   override def name = "bom"

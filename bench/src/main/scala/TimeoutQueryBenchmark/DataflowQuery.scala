@@ -14,6 +14,8 @@ import scala.NamedTuple.*
 import tyql.{Ord, Table}
 import tyql.Expr.{IntLit, min}
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TODataflowQuery extends QueryBenchmark {
   override def name = "dataflow"

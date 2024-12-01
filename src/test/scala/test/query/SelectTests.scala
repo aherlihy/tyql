@@ -13,6 +13,8 @@ type AddressT = (city: CityT, street: String, number: Int)
 type AllLocDBs = (cities: CityT, addresses: AddressT, cities2: CityT)
 type CityDB = (cities: CityT)
 
+import tyql.Dialect.ansi.given
+
 given cityDB: TestDatabase[CityDB] with
   override def tables = (
     cities = Table[CityT]("cities")

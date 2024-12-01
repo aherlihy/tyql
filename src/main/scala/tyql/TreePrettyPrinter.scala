@@ -11,7 +11,7 @@ object TreePrettyPrinter {
   import Expr.*
   import AggregationExpr.*
 
-  private def indent(level: Int): String = "  " * level
+  private def indent(level: Int): String = scala.collection.StringOps("  ") * level // TODO this broke for some reason
   private def indentWithKey(level: Int, key: String, value: String): String = s"${indent(level)}$key=${value.stripLeading()}"
   private def indentListWithKey(level: Int, key: String, values: Seq[String]): String =
     if (values.isEmpty)
@@ -60,8 +60,6 @@ object TreePrettyPrinter {
         s"${indent(depth)}NonEmpty(\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
       case IsEmpty(list) =>
         s"${indent(depth)}IsEmpty(\n${list.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case GtDouble(x, y) => s"${indent(depth)}GtDouble(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case LtDouble(x, y) => s"${indent(depth)}LtDouble(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case And(x, y) => s"${indent(depth)}And(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Or(x, y) => s"${indent(depth)}Or(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Not(x) => s"${indent(depth)}Not(${x.prettyPrint(depth + 1)})"

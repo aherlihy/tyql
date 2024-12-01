@@ -9,6 +9,8 @@ import scala.language.implicitConversions
 import java.time.LocalDate
 import tyql.Expr.{sum, max}
 
+import tyql.Dialect.ansi.given
+
 class FlowForTest1 extends SQLStringQueryTest[AllCommerceDBs, (bName: String, bId: Int)] {
   def testDescription = "Flow: project tuple, 1 nest, for comprehension"
   def query() =
