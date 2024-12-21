@@ -5,6 +5,8 @@ import tyql.*
 import test.query.{commerceDBs, AllCommerceDBs}
 import language.experimental.namedTuples
 
+import Dialect.ansi.given
+
 class MissingAttributeCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "named tuples require attributes to exist"
   def expectedError: String = "doesNotExist is not a member of"

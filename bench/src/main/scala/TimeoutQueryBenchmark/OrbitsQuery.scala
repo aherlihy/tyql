@@ -14,6 +14,8 @@ import scala.NamedTuple.*
 import tyql.{Ord, Table, Query}
 import tyql.Expr.max
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TOOrbitsQuery extends QueryBenchmark {
   override def name = "orbits"

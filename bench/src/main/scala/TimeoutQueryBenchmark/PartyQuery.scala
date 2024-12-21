@@ -15,6 +15,8 @@ import tyql.Query.{unrestrictedBagFix, unrestrictedFix}
 import tyql.Expr.{IntLit, StringLit, count}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TOPartyQuery extends QueryBenchmark {
   override def name = "party"

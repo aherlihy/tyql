@@ -1,0 +1,11 @@
+.dockerignore
+.git/
+.gitignore
+target/
+project/target/
+test-results/
+*.md
+*.log
+.bloop/
+.metals/
+.bsp/

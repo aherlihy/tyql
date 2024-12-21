@@ -1,6 +1,16 @@
 package tyql
 
-/** The type of query references to database tables, TODO: put driver stuff here? */
-case class Table[R]($name: String)(using ResultTag[R]) extends Query[R, BagResult]
+import scala.deriving.Mirror
 
-// case class Database(tables: ) // need seq of tables
+/** The type of query references to database tables */
+case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query[R, BagResult]
+
+object Table {
+  def apply[R]()(using r: ResultTag[R], m: Mirror.Of[R], config: tyql.Config): Table[R] =
+    new Table[R](config.caseConvention.convert(m.toString))
+  def apply[R](name: String)(using r: ResultTag[R]): Table[R] =
+    new Table[R](name)
+  // TODO I dislike this () here. I would prefer something like Table[Products] and this would just summon the right thing without making any variables
+}
+
+// case class Database(tables: ) // TODO, do we need this?
