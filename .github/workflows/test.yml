@@ -3,10 +3,10 @@ name: Test
 on:
   push:
     branches:
-      - better-containerization
+      - main
   pull_request:
     branches:
-      - better-containerization
+      - main
 
 jobs:
   test:
