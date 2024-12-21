@@ -2,7 +2,7 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 
 inThisBuild(Seq(
   organization := "ch.epfl.lamp",
-  scalaVersion := "3.5.2",
+  scalaVersion := "3.6.2",
   version := "0.0.1",
   libraryDependencies ++= Seq(
     // TODO do we still need this? https://github.com/scalameta/munit/issues/791
