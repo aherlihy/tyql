@@ -21,7 +21,6 @@ scalacOptions ++= Seq(
   "-experimental",
   "-feature",
   "-explain",
-  "-Xelide-below 1001",
 )
 
 //resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
