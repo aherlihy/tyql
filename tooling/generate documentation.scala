@@ -9,13 +9,9 @@ import pprint.pprintln
 
 
 /*
-  For now we are not yet writing the exact documentation/referece/tutorial,
-  but we are building the infrastructure for generating it.
-
   TODO:
   - have the snippets return the results of running the SQL against the DB
   - generate markdown
-  - generate HTML
 */
 
 /// sudo mkdir /mnt/ramdisk
@@ -65,13 +61,10 @@ $dialectSnippet
 
 case class R(i: Int)
 val t = tyql.Table[R]("t")
-
-var wasPolyfillUsed = false
 var sql = ""
 var exception = false
 
 @main def main() = {
-  tyql.polyfillWasUsed = () => { wasPolyfillUsed = true }
   try {
     sql = t.map(_ => ($codeSnippet)).toQueryIR.toSQLString()
   } catch {
@@ -80,7 +73,7 @@ var exception = false
     val js = if exception then
       ujson.Obj("exception" -> true)
     else
-      ujson.Obj("exception" -> false, "sql" -> sql, "wasPolyfillUsed" -> wasPolyfillUsed)
+      ujson.Obj("exception" -> false, "sql" -> sql, "wasPolyfillUsed" -> tyql.wasPolyfillUsed)
     println(ujson.write(js))
   }
 }

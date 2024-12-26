@@ -2,7 +2,7 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 
 inThisBuild(Seq(
   organization := "ch.epfl.lamp",
-  scalaVersion := "3.6.2",
+  scalaVersion := "3.5.2",
   version := "0.0.1",
   libraryDependencies ++= Seq(
     "org.scalameta" %% "munit" % "1.0.3" % Test,
@@ -20,7 +20,8 @@ inThisBuild(Seq(
 scalacOptions ++= Seq(
   "-experimental",
   "-feature",
-  "-explain"
+  "-explain",
+  "-Xelide-below 1001",
 )
 
 //resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"

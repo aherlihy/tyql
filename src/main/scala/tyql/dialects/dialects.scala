@@ -1,5 +1,6 @@
 package tyql
 
+import scala.annotation.elidable
 import tyql.DialectFeature
 import tyql.DialectFeature.*
 
@@ -192,5 +193,7 @@ object Dialect:
     given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
     given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
 
-// TODO I currenly have no better idea for this, maybe some macro?
-var polyfillWasUsed: Function0[Unit] = () => ()
+var wasPolyfillUsed: Boolean = false
+@elidable(elidable.SEVERE)
+def polyfillWasUsed(): Unit =
+    wasPolyfillUsed = true
