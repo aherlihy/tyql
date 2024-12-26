@@ -168,3 +168,5 @@ Set-Location -Path $env:TEMP
 Remove-Item -Path $downloadPath -Force
 Remove-Item -Path $extractPath -Recurse -Force
 ```
+
+You will also need Docker Desktop for Windows, and then stand up the databases (`--profile dbs`) before you can access them. The `tyql-main` image does not seem to work on Windows, but it is irrelevant for testing that the Windows version of `sbt` runs it.
