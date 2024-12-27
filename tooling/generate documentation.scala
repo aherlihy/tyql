@@ -14,6 +14,7 @@ import pprint.pprintln
   - generate markdown
 */
 
+/// Remember to publishLocal the library with the inline flag `shouldTrackPolyfillUsage` set to true!
 /// sudo mkdir /mnt/ramdisk
 /// sudo mount -t tmpfs -o size=1g tmpfs /mnt/ramdisk
 val directory = "/mnt/ramdisk/"
