@@ -3,7 +3,7 @@ package test.integration.dialectselection
 import munit.FunSuite
 import tyql.Dialect
 
-class DialectSelection extends FunSuite {
+class DialectSelectionTests extends FunSuite {
   private def behavior()(using d: Dialect): String = d.name()
 
   test("ANSI selected by default") {

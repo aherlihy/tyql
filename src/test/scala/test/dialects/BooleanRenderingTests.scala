@@ -8,13 +8,13 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 
-class BooleanTrueRendering extends SQLStringQueryTest[AllCommerceDBs, String] {
+class BooleanTrueRenderingTests extends SQLStringQueryTest[AllCommerceDBs, String] {
   override def testDescription: String = "Just LIMIT remains uniform across all dialects"
   def query() = testDB.tables.products.filter{ _ => tyql.Expr.BooleanLit(true) }.map( c => c.name)
   def expectedQueryPattern = """SELECT product$A.name FROM product as product$A WHERE TRUE"""
 }
 
-class BooleanFalseRendering extends SQLStringQueryTest[AllCommerceDBs, String] {
+class BooleanFalseRenderingTests extends SQLStringQueryTest[AllCommerceDBs, String] {
   override def testDescription: String = "Just LIMIT remains uniform across all dialects"
   def query() = testDB.tables.products.filter{ _ => tyql.Expr.BooleanLit(false) }.map( c => c.name)
   def expectedQueryPattern = """SELECT product$A.name FROM product as product$A WHERE FALSE"""

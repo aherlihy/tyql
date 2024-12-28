@@ -6,7 +6,7 @@ import test.needsDBs
 import java.sql.{Connection, DriverManager}
 import test.withDB
 
-class DBsAreLive extends FunSuite {
+class DBsAreLiveTests extends FunSuite {
   test("PostgreSQL responds".tag(needsDBs)) {
     withDB.postgres { conn =>
       val stmt = conn.createStatement()

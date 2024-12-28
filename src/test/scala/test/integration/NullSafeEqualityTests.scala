@@ -8,7 +8,7 @@ import scala.language.implicitConversions
 
 import tyql.Dialect.ansi.given
 
-class NullSafeEqualityTest extends FunSuite {
+class NullSafeEqualityTests extends FunSuite {
   def expectN(expected: String | scala.Null)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
   def expectB(expected: Boolean)(rs: ResultSet) = assertEquals(rs.getBoolean(1), expected)
 

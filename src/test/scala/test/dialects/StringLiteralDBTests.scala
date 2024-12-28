@@ -6,7 +6,7 @@ import tyql.Dialect
 import test.withDB
 import java.sql.{Connection, DriverManager}
 
-class StringLiteralDBTest extends FunSuite {
+class StringLiteralDBTests extends FunSuite {
   private def testStringLiteral(conn: Connection, input: String)(using dialect: Dialect) = {
     val quoted = dialect.quoteStringLiteral(input, insideLikePattern=false)
     val stmt = conn.createStatement()

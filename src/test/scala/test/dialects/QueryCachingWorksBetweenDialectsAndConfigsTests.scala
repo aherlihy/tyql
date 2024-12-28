@@ -3,7 +3,7 @@ package test.dialects.cachingworksbetweendialectsandconfigs
 import munit.FunSuite
 import tyql.Dialect
 
-class QueryCachingWorksBetweenDialectsAndConfigs extends FunSuite {
+class QueryCachingWorksBetweenDialectsAndConfigsTests extends FunSuite {
 
   case class Row(i: Int)
   val t = tyql.Table[Row]("t")

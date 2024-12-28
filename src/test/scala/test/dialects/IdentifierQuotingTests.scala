@@ -3,7 +3,7 @@ package test.integration.identifierquoting
 import munit.FunSuite
 import tyql.Dialect
 
-class IdentifierQuoting extends FunSuite {
+class IdentifierQuotingTests extends FunSuite {
   private val dialects = Set(
     Dialect.ansi.given_Dialect,
     Dialect.postgresql.given_Dialect,

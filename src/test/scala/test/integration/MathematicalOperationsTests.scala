@@ -6,7 +6,7 @@ import tyql.*
 import test.{checkExpr, withDBNoImplicits}
 import scala.language.implicitConversions
 
-class MathematicalOperationsTest extends FunSuite {
+class MathematicalOperationsTests extends FunSuite {
   def expectI(expected: Int)(rs: ResultSet) = assertEquals(rs.getInt(1), expected)
   def expectD(expected: Double)(rs: ResultSet) =
     val d = rs.getDouble(1)
