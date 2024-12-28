@@ -2,7 +2,7 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 
 inThisBuild(Seq(
   organization := "ch.epfl.lamp",
-  scalaVersion := "3.5.2",
+  scalaVersion := "3.5.2", /// 3.5.2 is currently the latest version that when compiled can be read by the current scala-cli (for documentation generation)
   version := "0.0.1",
   libraryDependencies ++= Seq(
     "org.scalameta" %% "munit" % "1.0.3" % Test,
@@ -23,10 +23,8 @@ scalacOptions ++= Seq(
   "-explain",
 )
 
-//resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+// resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 resolvers ++= Resolver.sonatypeOssRepos("snapshots")
-
-
 
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
@@ -57,6 +55,7 @@ lazy val root = (project in file("."))
         .map(ty =>
           baseDirectory.value / s"bench/data/$bm/out/$ty.csv"))
 )
+
 lazy val bench = (project in file("bench"))
   .dependsOn(root)
   .enablePlugins(JmhPlugin)
