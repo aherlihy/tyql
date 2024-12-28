@@ -5,7 +5,8 @@ import tyql.ResultTag.NamedTupleTag
 
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
-import NamedTupleDecomposition.*
+import NamedTupleDecomposition._
+import PolyfillTracking._
 
 /**
  * Logical query plan tree.
