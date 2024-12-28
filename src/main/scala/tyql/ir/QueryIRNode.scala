@@ -1,5 +1,21 @@
 package tyql
 
+// TODO can we source it from somewhere and not guess about this?
+// Current values were proposed on 2024-11-19 by Claude Sonnet 3.5 v20241022, and somewhat modifier later
+// Maybe compare with https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE which appears to be a little different
+object Precedence {
+  val Literal        = 100  // literals, identifiers
+  val ListOps        = 95   // list_append, list_prepend, list_contains
+  val Unary          = 90   // NOT, EXIST, etc
+  val Multiplicative = 80   // *, /
+  val Additive       = 70   // +, -
+  val Comparison     = 60   // =, <>, <, >, <=, >=
+  val And            = 50   // AND
+  val Or             = 40   // OR
+  val Concat         = 10   // , in select clause
+  val Default        = 0
+}
+
 /**
  * Nodes in the query IR tree, representing expressions / subclauses
  */
@@ -20,22 +36,6 @@ trait QueryIRNode:
   protected def computeSQLString(using d: Dialect)(using cnf: Config)(): String
 
 trait QueryIRLeaf extends QueryIRNode
-
-// TODO can we source it from somewhere and not guess about this?
-// Current values were proposed on 2024-11-19 by Claude Sonnet 3.5 v20241022, and somewhat modifier later
-// Maybe compare with https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE which appears to be a little different
-object Precedence {
-  val Literal        = 100  // literals, identifiers
-  val ListOps        = 95   // list_append, list_prepend, list_contains
-  val Unary          = 90   // NOT, EXIST, etc
-  val Multiplicative = 80   // *, /
-  val Additive       = 70   // +, -
-  val Comparison     = 60   // =, <>, <, >, <=, >=
-  val And            = 50   // AND
-  val Or             = 40   // OR
-  val Concat         = 10   // , in select clause
-  val Default        = 0
-}
 
 /**
  * Single WHERE clause containing 1+ predicates
@@ -71,6 +71,9 @@ case class FunctionCallOp(name: String, children: Seq[QueryIRNode], ast: Expr[?,
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = s"$name(" + children.map(_.toSQLString()).mkString(", ") + ")"
   // TODO does this need ()s sometimes?
 
+/**
+ * CASE statement called "searched" in the standard. This is like a multi-arm if-else statement.
+ */
 case class SearchedCaseOp(whenClauses: Seq[(QueryIRNode, QueryIRNode)], elseClause: Option[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence = Precedence.Literal
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
@@ -78,6 +81,9 @@ case class SearchedCaseOp(whenClauses: Seq[(QueryIRNode, QueryIRNode)], elseClau
     val elseStr = elseClause.map(e => s" ELSE ${e.toSQLString()}").getOrElse("")
     s"CASE $whenStr$elseStr END"
 
+/**
+ * CASE statement called "simple" in the standard. This is a vague equivalent of Scala's match expression.
+ */
 case class SimpleCaseOp(expr: QueryIRNode, whenClauses: Seq[(QueryIRNode, QueryIRNode)], elseClause: Option[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence = Precedence.Literal
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
@@ -86,6 +92,9 @@ case class SimpleCaseOp(expr: QueryIRNode, whenClauses: Seq[(QueryIRNode, QueryI
     val elseStr = elseClause.map(e => s" ELSE ${e.toSQLString()}").getOrElse("")
     s"CASE $exprStr $whenStr$elseStr END"
 
+/**
+ * For when we include something that does not make sense to represent fully in the IR, for example some one-off per-dialect features.
+ */
 case class RawSQLInsertOp(snippet: SqlSnippet, replacements: Map[String, QueryIRNode], override val precedence: Int, ast: Expr[?, ?]) extends QueryIRNode:
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     assert(replacements.keySet == snippet.sql.filter{ case (s: String) => false ; case (name: String, prec: Int) => true }.map{ case (name: String, prec: Int) => name ; case _ => assert(false) }.toSet)
@@ -138,12 +147,15 @@ case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?]) exte
 
 /**
  * Literals.
- * TODO: can't assume stringRep is universal, need to specialize for DB backend.
+ * TODO: is the existing per-dialect string handling enough?
  */
 case class Literal(stringRep: String, ast: Expr[?, ?]) extends QueryIRLeaf:
   override val precedence: Int = Precedence.Literal
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = stringRep
 
+/**
+ * List expression, for DBs that support lists/arrays.
+ */
 case class ListTypeExpr(elements: List[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence: Int = Precedence.Literal
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = elements.map(_.toSQLString()).mkString("[", ", ", "]")

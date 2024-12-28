@@ -426,7 +426,6 @@ object Expr:
 
 end Expr
 
-// TODO where should this be?
 def lit(x: Int): Expr[Int, NonScalarExpr] = Expr.IntLit(x)
 def lit(x: Double): Expr[Double, NonScalarExpr] = Expr.DoubleLit(x)
 def lit(x: String): Expr[String, NonScalarExpr] = Expr.StringLit(x)
