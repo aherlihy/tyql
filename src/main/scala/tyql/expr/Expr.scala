@@ -7,8 +7,7 @@ import scala.deriving.*
 import scala.compiletime.{erasedValue, summonInline}
 import tyql.DialectFeature
 
-// TODO: probably seal
-trait ExprShape
+sealed trait ExprShape
 class ScalarExpr extends ExprShape
 class NonScalarExpr extends ExprShape
 
