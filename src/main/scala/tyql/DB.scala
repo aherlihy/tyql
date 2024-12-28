@@ -7,6 +7,13 @@ import scala.deriving.Mirror
 import scala.Tuple
 
 class DB(conn: Connection) {
+
+  def runRaw(rawSql: String): Unit = {
+    val statement = conn.createStatement()
+    statement.execute(rawSql)
+    statement.close()
+  }
+
   def run[T](dbast: DatabaseAST[T])(using resultTag: ResultTag[T],
                                           dialect: tyql.Dialect,
                                           config: tyql.Config): List[T] = {
@@ -14,7 +21,7 @@ class DB(conn: Connection) {
     println("SQL << " + sqlString + " >>")
     val stmt = conn.createStatement()
     val rs = stmt.executeQuery(sqlString)
-    val metadata = rs.getMetaData()
+    val metadata = rs.getMetaData() // _.getColumnName()
     val columnCount = metadata.getColumnCount()
     var results = List[T]()
     while (rs.next()) {
@@ -63,27 +70,6 @@ class DB(conn: Connection) {
     stmt.close()
     results.reverse
   }
-
-  def runDebug[T](dbast: DatabaseAST[T])(using resultTag: ResultTag[T],
-                                               dialect: tyql.Dialect,
-                                               config: tyql.Config): List[Map[String, Any]] = {
-    val sqlString = dbast.toQueryIR.toSQLString()
-    println("SQL << " + sqlString + " >>")
-    val stmt = conn.createStatement()
-    val rs = stmt.executeQuery(sqlString)
-    val metadata = rs.getMetaData()
-    val columnCount = metadata.getColumnCount()
-    var results = List[Map[String, Any]]()
-    while (rs.next()) {
-      val row = (1 to columnCount).map { i =>
-        metadata.getColumnName(i) -> rs.getObject(i)
-      }.toMap
-      results = row :: results
-    }
-    rs.close()
-    stmt.close()
-    results.reverse
-  }
 }
 
 def driverMain(): Unit = {
@@ -93,6 +79,8 @@ def driverMain(): Unit = {
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores) {}
   case class Flowers(name: Option[String], flowerSize: Int, cost: Option[Double], likes: Int)
   val t = tyql.Table[Flowers]()
+
+  db.runRaw("create table if not exists flowers(name text, flower_size integer, cost double, likes integer);")
 
   println("------------1------------")
   val zzz = db.run(t.filter(t => t.flowerSize.isNull || t.flowerSize >= 2))
