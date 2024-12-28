@@ -92,7 +92,7 @@ class SelectModifiersOffset1cTest extends SQLStringQueryTest[AllCommerceDBs, Pro
 
   def query() =
     testDB.tables.products
-      .drop(1)
+      .offset(1)
 
   def expectedQueryPattern: String = "SELECT * FROM product as product$A OFFSET 1"
 }
@@ -142,7 +142,7 @@ class SelectModifiersSortOffsetTest extends SQLStringQueryTest[AllCommerceDBs, (
       .map: prod =>
         (name = prod.name, id = prod.id).toRow
       .sort(_.id, Ord.ASC)
-      .drop(2)
+      .offset(2)
   def expectedQueryPattern: String =  "SELECT product$A.name as name, product$A.id as id FROM product as product$A ORDER BY id ASC OFFSET 2"
 }
 
@@ -153,7 +153,7 @@ class SelectModifiersSortLimit2Test extends SQLStringQueryTest[AllCommerceDBs, (
       .map: prod =>
         (name = prod.name).toRow
       .sort(_.name, Ord.ASC)
-      .drop(2)
+      .offset(2)
       .take(4)
   def expectedQueryPattern: String =  "SELECT product$A.name as name FROM product as product$A ORDER BY name ASC OFFSET 2 LIMIT 4"
 }

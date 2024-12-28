@@ -25,7 +25,7 @@ private val dialects = mysqlDialects ++ otherDialects
 
 class JustLimitUnaffected extends SQLStringQueryTest[AllCommerceDBs, String] {
   override def testDescription: String = "Just LIMIT remains uniform across all dialects"
-  def query() = testDB.tables.products.map { c => c.name }.limit(10)
+  def query() = testDB.tables.products.map { c => c.name }.take(10)
   def expectedQueryPattern = """SELECT product$A.name FROM product as product$A LIMIT 10"""
 }
 
@@ -40,7 +40,7 @@ class BothTogetherOnMySQL extends SQLStringQueryTest[AllCommerceDBs, String] {
   override def testDescription: String = "LIMIT+OFFSET is special on MySQL"
   def query() =
     import Dialect.mysql.given
-    testDB.tables.products.map { c => c.name }.limit(10).offset(30)
+    testDB.tables.products.map { c => c.name }.take(10).offset(30)
   def expectedQueryPattern = """SELECT product$A.name FROM product as product$A LIMIT 30,10"""
 }
 
@@ -49,7 +49,7 @@ class BothTogetherOnMariaDB extends SQLStringQueryTest[AllCommerceDBs, String] {
   override def testDescription: String = "LIMIT+OFFSET is special on MySQL"
   def query() =
     import Dialect.mysql.given
-    testDB.tables.products.map { c => c.name }.limit(10).offset(30)
+    testDB.tables.products.map { c => c.name }.take(10).offset(30)
   def expectedQueryPattern = """SELECT product$A.name FROM product as product$A LIMIT 30,10"""
 }
 
@@ -57,7 +57,7 @@ class SeparateOnPostgresql extends SQLStringQueryTest[AllCommerceDBs, String] {
   override def testDescription: String = "LIMIT+OFFSET is special on MySQL"
   def query() =
     import Dialect.postgresql.given
-    testDB.tables.products.map { c => c.name }.limit(10).offset(30)
+    testDB.tables.products.map { c => c.name }.take(10).offset(30)
   def expectedQueryPattern = """SELECT product$A.name FROM product as product$A  LIMIT 10 OFFSET 30"""
 }
 
@@ -65,7 +65,7 @@ class SeparateOnSqlite extends SQLStringQueryTest[AllCommerceDBs, String] {
   override def testDescription: String = "LIMIT+OFFSET is special on MySQL"
   def query() =
     import Dialect.sqlite.given
-    testDB.tables.products.map { c => c.name }.limit(10).offset(30)
+    testDB.tables.products.map { c => c.name }.take(10).offset(30)
   def expectedQueryPattern = """SELECT product$A.name FROM product as product$A LIMIT 10 OFFSET 30"""
 }
 

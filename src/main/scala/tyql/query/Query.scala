@@ -443,11 +443,10 @@ object Query:
       val ref = Ref[R, NonScalarExpr]()
       Sort(x, Fun(ref, f(ref)), ord)
 
-    def limit(lim: Int): Query[R, C] = Limit(x, lim)
-    def take(lim: Int): Query[R, C] = limit(lim)
-
+    // offset and not drop since _.take.drop and _.drop.take are not equivalent like in SQL
+    def take(lim: Int): Query[R, C] = Limit(x, lim)
+    def limit(lim: Int): Query[R, C] = take(lim)
     def offset(lim: Int): Query[R, C] = Offset(x, lim)
-    def drop(lim: Int): Query[R, C] = offset(lim)
 
     def distinct: Query[R, SetResult] = Distinct(x)
 
