@@ -2,6 +2,9 @@ package tyql
 
 import tyql.SelectFlags.Final
 
+// TODO in this file we probably lose the original ASTs when merging, they're only replaced with the second operand's AST
+// TODO in `mergeWith`, some cases are missing, unclear if the catch-all implementation is enough
+
 /**
  * Modifiers for query generation, e.g. queries at the expression level need surrounding parens.
  */
@@ -172,6 +175,7 @@ case class SelectAllQuery(from: Seq[RelationOp],
 
   override def toString: String = // for debugging
     s"SelectAllQuery(\n\talias=$alias,\n\tfrom=$from,\n\twhere=$where\n)"
+
 /**
  * Select query, e.g. SELECT <Project> FROM <Relations> WHERE <where>
  * TODO: Eventually specialize join nodes, for now use Select with multiple FROM fields to indicate join.
@@ -190,12 +194,12 @@ case class SelectQuery(project: QueryIRNode,
   override def alias = name
 
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
-//    SelectQuery(project, from, where :+ w, Some(alias), astOther).appendFlags(flags)
+    // SelectQuery(project, from, where :+ w, Some(alias), astOther).appendFlags(flags)
     // Appending a where clause to something that already has a project triggers subquery
     SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
-    // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
+    // TODO define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
     SelectQuery(p, Seq(this), Seq(), None, astOther).appendFlags(flags)
 
 
@@ -206,7 +210,7 @@ case class SelectQuery(project: QueryIRNode,
       case q: SelectAllQuery =>
         SelectAllQuery(this +: q.from, q.where, None, astOther)
       case q: SelectQuery =>
-        // TODO: define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
+        // TODO define semantics of map(f1).map(f2), could collapse into map(f2(f1))? For now just trigger subquery
         SelectAllQuery(Seq(this, q), Seq(), None, astOther)
       case r: RelationOp =>
         // default to subquery, some ops may want to override

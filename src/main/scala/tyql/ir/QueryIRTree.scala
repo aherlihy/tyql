@@ -87,7 +87,7 @@ object QueryIRTree:
         collapseSort(sorts :+ (sort.$body, sort.$ord), sort.$from, symbols)
       case _ => (sorts, comprehension)
 
-  // TODO: verify set vs. bag operator precendence is preserved in the generated queries
+  // TODO verify set vs. bag operator precendence is preserved in the generated queries
   private def collapseNaryOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: DatabaseAST[?]): NaryRelationOp =
     val flattened = (
       lhs match
@@ -121,7 +121,6 @@ object QueryIRTree:
    */
   private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     import TreePrettyPrinter.*
-//    println(s"genQuery: ast=$ast")
     ast match
       case table: Table[?] =>
         TableLeaf(table.$name, table)
@@ -163,8 +162,8 @@ object QueryIRTree:
           unevaluated
         )
         import TreePrettyPrinter.*
-        /** TODO: this is where could create more complex join nodes,
-         * for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
+        /** TODO this is where could create more complex join nodes,
+         *  for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
          */
         unnest(fromNodes, projectIR, flatMap)
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
