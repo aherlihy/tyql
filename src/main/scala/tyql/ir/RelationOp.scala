@@ -73,7 +73,7 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
   override def alias = name
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
     val escapedTableName = d.quoteIdentifier(cnf.caseConvention.convert(tableName))
-    val escapedAlias = d.quoteIdentifier(cnf.caseConvention.convert(name)) // TODO does it break something? Think about it
+    val escapedAlias = d.quoteIdentifier(cnf.caseConvention.convert(name))
     if (flags.contains(SelectFlags.Final))
       escapedTableName
     else

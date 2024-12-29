@@ -69,7 +69,6 @@ case class UnaryExprOp(child: QueryIRNode, op: String => String, ast: Expr[?, ?]
 case class FunctionCallOp(name: String, children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence = Precedence.Literal
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = s"$name(" + children.map(_.toSQLString()).mkString(", ") + ")"
-  // TODO does this need ()s sometimes?
 
 /**
  * CASE statement called "searched" in the standard. This is like a multi-arm if-else statement.
@@ -116,7 +115,6 @@ case class RawSQLInsertOp(snippet: SqlSnippet, replacements: Map[String, QueryIR
  */
 case class ProjectClause(children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = children.map(_.toSQLString()).mkString("", ", ", "")
-
 
 /**
  * Named or unnamed attribute select expression, e.g. `table.rowName as customName`
