@@ -7,6 +7,7 @@ import language.experimental.namedTuples
 import NamedTuple.NamedTuple
 import NamedTupleDecomposition._
 import PolyfillTracking._
+import TreePrettyPrinter._
 
 /**
  * Logical query plan tree.
@@ -15,10 +16,17 @@ import PolyfillTracking._
  */
 object QueryIRTree:
 
+  /**
+    * Wrapper around `generateQuery` that appends the Final flag to not include the surrounding ()s on the top-level.
+    */
   def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     generateQuery(ast, symbols).appendFlag(SelectFlags.Final) // ignore top-level parens
 
+  /**
+    * Globally unique reference counter for identifiers, used for making aliases unique.
+    */
   var idCount = 0
+
   /**
    * Convert table.filter(p1).filter(p2) => table.filter(p1 && p2).
    * Example of a heuristic tree transformation/optimization
@@ -120,7 +128,6 @@ object QueryIRTree:
    * @return
    */
   private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
-    import TreePrettyPrinter.*
     ast match
       case table: Table[?] =>
         TableLeaf(table.$name, table)
@@ -161,7 +168,6 @@ object QueryIRTree:
           boundST,
           unevaluated
         )
-        import TreePrettyPrinter.*
         /** TODO this is where could create more complex join nodes,
          *  for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
          */
@@ -261,7 +267,7 @@ object QueryIRTree:
         def getSource(f: RelationOp): RelationOp = f match
           case SelectQuery(project, from, where, overrideAlias, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
-            SelectQuery(collapseMap(select, project), from, where, None, groupBy)
+            SelectQuery(collapseMap(select, project), from, where, None, groupBy) // TODO implement
           case SelectAllQuery(from, where, overrideAlias, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, from, where, None, groupBy)

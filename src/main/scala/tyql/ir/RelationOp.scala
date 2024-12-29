@@ -309,7 +309,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
         case v: SelectExpr => v.attrName
         case o => o.toSQLString()
       s"$varStr ${s._2.toString}"
-    ).mkString("", ", ", "")}")
+    ).mkString(", ")}")
 
 /**
  * N-ary relation-level operation

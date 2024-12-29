@@ -11,16 +11,13 @@ object TreePrettyPrinter {
   import Expr.*
   import AggregationExpr.*
 
-  private def indent(level: Int): String = scala.collection.StringOps("  ") * level // TODO this broke for some reason
+  private def indent(level: Int): String = scala.collection.StringOps("  ") * level // without explicit StringOps, treated as Expr[String] * Int
   private def indentWithKey(level: Int, key: String, value: String): String = s"${indent(level)}$key=${value.stripLeading()}"
   private def indentListWithKey(level: Int, key: String, values: Seq[String]): String =
     if (values.isEmpty)
       s"${indent(level)}$key=[]"
-//    else if (values.size == 1)
-//      s"${indent(level)}$key=[ ${values.head.stripLeading()} ]"
     else
       s"${indent(level)}$key=${values.mkString("[\n", ",\n", s"\n${indent(level)}]")}"
-
 
   extension (fun: Fun[?, ?, ?]) {
     def prettyPrint(depth: Int): String = fun match
@@ -40,6 +37,7 @@ object TreePrettyPrinter {
       case Gt(x, y) => s"${indent(depth)}Gt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Lt(x, y) => s"${indent(depth)}Lt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Lte(x, y) => s"${indent(depth)}Lte(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Gte(x, y) => s"${indent(depth)}Gte(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case ListExpr(elements) =>
         s"${indent(depth)}ListExpr(\n${elements.map(_.prettyPrint(depth + 1)).mkString("\n")}\n${indent(depth)}"
       case ListPrepend(x, list) =>
@@ -78,9 +76,73 @@ object TreePrettyPrinter {
             val namedStr = namedTupleNames(idx).fold("")(n => s"$n")
             indentWithKey(depth + 1, namedStr, e.prettyPrint(depth + 1))
           )
-        s"${indent(depth)}Project(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
+        s"${indent(depth)}Project(\n${children.mkString(",\n")}\n${indent(depth)})"
       case a: AggregationExpr[?] => a.prettyPrint(depth)
       case a: Aggregation[?, ?] => a.prettyPrint(depth)
+      case NullLit() => s"${indent(depth)}Null"
+      case IsNull(x) => s"${indent(depth)}IsNull(\n${x.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Coalesce(x, y, xs) =>
+        val children = (x +: y +: xs).map(_.prettyPrint(depth + 1))
+        s"${indent(depth)}Coalesce(\n${children.mkString(",\n")}\n${indent(depth)})"
+      case NullIf(x, y) =>
+        s"${indent(depth)}NullIf(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Xor(x, y) => s"${indent(depth)}Xor(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Modulo(x, y) => s"${indent(depth)}Modulo(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Cast(x, resultType) => s"${indent(depth)}Cast(\n${x.prettyPrint(depth + 1)},\n${indent(depth + 1)}$resultType\n${indent(depth)})"
+      case SearchedCase(cases, elseCase) =>
+        val casesStr = cases.map { case (cond, value) =>
+          s"${indent(depth + 1)}WHEN ${cond.prettyPrint(0)} THEN ${value.prettyPrint(0)}"
+        }.mkString("\n")
+        val elseStr = elseCase.map(e => s"\n${indent(depth + 1)}ELSE ${e.prettyPrint(0)}").getOrElse("")
+        s"${indent(depth)}SearchedCase(\n$casesStr$elseStr\n${indent(depth)})"
+      case SimpleCase(expr, cases, elseCase) =>
+        val exprStr = expr.prettyPrint(depth + 1)
+        val casesStr = cases.map { case (cond, value) =>
+          s"${indent(depth + 1)}WHEN ${cond.prettyPrint(0)} THEN ${value.prettyPrint(0)}"
+        }.mkString("\n")
+        val elseStr = elseCase.map(e => s"\n${indent(depth + 1)}ELSE ${e.prettyPrint(0)}").getOrElse("")
+        s"${indent(depth)}SimpleCase(\n$exprStr\n$casesStr$elseStr\n${indent(depth)})"
+      case OptionMap(x, f) => s"${indent(depth)}OptionMap(\n${x.prettyPrint(depth + 1)},\n<<<<<<UNCLEAR HOW TO PRINT A FUNCTION>>>>>>\n${indent(depth)})"
+      case StringCharLength(x) => s"${indent(depth)}StringCharLength(${x.prettyPrint(0)})"
+      case StringByteLength(x) => s"${indent(depth)}StringByteLength(${x.prettyPrint(0)})"
+      case LTrim(x) => s"${indent(depth)}LTrim(${x.prettyPrint(0)})"
+      case RTrim(x) => s"${indent(depth)}RTrim(${x.prettyPrint(0)})"
+      case Trim(x) => s"${indent(depth)}Trim(${x.prettyPrint(0)})"
+      case StrReplace(s, from, to) => s"${indent(depth)}StrReplace(\n${s.prettyPrint(depth + 1)},\n${from.prettyPrint(depth + 1)},\n${to.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Substring(s, from, len) =>
+        val lenStr = len.map(l => s",\n${l.prettyPrint(depth + 1)}").getOrElse("")
+        s"${indent(depth)}Substring(\n${s.prettyPrint(depth + 1)},\n${from.prettyPrint(depth + 1)}$lenStr\n${indent(depth)})"
+      case StrLike(s, pattern) => s"${indent(depth)}StrLike(\n${s.prettyPrint(depth + 1)},\n${pattern.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case StrConcat(x, xs) => s"${indent(depth)}StrConcat(\n${x.prettyPrint(depth + 1)},\n${xs.map(_.prettyPrint(depth + 1)).mkString(",\n")}\n${indent(depth)})"
+      case StrConcatUniform(x, xs) => s"${indent(depth)}StrConcatUniform(\n${x.prettyPrint(depth + 1)},\n${xs.map(_.prettyPrint(depth + 1)).mkString(",\n")}\n${indent(depth)})"
+      case StrConcatSeparator(sep, x, xs) => s"${indent(depth)}StrConcatSeparator(\n${sep.prettyPrint(depth + 1)},\n${x.prettyPrint(depth + 1)},\n${xs.map(_.prettyPrint(depth + 1)).mkString(",\n")}\n${indent(depth)})"
+      case StrReverse(x) => s"${indent(depth)}StrReverse(${x.prettyPrint(0)})"
+      case StrRepeat(s, n) => s"${indent(depth)}StrRepeat(\n${s.prettyPrint(depth + 1)},\n${n.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case StrLPad(s, len, pad) => s"${indent(depth)}StrLPad(\n${s.prettyPrint(depth + 1)},\n${len.prettyPrint(depth + 1)},\n${pad.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case StrRPad(s, len, pad) => s"${indent(depth)}StrRPad(\n${s.prettyPrint(depth + 1)},\n${len.prettyPrint(depth + 1)},\n${pad.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case StrPositionIn(substr, string) => s"${indent(depth)}StrPositionIn(\n${substr.prettyPrint(depth + 1)},\n${string.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case NullSafeEq(x, y) => s"${indent(depth)}NullSafeEq(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case NullSafeNe(x, y) => s"${indent(depth)}NullSafeNe(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Round(x) => s"${indent(depth)}Round(${x.prettyPrint(0)})"
+      case RoundWithPrecision(x, precision) => s"${indent(depth)}RoundWithPrecision(\n${x.prettyPrint(depth + 1)},\n${precision.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Ceil(x) => s"${indent(depth)}Ceil(${x.prettyPrint(0)})"
+      case Floor(x) => s"${indent(depth)}Floor(${x.prettyPrint(0)})"
+      case Power(x, y) => s"${indent(depth)}Power(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Sqrt(x) => s"${indent(depth)}Sqrt(${x.prettyPrint(0)})"
+      case Abs(x) => s"${indent(depth)}Abs(${x.prettyPrint(0)})"
+      case Sign(x) => s"${indent(depth)}Sign(${x.prettyPrint(0)})"
+      case LogNatural(x) => s"${indent(depth)}LogNatural(${x.prettyPrint(0)})"
+      case Log(base, x) => s"${indent(depth)}Log(\n${base.prettyPrint(depth + 1)},\n${x.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Exp(x) => s"${indent(depth)}Exp(${x.prettyPrint(0)})"
+      case Sin(x) => s"${indent(depth)}Sin(${x.prettyPrint(0)})"
+      case Cos(x) => s"${indent(depth)}Cos(${x.prettyPrint(0)})"
+      case Tan(x) => s"${indent(depth)}Tan(${x.prettyPrint(0)})"
+      case Asin(x) => s"${indent(depth)}Asin(${x.prettyPrint(0)})"
+      case Acos(x) => s"${indent(depth)}Acos(${x.prettyPrint(0)})"
+      case Atan(x) => s"${indent(depth)}Atan(${x.prettyPrint(0)})"
+      case RandomUUID() => s"${indent(depth)}RandomUUID()"
+      case RandomFloat() => s"${indent(depth)}RandomFloat()"
+      case RandomInt(x, y) => s"${indent(depth)}RandomInt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case _ => throw new Exception(s"Unimplemented pretty print EXPR $expr")
     }
   }
@@ -110,7 +172,7 @@ object TreePrettyPrinter {
             val namedStr = namedTupleNames(idx).fold("")(n => s"$n=")
             s"${indent(depth+1)}$namedStr${e.prettyPrint(0)}"
           )
-        s"${indent(depth)}AggProject(\n${children.mkString("", ",\n", "")}\n${indent(depth)})"
+        s"${indent(depth)}AggProject(\n${children.mkString(",\n")}\n${indent(depth)})"
       case _ => throw new Exception(s"Unimplemented pretty print AGG $agg")
     }
   }
@@ -243,6 +305,31 @@ object TreePrettyPrinter {
         s"${indent(depth)}Literal(${literal.stringRep}$astPrint)"
       case empty: EmptyLeaf =>
         s"${indent(depth)}EmptyLeaf"
+      case functionCall: FunctionCallOp =>
+        val childrenPrint = functionCall.children.map(_.prettyPrintIR(depth + 1, printAST)).mkString(",\n")
+        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", functionCall.ast.prettyPrint(depth + 1))}" else ""
+        s"${indent(depth)}FunctionCall(\n${indent(depth + 1)}name='${functionCall.name}',\n${indent(depth + 1)}args=[\n$childrenPrint\n${indent(depth + 1)}]$astPrint\n${indent(depth)})"
+      case searchedCase: SearchedCaseOp =>
+        val whenPrint = searchedCase.whenClauses.map { case (cond, res) =>
+          s"${indent(depth + 1)}WHEN:\n${cond.prettyPrintIR(depth + 2, printAST)}\n${indent(depth + 1)}THEN:\n${res.prettyPrintIR(depth + 2, printAST)}"
+        }.mkString("\n")
+        val elsePrint = searchedCase.elseClause.map(e => s"\n${indent(depth + 1)}ELSE:\n${e.prettyPrintIR(depth + 2, printAST)}").getOrElse("")
+        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", searchedCase.ast.prettyPrint(depth + 1))}" else ""
+        s"${indent(depth)}SearchedCase(\n$whenPrint$elsePrint$astPrint\n${indent(depth)})"
+      case simpleCase: SimpleCaseOp =>
+        val exprPrint = simpleCase.expr.prettyPrintIR(depth + 2, printAST)
+        val whenPrint = simpleCase.whenClauses.map { case (cond, res) =>
+          s"${indent(depth + 1)}WHEN:\n${cond.prettyPrintIR(depth + 2, printAST)}\n${indent(depth + 1)}THEN:\n${res.prettyPrintIR(depth + 2, printAST)}"
+        }.mkString("\n")
+        val elsePrint = simpleCase.elseClause.map(e => s"\n${indent(depth + 1)}ELSE:\n${e.prettyPrintIR(depth + 2, printAST)}").getOrElse("")
+        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", simpleCase.ast.prettyPrint(depth + 1))}" else ""
+        s"${indent(depth)}SimpleCase(\n${indent(depth + 1)}expr:\n$exprPrint\n$whenPrint$elsePrint$astPrint\n${indent(depth)})"
+      case rawSQL: RawSQLInsertOp =>
+        val replacementsPrint = rawSQL.replacements.map { case (name, node) =>
+          s"${indent(depth + 2)}$name -> ${node.prettyPrintIR(0, printAST)}"
+        }.mkString("\n")
+        val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", rawSQL.ast.prettyPrint(depth + 1))}" else ""
+        s"${indent(depth)}RawSQL(\n${indent(depth + 1)}snippet=${rawSQL.snippet},\n${indent(depth + 1)}replacements=[\n$replacementsPrint\n${indent(depth + 1)}]$astPrint\n${indent(depth)})"
 
       case relationOp: RelationOp => relationOp.prettyPrintIR(depth, printAST)
 
