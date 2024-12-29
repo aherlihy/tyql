@@ -199,10 +199,10 @@ object QueryIRTree:
         collapseNaryOp(lhs, rhs, s"$op$category", relOp)
       case limit: Query.Limit[?, ?] =>
         val from = generateQuery(limit.$from, symbols)
-        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, Expr.IntLit(limit.$limit)), "LIMIT", limit)
+        collapseNaryOp(from.appendFlag(SelectFlags.Final), LiteralInteger(limit.$limit, Expr.IntLit(limit.$limit)), "LIMIT", limit)
       case offset: Query.Offset[?, ?] =>
         val from = generateQuery(offset.$from, symbols)
-        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, Expr.IntLit(offset.$offset)), "OFFSET", offset)
+        collapseNaryOp(from.appendFlag(SelectFlags.Final), LiteralInteger(offset.$offset, Expr.IntLit(offset.$offset)), "OFFSET", offset)
       case distinct: Query.Distinct[?] =>
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
       case queryRef: Query.QueryRef[?, ?] =>
@@ -441,14 +441,18 @@ object QueryIRTree:
           Precedence.Concat,
           a
         )
-      case n: Expr.NullLit[?] => Literal("NULL", n)
+      case n: Expr.NullLit[?] => RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"NULL"), Map(), Precedence.Unary, n)
       case i: Expr.IsNull[?, ?] => UnaryExprOp("", generateExpr(i.$x, symbols), " IS NULL", i)
       case c: Expr.Coalesce[?, ?] => FunctionCallOp("COALESCE", (Seq(c.$x1, c.$x2) ++ c.$xs).map(generateExpr(_, symbols)), c)
       case i: Expr.NullIf[?, ?, ?] => FunctionCallOp("NULLIF", Seq(generateExpr(i.$x, symbols), generateExpr(i.$y, symbols)), i)
-      case l: Expr.DoubleLit => Literal(s"${l.$value}", l)
-      case l: Expr.IntLit => Literal(s"${l.$value}", l)
-      case l: Expr.StringLit => Literal(d.quoteStringLiteral(l.$value, insideLikePattern=false), l)
-      case l: Expr.BooleanLit => Literal(d.quoteBooleanLiteral(l.$value), l)
+      case l: Expr.DoubleLit => LiteralDouble(l.$value, l)
+      case l: Expr.IntLit => LiteralInteger(l.$value, l)
+      case l: Expr.StringLit => LiteralString(l.$value, insideLikePatternQuoting=false, l)
+      case l: Expr.BooleanLit =>
+        if l.$value then
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"TRUE"), Map(), Precedence.Unary, l)
+        else
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"FALSE"), Map(), Precedence.Unary, l)
       case c: Expr.SearchedCase[?, ?, ?] => SearchedCaseOp(c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))), c.$else.map(generateExpr(_, symbols)), c)
       case c: Expr.SimpleCase[?, ?, ?, ?] => SimpleCaseOp(generateExpr(c.$expr, symbols), c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))), c.$else.map(generateExpr(_, symbols)), c)
       case l: Expr.Lower[?] => UnaryExprOp("LOWER(", generateExpr(l.$x, symbols), ")", l)
@@ -460,7 +464,7 @@ object QueryIRTree:
       case l: Expr.StrReplace[?, ?] => FunctionCallOp("REPLACE", Seq(generateExpr(l.$s, symbols), generateExpr(l.$from, symbols), generateExpr(l.$to, symbols)), l)
       case l: Expr.StrLike[?, ?] =>
         l.$pattern match
-          case Expr.StringLit(pattern) => BinExprOp("", generateExpr(l.$s, symbols), "LIKE ", Literal(d.quoteStringLiteral(pattern, insideLikePattern=true), l.$pattern), "", Precedence.Comparison, l)
+          case Expr.StringLit(pattern) => BinExprOp("", generateExpr(l.$s, symbols), "LIKE ", LiteralString(pattern, insideLikePatternQuoting=true, l.$pattern), "", Precedence.Comparison, l)
           case _ => assert(false, "LIKE pattern must be a string literal")
       case l: Expr.Substring[?, ?] =>
         if l.$len.isEmpty then

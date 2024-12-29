@@ -300,9 +300,15 @@ object TreePrettyPrinter {
       case irVar: QueryIRVar =>
         val astPrint = if (printAST) s", ${irVar.ast.prettyPrint(0)}" else ""
         s"${indent(depth)}QueryIRVar(${irVar.name} -> ${irVar.toSub.alias}$astPrint)"
-      case literal: Literal =>
+      case literal: LiteralString =>
         val astPrint = if (printAST) s", ${literal.ast.prettyPrint(0)}" else ""
-        s"${indent(depth)}Literal(${literal.stringRep}$astPrint)"
+        s"${indent(depth)}LiteralString(<<${literal.unescapedString}>>$astPrint)"
+      case literal: LiteralInteger =>
+        val astPrint = if (printAST) s", ${literal.ast.prettyPrint(0)}" else ""
+        s"${indent(depth)}LiteralInteger(${literal.number}$astPrint)"
+      case literal: LiteralDouble =>
+        val astPrint = if (printAST) s", ${literal.ast.prettyPrint(0)}" else ""
+        s"${indent(depth)}LiteralDouble(${literal.number}$astPrint)"
       case empty: EmptyLeaf =>
         s"${indent(depth)}EmptyLeaf"
       case functionCall: FunctionCallOp =>

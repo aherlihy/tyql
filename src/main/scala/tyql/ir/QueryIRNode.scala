@@ -50,7 +50,8 @@ trait QueryIRNode:
     val (sql, _) = toSQLQuery()
     sql
 
-  final private[tyql] def toSQLQuery(using d: Dialect)(using cnf: Config)(): (String, collection.mutable.ArrayBuffer[Object]) =
+  // TODO maybe private?
+  final def toSQLQuery(using d: Dialect)(using cnf: Config)(): (String, collection.mutable.ArrayBuffer[Object]) =
     if cached == null then
       this.synchronized {
         if cached == null then
@@ -222,12 +223,36 @@ case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?]) exte
 
 /**
  * Literals.
- * TODO: is the existing per-dialect string handling enough?
  */
-case class Literal(stringRep: String, ast: Expr[?, ?]) extends QueryIRLeaf:
+case class LiteralString(unescapedString: String, insideLikePatternQuoting: Boolean, ast: Expr[?, ?]) extends QueryIRLeaf:
   override val precedence: Int = Precedence.Literal
   override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
-    ctx.sql.append(stringRep)
+    cnf.parameterStyle match
+      case ParameterStyle.EscapedInline =>
+        ctx.sql.append(d.quoteStringLiteral(unescapedString, insideLikePatternQuoting))
+      case ParameterStyle.DriverParametrized =>
+        ctx.sql.append("?")
+        ctx.parameters.append(unescapedString)
+
+case class LiteralInteger(number: Long, ast: Expr[?, ?]) extends QueryIRLeaf:
+  override val precedence: Int = Precedence.Literal
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    cnf.parameterStyle match
+      case ParameterStyle.EscapedInline =>
+        ctx.sql.append(number.toString)
+      case ParameterStyle.DriverParametrized =>
+        ctx.sql.append("?")
+        ctx.parameters.append(number.asInstanceOf[Object])
+
+case class LiteralDouble(number: Double, ast: Expr[?, ?]) extends QueryIRLeaf:
+  override val precedence: Int = Precedence.Literal
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    cnf.parameterStyle match
+      case ParameterStyle.EscapedInline =>
+        ctx.sql.append(number.toString)
+      case ParameterStyle.DriverParametrized =>
+        ctx.sql.append("?")
+        ctx.parameters.append(number.asInstanceOf[Object])
 
 /**
  * List expression, for DBs that support lists/arrays.

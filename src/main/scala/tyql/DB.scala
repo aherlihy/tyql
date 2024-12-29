@@ -17,10 +17,21 @@ class DB(conn: Connection) {
   def run[T](dbast: DatabaseAST[T])(using resultTag: ResultTag[T],
                                           dialect: tyql.Dialect,
                                           config: tyql.Config): List[T] = {
-    val sqlString = dbast.toQueryIR.toSQLString()
+    val (sqlString, parameters) = dbast.toQueryIR.toSQLQuery()
     println("SQL << " + sqlString + " >>")
+    for (p <- parameters) {
+      println("Param << " + p + " >>")
+    }
     val stmt = conn.createStatement()
-    val rs = stmt.executeQuery(sqlString)
+    var rs: java.sql.ResultSet = null
+    config.parameterStyle match
+      case tyql.ParameterStyle.DriverParametrized =>
+        val ps = conn.prepareStatement(sqlString)
+        for (i <- 0 until parameters.length) do
+          ps.setObject(i + 1, parameters(i))
+        rs = ps.executeQuery()
+      case tyql.ParameterStyle.EscapedInline =>
+        rs = stmt.executeQuery(sqlString)
     val metadata = rs.getMetaData() // _.getColumnName()
     val columnCount = metadata.getColumnCount()
     var results = List[T]()
@@ -76,7 +87,7 @@ def driverMain(): Unit = {
   import scala.language.implicitConversions
   val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
   val db = DB(conn)
-  given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores) {}
+  given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.DriverParametrized) {}
   case class Flowers(name: Option[String], flowerSize: Int, cost: Option[Double], likes: Int)
   val t = tyql.Table[Flowers]()
 

@@ -18,7 +18,6 @@ trait Dialect:
   def limitAndOffset(limit: Long, offset: Long): String
 
   def quoteStringLiteral(in: String, insideLikePattern: Boolean): String
-  def quoteBooleanLiteral(in: Boolean): String
 
   val stringLengthByCharacters: String = "CHAR_LENGTH"
   val stringLengthBytesNeedsEncodeFirst: Boolean = false
@@ -49,8 +48,7 @@ object Dialect:
   given Dialect = new Dialect
       with QuotingIdentifiers.AnsiBehavior
       with LimitAndOffset.Separate
-      with StringLiteral.AnsiSingleQuote
-      with BooleanLiterals.UseTrueFalse:
+      with StringLiteral.AnsiSingleQuote:
     def name() = "ANSI SQL Dialect"
 
   object ansi:
@@ -61,8 +59,7 @@ object Dialect:
     given Dialect = new Dialect
         with QuotingIdentifiers.PostgresqlBehavior
         with LimitAndOffset.Separate
-        with StringLiteral.PostgresqlBehavior
-        with BooleanLiterals.UseTrueFalse:
+        with StringLiteral.PostgresqlBehavior:
       def name() = "PostgreSQL Dialect"
       override val stringLengthByCharacters: String = "length"
       override def feature_RandomUUID_functionName: String = "gen_random_uuid"
@@ -88,8 +85,7 @@ object Dialect:
     class MySQLDialect extends Dialect
         with QuotingIdentifiers.MysqlBehavior
         with LimitAndOffset.MysqlLike
-        with StringLiteral.MysqlBehavior
-        with BooleanLiterals.UseTrueFalse:
+        with StringLiteral.MysqlBehavior:
       def name() = "MySQL Dialect"
       override val xorOperatorSupportedNatively = true
       override def feature_RandomUUID_functionName: String = "UUID"
@@ -125,8 +121,7 @@ object Dialect:
     given Dialect = new Dialect
         with QuotingIdentifiers.SqliteBehavior
         with LimitAndOffset.Separate
-        with StringLiteral.AnsiSingleQuote
-        with BooleanLiterals.UseTrueFalse:
+        with StringLiteral.AnsiSingleQuote:
       def name() = "SQLite Dialect"
       override val stringLengthByCharacters = "length"
       override def feature_RandomFloat_functionName: Option[String] = None
@@ -147,8 +142,7 @@ object Dialect:
     given Dialect = new Dialect
         with QuotingIdentifiers.H2Behavior
         with LimitAndOffset.Separate
-        with StringLiteral.AnsiSingleQuote
-        with BooleanLiterals.UseTrueFalse:
+        with StringLiteral.AnsiSingleQuote:
       def name() = "H2 Dialect"
       override val stringLengthByCharacters = "length"
       override def feature_RandomUUID_functionName: String = "RANDOM_UUID"
@@ -171,8 +165,7 @@ object Dialect:
     given Dialect = new Dialect
         with QuotingIdentifiers.DuckdbBehavior
         with LimitAndOffset.Separate
-        with StringLiteral.DuckdbBehavior
-        with BooleanLiterals.UseTrueFalse:
+        with StringLiteral.DuckdbBehavior:
       override def name(): String = "DuckDB Dialect"
       override val stringLengthByCharacters = "length"
       override val stringLengthBytesNeedsEncodeFirst = true
