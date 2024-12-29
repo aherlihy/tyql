@@ -61,7 +61,6 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
   def unionAll(that: Query[A, ?]): RestrictedQuery[A, BagResult, D] =
     RestrictedQuery(Query.UnionAll(wrapped, that))
 
-  // TODO: Does nonEmpty count as non-monotone? (yes)
   def nonEmpty: Expr[Boolean, NonScalarExpr] =
     Expr.NonEmpty(wrapped)
 

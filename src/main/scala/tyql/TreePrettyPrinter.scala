@@ -31,12 +31,6 @@ object TreePrettyPrinter {
       case _ => throw new Exception(s"Unimplemented pretty print FUN $fun")
   }
 
-  extension (fun: QueryFun[?, ?]) {
-    def prettyPrint(depth: Int): String = fun match
-      case QueryFun(param, body: DatabaseAST[?]) =>
-        s"${indent(depth)}FunR(${param.prettyPrint(0)} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
-  }
-
   extension (expr: Expr[?, ?]) {
     def prettyPrint(depth: Int): String = expr match {
       case Select(x, name) => s"${indent(depth)}Select(${x.prettyPrint(0)}.$name)"
@@ -137,8 +131,6 @@ object TreePrettyPrinter {
         s"${indent(depth)}Limit(limit=$limit\n${from.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Offset(from, offset) =>
         s"${indent(depth)}Offset(offset=$offset\n${from.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case Drop(from, offset) =>
-        s"${indent(depth)}Drop(\n${from.prettyPrint(depth + 1)}, $offset\n${indent(depth)})"
       case Distinct(from) =>
         s"${indent(depth)}Distinct(\n${from.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Union(thisQuery, other) =>

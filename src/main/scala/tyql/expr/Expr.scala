@@ -168,7 +168,6 @@ object Expr:
   def concat[S <: ExprShape](strs: Seq[Expr[String, S]]): Expr[String, S] =
     assert(strs.nonEmpty, "concat requires at least one argument")
     StrConcatUniform(strs.head, strs.tail)
-
   // TODO XXX this cannot be named concat since then Scala will never resolve it, it will always try for the first version without the sep parameter.
   def concatWith[S <: ExprShape, SS <: ExprShape](strs: Seq[Expr[String, S]], sep: Expr[String, SS]): Expr[String, CalculatedShape[S, SS]] =
     assert(strs.nonEmpty, "concatWith requires at least one argument")
@@ -182,19 +181,13 @@ object Expr:
 
   // Aggregations
   def sum(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
-
   @targetName("doubleSum")
   def sum(x: Expr[Double, ?]): AggregationExpr[Double] = AggregationExpr.Sum(x) // TODO: require summable type?
-
   def avg[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
-
   @targetName("doubleAvg")
   def avg(x: Expr[Double, ?]): AggregationExpr[Double] = AggregationExpr.Avg(x)
-
   def max[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
-
   def min[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
-
   def count(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
   @targetName("stringCnt")
   def count(x: Expr[String, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
@@ -366,12 +359,8 @@ object Expr:
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
   // TODO why does this break things?
 
-  def randomFloat(): Expr[Double, NonScalarExpr] =
-    RandomFloat()
-
-  def randomUUID(using r: DialectFeature.RandomUUID)(): Expr[String, NonScalarExpr] =
-    RandomUUID()
-
+  def randomFloat(): Expr[Double, NonScalarExpr] = RandomFloat()
+  def randomUUID(using r: DialectFeature.RandomUUID)(): Expr[String, NonScalarExpr] = RandomUUID()
   def randomInt[S1 <: ExprShape, S2 <: ExprShape](a: Expr[Int, S1], b: Expr[Int, S2])(using r: DialectFeature.RandomIntegerInInclusiveRange): Expr[Int, CalculatedShape[S1, S2]] =
     // TODO maybe add a check for (a <= b) if we know both components at generation time?
     // TODO what about parentheses? Do we really not need them?

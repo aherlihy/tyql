@@ -2,7 +2,7 @@ package tyql
 
 // TODO can we source it from somewhere and not guess about this?
 // Current values were proposed on 2024-11-19 by Claude Sonnet 3.5 v20241022, and somewhat modifier later
-// Maybe compare with https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE which appears to be a little different
+// Maybe compare with https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE which appear to be a little different
 object Precedence {
   val Literal        = 100  // literals, identifiers
   val ListOps        = 95   // list_append, list_prepend, list_contains

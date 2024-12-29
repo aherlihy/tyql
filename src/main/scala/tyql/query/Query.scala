@@ -241,6 +241,67 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
   def isEmpty: Expr[Boolean, NonScalarExpr] =
     Expr.IsEmpty(this)
 
+  /**
+   * When there is only one relation to be defined recursively.
+   */
+  def sort[B](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr], ord: Ord): Query[A, Category] =
+    val ref = Ref[A, NonScalarExpr]()
+    Query.Sort(this, Fun(ref, f(ref)), ord)
+
+  // offset and not drop since _.take.drop and _.drop.take are not equivalent like in SQL
+  def take(lim: Int): Query[A, Category] = Query.Limit(this, lim)
+  def limit(lim: Int): Query[A, Category] = take(lim)
+  def offset(lim: Int): Query[A, Category] = Query.Offset(this, lim)
+
+  def distinct: Query[A, SetResult] = Query.Distinct(this)
+
+  def sum[B: ResultTag](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[A *: EmptyTuple, B] =
+    val ref = Ref[A, NonScalarExpr]()
+    Aggregation.AggFlatMap(this, Fun(ref, AggregationExpr.Sum(f(ref))))
+
+  def avg[B: ResultTag](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[A *: EmptyTuple, B] =
+    val ref = Ref[A, NonScalarExpr]()
+    Aggregation.AggFlatMap(this, Fun(ref, AggregationExpr.Avg(f(ref))))
+
+  def max[B: ResultTag](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[A *: EmptyTuple, B] =
+    val ref = Ref[A, NonScalarExpr]()
+    Aggregation.AggFlatMap(this, Fun(ref, AggregationExpr.Max(f(ref))))
+
+  def min[B: ResultTag](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[A *: EmptyTuple, B] =
+    val ref = Ref[A, NonScalarExpr]()
+    Aggregation.AggFlatMap(this, Fun(ref, AggregationExpr.Min(f(ref))))
+
+  def size: Aggregation[A *: EmptyTuple, Int] =
+    val ref = Ref[A, ScalarExpr]()
+    Aggregation.AggFlatMap(this, Fun(ref, AggregationExpr.Count(Expr.IntLit(1))))
+
+  def union(that: Query[A, ?]): Query[A, SetResult] =
+    Query.Union(this, that)
+
+  def unionAll(that: Query[A, ?]): Query[A, BagResult] =
+    Query.UnionAll(this, that)
+
+  def intersect(that: Query[A, ?]): Query[A, SetResult] =
+    Query.Intersect(this, that)
+
+  def intersectAll(that: Query[A, ?]): Query[A, BagResult] =
+    Query.IntersectAll(this, that)
+
+  def except(that: Query[A, ?]): Query[A, SetResult] =
+    Query.Except(this, that)
+
+  def exceptAll(that: Query[A, ?]): Query[A, BagResult] =
+    Query.ExceptAll(this, that)
+
+  // Does not work for subsets, need to match types exactly
+  def contains(that: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] =
+    Expr.Contains(this, that)
+
+  // def single(): A =
+  //     Expr.Single(this)
+
+end Query // trait
+
 object Query:
   import Expr.{Pred, Fun, Ref}
   import RestrictedQuery.*
@@ -329,7 +390,7 @@ object Query:
   def fixImpl[QT <: Tuple, P <: Tuple, R <: Tuple](bases: QT)(fns: P => R): ToQuery[QT] =
     // If base cases are themselves recursive definitions.
     val baseRefsAndDefs = bases.toArray.map {
-      case MultiRecursive(params, querys, resultQ) => ???// TODO: decide on semantics for multiple fix definitions. (param, query)
+      case MultiRecursive(params, querys, resultQ) => ??? // TODO: decide on semantics for multiple fix definitions. (param, query)
       case base: Query[?, ?] => (RestrictedQueryRef()(using base.tag), base)
     }
     val refsTuple = Tuple.fromArray(baseRefsAndDefs.map(_._1)).asInstanceOf[P]
@@ -371,8 +432,6 @@ object Query:
     def stringRef() = s"recref$id"
     override def toString: String = s"QueryRef[${stringRef()}]"
 
-  case class QueryFun[A, B]($param: QueryRef[A, ?], $body: B)
-
   case class Filter[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $pred: Pred[A, NonScalarExpr]) extends Query[A, C]
   case class Map[A, B: ResultTag]($from: Query[A, ?], $query: Fun[A, Expr[B, ?], ?]) extends Query[B, BagResult]
   case class FlatMap[A, B: ResultTag]($from: Query[A, ?], $query: Fun[A, Query[B, ?], NonScalarExpr]) extends Query[B, BagResult]
@@ -380,7 +439,6 @@ object Query:
   case class Sort[A: ResultTag, B, C <: ResultCategory]($from: Query[A, C], $body: Fun[A, Expr[B, NonScalarExpr], NonScalarExpr], $ord: Ord) extends Query[A, C]
   case class Limit[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $limit: Int) extends Query[A, C]
   case class Offset[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $offset: Int) extends Query[A, C]
-  case class Drop[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $offset: Int) extends Query[A, C]
   case class Distinct[A: ResultTag]($from: Query[A, ?]) extends Query[A, SetResult]
 
   case class Union[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
@@ -434,69 +492,7 @@ object Query:
       else
         throw new Exception("Error: can only support a single having statement after groupBy")
 
-  // Extensions. TODO: Any reason not to move these into Query methods?
-  extension [R: ResultTag, C <: ResultCategory](x: Query[R, C])
-    /**
-     * When there is only one relation to be defined recursively.
-     */
-    def sort[B](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr], ord: Ord): Query[R, C] =
-      val ref = Ref[R, NonScalarExpr]()
-      Sort(x, Fun(ref, f(ref)), ord)
-
-    // offset and not drop since _.take.drop and _.drop.take are not equivalent like in SQL
-    def take(lim: Int): Query[R, C] = Limit(x, lim)
-    def limit(lim: Int): Query[R, C] = take(lim)
-    def offset(lim: Int): Query[R, C] = Offset(x, lim)
-
-    def distinct: Query[R, SetResult] = Distinct(x)
-
-    def sum[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[R *: EmptyTuple, B] =
-      val ref = Ref[R, NonScalarExpr]()
-       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Sum(f(ref))))
-
-    def avg[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[R *: EmptyTuple, B] =
-      val ref = Ref[R, NonScalarExpr]()
-       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Avg(f(ref))))
-
-    def max[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[R *: EmptyTuple, B] =
-      val ref = Ref[R, NonScalarExpr]()
-       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Max(f(ref))))
-
-    def min[B: ResultTag](f: Ref[R, NonScalarExpr] => Expr[B, NonScalarExpr]): Aggregation[R *: EmptyTuple, B] =
-      val ref = Ref[R, NonScalarExpr]()
-       Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Min(f(ref))))
-
-    def size: Aggregation[R *: EmptyTuple, Int] =
-      val ref = Ref[R, ScalarExpr]()
-      Aggregation.AggFlatMap(x, Fun(ref, AggregationExpr.Count(Expr.IntLit(1))))
-
-    def union(that: Query[R, ?]): Query[R, SetResult] =
-      Union(x, that)
-
-    def unionAll(that: Query[R, ?]): Query[R, BagResult] =
-      UnionAll(x, that)
-
-    def intersect(that: Query[R, ?]): Query[R, SetResult] =
-      Intersect(x, that)
-
-    def intersectAll(that: Query[R, ?]): Query[R, BagResult] =
-      IntersectAll(x, that)
-
-    def except(that: Query[R, ?]): Query[R, SetResult] =
-      Except(x, that)
-
-    def exceptAll(that: Query[R, ?]): Query[R, BagResult] =
-      ExceptAll(x, that)
-
-    // Does not work for subsets, need to match types exactly
-    def contains(that: Expr[R, NonScalarExpr]): Expr[Boolean, NonScalarExpr] =
-      Expr.Contains(x, that)
-
-
-  // def single(): R =
-    //   Expr.Single(x)
-
-end Query
+end Query // object
 
 /* The following is not needed currently
 
