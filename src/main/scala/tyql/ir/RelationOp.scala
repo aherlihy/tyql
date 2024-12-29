@@ -62,10 +62,16 @@ trait RelationOp extends QueryIRNode:
   def appendFlags(f: Set[SelectFlags]): RelationOp =
     f.foldLeft(this)((r: RelationOp, f) => r.appendFlag(f))
 
-  def wrapString(inner: String): String =
-    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
-    s"$open$inner$close$aliasStr"
+  def wrapStringStart(ctx: SQLRenderingContext): Unit =
+    if !flags.contains(SelectFlags.Final) then
+      ctx.sql.append("(")
+
+  def wrapStringEnd(ctx: SQLRenderingContext): Unit =
+    if !flags.contains(SelectFlags.Final) then
+      ctx.sql.append(")")
+    if !(flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel)) then
+      ctx.sql.append(" as ")
+      ctx.sql.append(alias)
 
 /**
  * Simple table read.
@@ -74,13 +80,13 @@ case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with Q
   val name = s"$tableName${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1
   override def alias = name
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
     val escapedTableName = d.quoteIdentifier(cnf.caseConvention.convert(tableName))
-    val escapedAlias = d.quoteIdentifier(cnf.caseConvention.convert(name))
-    if (flags.contains(SelectFlags.Final))
-      escapedTableName
-    else
-      s"$escapedTableName as $escapedAlias"
+    ctx.sql.append(escapedTableName)
+    if !(flags.contains(SelectFlags.Final)) then
+      ctx.sql.append(" as ")
+      val escapedAlias = d.quoteIdentifier(cnf.caseConvention.convert(name))
+      ctx.sql.append(escapedAlias)
 
   override def toString: String = s"TableLeaf($tableName as $name)"
 
@@ -163,15 +169,20 @@ case class SelectAllQuery(from: Seq[RelationOp],
     flags = flags + f
     this
 
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
-    val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
-    val whereStr = if where.nonEmpty then
-      s" WHERE ${if where.size == 1 then where.head.toSQLString() else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")}" else
-      ""
-    wrapString(
-      s"SELECT $flagsStr* FROM $fromStr$whereStr"
-    )
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    wrapStringStart(ctx)
+    ctx.sql.append("SELECT ")
+    if flags.contains(SelectFlags.Distinct) then
+      ctx.sql.append("DISTINCT ")
+    ctx.sql.append("* FROM ")
+    ctx.mkString(from, ", ")
+    if where.nonEmpty then
+      ctx.sql.append(" WHERE ")
+      if where.size == 1 then
+        where.head.computeSQL(ctx)
+      else
+        ctx.mkString(where, "(", " AND ", ")")
+    wrapStringEnd(ctx)
 
   override def toString: String = // for debugging
     s"SelectAllQuery(\n\talias=$alias,\n\tfrom=$from,\n\twhere=$where\n)"
@@ -220,14 +231,20 @@ case class SelectQuery(project: QueryIRNode,
     flags = flags + f
     this
 
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
-    val projectStr = project.toSQLString()
-    val fromStr = from.map(f => f.toSQLString()).mkString("", ", ", "")
-    val whereStr = if where.nonEmpty then
-      s" WHERE ${if where.size == 1 then where.head.toSQLString() else where.map(f => f.toSQLString()).mkString("(", " AND ", ")")}" else
-      ""
-    wrapString(s"SELECT $flagsStr$projectStr FROM $fromStr$whereStr")
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    wrapStringStart(ctx)
+    ctx.sql.append("SELECT ")
+    if flags.contains(SelectFlags.Distinct) then ctx.sql.append("DISTINCT ")
+    project.computeSQL(ctx)
+    ctx.sql.append(" FROM ")
+    ctx.mkString(from, ", ")
+    if where.nonEmpty then
+      ctx.sql.append(" WHERE ")
+      if where.size == 1 then
+        where.head.computeSQL(ctx)
+      else
+        ctx.mkString(where, "(", " AND ", ")")
+    wrapStringEnd(ctx)
 
   override def toString: String = // for debugging
     s"SelectQuery(\n\talias=$alias,\n\tproject=$project,\n\tfrom=$from,\n\twhere=$where\n)"
@@ -303,13 +320,21 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
         flags = flags + f
     this
 
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    wrapString(s"${query.toSQLString()} ORDER BY ${sortFn.map(s =>
-      val varStr = s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
-        case v: SelectExpr => v.attrName
-        case o => o.toSQLString()
-      s"$varStr ${s._2.toString}"
-    ).mkString(", ")}")
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    wrapStringStart(ctx)
+    query.computeSQL(ctx)
+    ctx.sql.append(" ORDER BY ")
+    var first = true
+    for s <- sortFn do
+      if first then first = false else ctx.sql.append(", ")
+      s._1 match // NOTE: special case orderBy alias since for now, don't bother prefixing, TODO: which prefix to use for multi-relation select?
+        case v: SelectExpr =>
+          ctx.sql.append(v.attrName)
+        case o =>
+          o.computeSQL(ctx)
+      ctx.sql.append(" ")
+      ctx.sql.append(s._2.toString)
+    wrapStringEnd(ctx)
 
 /**
  * N-ary relation-level operation
@@ -372,8 +397,10 @@ case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseA
         flags = flags + f
         this
 
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    wrapString(children.map(_.toSQLString()).mkString(s" $op "))
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    wrapStringStart(ctx)
+    ctx.mkString(children, s" $op ")
+    wrapStringEnd(ctx)
 
 case class MultiRecursiveRelationOp(aliases: Seq[String],
                                     query: Seq[RelationOp],
@@ -404,16 +431,27 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
         flags = flags + f
     this
 
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
     // NOTE: no parens or alias needed, since already defined
-    val ctes = aliases.zip(query).map((a, q) => s"$a AS (${q.toSQLString()})").mkString(",\n")
-    s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
+    ctx.sql.append("WITH RECURSIVE ")
+    var first = true
+    for (a, q) <- aliases.zip(query) do
+      if first then first = false else ctx.sql.append(",\n")
+      ctx.sql.append(a)
+      ctx.sql.append(s" AS (")
+      q.computeSQL(ctx)
+      ctx.sql.append(")")
+    ctx.sql.append("\n ")
+    finalQ.computeSQL(ctx)
 
 /**
  * A recursive variable that points to a table or subquery.
  */
 case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST[?]) extends RelationOp:
-  override def computeSQLString(using d: Dialect)(using cnf: Config)() = s"$pointsToAlias as $alias"
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append(pointsToAlias)
+    ctx.sql.append(" as ")
+    ctx.sql.append(alias)
   override def toString: String = s"RVAR($alias->$pointsToAlias)"
 
   // TODO: for now reuse TableOp's methods
@@ -481,11 +519,12 @@ case class GroupByQuery(
         flags = flags + f
     this
 
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    val flagsStr = if flags.contains(SelectFlags.Distinct) then "DISTINCT " else ""
-    val sourceStr = source.toSQLString()
-    val groupByStr = groupBy.toSQLString()
-    val havingStr = if having.nonEmpty then
-      s" HAVING ${having.get.toSQLString()}" else
-      ""
-    wrapString(s"$sourceStr GROUP BY $groupByStr$havingStr")
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    wrapStringStart(ctx)
+    source.computeSQL(ctx)
+    ctx.sql.append(" GROUP BY ")
+    groupBy.computeSQL(ctx)
+    if having.nonEmpty then
+      ctx.sql.append(" HAVING ")
+      having.get.computeSQL(ctx)
+    wrapStringEnd(ctx)

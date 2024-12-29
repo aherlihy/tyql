@@ -1,5 +1,7 @@
 package tyql
 
+import com.mysql.cj.xdevapi.SqlResult
+
 // TODO can we source it from somewhere and not guess about this?
 // Current values were proposed on 2024-11-19 by Claude Sonnet 3.5 v20241022, and somewhat modifier later
 // Maybe compare with https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE which appear to be a little different
@@ -16,6 +18,25 @@ object Precedence {
   val Default        = 0
 }
 
+class SQLRenderingContext {
+  val sql = new StringBuilder
+  val parameters = new scala.collection.mutable.ArrayBuffer[Object]
+
+  def mkString(elements: Seq[QueryIRNode], sep: String)(using d: Dialect)(using cnf: Config): Unit =
+    mkString(elements, "", sep, "")(using d)(using cnf)
+
+  def mkString(elements: Seq[QueryIRNode], start: String, sep: String, end: String)(using d: Dialect)(using cnf: Config): Unit =
+    sql.append(start)
+    var first = true
+    for e <- elements do
+      if first then
+        first = false
+      else
+        sql.append(sep)
+      e.computeSQL(this)
+    sql.append(end)
+}
+
 /**
  * Nodes in the query IR tree, representing expressions / subclauses
  */
@@ -23,17 +44,25 @@ trait QueryIRNode:
   val ast: DatabaseAST[?] | Expr[?, ?] | Expr.Fun[?, ?, ?] // Best-effort, keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
 
   val precedence: Int = Precedence.Default
-  private var cached: java.util.concurrent.ConcurrentHashMap[(Dialect, Config), String] = null // do not allocate memory if unused
+  private var cached: java.util.concurrent.ConcurrentHashMap[(Dialect, Config), SQLRenderingContext] = null // do not allocate memory if unused
 
   final def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+    val (sql, _) = toSQLQuery()
+    sql
+
+  final private[tyql] def toSQLQuery(using d: Dialect)(using cnf: Config)(): (String, collection.mutable.ArrayBuffer[Object]) =
     if cached == null then
       this.synchronized {
         if cached == null then
-          cached = new java.util.concurrent.ConcurrentHashMap[(Dialect, Config), String]()
+          cached = new java.util.concurrent.ConcurrentHashMap[(Dialect, Config), SQLRenderingContext]()
       }
-    cached.computeIfAbsent((d, cnf), _ => computeSQLString(using d)(using cnf)())
+    val ctx = cached.computeIfAbsent((d, cnf), _ =>
+      val ctx = new SQLRenderingContext()
+      computeSQL(using d)(using cnf)(ctx)
+      ctx)
+    (ctx.sql.toString, ctx.parameters)
 
-  protected def computeSQLString(using d: Dialect)(using cnf: Config)(): String
+  private[tyql] def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit
 
 trait QueryIRLeaf extends QueryIRNode
 
@@ -41,17 +70,33 @@ trait QueryIRLeaf extends QueryIRNode
  * Single WHERE clause containing 1+ predicates
  */
 case class WhereClause(children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = if children.size == 1 then children.head.toSQLString() else  s"${children.map(_.toSQLString()).mkString("", " AND ", "")}"
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    if children.size == 1 then
+      children.head.computeSQL(ctx)
+    else
+      ctx.mkString(children, " AND ")
 
 /**
  * Binary expression-level operation.
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
  */
-case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: (String, String) => String, override val precedence: Int, ast: Expr[?, ?]) extends QueryIRNode:
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    val leftStr = if needsParens(lhs) then s"(${lhs.toSQLString()})" else lhs.toSQLString()
-    val rightStr = if needsParens(rhs) then s"(${rhs.toSQLString()})" else rhs.toSQLString()
-    op(leftStr, rightStr)
+case class BinExprOp(pre: String, lhs: QueryIRNode, mid: String, rhs: QueryIRNode, post: String, override val precedence: Int, ast: Expr[?, ?]) extends QueryIRNode:
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append(pre)
+    if needsParens(lhs) then
+      ctx.sql.append("(")
+      lhs.computeSQL(ctx)
+      ctx.sql.append(")")
+    else
+      lhs.computeSQL(ctx)
+    ctx.sql.append(mid)
+    if needsParens(rhs) then
+      ctx.sql.append("(")
+      rhs.computeSQL(ctx)
+      ctx.sql.append(")")
+    else
+      rhs.computeSQL(ctx)
+    ctx.sql.append(post)
 
   private def needsParens(node: QueryIRNode): Boolean =
     // TODO should this be specialized into needsLeftParen and needsRightParen?
@@ -62,50 +107,76 @@ case class BinExprOp(lhs: QueryIRNode, rhs: QueryIRNode, op: (String, String) =>
  * Unary expression-level operation.
  * TODO: cannot assume the operation is universal, need to specialize for DB backend
  */
-case class UnaryExprOp(child: QueryIRNode, op: String => String, ast: Expr[?, ?]) extends QueryIRNode:
+case class UnaryExprOp(pre: String, child: QueryIRNode, post: String, ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence: Int = Precedence.Unary
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = op(s"${child.toSQLString()}")
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append(pre)
+    child.computeSQL(ctx)
+    ctx.sql.append(post)
 
 case class FunctionCallOp(name: String, children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence = Precedence.Literal
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = s"$name(" + children.map(_.toSQLString()).mkString(", ") + ")"
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append(name)
+    ctx.mkString(children, "(", ", ", ")")
 
 /**
  * CASE statement called "searched" in the standard. This is like a multi-arm if-else statement.
  */
 case class SearchedCaseOp(whenClauses: Seq[(QueryIRNode, QueryIRNode)], elseClause: Option[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence = Precedence.Literal
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    val whenStr = whenClauses.map { case (cond, res) => s"WHEN ${cond.toSQLString()} THEN ${res.toSQLString()}" }.mkString(" ")
-    val elseStr = elseClause.map(e => s" ELSE ${e.toSQLString()}").getOrElse("")
-    s"CASE $whenStr$elseStr END"
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append("CASE ")
+    var first = true
+    for (cond, res) <- whenClauses do
+      if first then first = false else ctx.sql.append(" ")
+      ctx.sql.append("WHEN ")
+      cond.computeSQL(ctx)
+      ctx.sql.append(" THEN ")
+      res.computeSQL(ctx)
+    if elseClause.nonEmpty then
+      ctx.sql.append(" ELSE ")
+      elseClause.get.computeSQL(ctx)
+    ctx.sql.append(" END")
 
 /**
  * CASE statement called "simple" in the standard. This is a vague equivalent of Scala's match expression.
  */
 case class SimpleCaseOp(expr: QueryIRNode, whenClauses: Seq[(QueryIRNode, QueryIRNode)], elseClause: Option[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence = Precedence.Literal
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    val exprStr = expr.toSQLString()
-    val whenStr = whenClauses.map { case (cond, res) => s"WHEN ${cond.toSQLString()} THEN ${res.toSQLString()}" }.mkString(" ")
-    val elseStr = elseClause.map(e => s" ELSE ${e.toSQLString()}").getOrElse("")
-    s"CASE $exprStr $whenStr$elseStr END"
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append("CASE ")
+    expr.computeSQL(ctx)
+    ctx.sql.append(" ")
+    var first = true
+    for (cond, res) <- whenClauses do
+      if first then first = false else ctx.sql.append(" ")
+      ctx.sql.append("WHEN ")
+      cond.computeSQL(ctx)
+      ctx.sql.append(" THEN ")
+      res.computeSQL(ctx)
+    if elseClause.nonEmpty then
+      ctx.sql.append(" ELSE ")
+      elseClause.get.computeSQL(ctx)
+    ctx.sql.append(" END")
 
 /**
  * For when we include something that does not make sense to represent fully in the IR, for example some one-off per-dialect features.
  */
 case class RawSQLInsertOp(snippet: SqlSnippet, replacements: Map[String, QueryIRNode], override val precedence: Int, ast: Expr[?, ?]) extends QueryIRNode:
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
     assert(replacements.keySet == snippet.sql.filter{ case (s: String) => false ; case (name: String, prec: Int) => true }.map{ case (name: String, prec: Int) => name ; case _ => assert(false) }.toSet)
     assert(precedence == snippet.precedence)
     snippet.sql.map {
-      case s: String => s
+      case s: String => ctx.sql.append(s)
       case (name: String, placementPrecedence: Int) =>
         val innerPrecedence = replacements(name).precedence
         if innerPrecedence <= placementPrecedence then
-          s"(${replacements(name).toSQLString()})"
+          ctx.sql.append("(")
+          replacements(name).computeSQL(ctx)
+          ctx.sql.append(")")
         else
-          replacements(name).toSQLString()
+          replacements(name).computeSQL(ctx)
     }.mkString
 
 /**
@@ -114,7 +185,8 @@ case class RawSQLInsertOp(snippet: SqlSnippet, replacements: Map[String, QueryIR
  * @param ast
  */
 case class ProjectClause(children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = children.map(_.toSQLString()).mkString("", ", ", "")
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.mkString(children, ", ")
 
 /**
  * Named or unnamed attribute select expression, e.g. `table.rowName as customName`
@@ -122,26 +194,31 @@ case class ProjectClause(children: Seq[QueryIRNode], ast: Expr[?, ?]) extends Qu
  * Note projected attributes with names is not the same as aliasing, and just exists for readability
  */
 case class AttrExpr(child: QueryIRNode, projectedName: Option[String], ast: Expr[?, ?])(using d: Dialect) extends QueryIRNode:
-  val asStr = projectedName match
-    case Some(value) => s" as ${d.quoteIdentifier(value)}"
-    case None => ""
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = s"${child.toSQLString()}$asStr"
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    child.computeSQL(ctx)
+    projectedName match
+      case Some(value) =>
+        ctx.sql.append(" as ")
+        ctx.sql.append(d.quoteIdentifier(value))
+      case None => ()
 
 /**
  * Attribute access expression, e.g. `table.rowName`.
  */
 case class SelectExpr(attrName: String, from: QueryIRNode, ast: Expr[?, ?]) extends QueryIRLeaf:
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String =
-    s"${from.toSQLString()}.${d.quoteIdentifier(cnf.caseConvention.convert(attrName))}"
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    from.computeSQL(ctx)
+    ctx.sql.append(".")
+    ctx.sql.append(d.quoteIdentifier(cnf.caseConvention.convert(attrName)))
 
 /**
  * A variable that points to a table or subquery.
  */
 case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?]) extends QueryIRLeaf:
-  override def computeSQLString(using d: Dialect)(using cnf: Config)() =
-    d.quoteIdentifier(cnf.caseConvention.convert(toSub.alias))
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append(d.quoteIdentifier(cnf.caseConvention.convert(toSub.alias)))
 
-  override def toString: String = s"VAR(${toSub.alias}.${name})" // TODO what about this?
+  override def toString: String = s"VAR(${toSub.alias}.${name})"
 
 /**
  * Literals.
@@ -149,17 +226,19 @@ case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?]) exte
  */
 case class Literal(stringRep: String, ast: Expr[?, ?]) extends QueryIRLeaf:
   override val precedence: Int = Precedence.Literal
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = stringRep
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append(stringRep)
 
 /**
  * List expression, for DBs that support lists/arrays.
  */
 case class ListTypeExpr(elements: List[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence: Int = Precedence.Literal
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = elements.map(_.toSQLString()).mkString("[", ", ", "]")
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.mkString(elements, "[", ", ", "]")
 
 /**
  * Empty leaf node, to avoid Options everywhere.
  */
 case class EmptyLeaf(ast: DatabaseAST[?] = null) extends QueryIRLeaf:
-  override def computeSQLString(using d: Dialect)(using cnf: Config)(): String = ""
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit = ()

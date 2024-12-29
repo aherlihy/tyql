@@ -29,8 +29,13 @@ object CaseConvention:
   private def splitName(name: String): List[String] =
     name.split("(?=[A-Z])|[_\\s]").filter(_.nonEmpty).map(_.toLowerCase).toList
 
+enum ParameterStyle:
+  case EscapedInline
+  case DriverParametrized
+
 trait Config (
-  val caseConvention: CaseConvention
+  val caseConvention: CaseConvention,
+  val providingArguments: ParameterStyle = ParameterStyle.DriverParametrized
 )
 
 object Config:

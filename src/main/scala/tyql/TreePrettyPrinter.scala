@@ -271,11 +271,11 @@ object TreePrettyPrinter {
       case unaryOp: UnaryExprOp =>
         val childPrint = unaryOp.child.prettyPrintIR(depth + 1, printAST)
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", unaryOp.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}UnaryExprOp(\n${indent(depth + 1)}op='${unaryOp.op("...")}',\n$childPrint$astPrint\n${indent(depth)})"
+        s"${indent(depth)}UnaryExprOp(\n${indent(depth + 1)}op='${unaryOp.pre + "..." + unaryOp.post}',\n$childPrint$astPrint\n${indent(depth)})"
       case binOp: BinExprOp =>
         val lhsPrint = binOp.lhs.prettyPrintIR(depth + 1, printAST)
         val rhsPrint = binOp.rhs.prettyPrintIR(depth + 1, printAST)
-        val opPrint = binOp.op("'..1'", "'..2'")
+        val opPrint = s"${binOp.pre}'..1'${binOp.mid}'..2'${binOp.post}"
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", binOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}BinExprOp(\n${indent(depth + 1)}op='$opPrint',\n$lhsPrint,\n$rhsPrint$astPrint\n${indent(depth)})"
       case listType: ListTypeExpr =>

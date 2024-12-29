@@ -346,25 +346,25 @@ object QueryIRTree:
       case p: Expr.Project[?] => generateProjection(p, symbols)
       case c: Expr.Cast[?, ?, ?] =>
         c.resultType match
-          case CastTarget.CString => UnaryExprOp(generateExpr(c.$x, symbols), o => s"CAST($o AS ${d.stringCast})", c)
-          case CastTarget.CBool => UnaryExprOp(generateExpr(c.$x, symbols), o => s"CAST($o AS ${d.booleanCast})", c)
-          case CastTarget.CDouble => UnaryExprOp(generateExpr(c.$x, symbols), o => s"CAST($o AS ${d.doubleCast})", c)
-          case CastTarget.CInt => UnaryExprOp(generateExpr(c.$x, symbols), o => s"CAST($o AS ${d.integerCast})", c)
-      case g: Expr.Gt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", Precedence.Comparison, g)
-      case g: Expr.Lt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", Precedence.Comparison, g)
-      case g: Expr.Lte[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", Precedence.Comparison, g)
-      case g: Expr.Gte[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l >= $r", Precedence.Comparison, g)
-      case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", Precedence.And, a)
-      case a: Expr.Or[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l OR $r", Precedence.Or, a)
-      case Expr.Not(inner: Expr.IsNull[?, ?]) => UnaryExprOp(generateExpr(inner.$x, symbols), o => s"$o IS NOT NULL", ast)
-      case n: Expr.Not[?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", n)
-      case x: Expr.Xor[?] => BinExprOp(generateExpr(x.$x, symbols), generateExpr(x.$y, symbols), ((l, r) =>
+          case CastTarget.CString => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.stringCast})", c)
+          case CastTarget.CBool => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.booleanCast})", c)
+          case CastTarget.CDouble => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.doubleCast})", c)
+          case CastTarget.CInt => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.integerCast})", c)
+      case g: Expr.Gt[?, ?, ?, ?] => BinExprOp("", generateExpr(g.$x, symbols), " > ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case g: Expr.Lt[?, ?, ?, ?] => BinExprOp("", generateExpr(g.$x, symbols), " < ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case g: Expr.Lte[?, ?, ?, ?] => BinExprOp("", generateExpr(g.$x, symbols), " <= ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case g: Expr.Gte[?, ?, ?, ?] => BinExprOp("", generateExpr(g.$x, symbols), " >= ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case a: Expr.And[?, ?] => BinExprOp("", generateExpr(a.$x, symbols), " AND ", generateExpr(a.$y, symbols), "", Precedence.And, a)
+      case a: Expr.Or[?, ?] => BinExprOp("", generateExpr(a.$x, symbols), " OR ", generateExpr(a.$y, symbols), "", Precedence.Or, a)
+      case Expr.Not(inner: Expr.IsNull[?, ?]) => UnaryExprOp("", generateExpr(inner.$x, symbols), " IS NOT NULL", ast)
+      case n: Expr.Not[?] => UnaryExprOp("NOT ", generateExpr(n.$x, symbols), "", n)
+      case x: Expr.Xor[?] =>
         d.xorOperatorSupportedNatively match
-          case true => s"$l XOR $r"
+          case true =>
+            BinExprOp("", generateExpr(x.$x, symbols), " XOR ", generateExpr(x.$y, symbols), "", 45, x)
           case false =>
             polyfillWasUsed()
-            s"($l = TRUE) <> ($r = TRUE)"
-        ), if d.xorOperatorSupportedNatively then 45 else 43, x) // TODO precedence?
+            BinExprOp("(", generateExpr(x.$x, symbols), " = TRUE) <> (", generateExpr(x.$y, symbols), " = TRUE)", 43, x)
       case f0: Expr.FunctionCall0[?] => FunctionCallOp(f0.name, Seq(), f0)
       case f1: Expr.FunctionCall1[?, ?, ?] => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
       case f2: Expr.FunctionCall2[?, ?, ?, ?, ?] => FunctionCallOp(f2.name, Seq(f2.$a1, f2.$a1).map(generateExpr(_, symbols)), f2)
@@ -383,11 +383,11 @@ object QueryIRTree:
           Map("a" -> generateExpr(i.$x, symbols), "b" -> generateExpr(i.$y, symbols)),
           d.feature_RandomInt_rawSQL.precedence,
           i)
-      case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", Precedence.Additive, a)
-      case a: Expr.Minus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l - $r", Precedence.Additive, a)
-      case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", Precedence.Multiplicative, a)
-      case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", Precedence.Comparison, a)
-      case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", Precedence.Comparison, a)
+      case a: Expr.Plus[?, ?, ?] => BinExprOp("", generateExpr(a.$x, symbols), " + ", generateExpr(a.$y, symbols), "", Precedence.Additive, a)
+      case a: Expr.Minus[?, ?, ?] => BinExprOp("", generateExpr(a.$x, symbols), " - ", generateExpr(a.$y, symbols), "", Precedence.Additive, a)
+      case a: Expr.Times[?, ?, ?] => BinExprOp("", generateExpr(a.$x, symbols), " * ", generateExpr(a.$y, symbols), "", Precedence.Multiplicative, a)
+      case a: Expr.Eq[?, ?] => BinExprOp("", generateExpr(a.$x, symbols), " = ", generateExpr(a.$y, symbols), "", Precedence.Comparison, a)
+      case a: Expr.Ne[?, ?] => BinExprOp("", generateExpr(a.$x, symbols), " <> ", generateExpr(a.$y, symbols), "", Precedence.Comparison, a)
       case e: Expr.NullSafeEq[?, ?] =>
         val a = ("a", Precedence.Comparison)
         val b = ("b", Precedence.Comparison)
@@ -405,7 +405,7 @@ object QueryIRTree:
           RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"NOT($a <=> $b)"), Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)), Precedence.Unary, e)
         else
           RawSQLInsertOp(SqlSnippet(Precedence.Comparison, snippet"$a IS DISTINCT FROM $b"), Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)), Precedence.Comparison, e)
-      case a: Expr.Modulo[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l % $r", Precedence.Multiplicative, a)
+      case a: Expr.Modulo[?, ?] => BinExprOp("", generateExpr(a.$x, symbols), " % ", generateExpr(a.$y, symbols), "", Precedence.Multiplicative, a)
       case r: Expr.Round[?, ?] => FunctionCallOp("ROUND", Seq(generateExpr(r.$x, symbols)), r)
       case r: Expr.RoundWithPrecision[?, ?, ?] => FunctionCallOp("ROUND", Seq(generateExpr(r.$x, symbols), generateExpr(r.$precision, symbols)), r)
       case c: Expr.Ceil[?, ?] => FunctionCallOp("CEIL", Seq(generateExpr(c.$x, symbols)), c)
@@ -433,14 +433,16 @@ object QueryIRTree:
           case _ => throw new Exception("Unimplemented: concatting something that is not a literal nor a variable")
 
         BinExprOp(
+          "",
           lhsIR,
+          ", ",
           rhsIR,
-          (l, r) => s"$l, $r",
+          "",
           Precedence.Concat,
           a
         )
       case n: Expr.NullLit[?] => Literal("NULL", n)
-      case i: Expr.IsNull[?, ?] => UnaryExprOp(generateExpr(i.$x, symbols), o => s"$o IS NULL", i)
+      case i: Expr.IsNull[?, ?] => UnaryExprOp("", generateExpr(i.$x, symbols), " IS NULL", i)
       case c: Expr.Coalesce[?, ?] => FunctionCallOp("COALESCE", (Seq(c.$x1, c.$x2) ++ c.$xs).map(generateExpr(_, symbols)), c)
       case i: Expr.NullIf[?, ?, ?] => FunctionCallOp("NULLIF", Seq(generateExpr(i.$x, symbols), generateExpr(i.$y, symbols)), i)
       case l: Expr.DoubleLit => Literal(s"${l.$value}", l)
@@ -449,16 +451,16 @@ object QueryIRTree:
       case l: Expr.BooleanLit => Literal(d.quoteBooleanLiteral(l.$value), l)
       case c: Expr.SearchedCase[?, ?, ?] => SearchedCaseOp(c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))), c.$else.map(generateExpr(_, symbols)), c)
       case c: Expr.SimpleCase[?, ?, ?, ?] => SimpleCaseOp(generateExpr(c.$expr, symbols), c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))), c.$else.map(generateExpr(_, symbols)), c)
-      case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
-      case l: Expr.Upper[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"UPPER($o)", l)
-      case l: Expr.StrReverse[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"REVERSE($o)", l)
-      case l: Expr.Trim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"TRIM($o)", l)
-      case l: Expr.LTrim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LTRIM($o)", l)
-      case l: Expr.RTrim[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"RTRIM($o)", l)
+      case l: Expr.Lower[?] => UnaryExprOp("LOWER(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.Upper[?] => UnaryExprOp("UPPER(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.StrReverse[?] => UnaryExprOp("REVERSE(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.Trim[?] => UnaryExprOp("TRIM(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.LTrim[?] => UnaryExprOp("LTRIM(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.RTrim[?] => UnaryExprOp("RTRIM(", generateExpr(l.$x, symbols), ")", l)
       case l: Expr.StrReplace[?, ?] => FunctionCallOp("REPLACE", Seq(generateExpr(l.$s, symbols), generateExpr(l.$from, symbols), generateExpr(l.$to, symbols)), l)
       case l: Expr.StrLike[?, ?] =>
         l.$pattern match
-          case Expr.StringLit(pattern) => BinExprOp(generateExpr(l.$s, symbols), Literal(d.quoteStringLiteral(pattern, insideLikePattern=true), l.$pattern), (l, r) => s"$l LIKE $r", Precedence.Comparison, l)
+          case Expr.StringLit(pattern) => BinExprOp("", generateExpr(l.$s, symbols), "LIKE ", Literal(d.quoteStringLiteral(pattern, insideLikePattern=true), l.$pattern), "", Precedence.Comparison, l)
           case _ => assert(false, "LIKE pattern must be a string literal")
       case l: Expr.Substring[?, ?] =>
         if l.$len.isEmpty then
@@ -468,8 +470,12 @@ object QueryIRTree:
       case l: Expr.StrConcat[?, ?] => FunctionCallOp("CONCAT", (Seq(l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
       case l: Expr.StrConcatUniform[?] => FunctionCallOp("CONCAT", (Seq(l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
       case l: Expr.StrConcatSeparator[?, ?] => FunctionCallOp("CONCAT_WS", (Seq(l.$sep, l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
-      case l: Expr.StringCharLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"${d.stringLengthByCharacters}($o)", l)
-      case l: Expr.StringByteLength[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => if d.stringLengthBytesNeedsEncodeFirst then s"OCTET_LENGTH(ENCODE($o))" else s"OCTET_LENGTH($o)", l)
+      case l: Expr.StringCharLength[?] => UnaryExprOp(d.stringLengthByCharacters + "(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.StringByteLength[?] =>
+        if d.stringLengthBytesNeedsEncodeFirst then
+          UnaryExprOp("OCTET_LENGTH(ENCODE(", generateExpr(l.$x, symbols), "))", l)
+        else
+          UnaryExprOp("OCTET_LENGTH(", generateExpr(l.$x, symbols), ")", l)
       case l: Expr.StrRepeat[?, ?] =>
         if !d.needsStringRepeatPolyfill then
           FunctionCallOp("REPEAT", Seq(generateExpr(l.$s, symbols), generateExpr(l.$n, symbols)), l)
@@ -506,26 +512,26 @@ object QueryIRTree:
                          Precedence.Unary,
                          l)
       case l: Expr.StrPositionIn[?, ?] => d.stringPositionFindingVia match
-        case "POSITION" => BinExprOp(generateExpr(l.$substr, symbols), generateExpr(l.$string, symbols), (l, r) => s"POSITION($l IN $r)", Precedence.Unary, l)
+        case "POSITION" => BinExprOp("POSITION(", generateExpr(l.$substr, symbols), " IN ", generateExpr(l.$string, symbols), ")", Precedence.Unary, l)
         case "LOCATE" => FunctionCallOp("LOCATE", Seq(generateExpr(l.$substr, symbols), generateExpr(l.$string, symbols)), l)
         case "INSTR" => FunctionCallOp("INSTR", Seq(generateExpr(l.$string, symbols), generateExpr(l.$substr, symbols)), l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
-      case p: Expr.ListPrepend[?] => BinExprOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), (l, r) => s"list_prepend($l, $r)", Precedence.Unary, p)
-      case p: Expr.ListAppend[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_append($l, $r)", Precedence.Unary, p)
-      case p: Expr.ListContains[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_contains($l, $r)", Precedence.Unary, p)
-      case p: Expr.ListLength[?] => UnaryExprOp(generateExpr(p.$list, symbols), s => s"length($s)", p)
-      case p: Expr.NonEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"EXISTS ($s)", p)
-      case p: Expr.IsEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"NOT EXISTS ($s)", p)
+      case p: Expr.ListPrepend[?] => BinExprOp("list_prepend(", generateExpr(p.$x, symbols), ", ", generateExpr(p.$list, symbols), ")", Precedence.Unary, p)
+      case p: Expr.ListAppend[?] => BinExprOp("list_append(", generateExpr(p.$list, symbols), ", ", generateExpr(p.$x, symbols), ")", Precedence.Unary, p)
+      case p: Expr.ListContains[?] => BinExprOp("list_contains(", generateExpr(p.$list, symbols), ", ", generateExpr(p.$x, symbols), ")", Precedence.Unary, p)
+      case p: Expr.ListLength[?] => UnaryExprOp("length(", generateExpr(p.$list, symbols), ")", p)
+      case p: Expr.NonEmpty[?] => UnaryExprOp("EXISTS (", generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), ")", p)
+      case p: Expr.IsEmpty[?] => UnaryExprOp("NOT EXISTS (", generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), ")", p)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
   private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match
-      case s: AggregationExpr.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
-      case s: AggregationExpr.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
-      case s: AggregationExpr.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
-      case s: AggregationExpr.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
-      case c: AggregationExpr.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT($o)", c)
+      case s: AggregationExpr.Sum[?] => UnaryExprOp("SUM(", generateExpr(s.$a, symbols), ")", s)
+      case s: AggregationExpr.Avg[?] => UnaryExprOp("AVG(", generateExpr(s.$a, symbols), ")", s)
+      case s: AggregationExpr.Min[?] => UnaryExprOp("MIN(", generateExpr(s.$a, symbols), ")", s)
+      case s: AggregationExpr.Max[?] => UnaryExprOp("MAX(", generateExpr(s.$a, symbols), ")", s)
+      case c: AggregationExpr.Count[?] => UnaryExprOp("COUNT(", generateExpr(c.$a, symbols), ")", c)
       case p: AggregationExpr.AggProject[?] => generateProjection(p, symbols)
       case _ => throw new Exception(s"Unimplemented aggregation op: $ast")
