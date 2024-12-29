@@ -28,7 +28,13 @@ class DB(conn: Connection) {
       case tyql.ParameterStyle.DriverParametrized =>
         val ps = conn.prepareStatement(sqlString)
         for (i <- 0 until parameters.length) do
-          ps.setObject(i + 1, parameters(i))
+          parameters(i) match
+            case null => ps.setNull(i + 1, java.sql.Types.NULL)
+            case v if v.isInstanceOf[Long] => ps.setLong(i + 1, v.asInstanceOf[Long])
+            case v if v.isInstanceOf[Int] => ps.setInt(i + 1, v.asInstanceOf[Int])
+            case v if v.isInstanceOf[Double] => ps.setDouble(i + 1, v.asInstanceOf[Double])
+            case v if v.isInstanceOf[String] => ps.setString(i + 1, v.asInstanceOf[String])
+            case v => ps.setObject(i + 1, v)
         rs = ps.executeQuery()
       case tyql.ParameterStyle.EscapedInline =>
         rs = stmt.executeQuery(sqlString)
