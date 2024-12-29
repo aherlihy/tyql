@@ -38,6 +38,14 @@ We provide a `dev.sh` script to manage the development environment using Docker 
 # Run all tests
 ./dev.sh test
 ```
+
+**But** you probably want to use the following. Running tests locally does not mess with the `.metal` and `.bloop` directories, which means that your IDE tooling will not desynchronize, which would mean the need for cleaning and re-importing.
+```bash
+./dev.sh db-start
+sbt run test
+./dev.sh test
+```
+
 For convenience, bash completion is provided for the `dev.sh` script. To enable it:
 ```bash
 # Add this to your ~/.bashrc or ~/.bash_profile
