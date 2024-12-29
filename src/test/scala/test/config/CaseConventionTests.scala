@@ -50,7 +50,7 @@ class CaseConventionTests extends FunSuite {
       assertEquals(c.caseConvention.convert("aa bb cc"), "aaBbCc")
       assertEquals(c.caseConvention.convert("aaBb_cc"), "aaBbCc")
     }
-    given Config = new Config(caseConvention = CaseConvention.CamelCase, parameterStyle = ParameterStyle.EscapedInline) {}
+    given Config = new Config(caseConvention = CaseConvention.CamelCase) {}
     check()
   }
 
@@ -79,13 +79,13 @@ class CaseConventionTests extends FunSuite {
         finally stmt.close()
       }
 
-      check("caseCon ventionTests 19471", "aaBb_Cc")(using new Config(CaseConvention.Exact, ParameterStyle.EscapedInline) {})
-      check("caseConventionTests19471", "aaBbCc")(using new Config(CaseConvention.CamelCase, ParameterStyle.EscapedInline) {})
-      check("CaseConventionTests19471", "AaBbCc")(using new Config(CaseConvention.PascalCase, ParameterStyle.EscapedInline) {})
-      check("case_convention_tests19471", "aa_bb_cc")(using new Config(CaseConvention.Underscores, ParameterStyle.EscapedInline) {})
-      check("CaseConventionTests19471", "aaBb_Cc", postgresTableName="CASE_CONVENTION_TESTS19471", postgresColumnName="AA_BB_CC")(using new Config(CaseConvention.CapitalUnderscores, ParameterStyle.EscapedInline) {}) // XXX AA_BB_CC would be interpreted as a_a_b_c !
-      check("caseconventiontests19471", "aabbcc")(using new Config(CaseConvention.Joined, ParameterStyle.EscapedInline) {})
-      check("CaseConventionTests19471", "aaBb_Cc", postgresTableName="CASECONVENTIONTESTS19471", postgresColumnName="AABBCC")(using new Config(CaseConvention.JoinedCapital, ParameterStyle.EscapedInline) {}) // XXX AA_BB_CC would be interpreted as a_a_b_c !
+      check("caseCon ventionTests 19471", "aaBb_Cc")(using new Config(caseConvention = CaseConvention.Exact) {})
+      check("caseConventionTests19471", "aaBbCc")(using new Config(caseConvention = CaseConvention.CamelCase) {})
+      check("CaseConventionTests19471", "AaBbCc")(using new Config(caseConvention = CaseConvention.PascalCase) {})
+      check("case_convention_tests19471", "aa_bb_cc")(using new Config(caseConvention = CaseConvention.Underscores) {})
+      check("CaseConventionTests19471", "aaBb_Cc", postgresTableName="CASE_CONVENTION_TESTS19471", postgresColumnName="AA_BB_CC")(using new Config(caseConvention = CaseConvention.CapitalUnderscores) {}) // XXX AA_BB_CC would be interpreted as a_a_b_c !
+      check("caseconventiontests19471", "aabbcc")(using new Config(caseConvention = CaseConvention.Joined) {})
+      check("CaseConventionTests19471", "aaBb_Cc", postgresTableName="CASECONVENTIONTESTS19471", postgresColumnName="AABBCC")(using new Config(caseConvention = CaseConvention.JoinedCapital) {}) // XXX AA_BB_CC would be interpreted as a_a_b_c !
       // TODO document this weird (?) behavior, or maybe change it?
       // In the Scala code you must use `_`s or capital letters as separators, and the config
       //   changes only what is ouputted to the DB, so you cannot use something like ABC as the column name from

@@ -34,9 +34,9 @@ enum ParameterStyle:
   case DriverParametrized
 
 trait Config (
-  val caseConvention: CaseConvention,
-  val parameterStyle: ParameterStyle
+  val caseConvention: CaseConvention = CaseConvention.Exact,
+  val parameterStyle: ParameterStyle = ParameterStyle.EscapedInline,
 )
 
 object Config:
-  given Config = new Config(CaseConvention.Exact, ParameterStyle.EscapedInline) {}
+  given Config = new Config() {}
