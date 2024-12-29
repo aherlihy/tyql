@@ -55,7 +55,7 @@ object Aggregation:
 
       val groupResult = groupingFn(refsTuple)
 
-      Query.NewGroupBy(this, groupResult, argRefs, sourceTags, None)
+      Query.NewGroupBy(this, groupResult, argRefs.toIndexedSeq, sourceTags, None)
 
   case class AggFilter[A: ResultTag]($from: Query[A, ?], $pred: Expr.Pred[A, ScalarExpr]) extends Aggregation[A *: EmptyTuple, A]:
     def groupBySource[GroupResult, GroupShape <: ExprShape]
