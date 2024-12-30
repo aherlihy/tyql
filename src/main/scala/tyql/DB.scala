@@ -9,6 +9,8 @@ import scala.Tuple
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
+import tyql._
+import tyql.Expr._
 
 class DB(conn: Connection) {
 
@@ -46,7 +48,6 @@ class DB(conn: Connection) {
     val columnCount = metadata.getColumnCount()
     var results = List[T]()
     while (rs.next()) {
-      println("RESULT TAG IS " + resultTag.toString)
       val row = resultTag match
         case ResultTag.IntTag => rs.getInt(1)
         case ResultTag.DoubleTag => rs.getDouble(1)
@@ -147,4 +148,21 @@ def driverMain(): Unit = {
   val zzz3 = db.run(t.max(_.flowerSize))
   println("received:")
   pprintln(zzz3)
+
+
+  println("------------5------------")
+  val wfr = db.run(t.map(r =>
+    (name = r.name,
+     size = r.flowerSize,
+     sizePartition = sum(r.flowerSize).partitionBy(r.likes))))
+  println("received:")
+  pprintln(wfr)
+
+  println("------------6------------")
+  val wfr2 = db.run(t.map(r =>
+    (name = r.name,
+     size = r.flowerSize,
+     sizePartition = rowNumber.partitionBy(r.likes))))
+  println("received:")
+  pprintln(wfr2)
 }

@@ -192,6 +192,21 @@ object Expr:
   @targetName("stringCnt")
   def count(x: Expr[String, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
 
+  // Window function expressions
+  def rowNumber: ExprInWindowPosition[Int] = RowNumber()
+  def rank: ExprInWindowPosition[Int] = Rank()
+  def denseRank: ExprInWindowPosition[Int] = DenseRank()
+  def ntile(n: Int): ExprInWindowPosition[Int] = NTile(n)
+  def lag[R, S <: ExprShape](e: Expr[R, S], offset: Int, default: Expr[R, S])(using ResultTag[R]): ExprInWindowPosition[R] = Lag(e, Some(offset), Some(default))
+  def lag[R, S <: ExprShape](e: Expr[R, S], offset: Int)(using ResultTag[R]): ExprInWindowPosition[R] = Lag(e, Some(offset), None)
+  def lag[R, S <: ExprShape](e: Expr[R, S])(using ResultTag[R]): ExprInWindowPosition[R] = Lag(e, None, None)
+  def lead[R, S <: ExprShape](e: Expr[R, S], offset: Int, default: Expr[R, S])(using ResultTag[R]): ExprInWindowPosition[R] = Lead(e, Some(offset), Some(default))
+  def lead[R, S <: ExprShape](e: Expr[R, S], offset: Int)(using ResultTag[R]): ExprInWindowPosition[R] = Lead(e, Some(offset), None)
+  def lead[R, S <: ExprShape](e: Expr[R, S])(using ResultTag[R]): ExprInWindowPosition[R] = Lead(e, None, None)
+  def firstValue[R, S <: ExprShape](e: Expr[R, S])(using ResultTag[R]): ExprInWindowPosition[R] = FirstValue(e)
+  def lastValue[R, S <: ExprShape](e: Expr[R, S])(using ResultTag[R]): ExprInWindowPosition[R] = LastValue(e)
+  def nthValue[R, S <: ExprShape](e: Expr[R, S], n: Int)(using ResultTag[R]): ExprInWindowPosition[R] = NthValue(e, n)
+
   // TODO aren't these types too restrictive?
   def cases[T: ResultTag, SC <: ExprShape, SV <: ExprShape](firstCase: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV]), restOfCases: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV])*): Expr[T, SV] =
     var mainCases: collection.mutable.ArrayBuffer[(Expr[Boolean, SC], Expr[T, SV])] = collection.mutable.ArrayBuffer.empty

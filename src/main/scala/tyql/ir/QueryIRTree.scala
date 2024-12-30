@@ -91,6 +91,7 @@ object QueryIRTree:
 
   private def collapseSort(sorts: Seq[(Expr.Fun[?, ?, ?], Ord)], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[(Expr.Fun[?, ?, ?], Ord)], DatabaseAST[?]) =
     comprehension match
+      // TODO are you sure about this order? now _.sort().sort() will have different semantics than in Scala!
       case sort: Query.Sort[?, ?, ?] =>
         collapseSort(sorts :+ (sort.$body, sort.$ord), sort.$from, symbols)
       case _ => (sorts, comprehension)
@@ -336,6 +337,33 @@ object QueryIRTree:
       )
     ProjectClause(children, p)
 
+  private def generateExprInWindowPosition(ast: ExprInWindowPosition[?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
+    ast match
+      case _: RowNumber => FunctionCallOp("ROW_NUMBER", Seq(), Expr.FunctionCall0[Int]("ROW_NUMBER"))
+      case _: Rank => FunctionCallOp("RANK", Seq(), Expr.FunctionCall0[Int]("RANK"))
+      case _: DenseRank => FunctionCallOp("DENSE_RANK", Seq(), Expr.FunctionCall0[Int]("DENSE_RANK"))
+      case n: NTile => FunctionCallOp("NTILE", Seq(LiteralInteger(n.n, Expr.IntLit(n.n))), Expr.FunctionCall1[Int, Int, NonScalarExpr]("NTILE", Expr.IntLit(n.n)))
+      case l: Lag[?, ?] =>
+        if l.default.isDefined then
+          FunctionCallOp("LAG", Seq(generateExpr(l.e, symbols), LiteralInteger(l.offset.get, Expr.IntLit(l.offset.get)), generateExpr(l.default.get, symbols)), null)
+        else if l.offset.isDefined then
+          FunctionCallOp("LAG", Seq(generateExpr(l.e, symbols), LiteralInteger(l.offset.get, Expr.IntLit(l.offset.get))), null)
+        else
+          FunctionCallOp("LAG", Seq(generateExpr(l.e, symbols)), null)
+      case l: Lead[?, ?] =>
+        if l.default.isDefined then
+          FunctionCallOp("LEAD", Seq(generateExpr(l.e, symbols), LiteralInteger(l.offset.get, Expr.IntLit(l.offset.get)), generateExpr(l.default.get, symbols)), null)
+        else if l.offset.isDefined then
+          FunctionCallOp("LEAD", Seq(generateExpr(l.e, symbols), LiteralInteger(l.offset.get, Expr.IntLit(l.offset.get))), null)
+        else
+          FunctionCallOp("LEAD", Seq(generateExpr(l.e, symbols)), null)
+      case l: FirstValue[?, ?] =>
+          FunctionCallOp("FIRST_VALUE", Seq(generateExpr(l.e, symbols)), null)
+      case l: LastValue[?, ?] =>
+          FunctionCallOp("LAST_VALUE", Seq(generateExpr(l.e, symbols)), null)
+      case l: NthValue[?, ?] =>
+          FunctionCallOp("NTH_VALUE", Seq(generateExpr(l.e, symbols), LiteralInteger(l.n, Expr.IntLit(l.n))), null)
+
   private def generateExpr(ast: Expr[?, ?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match
       case ref: Expr.Ref[?, ?] =>
@@ -350,6 +378,12 @@ object QueryIRTree:
           case CastTarget.CBool => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.booleanCast})", c)
           case CastTarget.CDouble => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.doubleCast})", c)
           case CastTarget.CInt => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.integerCast})", c)
+      case w: WindExpr[?] =>
+        val ae = w.ae match
+          case Left(aggrExpr) => generateExpr(aggrExpr, symbols)
+          case Right(windowExpr) => generateExprInWindowPosition(windowExpr, symbols)
+        val partitionBy = w.partitionBy.map(generateExpr(_, symbols))
+        WindowFunctionOp(ae, partitionBy, Seq(), w)
       case g: Expr.Gt[?, ?, ?, ?] => BinExprOp("", generateExpr(g.$x, symbols), " > ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
       case g: Expr.Lt[?, ?, ?, ?] => BinExprOp("", generateExpr(g.$x, symbols), " < ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
       case g: Expr.Lte[?, ?, ?, ?] => BinExprOp("", generateExpr(g.$x, symbols), " <= ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)

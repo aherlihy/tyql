@@ -180,6 +180,34 @@ case class RawSQLInsertOp(snippet: SqlSnippet, replacements: Map[String, QueryIR
           replacements(name).computeSQL(ctx)
     }.mkString
 
+case class WindowFunctionOp(expr: QueryIRNode, partitionBy: Seq[QueryIRNode], orderBy: Seq[(QueryIRNode, tyql.Ord)], ast: Expr[?, ?]) extends QueryIRNode:
+  override val precedence = Precedence.Literal
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    expr.computeSQL(ctx)
+    assert(partitionBy.nonEmpty || orderBy.nonEmpty)
+    ctx.sql.append(" OVER ( ")
+
+    var outputtedSomethingHere = false
+    if partitionBy.nonEmpty then
+      ctx.sql.append("PARTITION BY ")
+      var first = true
+      for e <- partitionBy do
+        if first then first = false else ctx.sql.append(", ")
+        outputtedSomethingHere = true
+        e.computeSQL(ctx)
+    if outputtedSomethingHere then
+      ctx.sql.append(" ")
+    if orderBy.nonEmpty then
+      ctx.sql.append("ORDER BY ")
+      var first = true
+      for (e, ord) <- orderBy do
+        if first then first = false else ctx.sql.append(", ")
+        e.computeSQL(ctx)
+        ord match
+          case Ord.ASC => ctx.sql.append(" ASC")
+          case Ord.DESC => ctx.sql.append(" DESC")
+    ctx.sql.append(")")
+
 /**
  * Project clause, e.g. SELECT <...> FROM
  * @param children
