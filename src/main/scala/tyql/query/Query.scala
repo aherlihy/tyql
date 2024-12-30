@@ -297,9 +297,6 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
   def contains(that: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] =
     Expr.Contains(this, that)
 
-  // def single(): A =
-  //     Expr.Single(this)
-
 end Query // trait
 
 object Query:
