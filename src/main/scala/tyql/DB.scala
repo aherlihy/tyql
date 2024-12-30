@@ -6,6 +6,10 @@ import pprint.pprintln
 import scala.deriving.Mirror
 import scala.Tuple
 
+import language.experimental.namedTuples
+import NamedTuple.*
+import scala.language.implicitConversions
+
 class DB(conn: Connection) {
 
   def runRaw(rawSql: String): Unit = {
@@ -42,6 +46,7 @@ class DB(conn: Connection) {
     val columnCount = metadata.getColumnCount()
     var results = List[T]()
     while (rs.next()) {
+      println("RESULT TAG IS " + resultTag.toString)
       val row = resultTag match
         case ResultTag.IntTag => rs.getInt(1)
         case ResultTag.DoubleTag => rs.getDouble(1)
@@ -80,6 +85,27 @@ class DB(conn: Connection) {
           }
           m.fromProduct(Tuple.fromArray(fieldValues.toArray))
         }
+        case ResultTag.NamedTupleTag(names, typesResultTags) =>
+          val fieldValues = names.zip(typesResultTags).zipWithIndex.map { case ((name, tag), idx) =>
+            val col = idx + 1 // XXX if you want to use `name` here, you must case-convert it
+            tag match
+              case ResultTag.IntTag => rs.getInt(col)
+              case ResultTag.DoubleTag => rs.getDouble(col)
+              case ResultTag.StringTag => rs.getString(col)
+              case ResultTag.BoolTag => rs.getBoolean(col)
+              case ResultTag.OptionalTag(e) => {
+                val got = rs.getObject(col)
+                if got == null then None
+                else e match
+                  case ResultTag.IntTag => Some(got.asInstanceOf[Int])
+                  case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+                  case ResultTag.StringTag => Some(got.asInstanceOf[String])
+                  case ResultTag.BoolTag => Some(got.asInstanceOf[Boolean])
+                  case _ => assert(false, "Unsupported type")
+              }
+              case _ => assert(false, "Unsupported type")
+          }
+          Tuple.fromArray(fieldValues.toArray)
         case _ => assert(false, "Unsupported type")
       results = row.asInstanceOf[T] :: results
     }
@@ -104,14 +130,20 @@ def driverMain(): Unit = {
   val zzz = db.run(t.filter(t => t.flowerSize.isNull || t.flowerSize >= 2))
   println("received:")
   pprintln(zzz)
-  // println("likes are " + zzz.head.likes.toString())
 
   println("------------2------------")
+  val ggoott = db.run(t.map(r => (b = r.flowerSize, c=lit(101))))
+  println("received:")
+  pprintln(ggoott)
+  // println("first received's `b`")
+  // pprintln(ggoott.head.b)
+
+  println("------------3------------")
   val zzz2 = db.run(t.map(_.name.getOrElse("UNKNOWN")))
   println("received:")
   pprintln(zzz2)
 
-  println("------------3------------")
+  println("------------4------------")
   val zzz3 = db.run(t.max(_.flowerSize))
   println("received:")
   pprintln(zzz3)
