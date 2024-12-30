@@ -9,6 +9,10 @@ import tyql.DialectFeature.*
 private def unsupportedFeature(feature: String) =
   throw new UnsupportedOperationException(s"$feature feature not supported in this dialect!")
 
+
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║                         Base Dialect Trait                         ║
+// ╚════════════════════════════════════════════════════════════════════╝
 trait Dialect:
   def name(): String
 
@@ -41,6 +45,8 @@ trait Dialect:
   val doubleCast: String = "DOUBLE PRECISION"
   val stringCast: String = "VARCHAR"
 
+  val `prefers $n over ? for parametrization` = false
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -51,10 +57,18 @@ object Dialect:
       with StringLiteral.AnsiSingleQuote:
     def name() = "ANSI SQL Dialect"
 
+
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║                         ANSI SQL Dialect                           ║
+// ╚════════════════════════════════════════════════════════════════════╝
   object ansi:
     given Dialect = Dialect.given_Dialect
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
 
+
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║                        PostgreSQL Dialect                          ║
+// ╚════════════════════════════════════════════════════════════════════╝
   object postgresql:
     given Dialect = new Dialect
         with QuotingIdentifiers.PostgresqlBehavior
@@ -70,6 +84,7 @@ object Dialect:
         val b = ("b", Precedence.Concat)
         SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)")
       override def stringPositionFindingVia: String = "POSITION"
+      override val `prefers $n over ? for parametrization` = true
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
@@ -80,6 +95,9 @@ object Dialect:
     given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
 
 
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║                          MySQL Dialect                             ║
+// ╚════════════════════════════════════════════════════════════════════╝
   object mysql:
     given Dialect = new MySQLDialect
     class MySQLDialect extends Dialect
@@ -106,6 +124,9 @@ object Dialect:
     given ReversibleStrings = new ReversibleStrings {}
     given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
 
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║                         MariaDB Dialect                            ║
+// ╚════════════════════════════════════════════════════════════════════╝
   object mariadb:
     // XXX MariaDB extends MySQL
     // XXX but you still have to redeclare the givens
@@ -117,6 +138,9 @@ object Dialect:
     given ReversibleStrings = mysql.given_ReversibleStrings
     given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
 
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║                         SQLite Dialect                             ║
+// ╚════════════════════════════════════════════════════════════════════╝
   object sqlite:
     given Dialect = new Dialect
         with QuotingIdentifiers.SqliteBehavior
@@ -138,6 +162,9 @@ object Dialect:
     given ReversibleStrings = new ReversibleStrings {}
     given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
 
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║                           H2 Dialect                               ║
+// ╚════════════════════════════════════════════════════════════════════╝
   object h2:
     given Dialect = new Dialect
         with QuotingIdentifiers.H2Behavior
@@ -161,6 +188,9 @@ object Dialect:
     given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
 
 
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║                         DuckDB Dialect                             ║
+// ╚════════════════════════════════════════════════════════════════════╝
   object duckdb:
     given Dialect = new Dialect
         with QuotingIdentifiers.DuckdbBehavior
@@ -177,6 +207,7 @@ object Dialect:
         val b = ("b", Precedence.Concat)
         SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)")
       override def stringPositionFindingVia: String = "POSITION"
+      override val `prefers $n over ? for parametrization` = true
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}

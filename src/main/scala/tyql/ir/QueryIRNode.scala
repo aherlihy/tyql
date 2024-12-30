@@ -224,6 +224,12 @@ case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?]) exte
 /**
  * Literals.
  */
+private def preferredPlaceholder(using d: Dialect)(ctx: SQLRenderingContext, oneBasedNumber: Long): String =
+  if d.`prefers $n over ? for parametrization` then
+    "$" + oneBasedNumber
+  else
+    "?"
+
 case class LiteralString(unescapedString: String, insideLikePatternQuoting: Boolean, ast: Expr[?, ?]) extends QueryIRLeaf:
   override val precedence: Int = Precedence.Literal
   override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
@@ -231,7 +237,7 @@ case class LiteralString(unescapedString: String, insideLikePatternQuoting: Bool
       case ParameterStyle.EscapedInline =>
         ctx.sql.append(d.quoteStringLiteral(unescapedString, insideLikePatternQuoting))
       case ParameterStyle.DriverParametrized =>
-        ctx.sql.append("?")
+        ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
         ctx.parameters.append(unescapedString)
 
 case class LiteralInteger(number: Long, ast: Expr[?, ?]) extends QueryIRLeaf:
@@ -241,7 +247,7 @@ case class LiteralInteger(number: Long, ast: Expr[?, ?]) extends QueryIRLeaf:
       case ParameterStyle.EscapedInline =>
         ctx.sql.append(number.toString)
       case ParameterStyle.DriverParametrized =>
-        ctx.sql.append("?")
+        ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
         ctx.parameters.append(number.asInstanceOf[Object])
 
 case class LiteralDouble(number: Double, ast: Expr[?, ?]) extends QueryIRLeaf:
@@ -251,7 +257,7 @@ case class LiteralDouble(number: Double, ast: Expr[?, ?]) extends QueryIRLeaf:
       case ParameterStyle.EscapedInline =>
         ctx.sql.append(number.toString)
       case ParameterStyle.DriverParametrized =>
-        ctx.sql.append("?")
+        ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
         ctx.parameters.append(number.asInstanceOf[Object])
 
 /**

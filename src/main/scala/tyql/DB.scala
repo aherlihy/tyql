@@ -94,6 +94,7 @@ def driverMain(): Unit = {
   val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
   val db = DB(conn)
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.DriverParametrized) {}
+  import tyql.Dialect.mariadb.given_Dialect
   case class Flowers(name: Option[String], flowerSize: Int, cost: Option[Double], likes: Int)
   val t = tyql.Table[Flowers]()
 
