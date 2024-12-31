@@ -274,7 +274,7 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
-      case t: (TableLeaf  | RecursiveIRVar) =>
+      case t: (TableLeaf | RecursiveIRVar) =>
         OrderedQuery(query.mergeWith(t, astOther), sortFn, ast)
       case q: SelectAllQuery =>
         SelectAllQuery(

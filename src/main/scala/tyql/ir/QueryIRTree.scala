@@ -571,4 +571,3 @@ object QueryIRTree:
       case s: AggregationExpr.Max[?] => UnaryExprOp("MAX(", generateExpr(s.$a, symbols), ")", s)
       case c: AggregationExpr.Count[?] => UnaryExprOp("COUNT(", generateExpr(c.$a, symbols), ")", c)
       case p: AggregationExpr.AggProject[?] => generateProjection(p, symbols)
-      case _ => throw new Exception(s"Unimplemented aggregation op: $ast")

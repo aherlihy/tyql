@@ -174,7 +174,6 @@ object TreePrettyPrinter {
             s"${indent(depth+1)}$namedStr${e.prettyPrint(0)}"
           )
         s"${indent(depth)}AggProject(\n${children.mkString(",\n")}\n${indent(depth)})"
-      case _ => throw new Exception(s"Unimplemented pretty print AGG $agg")
     }
   }
 
