@@ -127,7 +127,7 @@ def driverMain(): Unit = {
   import scala.language.implicitConversions
   val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
   val db = DB(conn)
-  given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.DriverParametrized) {}
+  given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.EscapedInline) {}
   import tyql.Dialect.mariadb.given
   case class Flowers(name: Option[String], flowerSize: Int, cost: Option[Double], likes: Int)
   val t = tyql.Table[Flowers]()
@@ -141,7 +141,17 @@ def driverMain(): Unit = {
   val customers = tyql.Table[Customers]()
   val orders = tyql.Table[Orders]()
 
+
+  val inlineValues = tyql.Values(
+    (a = 1, b = 2.0), (a = 10, b = 12.0)
+    )
+  println(db.run(
+    inlineValues.map(x => (a = x.a + 1, b = x.b + 1.0))
+  ))
+
   pprintln(db.run(
-    customers.map(c => (i = c.custId + 1)).map(c => (i = c.i - 1))
+    t.flatMap(fs =>
+        Values((a=1), (a=2), (a=10)).map(vs => (name = fs.name, idx = vs.a))
+      )
   ))
 }

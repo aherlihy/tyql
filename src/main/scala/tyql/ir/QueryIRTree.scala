@@ -8,6 +8,7 @@ import NamedTuple.NamedTuple
 import NamedTupleDecomposition._
 import PolyfillTracking._
 import TreePrettyPrinter._
+import tyql.Expr.Exp
 
 /** Logical query plan tree. Moves all type parameters into terms (using ResultTag). Collapses nested queries where
   * possible.
@@ -119,6 +120,15 @@ object QueryIRTree:
       .reduce((q1, q2) => q1.mergeWith(q2, astOther = flatMap))
       .appendProject(projectIR, astOther = flatMap)
 
+  private def anyToExprConverter(v: Any): Expr[?, ?] =
+    v match
+      case _ if v.isInstanceOf[Int] => lit(v.asInstanceOf[Int])
+      case _ if v.isInstanceOf[String] => lit(v.asInstanceOf[String])
+      case _ if v.isInstanceOf[Double] => lit(v.asInstanceOf[Double])
+      case _ if v.isInstanceOf[Boolean] => lit(v.asInstanceOf[Boolean])
+      case _ if v.isInstanceOf[Expr[?,?]] => v.asInstanceOf[Expr[?,?]]
+      case _ => assert(false)
+
   /** Generate top-level or subquery
     *
     * @param ast
@@ -129,6 +139,15 @@ object QueryIRTree:
     */
   private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     ast match
+      case values: Query.Values[?] =>
+        val listOfTuples: List[Tuple] = values.$values.toList.asInstanceOf[List[Tuple]]
+        val nodes = (0 until listOfTuples.length).map(i => // XXX the usual map here crashes the compiler
+          val firstTuple = listOfTuples(i)
+          val firstList: List[Any] = firstTuple.toList
+          val firstListOfExpr: List[Expr[?, ?]] = firstList.map(anyToExprConverter)
+          val firstListOfNodes = firstListOfExpr.map(v => generateExpr(v, symbols))
+          firstListOfNodes)
+        ValuesLeaf(nodes, values.$names, values)
       case table: Table[?] =>
         TableLeaf(table.$name, table)
       case map: Query.Map[?, ?] =>

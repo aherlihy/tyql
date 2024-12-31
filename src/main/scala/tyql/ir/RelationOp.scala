@@ -72,6 +72,72 @@ trait RelationOp extends QueryIRNode:
       ctx.sql.append(" as ")
       ctx.sql.append(alias)
 
+/** VALUES (1, 2), (3, 4) clause
+  */
+case class ValuesLeaf(values: Seq[Seq[QueryIRNode]], names: Seq[String], ast: Query.Values[?]) extends RelationOp with QueryIRLeaf:
+  val name = s"values${QueryIRTree.idCount}"
+  QueryIRTree.idCount += 1
+  override def alias = name
+
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    if !flags.contains(SelectFlags.Final) then
+      ctx.sql.append("(")
+    var first = true
+    var firstAgain = true
+    for row <- values do
+      if first then first = false else ctx.sql.append(" UNION ALL ")
+      ctx.sql.append("(SELECT ")
+      var first2 = true
+      for (value, nameHere) <- row.zip(names) do
+        if first2 then first2 = false else ctx.sql.append(", ")
+        value.computeSQL(ctx)
+        if firstAgain then
+          ctx.sql.append(" as ")
+          ctx.sql.append(nameHere)
+      ctx.sql.append(")")
+      firstAgain = false
+    if !flags.contains(SelectFlags.Final) then
+      ctx.sql.append(")")
+    if !(flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel)) then
+      ctx.sql.append(" as ")
+      ctx.sql.append(name)
+
+  override def toString: String = s"VALUES(... as $name)"
+
+  override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
+    r match
+      case t: (TableLeaf | RecursiveIRVar) =>
+        SelectAllQuery(Seq(this, t), Seq(), None, astOther)
+      case q: SelectAllQuery =>
+        SelectAllQuery(this +: q.from, q.where, None, astOther)
+      case q: SelectQuery =>
+        SelectQuery(
+          q.project,
+          this +: q.from,
+          q.where,
+          None,
+          astOther
+        )
+      case r: RelationOp =>
+        // default to subquery, some ops may want to override
+        SelectAllQuery(Seq(this, r), Seq(), None, astOther)
+
+  override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
+    SelectAllQuery(Seq(this), Seq(w), Some(alias), astOther).appendFlags(flags)
+
+  override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
+    SelectQuery(p, Seq(this), Seq(), None, astOther).appendFlags(flags)
+
+  override def appendFlag(f: SelectFlags): RelationOp =
+    val q = f match
+      case SelectFlags.Distinct => // Distinct is special case because needs to be "hoisted" to enclosing SELECT, so alias is kept
+        SelectAllQuery(Seq(this), Seq(), Some(alias), ast)
+      case _ =>
+        SelectAllQuery(Seq(this), Seq(), None, ast)
+
+    q.flags = q.flags + f
+    q
+
 /** Simple table read.
   */
 case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with QueryIRLeaf:

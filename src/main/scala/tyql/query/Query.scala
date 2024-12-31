@@ -7,6 +7,8 @@ import scala.reflect.ClassTag
 import Utils.{HasDuplicate, naturalMap}
 import tyql.Expr.StripExpr
 import tyql.RestrictedQuery.ToRestrictedQueryRef
+import scala.deriving.Mirror
+import scala.compiletime.constValueTuple
 
 trait ResultCategory
 class SetResult extends ResultCategory
@@ -345,6 +347,10 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 
 end Query // trait
 
+// type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?]
+inline def Values[N <: Tuple, T <: Tuple](v: NamedTuple[N, T]*)(using ResultTag[NamedTuple[N, T]]): Query[NamedTuple[N, T], BagResult] =
+  Query.Values(v.map(z => z.asInstanceOf[Tuple]), constValueTuple[N].toList.asInstanceOf[List[String]])
+
 object Query:
   import Expr.{Pred, Fun, Ref}
   import RestrictedQuery.*
@@ -521,6 +527,8 @@ object Query:
   case class IntersectAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
   case class Except[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
   case class ExceptAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
+
+  case class Values[A]($values: Seq[Tuple], $names: Seq[String])(using ResultTag[A]) extends Query[A, BagResult]
 
   case class NewGroupBy[
       AllSourceTypes <: Tuple,
