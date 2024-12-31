@@ -6,10 +6,11 @@ import java.sql.{Connection, Statement, ResultSet}
 import tyql.{Dialect, Table, Expr}
 import tyql.{NonScalarExpr, ResultTag}
 
-
-def checkExpr[A](using ResultTag[A])
-    (expr: tyql.Expr[A, NonScalarExpr], checkValue: ResultSet => Unit, sqlCallback: String => Unit = _ => ())
-    (runner: (f: Connection => Unit) => Unit): Unit = {
+def checkExpr[A]
+  (using ResultTag[A])
+  (expr: tyql.Expr[A, NonScalarExpr], checkValue: ResultSet => Unit, sqlCallback: String => Unit = _ => ())
+  (runner: (f: Connection => Unit) => Unit)
+  : Unit = {
   case class Row(i: Int)
   val t = Table[Row]("table59175810544")
   runner { conn =>
@@ -26,9 +27,11 @@ def checkExpr[A](using ResultTag[A])
   }
 }
 
-def checkExprDialect[A](using ResultTag[A])
-    (expr: tyql.Expr[A, NonScalarExpr], checkValue: ResultSet => Unit, sqlCallback: String => Unit = _ => ())
-    (runner: (f: Connection => Dialect ?=> Unit) => Unit): Unit = {
+def checkExprDialect[A]
+  (using ResultTag[A])
+  (expr: tyql.Expr[A, NonScalarExpr], checkValue: ResultSet => Unit, sqlCallback: String => Unit = _ => ())
+  (runner: (f: Connection => Dialect ?=> Unit) => Unit)
+  : Unit = {
   case class Row(i: Int)
   val t = Table[Row]("table59175810544")
   runner { conn =>

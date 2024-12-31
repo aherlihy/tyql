@@ -34,7 +34,8 @@ lazy val root = (project in file("."))
 //    Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
     buildInfoKeys := Seq[BuildInfoKey](baseDirectory),
     buildInfoPackage := "buildinfo",
-    cleanFiles ++= Seq("tc",
+    cleanFiles ++= Seq(
+      "tc",
       "ancestry",
       "andersens",
       "asps",
@@ -51,21 +52,23 @@ lazy val root = (project in file("."))
       "sssp",
       "tc",
       "trustchain",
-    ).flatMap(bm => Seq("collections", "tyql", "scalasql")
+    ).flatMap(bm =>
+      Seq("collections", "tyql", "scalasql")
         .map(ty =>
-          baseDirectory.value / s"bench/data/$bm/out/$ty.csv"))
-)
+          baseDirectory.value / s"bench/data/$bm/out/$ty.csv"
+        )
+    )
+  )
 
 lazy val bench = (project in file("bench"))
   .dependsOn(root)
   .enablePlugins(JmhPlugin)
   .settings(
-    Jmh/compile := (Jmh/compile).dependsOn(Test/compile).value,
-    Jmh/run := (Jmh/run).dependsOn(Jmh/compile).evaluated,
+    Jmh / compile := (Jmh / compile).dependsOn(Test / compile).value,
+    Jmh / run := (Jmh / run).dependsOn(Jmh / compile).evaluated,
 
     // sbt-jmh generates a ton of Java files, but they're never referenced by Scala files.
     // By enforcing this using `compileOrder`, we avoid having to run these generated files
     // through the Scala typechecker which has a significant impact on compile-time.
-    Jmh/compileOrder := CompileOrder.ScalaThenJava
-
+    Jmh / compileOrder := CompileOrder.ScalaThenJava
   )

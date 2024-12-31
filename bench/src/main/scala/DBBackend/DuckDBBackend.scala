@@ -18,11 +18,14 @@ class DuckDBBackend(timeout: Int = -1) {
     Class.forName("org.duckdb.DuckDBDriver")
 
     connection = DriverManager.getConnection("jdbc:duckdb:")
-    scalaSqlDb = new scalasql.DbClient.Connection(connection, new Config{
-      override def nameMapper(v: String) = v
-      override def tableNameMapper(v: String) = s"${v.toLowerCase()}"
-      override def defaultQueryTimeoutSeconds: Int = timeout
-    })
+    scalaSqlDb = new scalasql.DbClient.Connection(
+      connection,
+      new Config {
+        override def nameMapper(v: String) = v
+        override def tableNameMapper(v: String) = s"${v.toLowerCase()}"
+        override def defaultQueryTimeoutSeconds: Int = timeout
+      }
+    )
 
   def loadData(benchmark: String): Unit =
     val datadir = s"${BuildInfo.baseDirectory}/bench/data/$benchmark/"

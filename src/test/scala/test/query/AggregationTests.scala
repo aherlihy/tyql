@@ -1,6 +1,6 @@
 package test.query.aggregation
 import test.{SQLStringAggregationTest, SQLStringQueryTest}
-import test.query.{commerceDBs,  AllCommerceDBs}
+import test.query.{commerceDBs, AllCommerceDBs}
 
 import tyql.*
 import language.experimental.namedTuples
@@ -72,14 +72,15 @@ class AggregateMultiAggregateTest extends SQLStringAggregationTest[AllCommerceDB
       """ // TODO should pass with just `0`
 }
 
-class AggregateMultiSubexpressionAggregateTest extends SQLStringAggregationTest[AllCommerceDBs, (sum: Boolean, avg: Boolean)] {
+class AggregateMultiSubexpressionAggregateTest
+    extends SQLStringAggregationTest[AllCommerceDBs, (sum: Boolean, avg: Boolean)] {
   def testDescription: String = "Aggregation: put aggregation in subexpression, stays as aggregation type"
 
   def query() =
     import AggregationExpr.toRow
     testDB.tables.products
       .aggregate(p =>
-        (sum = sum(p.price)==1 , avg = avg(p.price) > p.price).toRow
+        (sum = sum(p.price) == 1, avg = avg(p.price) > p.price).toRow
       )
 
   def expectedQueryPattern: String =

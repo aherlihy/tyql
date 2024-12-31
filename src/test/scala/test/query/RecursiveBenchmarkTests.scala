@@ -21,33 +21,41 @@ given WeightedGraphDBs: TestDatabase[WeightedGraphDB] with
   )
 
 class APSPTest extends SQLStringQueryTest[WeightedGraphDB, WeightedEdge] {
-def testDescription: String = "APSP benchmark"
+  def testDescription: String = "APSP benchmark"
 
-def query() =
-  val base = testDB.tables.edge
-    .aggregate(e =>
-      (src = e.src, dst = e.dst, cost = min(e.cost)).toGroupingRow)
-    .groupBySource(e =>
-      (src = e._1.src, dst = e._1.dst).toRow)
+  def query() =
+    val base = testDB.tables.edge
+      .aggregate(e =>
+        (src = e.src, dst = e.dst, cost = min(e.cost)).toGroupingRow
+      )
+      .groupBySource(e =>
+        (src = e._1.src, dst = e._1.dst).toRow
+      )
 
-  val asps = base.unrestrictedFix(path =>
-    path.aggregate(p =>
-      path
-        .filter(e =>
-          p.dst == e.src)
-        .aggregate(e =>
-          (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow))
+    val asps = base.unrestrictedFix(path =>
+      path.aggregate(p =>
+        path
+          .filter(e =>
+            p.dst == e.src
+          )
+          .aggregate(e =>
+            (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow
+          )
+      )
         .groupBySource(p =>
-          (g1 = p._1.src, g2 = p._2.dst).toRow).distinct
-  )
-  asps
-    .aggregate(a =>
-      (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow)
-    .groupBySource(p =>
-      (g1 = p._1.src, g2 = p._1.dst).toRow)
+          (g1 = p._1.src, g2 = p._2.dst).toRow
+        ).distinct
+    )
+    asps
+      .aggregate(a =>
+        (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow
+      )
+      .groupBySource(p =>
+        (g1 = p._1.src, g2 = p._1.dst).toRow
+      )
 
-def expectedQueryPattern: String =
-  """
+  def expectedQueryPattern: String =
+    """
    WITH RECURSIVE
     recursive$1 AS
       ((SELECT edge$1.src as src, edge$1.dst as dst, MIN(edge$1.cost) as cost
@@ -62,7 +70,6 @@ def expectedQueryPattern: String =
    GROUP BY recref$0.src, recref$0.dst
   """
 }
-
 
 type Edge = (x: Int, y: Int)
 type GraphDB = (edge: Edge)
@@ -79,8 +86,7 @@ class CCMonotoneTest extends SQLStringQueryTest[GraphDB, (x: Int, id: Int)] {
     val undirected = testDB.tables.edge.union( // cyclic
       testDB.tables.edge.map(e =>
         (x = e.y, y = e.x).toRow
-      )
-    )
+      ))
     val base = undirected.map(b => (x = b.x, y = b.x)) // self cycles
 
     base.unrestrictedFix(cc =>
@@ -141,7 +147,8 @@ class OrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
             .flatMap(o1 =>
               orbitsRef
                 .filter(o2 => o1.y == o2.x)
-                .map(o2 => (x = o1.x, y = o2.y).toRow))
+                .map(o2 => (x = o1.x, y = o2.y).toRow)
+            )
             .filter(io => o.x == io.x && o.y == io.y)
             .nonEmpty
         )
@@ -185,19 +192,28 @@ class AndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge] {
     base.unrestrictedFix(pointsTo =>
       testDB.tables.assign.flatMap(a =>
         pointsTo.filter(p => a.y == p.x).map(p =>
-          (x = a.x, y = p.y).toRow))
-      .union(testDB.tables.load.flatMap(l =>
-        pointsTo.flatMap(pt1 =>
-          pointsTo
-            .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
-            .map(pt2 =>
-              (x = l.x, y = pt2.y).toRow))))
-      .union(testDB.tables.store.flatMap(s =>
-        pointsTo.flatMap(pt1 =>
-          pointsTo
-            .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
-            .map(pt2 =>
-              (x = pt1.y, y = pt2.y).toRow)))))
+          (x = a.x, y = p.y).toRow
+        )
+      )
+        .union(testDB.tables.load.flatMap(l =>
+          pointsTo.flatMap(pt1 =>
+            pointsTo
+              .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
+              .map(pt2 =>
+                (x = l.x, y = pt2.y).toRow
+              )
+          )
+        ))
+        .union(testDB.tables.store.flatMap(s =>
+          pointsTo.flatMap(pt1 =>
+            pointsTo
+              .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
+              .map(pt2 =>
+                (x = pt1.y, y = pt2.y).toRow
+              )
+          )
+        ))
+    )
 
   def expectedQueryPattern: String =
     """
@@ -224,7 +240,8 @@ class AndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge] {
 
 type ProgramHeapOp = (x: String, y: String, h: String)
 type ProgramOp = (x: String, y: String)
-type PointsToDB = (newPT: ProgramOp, assign: ProgramOp, loadT: ProgramHeapOp, store: ProgramHeapOp, baseHPT: ProgramHeapOp)
+type PointsToDB =
+  (newPT: ProgramOp, assign: ProgramOp, loadT: ProgramHeapOp, store: ProgramHeapOp, baseHPT: ProgramHeapOp)
 
 given PointsToDBs: TestDatabase[PointsToDB] with
   override def tables = (
@@ -232,7 +249,7 @@ given PointsToDBs: TestDatabase[PointsToDB] with
     assign = Table[ProgramOp]("assign"),
     loadT = Table[ProgramHeapOp]("loadT"),
     store = Table[ProgramHeapOp]("store"),
-    baseHPT= Table[ProgramHeapOp]("baseHPT")
+    baseHPT = Table[ProgramHeapOp]("baseHPT")
   )
 
 class JavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] {
@@ -330,51 +347,54 @@ class CSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location] {
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
-        // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
-        val vfDef1 =
-          for
-            a <- assign
-            m <- memoryAlias
-            if a.p2 == m.p1
-          yield (p1 = a.p1, p2 = m.p2).toRow
-        // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
-        val vfDef2 =
-          for
-            vf1 <- valueFlow
-            vf2 <- valueFlow
-            if vf1.p2 == vf2.p1
-          yield (p1 = vf1.p1, p2 = vf2.p2).toRow
-        val VF = vfDef1.union(vfDef2)
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(
+      valueFlowBase,
+      testDB.tables.empty,
+      memoryAliasBase
+    )((valueFlow, valueAlias, memoryAlias) =>
+      // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
+      val vfDef1 =
+        for
+          a <- assign
+          m <- memoryAlias
+          if a.p2 == m.p1
+        yield (p1 = a.p1, p2 = m.p2).toRow
+      // ValueFlow(x, y) :- (ValueFlow(x, z), ValueFlow(z, y))
+      val vfDef2 =
+        for
+          vf1 <- valueFlow
+          vf2 <- valueFlow
+          if vf1.p2 == vf2.p1
+        yield (p1 = vf1.p1, p2 = vf2.p2).toRow
+      val VF = vfDef1.union(vfDef2)
 
-        // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
-        val MA =
-          for
-            d1 <- dereference
-            va <- valueAlias
-            d2 <- dereference
-            if d1.p1 == va.p1 && va.p2 == d2.p1
-          yield (p1 = d1.p2, p2 = d2.p2).toRow
+      // MemoryAlias(x, w) :- (Dereference(y, x), ValueAlias(y, z), Dereference(z, w))
+      val MA =
+        for
+          d1 <- dereference
+          va <- valueAlias
+          d2 <- dereference
+          if d1.p1 == va.p1 && va.p2 == d2.p1
+        yield (p1 = d1.p2, p2 = d2.p2).toRow
 
-        // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
-        val vaDef1 =
-          for
-            vf1 <- valueFlow
-            vf2 <- valueFlow
-            if vf1.p1 == vf2.p1
-          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
-        // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
-        val vaDef2 =
-          for
-            vf1 <- valueFlow
-            m <- memoryAlias
-            vf2 <- valueFlow
-            if vf1.p1 == m.p1 && vf2.p1 == m.p2
-          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
-        val VA = vaDef1.union(vaDef2)
+      // ValueAlias(x, y) :- (ValueFlow(z, x), ValueFlow(z, y))
+      val vaDef1 =
+        for
+          vf1 <- valueFlow
+          vf2 <- valueFlow
+          if vf1.p1 == vf2.p1
+        yield (p1 = vf1.p2, p2 = vf2.p2).toRow
+      // ValueAlias(x, y) :- (ValueFlow(z, x), MemoryAlias(z, w), ValueFlow(w, y))
+      val vaDef2 =
+        for
+          vf1 <- valueFlow
+          m <- memoryAlias
+          vf2 <- valueFlow
+          if vf1.p1 == m.p1 && vf2.p1 == m.p2
+        yield (p1 = vf1.p2, p2 = vf2.p2).toRow
+      val VA = vaDef1.union(vaDef2)
 
-        (VF, MA.distinct, VA)
+      (VF, MA.distinct, VA)
     )
     valueFlowFinal
   def expectedQueryPattern: String =
@@ -436,7 +456,9 @@ class BOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int)] {
       testDB.tables.assbl.flatMap(assbl =>
         waitFor
           .filter(wf => assbl.spart == wf.part)
-          .map(wf => (part = assbl.part, days = wf.days).toRow)))
+          .map(wf => (part = assbl.part, days = wf.days).toRow)
+      )
+    )
       .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
       .groupBySource(wf => (part = wf._1.part).toRow)
 
@@ -455,7 +477,6 @@ class BOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int)] {
         GROUP BY recref$14.part
       """
 }
-
 
 class RecursionSSSPTest extends SQLStringQueryTest[WeightedGraphDB, (dst: Int, cost: Int)] {
   def testDescription: String = "Single source shortest path"
@@ -553,12 +574,10 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
   def query() =
     val (cshares, control) = unrestrictedFix(testDB.tables.shares, testDB.tables.control)((cshares, control) =>
       val csharesRecur = control.aggregate(con =>
-          cshares
-            .filter(cs => cs.byC == con.com2)
-            .aggregate(cs => (byC = con.com1, of = cs.of, percent = sum(cs.percent)).toGroupingRow)
-        ).groupBySource(
-          (con, csh) => (byC = con.com1, of = csh.of).toRow
-        ).distinct
+        cshares
+          .filter(cs => cs.byC == con.com2)
+          .aggregate(cs => (byC = con.com1, of = cs.of, percent = sum(cs.percent)).toGroupingRow)
+      ).groupBySource((con, csh) => (byC = con.com1, of = csh.of).toRow).distinct
       val controlRecur = cshares
         .filter(s => s.percent > 50)
         .map(s => (com1 = s.byC, com2 = s.of).toRow)
@@ -566,7 +585,6 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
       (csharesRecur, controlRecur)
     )
     control
-
 
   def expectedQueryPattern: String =
     """
@@ -602,7 +620,10 @@ class GraphalyticsDAGTest extends SQLStringQueryTest[GraphDB, Path] {
         testDB.tables.edge
           .filter(e => e.x == p.endNode && !p.path.contains(e.y))
           .map(e =>
-            (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow)))
+            (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
+          )
+      )
+    )
       .sort(p => p.path, Ord.ASC).sort(p => p.path.length, Ord.ASC)
 
   def expectedQueryPattern: String =
@@ -626,7 +647,7 @@ type AncestryDB = (parent: Parent)
 given ancestryDBs: TestDatabase[AncestryDB] with
   override def tables = (
     parent = Table[Parent]("parents")
-    )
+  )
 
 class AncestryTest extends SQLStringQueryTest[AncestryDB, (name: String)] {
   def testDescription: String = "Ancestry query to calculate total number of descendants in the same generation"
@@ -640,7 +661,6 @@ class AncestryTest extends SQLStringQueryTest[AncestryDB, (name: String)] {
           .map(g => (name = parent.child, gen = g.gen + 1).toRow)
       ).distinct
     ).filter(g => g.gen == 2).map(g => (name = g.name).toRow)
-
 
   def expectedQueryPattern: String =
     """
@@ -664,14 +684,16 @@ type EvenOddDB = (numbers: Number)
 given EvenOddDBs: TestDatabase[EvenOddDB] with
   override def tables = (
     numbers = Table[Number]("numbers")
-    )
+  )
 
 class EvenOddTest extends SQLStringQueryTest[EvenOddDB, NumberType] {
   def testDescription: String = "Mutually recursive even-odd (classic)"
 
   def query() =
-    val evenBase = testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
-    val oddBase = testDB.tables.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
+    val evenBase =
+      testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
+    val oddBase =
+      testDB.tables.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
 
     val (even, odd) = fix((evenBase, oddBase))((even, odd) =>
       val evenResult = testDB.tables.numbers.flatMap(num =>
@@ -736,7 +758,8 @@ class CBATest extends SQLStringAggregationTest[CBADB, Int] {
     val dataTermBase = testDB.tables.term.flatMap(t =>
       testDB.tables.lits
         .filter(l => l.x == t.z && t.y == StringLit("Lit"))
-        .map(l => (x = t.x, y = l.y).toRow))
+        .map(l => (x = t.x, y = l.y).toRow)
+    )
 
     val dataVarBase = testDB.tables.baseData
 
@@ -744,60 +767,64 @@ class CBATest extends SQLStringAggregationTest[CBADB, Int] {
 
     val ctrlVarBase = testDB.tables.baseCtrl
 
-    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = unrestrictedBagFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))(
-      (dataTerm, dataVar, ctrlTerm, ctrlVar) => {
-        val dt1 =
-          for
-            t <- testDB.tables.term
-            dv <- dataVar
-            if t.y == "Var" && t.z == dv.x
-          yield (x = t.x, y = dv.y).toRow
+    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = unrestrictedBagFix((
+      dataTermBase,
+      dataVarBase,
+      ctrlTermBase,
+      ctrlVarBase
+    ))((dataTerm, dataVar, ctrlTerm, ctrlVar) => {
+      val dt1 =
+        for
+          t <- testDB.tables.term
+          dv <- dataVar
+          if t.y == "Var" && t.z == dv.x
+        yield (x = t.x, y = dv.y).toRow
 
-        val dt2 =
-          for
-            t <- testDB.tables.term
-            dt <- dataTerm
-            ct <- ctrlTerm
-            abs <- testDB.tables.abs
-            app <- testDB.tables.app
-            if t.y == "App" && t.z == app.x && dt.x == abs.z && ct.x == app.y && ct.y == abs.x
-          yield (x = t.x, y = dt.y).toRow
+      val dt2 =
+        for
+          t <- testDB.tables.term
+          dt <- dataTerm
+          ct <- ctrlTerm
+          abs <- testDB.tables.abs
+          app <- testDB.tables.app
+          if t.y == "App" && t.z == app.x && dt.x == abs.z && ct.x == app.y && ct.y == abs.x
+        yield (x = t.x, y = dt.y).toRow
 
-        val dv =
-          for
-            ct <- ctrlTerm
-            dt <- dataTerm
-            abs <- testDB.tables.abs
-            app <- testDB.tables.app
-            if ct.x == app.y && ct.y == abs.x && dt.x == app.z
-          yield (x = abs.y, y = dt.y).toRow
+      val dv =
+        for
+          ct <- ctrlTerm
+          dt <- dataTerm
+          abs <- testDB.tables.abs
+          app <- testDB.tables.app
+          if ct.x == app.y && ct.y == abs.x && dt.x == app.z
+        yield (x = abs.y, y = dt.y).toRow
 
-        val ct1 =
-          for
-            t <- testDB.tables.term
-            cv <- ctrlVar
-            if t.y == "Var" && t.z == cv.x
-          yield (x = t.x, y = cv.y).toRow
-        val ct2 =
-          for
-            t <- testDB.tables.term
-            ct1 <- ctrlTerm
-            ct2 <- ctrlTerm
-            abs <- testDB.tables.abs
-            app <- testDB.tables.app
-            if t.y == "App" && t.z == app.x && ct1.x == abs.z && ct2.x == app.y && ct2.y == abs.x
-          yield (x = t.x, y = ct1.y).toRow
+      val ct1 =
+        for
+          t <- testDB.tables.term
+          cv <- ctrlVar
+          if t.y == "Var" && t.z == cv.x
+        yield (x = t.x, y = cv.y).toRow
+      val ct2 =
+        for
+          t <- testDB.tables.term
+          ct1 <- ctrlTerm
+          ct2 <- ctrlTerm
+          abs <- testDB.tables.abs
+          app <- testDB.tables.app
+          if t.y == "App" && t.z == app.x && ct1.x == abs.z && ct2.x == app.y && ct2.y == abs.x
+        yield (x = t.x, y = ct1.y).toRow
 
-        val cv =
-          for
-            ct1 <- ctrlTerm
-            ct2 <- ctrlTerm
-            abs <- testDB.tables.abs
-            app <- testDB.tables.app
-            if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
-          yield (x = abs.y, y = ct2.y).toRow
+      val cv =
+        for
+          ct1 <- ctrlTerm
+          ct2 <- ctrlTerm
+          abs <- testDB.tables.abs
+          app <- testDB.tables.app
+          if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
+        yield (x = abs.y, y = ct2.y).toRow
 
-        (dt1.unionAll(dt2), dv, ct1.unionAll(ct2), cv)
+      (dt1.unionAll(dt2), dv, ct1.unionAll(ct2), cv)
     })
 
     dataTerm.distinct.size
@@ -851,7 +878,7 @@ type TrustDB = (friends: Friends)
 given TrustDBs: TestDatabase[TrustDB] with
   override def tables = (
     friends = Table[Friends]("friends")
-    )
+  )
 
 class TrustChainTest extends SQLStringQueryTest[TrustDB, (person: String, count: Int)] {
   def testDescription: String = "Mutually recursive trust chain"
@@ -951,7 +978,6 @@ class TrustChainTest extends SQLStringQueryTest[TrustDB, (person: String, count:
 //      """
 //}
 
-
 type Instruction = (opN: String, varN: String)
 type Jump = (a: String, b: String)
 
@@ -971,12 +997,17 @@ class FlowTest extends SQLStringQueryTest[FlowDB, (r: String, w: String)] {
       .unrestrictedBagFix(flow =>
         flow.flatMap(f1 =>
           flow.filter(f2 => f1.b == f2.a).map(f2 =>
-            (a = f1.a, b = f2.b).toRow)))
+            (a = f1.a, b = f2.b).toRow
+          )
+        )
+      )
       .flatMap(f =>
         testDB.tables.readOp.flatMap(r =>
           testDB.tables.writeOp
             .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
-            .map(w => (r = r.opN, w = w.opN).toRow)))
+            .map(w => (r = r.opN, w = w.opN).toRow)
+        )
+      )
   }
 
   def expectedQueryPattern: String =
@@ -1053,4 +1084,3 @@ class PointsToCountTest extends SQLStringAggregationTest[PointsToDB, Int] {
         SELECT COUNT(1) FROM recursive$1 as recref$0 WHERE recref$0.x = 'r'
     """
 }
-

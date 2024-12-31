@@ -8,7 +8,7 @@ import java.sql.{Connection, DriverManager}
 
 class StringLiteralDBTests extends FunSuite {
   private def testStringLiteral(conn: Connection, input: String)(using dialect: Dialect) = {
-    val quoted = dialect.quoteStringLiteral(input, insideLikePattern=false)
+    val quoted = dialect.quoteStringLiteral(input, insideLikePattern = false)
     val stmt = conn.createStatement()
     val rs = stmt.executeQuery(s"SELECT $quoted as str")
     assert(rs.next())
@@ -25,27 +25,28 @@ class StringLiteralDBTests extends FunSuite {
     "a\rb",
     "a\tb",
     "a\u001Ab", // Ctrl+Z
-    "a%b",      // LIKE wildcard %
-    "a_b",      // LIKE wildcard _
+    "a%b", // LIKE wildcard %
+    "a_b", // LIKE wildcard _
     "éèêëàâäôöûüùïîçæœ ÉÈÊËÀÂÄÔÖÛÜÙÏÎÇÆŒ", // French
-    "äöüßÄÖÜ",                             // German
-    "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ",                  // Polish
+    "äöüßÄÖÜ", // German
+    "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ", // Polish
     "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ", // Russian
-    "αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩάέήίόύώΆΈΉΊΌΎΏ",     // Greek
+    "αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩάέήίόύώΆΈΉΊΌΎΏ", // Greek
   )
 
   test("string literals are handled per dialect") {
-    assertEquals(Dialect.postgresql.given_Dialect.quoteStringLiteral("a\nb", insideLikePattern=false), "E'a\\nb'");
-    assertEquals(Dialect.sqlite.given_Dialect.quoteStringLiteral("a\nb", insideLikePattern=false), "'a\nb'");
+    assertEquals(Dialect.postgresql.given_Dialect.quoteStringLiteral("a\nb", insideLikePattern = false), "E'a\\nb'");
+    assertEquals(Dialect.sqlite.given_Dialect.quoteStringLiteral("a\nb", insideLikePattern = false), "'a\nb'");
   }
 
   private def testLikePatterns(conn: Connection)(using dialect: Dialect) = {
     val stmt = conn.createStatement()
 
-    val underscorePattern = dialect.quoteStringLiteral("a_c", insideLikePattern=true)
-    val literalUnderscorePattern = dialect.quoteStringLiteral(s"a${Dialect.literal_underscore}c", insideLikePattern=true)
-    val percentPattern = dialect.quoteStringLiteral("a%c", insideLikePattern=true)
-    val literalPercentPattern = dialect.quoteStringLiteral(s"a${Dialect.literal_percent}c", insideLikePattern=true)
+    val underscorePattern = dialect.quoteStringLiteral("a_c", insideLikePattern = true)
+    val literalUnderscorePattern =
+      dialect.quoteStringLiteral(s"a${Dialect.literal_underscore}c", insideLikePattern = true)
+    val percentPattern = dialect.quoteStringLiteral("a%c", insideLikePattern = true)
+    val literalPercentPattern = dialect.quoteStringLiteral(s"a${Dialect.literal_percent}c", insideLikePattern = true)
 
     def check(query: String, expectedResult: Boolean) = {
       val rs = stmt.executeQuery(query + " as did_match")

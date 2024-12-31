@@ -15,7 +15,7 @@ class IdentifierQuotingTests extends FunSuite {
   )
 
   test("common names are not quoted") {
-    for (d <- dialects ; e <- Set("sum", "min", "max", "avg", "count")) {
+    for (d <- dialects; e <- Set("sum", "min", "max", "avg", "count")) {
       assertEquals(d.quoteIdentifier(e), e)
       assertEquals(d.quoteIdentifier(e.toUpperCase), e.toUpperCase)
     }

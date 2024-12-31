@@ -7,7 +7,9 @@ import NamedTuple.{NamedTuple, AnyNamedTuple}
 // Repros for bugs or questions
 class Query2[A]():
   def map[B](f: Expr2.Ref[A, NExpr] => Expr2[B, NExpr]): Query2[B] = ???
-  def map[B <: AnyNamedTuple : Expr2.IsTupleOfExpr](f: Expr2.Ref[A, NExpr] => B): Query2[ NamedTuple.Map[B, Expr2.StripExpr2] ] = ???
+  def map[B <: AnyNamedTuple : Expr2.IsTupleOfExpr]
+    (f: Expr2.Ref[A, NExpr] => B)
+    : Query2[NamedTuple.Map[B, Expr2.StripExpr2]] = ???
 
 trait ExprShape
 class ScalarExpr extends ExprShape
@@ -23,8 +25,7 @@ object Expr2:
 
   case class AggProject[A <: AnyNamedTuple]($a: A) extends Expr2[NamedTuple.Map[A, StripExpr2], NExpr]
   case class Project[A <: AnyNamedTuple]($a: A) extends Expr2[NamedTuple.Map[A, StripExpr2], NExpr]
-  case class Ref[A, S<: ExprShape]() extends Expr2[A, S]
-
+  case class Ref[A, S <: ExprShape]() extends Expr2[A, S]
 
   type StripExpr2[E] = E match
     case Expr2[b, s] => b
@@ -40,7 +41,6 @@ object Expr2:
   given [A <: AnyNamedTuple : IsTupleOfExpr]: RowConversion[A, Project[A]] = ???
   given [A <: AnyNamedTuple : IsTupleOfAgg]: RowConversion[A, AggProject[A]] = ???
 //  given [A <: AnyNamedTuple]: Conversion[A, Expr2.Project[A]] = Expr2.Project(_)
-
 
 trait RowConversion[From, To]:
   extension (x: From) def toRow: To

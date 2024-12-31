@@ -29,8 +29,8 @@ class EvenOddQuery extends QueryBenchmark {
   type EvenOddDB = (numbers: Number)
 
   val tyqlDB = (
-      numbers = Table[Number]("evenodd_numbers")
-      )
+    numbers = Table[Number]("evenodd_numbers")
+  )
 
   // Collections data model + initialization
   case class NumbersCC(id: Int, value: Int)
@@ -107,7 +107,7 @@ class EvenOddQuery extends QueryBenchmark {
         oddDerived.filter(o => num.value == o.value + 1).map(o => ResultCC(value = num.value, typ = "even"))
       ).distinct
       val oddResult = collectionsDB.numbers.flatMap(num =>
-        evenDerived.filter(e => num.value == e.value + 1).map(e => ResultCC(value = num.value, typ ="odd"))
+        evenDerived.filter(e => num.value == e.value + 1).map(e => ResultCC(value = num.value, typ = "odd"))
       ).distinct
       (evenResult, oddResult)
     )
@@ -123,15 +123,20 @@ class EvenOddQuery extends QueryBenchmark {
         .map(n => (n.value, Expr("even")))
       val odd = evenodd_numbers.select
         .filter(n => n.value === Expr(1))
-        .map(n => ( n.value, Expr("odd")))
+        .map(n => (n.value, Expr("odd")))
       (even, odd)
 
     var it = 0
-    val fixFn: ((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[(Expr[Int], Expr[String]), (Int, String)], query.Select[(Expr[Int], Expr[String]), (Int, String)]) =
+    val fixFn
+      : ((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (
+          query.Select[(Expr[Int], Expr[String]), (Int, String)],
+          query.Select[(Expr[Int], Expr[String]), (Int, String)]
+      ) =
       recur =>
         val (even, odd) = recur
-        val (evenAcc, oddAcc) = if it == 0 then (evenodd_delta1, evenodd_delta2) else (evenodd_derived1, evenodd_derived2)
-        it+=1
+        val (evenAcc, oddAcc) =
+          if it == 0 then (evenodd_delta1, evenodd_delta2) else (evenodd_derived1, evenodd_derived2)
+        it += 1
 
 //        println(s"***iteration $it")
 //        println(s"BASES:\n\teven : ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(even)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\todd: ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(odd)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
@@ -151,16 +156,21 @@ class EvenOddQuery extends QueryBenchmark {
         (evenResult, oddResult)
 
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      ddb, (evenodd_delta1, evenodd_delta2), (evenodd_tmp1, evenodd_tmp2), (evenodd_derived1, evenodd_derived2)
+      ddb,
+      (evenodd_delta1, evenodd_delta2),
+      (evenodd_tmp1, evenodd_tmp2),
+      (evenodd_derived1, evenodd_derived2)
     )(
       (toTuple, toTuple)
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[ResultSS], ScalaSQLTable[ResultSS])) => (
+        query.Select[Any, Any],
+        query.Select[Any, Any]
+    )])
 
     val result = evenodd_derived2.select.sortBy(_.value).sortBy(_.typ)
     resultScalaSQL = db.run(result)
-
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

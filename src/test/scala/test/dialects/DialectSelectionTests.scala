@@ -7,7 +7,7 @@ class DialectSelectionTests extends FunSuite {
   private def behavior()(using d: Dialect): String = d.name()
 
   test("ANSI selected by default") {
-      assertEquals(behavior(), "ANSI SQL Dialect")
+    assertEquals(behavior(), "ANSI SQL Dialect")
   }
 
   test("ANSI selected also by import") {

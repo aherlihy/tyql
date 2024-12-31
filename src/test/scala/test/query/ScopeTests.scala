@@ -37,9 +37,7 @@ class Scope1Test extends SQLStringQueryTest[AllCommerceDBs, Int] {
 
   def query() =
     testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.
-        filter(prod => prod.id == purch.productId).
-        map(prod => prod.id)
+      testDB.tables.products.filter(prod => prod.id == purch.productId).map(prod => prod.id)
     )
 
   def expectedQueryPattern =
@@ -56,9 +54,9 @@ class Scope2Test extends SQLStringQueryTest[AllCommerceDBs, (purchId: Int, prodP
 
   def query() =
     testDB.tables.purchases.flatMap(purch =>
-      testDB.tables.products.
-        filter(prod => prod.id == purch.productId).
-        map(prod => (purchId = purch.id, prodPrice = prod.price).toRow)
+      testDB.tables.products.filter(prod => prod.id == purch.productId).map(prod =>
+        (purchId = purch.id, prodPrice = prod.price).toRow
+      )
     )
 
   def expectedQueryPattern =
@@ -95,9 +93,7 @@ class ScopeSubquery1Test extends SQLStringQueryTest[AllCommerceDBs, Int] {
 
   def query() =
     testDB.tables.purchases.take(1).flatMap(purch =>
-      testDB.tables.products.take(2).
-        filter(prod => prod.id == purch.productId).
-        map(prod => prod.id)
+      testDB.tables.products.take(2).filter(prod => prod.id == purch.productId).map(prod => prod.id)
     )
 
   def expectedQueryPattern =
@@ -115,9 +111,9 @@ class ScopeSubquery2Test extends SQLStringQueryTest[AllCommerceDBs, (purchId: In
 
   def query() =
     testDB.tables.purchases.take(1).flatMap(purch =>
-      testDB.tables.products.take(2).
-        filter(prod => prod.id == purch.productId).
-        map(prod => (purchId = purch.id, prodPrice = prod.price).toRow)
+      testDB.tables.products.take(2).filter(prod => prod.id == purch.productId).map(prod =>
+        (purchId = purch.id, prodPrice = prod.price).toRow
+      )
     )
 
   def expectedQueryPattern =
@@ -135,9 +131,9 @@ class ScopeSubquery3Test extends SQLStringQueryTest[AllCommerceDBs, (purchId: In
 
   def query() =
     testDB.tables.purchases.map(m => (purchasesId = m.id, purchasesProductId = m.productId)).take(1).flatMap(purch =>
-      testDB.tables.products.map(m => (productsId = m.id, productsPrice = m.price)).take(2).
-        filter(prod => prod.productsId == purch.purchasesProductId).
-        map(prod => (purchId = purch.purchasesId, prodPrice = prod.productsPrice).toRow)
+      testDB.tables.products.map(m => (productsId = m.id, productsPrice = m.price)).take(2).filter(prod =>
+        prod.productsId == purch.purchasesProductId
+      ).map(prod => (purchId = purch.purchasesId, prodPrice = prod.productsPrice).toRow)
     )
 
   def expectedQueryPattern =
@@ -154,9 +150,9 @@ class ScopeSubquery4Test extends SQLStringQueryTest[AllCommerceDBs, (purchId: In
   def testDescription = "Subquery (sort) on both"
   def query() =
     testDB.tables.purchases.sort(_.total, Ord.ASC).flatMap(purch =>
-      testDB.tables.products.sort(_.price, Ord.DESC).
-        filter(prod => prod.id == purch.productId).
-        map(prod => (purchId = purch.id, prodPrice = prod.price).toRow)
+      testDB.tables.products.sort(_.price, Ord.DESC).filter(prod => prod.id == purch.productId).map(prod =>
+        (purchId = purch.id, prodPrice = prod.price).toRow
+      )
     )
   def expectedQueryPattern = """
         SELECT subquery$C.id as purchId, subquery$D.price as prodPrice
@@ -171,4 +167,3 @@ class ScopeSubquery4Test extends SQLStringQueryTest[AllCommerceDBs, (purchId: In
         WHERE subquery$D.id = subquery$C.productId
       """
 }
-

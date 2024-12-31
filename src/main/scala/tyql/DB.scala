@@ -23,9 +23,10 @@ class DB(conn: Connection) {
     statement.close()
   }
 
-  def run[T](dbast: DatabaseAST[T])(using resultTag: ResultTag[T],
-                                          dialect: tyql.Dialect,
-                                          config: tyql.Config): List[T] = {
+  def run[T]
+    (dbast: DatabaseAST[T])
+    (using resultTag: ResultTag[T], dialect: tyql.Dialect, config: tyql.Config)
+    : List[T] = {
     val (sqlString, parameters) = dbast.toQueryIR.toSQLQuery()
     println("SQL << " + sqlString + " >>")
     for (p <- parameters) {
@@ -38,12 +39,12 @@ class DB(conn: Connection) {
         val ps = conn.prepareStatement(sqlString)
         for (i <- 0 until parameters.length) do
           parameters(i) match
-            case null => ps.setNull(i + 1, java.sql.Types.NULL)
-            case v if v.isInstanceOf[Long] => ps.setLong(i + 1, v.asInstanceOf[Long])
-            case v if v.isInstanceOf[Int] => ps.setInt(i + 1, v.asInstanceOf[Int])
+            case null                        => ps.setNull(i + 1, java.sql.Types.NULL)
+            case v if v.isInstanceOf[Long]   => ps.setLong(i + 1, v.asInstanceOf[Long])
+            case v if v.isInstanceOf[Int]    => ps.setInt(i + 1, v.asInstanceOf[Int])
             case v if v.isInstanceOf[Double] => ps.setDouble(i + 1, v.asInstanceOf[Double])
             case v if v.isInstanceOf[String] => ps.setString(i + 1, v.asInstanceOf[String])
-            case v => ps.setObject(i + 1, v)
+            case v                           => ps.setObject(i + 1, v)
         rs = ps.executeQuery()
       case tyql.ParameterStyle.EscapedInline =>
         rs = stmt.executeQuery(sqlString)
@@ -52,38 +53,40 @@ class DB(conn: Connection) {
     var results = List[T]()
     while (rs.next()) {
       val row = resultTag match
-        case ResultTag.IntTag => rs.getInt(1)
+        case ResultTag.IntTag    => rs.getInt(1)
         case ResultTag.DoubleTag => rs.getDouble(1)
         case ResultTag.StringTag => rs.getString(1)
-        case ResultTag.BoolTag => rs.getBoolean(1)
+        case ResultTag.BoolTag   => rs.getBoolean(1)
         case ResultTag.OptionalTag(e) => {
           val got = rs.getObject(1)
           if got == null then None
-          else e match
-            case ResultTag.IntTag => Some(got.asInstanceOf[Int])
-            case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
-            case ResultTag.StringTag => Some(got.asInstanceOf[String])
-            case ResultTag.BoolTag => Some(got.asInstanceOf[Boolean])
-            case _ => assert(false, "Unsupported type")
+          else
+            e match
+              case ResultTag.IntTag    => Some(got.asInstanceOf[Int])
+              case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+              case ResultTag.StringTag => Some(got.asInstanceOf[String])
+              case ResultTag.BoolTag   => Some(got.asInstanceOf[Boolean])
+              case _                   => assert(false, "Unsupported type")
         }
         case ResultTag.ProductTag(_, fields, m) => {
-          val nt = fields.asInstanceOf[ResultTag.NamedTupleTag[?,?]]
+          val nt = fields.asInstanceOf[ResultTag.NamedTupleTag[?, ?]]
           val fieldValues = nt.names.zip(nt.types).zipWithIndex.map { case ((name, tag), idx) =>
             val col = idx + 1 // XXX if you want to use `name` here, you must case-convert it
             tag match
-              case ResultTag.IntTag => rs.getInt(col)
+              case ResultTag.IntTag    => rs.getInt(col)
               case ResultTag.DoubleTag => rs.getDouble(col)
               case ResultTag.StringTag => rs.getString(col)
-              case ResultTag.BoolTag => rs.getBoolean(col)
+              case ResultTag.BoolTag   => rs.getBoolean(col)
               case ResultTag.OptionalTag(e) => {
                 val got = rs.getObject(col)
                 if got == null then None
-                else e match
-                  case ResultTag.IntTag => Some(got.asInstanceOf[Int])
-                  case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
-                  case ResultTag.StringTag => Some(got.asInstanceOf[String])
-                  case ResultTag.BoolTag => Some(got.asInstanceOf[Boolean])
-                  case _ => assert(false, "Unsupported type")
+                else
+                  e match
+                    case ResultTag.IntTag    => Some(got.asInstanceOf[Int])
+                    case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+                    case ResultTag.StringTag => Some(got.asInstanceOf[String])
+                    case ResultTag.BoolTag   => Some(got.asInstanceOf[Boolean])
+                    case _                   => assert(false, "Unsupported type")
               }
               case _ => assert(false, "Unsupported type")
           }
@@ -93,19 +96,20 @@ class DB(conn: Connection) {
           val fieldValues = names.zip(typesResultTags).zipWithIndex.map { case ((name, tag), idx) =>
             val col = idx + 1 // XXX if you want to use `name` here, you must case-convert it
             tag match
-              case ResultTag.IntTag => rs.getInt(col)
+              case ResultTag.IntTag    => rs.getInt(col)
               case ResultTag.DoubleTag => rs.getDouble(col)
               case ResultTag.StringTag => rs.getString(col)
-              case ResultTag.BoolTag => rs.getBoolean(col)
+              case ResultTag.BoolTag   => rs.getBoolean(col)
               case ResultTag.OptionalTag(e) => {
                 val got = rs.getObject(col)
                 if got == null then None
-                else e match
-                  case ResultTag.IntTag => Some(got.asInstanceOf[Int])
-                  case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
-                  case ResultTag.StringTag => Some(got.asInstanceOf[String])
-                  case ResultTag.BoolTag => Some(got.asInstanceOf[Boolean])
-                  case _ => assert(false, "Unsupported type")
+                else
+                  e match
+                    case ResultTag.IntTag    => Some(got.asInstanceOf[Int])
+                    case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+                    case ResultTag.StringTag => Some(got.asInstanceOf[String])
+                    case ResultTag.BoolTag   => Some(got.asInstanceOf[Boolean])
+                    case _                   => assert(false, "Unsupported type")
               }
               case _ => assert(false, "Unsupported type")
           }

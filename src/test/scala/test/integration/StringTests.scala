@@ -21,8 +21,15 @@ class StringTests extends FunSuite {
   test("upper and lower work also with unicode") {
     def checkValue(expected: String)(rs: ResultSet) = assertEquals(rs.getString(1), expected)
 
-    for (r <- Seq(withDBNoImplicits.postgres[Unit], withDBNoImplicits.mariadb[Unit],
-                  withDBNoImplicits.mysql[Unit], withDBNoImplicits.h2[Unit], withDBNoImplicits.duckdb[Unit])) {
+    for (
+      r <- Seq(
+        withDBNoImplicits.postgres[Unit],
+        withDBNoImplicits.mariadb[Unit],
+        withDBNoImplicits.mysql[Unit],
+        withDBNoImplicits.h2[Unit],
+        withDBNoImplicits.duckdb[Unit]
+      )
+    ) {
       checkExpr[String](lit("aŁaJć").toUpperCase, checkValue("AŁAJĆ"))(r)
       checkExpr[String](lit("aŁaJć").toLowerCase, checkValue("ałajć"))(r)
     }
@@ -108,27 +115,33 @@ class StringTests extends FunSuite {
 
     checkExprDialect[Boolean](
       lit("abba").like(lit("abba")),
-      checkValue(true))(withDB.all)
+      checkValue(true)
+    )(withDB.all)
 
     checkExprDialect[Boolean](
       lit("abba").like(lit("a_b_")),
-      checkValue(true))(withDB.all)
+      checkValue(true)
+    )(withDB.all)
 
     checkExprDialect[Boolean](
       lit("abba").like(lit("bba")),
-      checkValue(false))(withDB.all)
+      checkValue(false)
+    )(withDB.all)
 
     checkExprDialect[Boolean](
       lit("abba").like(lit("a%")),
-      checkValue(true))(withDB.all)
+      checkValue(true)
+    )(withDB.all)
 
     checkExprDialect[Boolean](
       lit("abba").like(lit("%")),
-      checkValue(true))(withDB.all)
+      checkValue(true)
+    )(withDB.all)
 
     checkExprDialect[Boolean](
       lit("abba").like(lit("___")),
-      checkValue(false))(withDB.all)
+      checkValue(false)
+    )(withDB.all)
   }
 
   test("LIKE patterns handle % and _ differently") {
@@ -136,22 +149,28 @@ class StringTests extends FunSuite {
 
     checkExprDialect[Boolean](
       lit("a%bc").like(lit("a%")),
-      checkValue(true))(withDB.all)
+      checkValue(true)
+    )(withDB.all)
     checkExprDialect[Boolean](
       lit("a%bc").like(lit("a" + literal_percent)),
-      checkValue(false))(withDB.all)
+      checkValue(false)
+    )(withDB.all)
     checkExprDialect[Boolean](
       lit("a%bc").like(lit("a" + literal_percent + "bc")),
-      checkValue(true))(withDB.all)
+      checkValue(true)
+    )(withDB.all)
     checkExprDialect[Boolean](
       lit("ab").like(lit("_b")),
-      checkValue(true))(withDB.all)
+      checkValue(true)
+    )(withDB.all)
     checkExprDialect[Boolean](
       lit("ab").like(lit(literal_underscore + "b")),
-      checkValue(false))(withDB.all)
+      checkValue(false)
+    )(withDB.all)
     checkExprDialect[Boolean](
       lit("_b").like(lit(literal_underscore + "b")),
-      checkValue(true))(withDB.all)
+      checkValue(true)
+    )(withDB.all)
   }
 
   test("concatenation of two strings") {
@@ -159,15 +178,18 @@ class StringTests extends FunSuite {
 
     checkExprDialect[String](
       lit("__a") + lit("bcd"),
-      checkValue("__abcd"))(withDB.all)
+      checkValue("__abcd")
+    )(withDB.all)
 
     checkExprDialect[String](
       lit("__a") + (lit("bc") + lit("d")),
-      checkValue("__abcd"))(withDB.all)
+      checkValue("__abcd")
+    )(withDB.all)
 
     checkExprDialect[String](
       (lit("__") + lit("a")) + lit("bcd"),
-      checkValue("__abcd"))(withDB.all)
+      checkValue("__abcd")
+    )(withDB.all)
   }
 
   test("concatenation of multiple strings") {
@@ -175,11 +197,13 @@ class StringTests extends FunSuite {
 
     checkExprDialect[String](
       Expr.concat(Seq(lit("a"), lit("b"), lit("CCCC"))),
-      checkValue("abCCCC"))(withDB.all)
+      checkValue("abCCCC")
+    )(withDB.all)
 
     checkExprDialect[String](
       Expr.concatWith(Seq(lit("a"), lit("b"), lit("CCCC")), lit("--")),
-      checkValue("a--b--CCCC"))(withDB.all)
+      checkValue("a--b--CCCC")
+    )(withDB.all)
   }
 
   test("reverse") {

@@ -7,12 +7,11 @@
 
 import pprint.pprintln
 
-
 /*
   TODO:
   - have the snippets return the results of running the SQL against the DB
   - generate markdown
-*/
+ */
 
 /// Remember to publishLocal the library with the inline flag `shouldTrackPolyfillUsage` set to true!
 /// sudo mkdir /mnt/ramdisk
@@ -21,37 +20,37 @@ val directory = "/mnt/ramdisk/"
 
 object dialects {
   val postgresql = "postgresql"
-  val mysql      = "mysql"
-  val mariadb    = "mariadb"
-  val sqlite     = "sqlite"
-  val duckdb     = "duckdb"
-  val h2         = "h2"
+  val mysql = "mysql"
+  val mariadb = "mariadb"
+  val sqlite = "sqlite"
+  val duckdb = "duckdb"
+  val h2 = "h2"
 }
 
 object dialect_features {
-  val randomUUID        = "randomUUID"
-  val randomInt         = "randomInt"
+  val randomUUID = "randomUUID"
+  val randomInt = "randomInt"
   val reversibleStrings = "reversibleStrings"
 }
 
 val dialect_imports = Map(
   dialects.postgresql -> "import tyql.Dialect.postgresql.given",
-  dialects.mysql      -> "import tyql.Dialect.mysql.given",
-  dialects.mariadb    -> "import tyql.Dialect.mariadb.given",
-  dialects.sqlite     -> "import tyql.Dialect.sqlite.given",
-  dialects.duckdb     -> "import tyql.Dialect.duckdb.given",
-  dialects.h2         -> "import tyql.Dialect.h2.given"
+  dialects.mysql -> "import tyql.Dialect.mysql.given",
+  dialects.mariadb -> "import tyql.Dialect.mariadb.given",
+  dialects.sqlite -> "import tyql.Dialect.sqlite.given",
+  dialects.duckdb -> "import tyql.Dialect.duckdb.given",
+  dialects.h2 -> "import tyql.Dialect.h2.given"
 )
 
 val dialect_features_uses = Map(
-  dialect_features.randomUUID        -> "tyql.Expr.randomUUID()",
-  dialect_features.randomInt         -> "tyql.Expr.randomInt(0, tyql.lit(1) + tyql.lit(1))",
+  dialect_features.randomUUID -> "tyql.Expr.randomUUID()",
+  dialect_features.randomInt -> "tyql.Expr.randomInt(0, tyql.lit(1) + tyql.lit(1))",
   dialect_features.reversibleStrings -> "tyql.Expr.reverse(tyql.lit(\"abc\"))"
 )
 
 // WARNING XXX: this needs `sbt publishLocal` first
 def testScript(dialectSnippet: String, codeSnippet: String) = "" +
-s"""//> using jvm "21"
+  s"""//> using jvm "21"
 //> using options "-experimental"
 //> using dep "ch.epfl.lamp::tyql:0.0.1"
 //> using dep "com.lihaoyi::ujson:4.0.2"
@@ -91,7 +90,7 @@ var exception = false
       os.write.over(os.Path(path), script)
       val compilationAndRunStatus =
         os.proc("scala-cli", path)
-          .call(cwd=os.Path(directory), check=false)
+          .call(cwd = os.Path(directory), check = false)
       if (compilationAndRunStatus.exitCode != 0) {
         dialect -> (compilationAndRunStatus.exitCode == 0)
       } else {
@@ -159,4 +158,4 @@ Map(
     "duckdb" -> (true, false, "SELECT REVERSE('abc') FROM t as t0")
   )
 )
-*/
+ */

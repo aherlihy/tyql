@@ -30,12 +30,12 @@ object StringLiteral:
       val (in, shouldAddEscape) = handleLiteralPatterns(insideLikePattern, lit)
       val out = if in.exists("\n\r\t\b\f\\".contains) then
         "E'" + in.replace("\\", "\\\\")
-                 .replace("'", "\\'")
-                 .replace("\b", "\\b")
-                 .replace("\f", "\\f")
-                 .replace("\n", "\\n")
-                 .replace("\r", "\\r")
-                 .replace("\t", "\\t") + "'"
+          .replace("'", "\\'")
+          .replace("\b", "\\b")
+          .replace("\f", "\\f")
+          .replace("\n", "\\n")
+          .replace("\r", "\\r")
+          .replace("\t", "\\t") + "'"
       else
         "'" + in.replace("'", "''") + "'"
       if shouldAddEscape then s"$out ESCAPE '\\'" else out
@@ -49,14 +49,14 @@ object StringLiteral:
     override def quoteStringLiteral(lit: String, insideLikePattern: Boolean): String =
       val (in, shouldAddEscape) = handleLiteralPatterns(insideLikePattern, lit)
       val out = "'" + in.replace("\\", "\\\\")
-                        .replace("\u0000", "\\0")
-                        .replace("'", "\\'")
-                        .replace("\"", "\\\"")
-                        .replace("\b", "\\b")
-                        .replace("\n", "\\n")
-                        .replace("\r", "\\r")
-                        .replace("\t", "\\t")
-                        .replace("\u001A", "\\Z") + "'"
+        .replace("\u0000", "\\0")
+        .replace("'", "\\'")
+        .replace("\"", "\\\"")
+        .replace("\b", "\\b")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+        .replace("\u001A", "\\Z") + "'"
       out // ignore `ESCAPE` since MySQL/MariaDB do not support it
 
   trait DuckdbBehavior extends Dialect:
@@ -66,12 +66,12 @@ object StringLiteral:
       val (in, shouldAddEscape) = handleLiteralPatterns(insideLikePattern, lit)
       val out = if in.exists("\n\r\t\b\f\\".contains) then
         "E'" + in.replace("\\", "\\\\")
-                .replace("'", "''")  // different from PostgreSQL
-                .replace("\b", "\\b")
-                .replace("\f", "\\f")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t") + "'"
+          .replace("'", "''") // different from PostgreSQL
+          .replace("\b", "\\b")
+          .replace("\f", "\\f")
+          .replace("\n", "\\n")
+          .replace("\r", "\\r")
+          .replace("\t", "\\t") + "'"
       else
         "'" + in.replace("'", "''") + "'"
       if shouldAddEscape then s"$out ESCAPE '\\'" else out

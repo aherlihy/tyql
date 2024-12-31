@@ -27,11 +27,11 @@ class TOAndersensQuery extends QueryBenchmark {
   type AndersensDB = (addressOf: Edge, assign: Edge, loadT: Edge, store: Edge)
 
   val tyqlDB = (
-      addressOf = Table[Edge]("andersens_addressOf"),
-      assign = Table[Edge]("andersens_assign"),
-      loadT = Table[Edge]("andersens_loadT"),
-      store = Table[Edge]("andersens_store")
-    )
+    addressOf = Table[Edge]("andersens_addressOf"),
+    assign = Table[Edge]("andersens_assign"),
+    loadT = Table[Edge]("andersens_loadT"),
+    store = Table[Edge]("andersens_store")
+  )
 
   // Collections data model + initialization
   case class EdgeCC(x: String, y: String)
@@ -58,7 +58,8 @@ class TOAndersensQuery extends QueryBenchmark {
   case class EdgeSS[T[_]](x: T[String], y: T[String])
 
   def fromSSRes(r: EdgeSS[?]): Seq[String] = Seq(
-    r.x.toString, r.y.toString
+    r.x.toString,
+    r.y.toString
   )
 
   object andersens_addressOf extends ScalaSQLTable[EdgeSS]
@@ -80,20 +81,29 @@ class TOAndersensQuery extends QueryBenchmark {
     val base = tyqlDB.addressOf.map(a => (x = a.x, y = a.y).toRow)
     val query = base.unrestrictedFix(pointsTo =>
       tyqlDB.assign.flatMap(a =>
-          pointsTo.filter(p => a.y == p.x).map(p =>
-            (x = a.x, y = p.y).toRow))
+        pointsTo.filter(p => a.y == p.x).map(p =>
+          (x = a.x, y = p.y).toRow
+        )
+      )
         .union(tyqlDB.loadT.flatMap(l =>
           pointsTo.flatMap(pt1 =>
             pointsTo
               .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
               .map(pt2 =>
-                (x = l.x, y = pt2.y).toRow))))
+                (x = l.x, y = pt2.y).toRow
+              )
+          )
+        ))
         .union(tyqlDB.store.flatMap(s =>
           pointsTo.flatMap(pt1 =>
             pointsTo
               .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
               .map(pt2 =>
-                (x = pt1.y, y = pt2.y).toRow)))))
+                (x = pt1.y, y = pt2.y).toRow
+              )
+          )
+        ))
+    )
       .sort(_.y, Ord.ASC).sort(_.x, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
@@ -105,12 +115,15 @@ class TOAndersensQuery extends QueryBenchmark {
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(pointsTo =>
       it += 1
       collectionsDB.assign.flatMap(a =>
+        if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
+        pointsTo.filter(p =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-          pointsTo.filter(p =>
-            if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-            a.y == p.x).map(p =>
-            if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-            EdgeCC(x = a.x, y = p.y)))
+          a.y == p.x
+        ).map(p =>
+          if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
+          EdgeCC(x = a.x, y = p.y)
+        )
+      )
         .union(collectionsDB.loadT.flatMap(l =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
           pointsTo.flatMap(pt1 =>
@@ -118,10 +131,14 @@ class TOAndersensQuery extends QueryBenchmark {
             pointsTo
               .filter(pt2 =>
                 if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-                l.y == pt1.x && pt1.y == pt2.x)
+                l.y == pt1.x && pt1.y == pt2.x
+              )
               .map(pt2 =>
                 if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-                EdgeCC(x = l.x, y = pt2.y)))))
+                EdgeCC(x = l.x, y = pt2.y)
+              )
+          )
+        ))
         .union(collectionsDB.store.flatMap(s =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
           pointsTo.flatMap(pt1 =>
@@ -129,13 +146,17 @@ class TOAndersensQuery extends QueryBenchmark {
             pointsTo
               .filter(pt2 =>
                 if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-                s.x == pt1.x && s.y == pt2.x)
+                s.x == pt1.x && s.y == pt2.x
+              )
               .map(pt2 =>
                 if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-                EdgeCC(x = pt1.y, y = pt2.y))))))
+                EdgeCC(x = pt1.y, y = pt2.y)
+              )
+          )
+        ))
+    )
       .sortBy(_.y).sortBy(_.x)
-      println(s"\nIT,$name,collections,$it")
-
+    println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -165,10 +186,14 @@ class TOAndersensQuery extends QueryBenchmark {
 
       innerQ1.union(innerQ2).union(innerQ3)
 
-
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, andersens_delta, andersens_tmp, andersens_derived
-    )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]])
+      ddb,
+      andersens_delta,
+      andersens_tmp,
+      andersens_derived
+    )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]]
+    )
 
     val result = andersens_derived.select.sortBy(_.y).sortBy(_.x)
     resultScalaSQL = db.run(result)

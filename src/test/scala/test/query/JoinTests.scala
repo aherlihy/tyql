@@ -1,6 +1,6 @@
 package test.query.join
 import test.SQLStringQueryTest
-import test.query.{commerceDBs,  AllCommerceDBs}
+import test.query.{commerceDBs, AllCommerceDBs}
 
 import tyql.*
 import tyql.Expr.*
@@ -43,7 +43,8 @@ class JoinSimple2Test extends SQLStringQueryTest[AllCommerceDBs, (newId: Int, ne
   SELECT product$A.id as newId, buyers$B.id as newId2 FROM buyers as buyers$B, product as product$A WHERE product$A.name = buyers$B.name
   """
 }
-class JoinSimple3Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple3Test
+    extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join on string literal comparison"
   def query() =
     for
@@ -62,7 +63,8 @@ class JoinSimple3Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: Str
       """
 }
 
-class JoinSimple4Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+class JoinSimple4Test
+    extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
   def testDescription = "Join: two-table simple join with separate conditions"
   def query() =
     for

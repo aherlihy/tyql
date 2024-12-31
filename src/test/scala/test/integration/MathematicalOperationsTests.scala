@@ -71,6 +71,8 @@ class MathematicalOperationsTests extends FunSuite {
     checkExpr[Double](Expr.sin(Expr.asin(0.76)), expectD(0.76))(withDBNoImplicits.all)
     checkExpr[Double](Expr.cos(Expr.acos(0.76)), expectD(0.76))(withDBNoImplicits.all)
     checkExpr[Double](Expr.tan(Expr.atan(0.76)), expectD(0.76))(withDBNoImplicits.all)
-    checkExpr[Double](Expr.cos(17).power(2.0) - Expr.sin(17).power(2.0), expectD(Math.cos(17*2)))(withDBNoImplicits.all)
+    checkExpr[Double](Expr.cos(17).power(2.0) - Expr.sin(17).power(2.0), expectD(Math.cos(17 * 2)))(
+      withDBNoImplicits.all
+    )
   }
 }

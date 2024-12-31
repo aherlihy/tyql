@@ -9,7 +9,6 @@ import tyql.DialectFeature.*
 private def unsupportedFeature(feature: String) =
   throw new UnsupportedOperationException(s"$feature feature not supported in this dialect!")
 
-
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                         Base Dialect Trait                         ║
 // ╚════════════════════════════════════════════════════════════════════╝
@@ -52,11 +51,10 @@ object Dialect:
   val literal_underscore = '\uE001'
 
   given Dialect = new Dialect
-      with QuotingIdentifiers.AnsiBehavior
-      with LimitAndOffset.Separate
-      with StringLiteral.AnsiSingleQuote:
+    with QuotingIdentifiers.AnsiBehavior
+    with LimitAndOffset.Separate
+    with StringLiteral.AnsiSingleQuote:
     def name() = "ANSI SQL Dialect"
-
 
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                         ANSI SQL Dialect                           ║
@@ -65,15 +63,14 @@ object Dialect:
     given Dialect = Dialect.given_Dialect
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
 
-
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                        PostgreSQL Dialect                          ║
 // ╚════════════════════════════════════════════════════════════════════╝
   object postgresql:
     given Dialect = new Dialect
-        with QuotingIdentifiers.PostgresqlBehavior
-        with LimitAndOffset.Separate
-        with StringLiteral.PostgresqlBehavior:
+      with QuotingIdentifiers.PostgresqlBehavior
+      with LimitAndOffset.Separate
+      with StringLiteral.PostgresqlBehavior:
       def name() = "PostgreSQL Dialect"
       override val stringLengthByCharacters: String = "length"
       override def feature_RandomUUID_functionName: String = "gen_random_uuid"
@@ -82,7 +79,10 @@ object Dialect:
       override def feature_RandomInt_rawSQL: SqlSnippet =
         val a = ("a", Precedence.Concat)
         val b = ("b", Precedence.Concat)
-        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)")
+        SqlSnippet(
+          Precedence.Unary,
+          snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)"
+        )
       override def stringPositionFindingVia: String = "POSITION"
       override val `prefers $n over ? for parametrization` = true
 
@@ -93,7 +93,6 @@ object Dialect:
     // TODO later support more options here (?)
     given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
     given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
-
 
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                          MySQL Dialect                             ║
@@ -112,7 +111,10 @@ object Dialect:
       override def feature_RandomInt_rawSQL: SqlSnippet =
         val a = ("a", Precedence.Concat)
         val b = ("b", Precedence.Concat)
-        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)")
+        SqlSnippet(
+          Precedence.Unary,
+          snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)"
+        )
       override val nullSafeEqualityViaSpecialOperator: Boolean = true
       override val booleanCast: String = "SIGNED"
       override val integerCast: String = "DECIMAL"
@@ -143,17 +145,21 @@ object Dialect:
 // ╚════════════════════════════════════════════════════════════════════╝
   object sqlite:
     given Dialect = new Dialect
-        with QuotingIdentifiers.SqliteBehavior
-        with LimitAndOffset.Separate
-        with StringLiteral.AnsiSingleQuote:
+      with QuotingIdentifiers.SqliteBehavior
+      with LimitAndOffset.Separate
+      with StringLiteral.AnsiSingleQuote:
       def name() = "SQLite Dialect"
       override val stringLengthByCharacters = "length"
       override def feature_RandomFloat_functionName: Option[String] = None
-      override def feature_RandomFloat_rawSQL: Option[SqlSnippet] = Some(SqlSnippet(Precedence.Unary, snippet"(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)"))
+      override def feature_RandomFloat_rawSQL: Option[SqlSnippet] =
+        Some(SqlSnippet(Precedence.Unary, snippet"(0.5 - RANDOM() / CAST(-9223372036854775808 AS REAL) / 2)"))
       override def feature_RandomInt_rawSQL: SqlSnippet =
         val a = ("a", Precedence.Concat)
         val b = ("b", Precedence.Concat)
-        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select cast(abs(random() % (b - a + 1) + a) as integer) from randomIntParameters)")
+        SqlSnippet(
+          Precedence.Unary,
+          snippet"(with randomIntParameters as (select $a as a, $b as b) select cast(abs(random() % (b - a + 1) + a) as integer) from randomIntParameters)"
+        )
       override def needsStringRepeatPolyfill: Boolean = true
       override def needsStringLPadRPadPolyfill: Boolean = true
       override def stringPositionFindingVia: String = "INSTR"
@@ -167,9 +173,9 @@ object Dialect:
 // ╚════════════════════════════════════════════════════════════════════╝
   object h2:
     given Dialect = new Dialect
-        with QuotingIdentifiers.H2Behavior
-        with LimitAndOffset.Separate
-        with StringLiteral.AnsiSingleQuote:
+      with QuotingIdentifiers.H2Behavior
+      with LimitAndOffset.Separate
+      with StringLiteral.AnsiSingleQuote:
       def name() = "H2 Dialect"
       override val stringLengthByCharacters = "length"
       override def feature_RandomUUID_functionName: String = "RANDOM_UUID"
@@ -178,7 +184,10 @@ object Dialect:
       override def feature_RandomInt_rawSQL: SqlSnippet =
         val a = ("a", Precedence.Concat)
         val b = ("b", Precedence.Concat)
-        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)")
+        SqlSnippet(
+          Precedence.Unary,
+          snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)"
+        )
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
@@ -187,15 +196,14 @@ object Dialect:
     given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
     given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
 
-
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                         DuckDB Dialect                             ║
 // ╚════════════════════════════════════════════════════════════════════╝
   object duckdb:
     given Dialect = new Dialect
-        with QuotingIdentifiers.DuckdbBehavior
-        with LimitAndOffset.Separate
-        with StringLiteral.DuckdbBehavior:
+      with QuotingIdentifiers.DuckdbBehavior
+      with LimitAndOffset.Separate
+      with StringLiteral.DuckdbBehavior:
       override def name(): String = "DuckDB Dialect"
       override val stringLengthByCharacters = "length"
       override val stringLengthBytesNeedsEncodeFirst = true
@@ -205,7 +213,10 @@ object Dialect:
       override def feature_RandomInt_rawSQL: SqlSnippet =
         val a = ("a", Precedence.Concat)
         val b = ("b", Precedence.Concat)
-        SqlSnippet(Precedence.Unary, snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)")
+        SqlSnippet(
+          Precedence.Unary,
+          snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)"
+        )
       override def stringPositionFindingVia: String = "POSITION"
       override val `prefers $n over ? for parametrization` = true
 

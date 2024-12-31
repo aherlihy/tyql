@@ -54,7 +54,8 @@ class SSSPQuery extends QueryBenchmark {
         case _ => ???
       (name, loaded)
     ).toMap
-    collectionsDB = CollectionsDB(tables("base").asInstanceOf[Seq[ResultEdgeCC]], tables("edge").asInstanceOf[Seq[WEdgeCC]])
+    collectionsDB =
+      CollectionsDB(tables("base").asInstanceOf[Seq[ResultEdgeCC]], tables("edge").asInstanceOf[Seq[WEdgeCC]])
 
   //   ScalaSQL data model
   case class WEdgeSS[T[_]](src: T[Int], dst: T[Int], cost: T[Int])
@@ -99,18 +100,17 @@ class SSSPQuery extends QueryBenchmark {
   def executeCollections(): Unit =
     val base = collectionsDB.base
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
-        collectionsDB.edge.flatMap(edge =>
-          sp
-            .filter(s => s.dst == edge.src)
-            .map(s => ResultEdgeCC(dst = edge.dst, cost = s.cost + edge.cost))
-        ).distinct
-      )
+      collectionsDB.edge.flatMap(edge =>
+        sp
+          .filter(s => s.dst == edge.src)
+          .map(s => ResultEdgeCC(dst = edge.dst, cost = s.cost + edge.cost))
+      ).distinct
+    )
       .groupBy(_.dst)
       .mapValues(_.minBy(_.cost))
       .values.toSeq
       .sortBy(_.cost)
       .sortBy(_.dst)
-
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -125,11 +125,18 @@ class SSSPQuery extends QueryBenchmark {
       } yield (edge.dst, s.cost + edge.cost)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, sssp_delta, sssp_tmp, sssp_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]])
+      ddb,
+      sssp_delta,
+      sssp_tmp,
+      sssp_derived
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[WResultEdgeSS] => query.Select[Any, Any]]
+    )
 
     //    sssp_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
-    backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst ORDER BY dst, cost")
+    backupResultScalaSql = ddb.runQuery(
+      s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst ORDER BY dst, cost"
+    )
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

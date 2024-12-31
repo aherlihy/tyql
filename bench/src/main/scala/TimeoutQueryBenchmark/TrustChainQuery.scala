@@ -28,7 +28,7 @@ class TOTrustChainQuery extends QueryBenchmark {
 
   val tyqlDB = (
     friends = Table[Friends]("trustchain_friends")
-    )
+  )
 
   // Collections data model + initialization
   case class FriendsCC(person1: String, person2: String)
@@ -78,7 +78,8 @@ class TOTrustChainQuery extends QueryBenchmark {
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val baseFriends = tyqlDB.friends
 
-    val tyqlFix = if set then unrestrictedFix((baseFriends, baseFriends)) else unrestrictedBagFix((baseFriends, baseFriends))
+    val tyqlFix =
+      if set then unrestrictedFix((baseFriends, baseFriends)) else unrestrictedBagFix((baseFriends, baseFriends))
     val (trust, friends) = tyqlFix((trust, friends) => {
       val mutualTrustResult = friends.flatMap(f =>
         trust
@@ -120,10 +121,12 @@ class TOTrustChainQuery extends QueryBenchmark {
         friendsAcc
           .filter(mt =>
             if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-            mt.person2 == f.person1)
+            mt.person2 == f.person1
+          )
           .map(mt =>
             if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-            FriendsCC(person1 = mt.person1, person2 = f.person2))
+            FriendsCC(person1 = mt.person1, person2 = f.person2)
+          )
       )
 
       val friendsResult = trustAcc.map(mt =>
@@ -153,12 +156,17 @@ class TOTrustChainQuery extends QueryBenchmark {
       val baseTrust = trustchain_friends.select.map(f => (f.person1, f.person2))
       (baseFriends, baseTrust)
 
-    val fixFn: ((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String]), (String, String)]) =
+    val fixFn
+      : ((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (
+          query.Select[(Expr[String], Expr[String]), (String, String)],
+          query.Select[(Expr[String], Expr[String]), (String, String)]
+      ) =
       recur =>
         val (trust, friends) = recur
-        val (trustAcc, friendsAcc) = if it == 0 then (trustchain_delta1, trustchain_delta2) else (trustchain_derived1, trustchain_derived2)
+        val (trustAcc, friendsAcc) =
+          if it == 0 then (trustchain_delta1, trustchain_delta2) else (trustchain_derived1, trustchain_derived2)
 //        println(s"***iteration $it")
-        it+=1
+        it += 1
 //        println(s"input:\n\ttrust : ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(trust)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\tfriends: ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(friends)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         val trustRecur = for {
           f <- friendsAcc.select
@@ -172,14 +180,22 @@ class TOTrustChainQuery extends QueryBenchmark {
 
     // Fix point only on target result?
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      ddb, (trustchain_delta1, trustchain_delta2), (trustchain_tmp1, trustchain_tmp2), (trustchain_derived1, trustchain_derived2)
+      ddb,
+      (trustchain_delta1, trustchain_delta2),
+      (trustchain_tmp1, trustchain_tmp2),
+      (trustchain_derived1, trustchain_derived2)
     )(
       (toTuple, toTuple)
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (
+        query.Select[Any, Any],
+        query.Select[Any, Any]
+    )])
 
-    backupResultScalaSql = ddb.runQuery(s"SELECT r.person2 as name, COUNT(r.person1) as count FROM ${ScalaSQLTable.name(trustchain_derived2)} as r GROUP BY r.person2 ORDER BY count, r.person2")
+    backupResultScalaSql = ddb.runQuery(
+      s"SELECT r.person2 as name, COUNT(r.person1) as count FROM ${ScalaSQLTable.name(trustchain_derived2)} as r GROUP BY r.person2 ORDER BY count, r.person2"
+    )
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking

@@ -15,13 +15,13 @@ import org.junit.experimental.theories.ParameterSupplier
 class CaseConventionTests extends FunSuite {
   private val expectations = Seq(
     ("aa bb cc", "aa_bb_cc", "aaBbCc", "AaBbCc", "AA_BB_CC", "aabbcc", "AABBCC"),
-    ("aabbcc",   "aabbcc",   "aabbcc", "Aabbcc", "AABBCC",   "aabbcc", "AABBCC"),
-    ("aaBb_cc",  "aa_bb_cc", "aaBbCc", "AaBbCc", "AA_BB_CC", "aabbcc", "AABBCC"),
-    ("AaBbCc",   "aa_bb_cc", "aaBbCc", "AaBbCc", "AA_BB_CC", "aabbcc", "AABBCC"),
-    ("abc12",    "abc12",    "abc12",  "Abc12",  "ABC12",    "abc12",  "ABC12"),
-    ("abc_12",   "abc_12",   "abc12",  "Abc12",  "ABC_12",   "abc12",  "ABC12"),
-    ("abC12",    "ab_c12",   "abC12",  "AbC12",  "AB_C12",   "abc12",  "ABC12"),
-    ("ABC",      "a_b_c",    "aBC",    "ABC",    "A_B_C",    "abc",    "ABC"),
+    ("aabbcc", "aabbcc", "aabbcc", "Aabbcc", "AABBCC", "aabbcc", "AABBCC"),
+    ("aaBb_cc", "aa_bb_cc", "aaBbCc", "AaBbCc", "AA_BB_CC", "aabbcc", "AABBCC"),
+    ("AaBbCc", "aa_bb_cc", "aaBbCc", "AaBbCc", "AA_BB_CC", "aabbcc", "AABBCC"),
+    ("abc12", "abc12", "abc12", "Abc12", "ABC12", "abc12", "ABC12"),
+    ("abc_12", "abc_12", "abc12", "Abc12", "ABC_12", "abc12", "ABC12"),
+    ("abC12", "ab_c12", "abC12", "AbC12", "AB_C12", "abc12", "ABC12"),
+    ("ABC", "a_b_c", "aBC", "ABC", "A_B_C", "abc", "ABC"),
   )
 
   test("expected case conversions") {
@@ -55,9 +55,11 @@ class CaseConventionTests extends FunSuite {
   }
 
   test("postgres handles it".tag(needsDBs)) {
-    withDB.postgres{ conn =>
+    withDB.postgres { conn =>
 
-      def check(tableName: String, columnName: String, postgresTableName: String = null, postgresColumnName: String = null)(using cnf: Config) = {
+      def check
+        (tableName: String, columnName: String, postgresTableName: String = null, postgresColumnName: String = null)
+        (using cnf: Config) = {
         val escapedTableName = summon[Dialect].quoteIdentifier(Option(postgresTableName).getOrElse(tableName))
         val escapedColunmName = summon[Dialect].quoteIdentifier(Option(postgresColumnName).getOrElse(columnName))
 
@@ -72,20 +74,32 @@ class CaseConventionTests extends FunSuite {
           assert(r.next())
           assertEquals(r.getInt(cnf.caseConvention.convert(columnName)), 117)
           stmt.executeUpdate(s"drop table ${escapedTableName};")
-        }
-        catch {
+        } catch {
           case e: Exception => throw e
-        }
-        finally stmt.close()
+        } finally stmt.close()
       }
 
       check("caseCon ventionTests 19471", "aaBb_Cc")(using new Config(caseConvention = CaseConvention.Exact) {})
       check("caseConventionTests19471", "aaBbCc")(using new Config(caseConvention = CaseConvention.CamelCase) {})
       check("CaseConventionTests19471", "AaBbCc")(using new Config(caseConvention = CaseConvention.PascalCase) {})
       check("case_convention_tests19471", "aa_bb_cc")(using new Config(caseConvention = CaseConvention.Underscores) {})
-      check("CaseConventionTests19471", "aaBb_Cc", postgresTableName="CASE_CONVENTION_TESTS19471", postgresColumnName="AA_BB_CC")(using new Config(caseConvention = CaseConvention.CapitalUnderscores) {}) // XXX AA_BB_CC would be interpreted as a_a_b_c !
+      check(
+        "CaseConventionTests19471",
+        "aaBb_Cc",
+        postgresTableName = "CASE_CONVENTION_TESTS19471",
+        postgresColumnName = "AA_BB_CC"
+      )(using
+        new Config(caseConvention = CaseConvention.CapitalUnderscores) {}
+      ) // XXX AA_BB_CC would be interpreted as a_a_b_c !
       check("caseconventiontests19471", "aabbcc")(using new Config(caseConvention = CaseConvention.Joined) {})
-      check("CaseConventionTests19471", "aaBb_Cc", postgresTableName="CASECONVENTIONTESTS19471", postgresColumnName="AABBCC")(using new Config(caseConvention = CaseConvention.JoinedCapital) {}) // XXX AA_BB_CC would be interpreted as a_a_b_c !
+      check(
+        "CaseConventionTests19471",
+        "aaBb_Cc",
+        postgresTableName = "CASECONVENTIONTESTS19471",
+        postgresColumnName = "AABBCC"
+      )(using
+        new Config(caseConvention = CaseConvention.JoinedCapital) {}
+      ) // XXX AA_BB_CC would be interpreted as a_a_b_c !
       // TODO document this weird (?) behavior, or maybe change it?
       // In the Scala code you must use `_`s or capital letters as separators, and the config
       //   changes only what is ouputted to the DB, so you cannot use something like ABC as the column name from

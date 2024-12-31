@@ -26,9 +26,17 @@ class NullTests extends FunSuite {
   }
 
   test("!isNull is simplified") {
-    checkExprDialect[Boolean](!Null.isNull, expectB(false), s => assert(s.toLowerCase().contains("is not null")))(withDB.all)
-    checkExprDialect[Boolean](!lit("hello").isNull, expectB(true), s => assert(s.toLowerCase().contains("is not null")))(withDB.all)
-    checkExprDialect[Boolean](!lit(101).isNull, expectB(true), s => assert(s.toLowerCase().contains("is not null")))(withDB.all)
+    checkExprDialect[Boolean](!Null.isNull, expectB(false), s => assert(s.toLowerCase().contains("is not null")))(
+      withDB.all
+    )
+    checkExprDialect[Boolean](
+      !lit("hello").isNull,
+      expectB(true),
+      s => assert(s.toLowerCase().contains("is not null"))
+    )(withDB.all)
+    checkExprDialect[Boolean](!lit(101).isNull, expectB(true), s => assert(s.toLowerCase().contains("is not null")))(
+      withDB.all
+    )
   }
 
   test("coalesce compiles") {

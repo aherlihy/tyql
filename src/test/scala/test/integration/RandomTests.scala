@@ -104,7 +104,9 @@ class RandomTests extends FunSuite {
 
     {
       import Dialect.postgresql.given
-      checkExprDialect[String](q, checkValue, s => assert(s.toLowerCase().contains("gen_random_uuid(")))(withDB.postgres)
+      checkExprDialect[String](q, checkValue, s => assert(s.toLowerCase().contains("gen_random_uuid(")))(
+        withDB.postgres
+      )
     }
     {
       import Dialect.mysql.given

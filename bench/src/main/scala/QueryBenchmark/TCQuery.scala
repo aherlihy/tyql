@@ -74,11 +74,14 @@ class TCQuery extends QueryBenchmark {
       .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
 
     val query = pathBase.unrestrictedBagFix(path =>
-        path.flatMap(p =>
-          tyqlDB.edge
-            .filter(e => e.x == p.endNode && !p.path.contains(e.y))
-            .map(e =>
-              (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow)))
+      path.flatMap(p =>
+        tyqlDB.edge
+          .filter(e => e.x == p.endNode && !p.path.contains(e.y))
+          .map(e =>
+            (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
+          )
+      )
+    )
       .sort(p => p.path.length, Ord.ASC)
       .sort(p => p.startNode, Ord.ASC)
       .sort(_.endNode, Ord.ASC)
@@ -93,13 +96,13 @@ class TCQuery extends QueryBenchmark {
     var it = 0
     resultCollections = FixedPointQuery.fix(set)(path, Seq())(path =>
 //      println(s"***iteration $it")
-      it+=1
+      it += 1
 //      println(s"input: path=${path.mkString("[", ", ", "]")}")
       val res = path.flatMap(p =>
         collectionsDB.edge
           .filter(e => p.endNode == e.x && !p.path.contains(e.y))
           .map(e => ResultEdgeCC(startNode = p.startNode, endNode = e.y, p.path :+ e.y))
-      )//.distinct
+      ) // .distinct
 //      println(s"output: path=${res.mkString("[", ", ", "]")}")
       res
     ).sortBy(r => r.path.length)
@@ -109,7 +112,9 @@ class TCQuery extends QueryBenchmark {
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     def initList(v1: Expr[Int], v2: Expr[Int]): Expr[String] = Expr { implicit ctx => sql"[$v1, $v2]" }
     def listAppend(v: Expr[Int], lst: Expr[String]): Expr[String] = Expr { implicit ctx => sql"list_append($lst, $v)" }
-    def listContains(v: Expr[Int], lst: Expr[String]): Expr[Boolean] = Expr { implicit ctx => sql"list_contains($lst, $v)" }
+    def listContains(v: Expr[Int], lst: Expr[String]): Expr[Boolean] = Expr { implicit ctx =>
+      sql"list_contains($lst, $v)"
+    }
     def listLength(lst: Expr[String]): Expr[Int] = Expr { implicit ctx => sql"length($lst)" }
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: ResultEdgeSS[?]) => (c.startNode, c.endNode, c.path)
@@ -120,23 +125,28 @@ class TCQuery extends QueryBenchmark {
         .map(e => (e.x, e.y, initList(e.x, e.y)))
 
     var it = 0
-    val fixFn: ScalaSQLTable[ResultEdgeSS] => query.Select[(Expr[Int], Expr[Int], Expr[String]), (Int, Int, String)] = path =>
+    val fixFn: ScalaSQLTable[ResultEdgeSS] => query.Select[(Expr[Int], Expr[Int], Expr[String]), (Int, Int, String)] =
+      path =>
 //      println(s"***iteration $it")
-      it += 1
+        it += 1
 //      println(s"input: path=${db.runRaw[(Int, Int, String)](s"SELECT * FROM ${ScalaSQLTable.name(path)}").mkString("[", ", ", "]")}")
-      val res = for {
-        p <- path.select
-        e <- tc_edge.join(p.endNode === _.x)
-        if !listContains(e.y, p.path)
-      } yield (p.startNode, e.y, listAppend(e.y, p.path))
+        val res = for {
+          p <- path.select
+          e <- tc_edge.join(p.endNode === _.x)
+          if !listContains(e.y, p.path)
+        } yield (p.startNode, e.y, listAppend(e.y, p.path))
 
 //      println(s"output: path=${db.run(res).mkString("[", ", ", "]")}")
 
-      res
+        res
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, tc_delta, tc_tmp, tc_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]])
-
+      ddb,
+      tc_delta,
+      tc_tmp,
+      tc_derived
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]]
+    )
 
     val result = tc_derived.select.sortBy(_.path).sortBy(_.endNode).sortBy(_.startNode)
     resultScalaSQL = db.run(result)
