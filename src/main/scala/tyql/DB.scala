@@ -6,6 +6,9 @@ import pprint.pprintln
 import scala.deriving.Mirror
 import scala.Tuple
 
+import pprint.pprintln
+import TreePrettyPrinter._
+
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
@@ -121,48 +124,20 @@ def driverMain(): Unit = {
   val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
   val db = DB(conn)
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.DriverParametrized) {}
-  import tyql.Dialect.mariadb.given_Dialect
+  import tyql.Dialect.mariadb.given
   case class Flowers(name: Option[String], flowerSize: Int, cost: Option[Double], likes: Int)
   val t = tyql.Table[Flowers]()
 
   db.runRaw("create table if not exists flowers(name text, flower_size integer, cost double, likes integer);")
+  db.runRaw("create table if not exists customers(cust_id integer primary key, cust_name varchar(255));")
+  db.runRaw("create table if not exists orders(order_id integer primary key, cust_id integer, prod varchar(255));")
 
-  println("------------1------------")
-  val zzz = db.run(t.filter(t => t.flowerSize.isNull || t.flowerSize >= 2))
-  println("received:")
-  pprintln(zzz)
+  case class Customers(custId: Int, custName: String)
+  case class Orders(orderId: Int, custId: Int, prod: String)
+  val customers = tyql.Table[Customers]()
+  val orders = tyql.Table[Orders]()
 
-  println("------------2------------")
-  val ggoott = db.run(t.map(r => (b = r.flowerSize, c=lit(101))))
-  println("received:")
-  pprintln(ggoott)
-  // println("first received's `b`")
-  // pprintln(ggoott.head.b)
-
-  println("------------3------------")
-  val zzz2 = db.run(t.map(_.name.getOrElse("UNKNOWN")))
-  println("received:")
-  pprintln(zzz2)
-
-  println("------------4------------")
-  val zzz3 = db.run(t.max(_.flowerSize))
-  println("received:")
-  pprintln(zzz3)
-
-
-  println("------------5------------")
-  val wfr = db.run(t.map(r =>
-    (name = r.name,
-     size = r.flowerSize,
-     sizePartition = sum(r.flowerSize).partitionBy(r.likes))))
-  println("received:")
-  pprintln(wfr)
-
-  println("------------6------------")
-  val wfr2 = db.run(t.map(r =>
-    (name = r.name,
-     size = r.flowerSize,
-     sizePartition = rowNumber.partitionBy(r.likes))))
-  println("received:")
-  pprintln(wfr2)
+  pprintln(db.run(
+    customers.map(c => (i = c.custId + 1)).map(c => (i = c.i - 1))
+  ))
 }

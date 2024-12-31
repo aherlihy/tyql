@@ -30,6 +30,7 @@ object TreePrettyPrinter {
 
   extension (expr: Expr[?, ?]) {
     def prettyPrint(depth: Int): String = expr match {
+      case null => s"${indent(depth)}---null---"
       case Select(x, name) => s"${indent(depth)}Select(${x.prettyPrint(0)}.$name)"
       case Ref(_) => s"${indent(depth)}${expr.asInstanceOf[Ref[?, ?]].stringRef()}"
       case Eq(x, y) => s"${indent(depth)}Eq(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"

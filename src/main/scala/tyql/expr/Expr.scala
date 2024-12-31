@@ -236,6 +236,7 @@ object Expr:
   case class Gt[T1: Numeric, T2: Numeric,S1 <: ExprShape, S2 <: ExprShape]($x: Expr[T1, S1], $y: Expr[T2, S2])(using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Gte[T1: Numeric, T2: Numeric,S1 <: ExprShape, S2 <: ExprShape]($x: Expr[T1, S1], $y: Expr[T2, S2])(using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
 
+  // TODO maybe remove these FunctionCall_, for now they only exist to create fake AST trees for debug purposes...
   case class FunctionCall0[R](name: String)(using ResultTag[R]) extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
   case class FunctionCall1[A1, R, S1 <: ExprShape](name: String, $a1: Expr[A1, S1])(using ResultTag[R]) extends Expr[R, S1]
   case class FunctionCall2[A1, A2, R, S1 <: ExprShape, S2 <: ExprShape](name: String, $a1: Expr[A1, S1], $a2: Expr[A2, S2])(using ResultTag[R]) extends Expr[R, CalculatedShape[S1, S2]]

@@ -112,14 +112,12 @@ object QueryIRTree:
 
     NaryRelationOp(flattened, op, ast)
 
-  private def collapseMap(lhs: QueryIRNode, rhs: QueryIRNode): RelationOp =
-    ???
+  private def collapseMap(lhs: QueryIRNode, rhs: QueryIRNode): RelationOp = ???
 
   private def unnest(fromNodes: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
-    fromNodes.reduce((q1, q2) =>
-      val res = q1.mergeWith(q2, flatMap)
-      res
-    ).appendProject(projectIR, flatMap)
+    fromNodes
+      .reduce((q1, q2) => q1.mergeWith(q2, astOther=flatMap))
+      .appendProject(projectIR, astOther=flatMap)
 
   /**
    * Generate top-level or subquery
@@ -145,11 +143,12 @@ object QueryIRTree:
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         actualParam.appendWhere(where, filter)
-      case filter: Aggregation.AggFilter[?] =>
+      case filter: Aggregation.AggFilter[?] => // same as for Query.Filter
         val (predicateASTs, fromNodeAST) = collapseFilters(Seq(), filter, symbols)
         val actualParam = generateActualParam(fromNodeAST, filter.$pred.$param, symbols)
+        val allSymbols = symbols.bind(actualParam.carriedSymbols)
         val predicateExprs = predicateASTs.map(pred =>
-          generateFun(pred, actualParam, symbols.bind(actualParam.carriedSymbols))
+          generateFun(pred, actualParam, allSymbols)
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         actualParam.appendWhere(where, filter)
@@ -157,8 +156,7 @@ object QueryIRTree:
         val (orderByASTs, fromNodeAST) = collapseSort(Seq(), sort, symbols)
         val actualParam = generateActualParam(fromNodeAST, sort.$body.$param, symbols)
         val orderByExprs = orderByASTs.map(ord =>
-          val res = generateFun(ord._1, actualParam, symbols)
-          (res, ord._2)
+          (generateFun(ord._1, actualParam, symbols), ord._2)
         )
         OrderedQuery(actualParam.appendFlag(SelectFlags.Final), orderByExprs, sort)
       case flatMap: Query.FlatMap[?, ?] =>
@@ -254,6 +252,7 @@ object QueryIRTree:
           case _ => throw new Exception("Unimplemented: groupBy on complex query")
 
         val newSymbols = symbols.bind(sourceRefs.zipWithIndex.map((r, i) => (r.stringRef(), sourceTables(i))))
+        // Turn off the attribute names for the grouping clause since no aliases needed
         grouping.tag match
           case t: NamedTupleTag[?, ?] => t.names = List()
           case _ =>
@@ -291,9 +290,9 @@ object QueryIRTree:
 
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
-
   private def generateActualParam(from: DatabaseAST[?], formalParam: Expr.Ref[?, ?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     lookupRecursiveRef(generateQuery(from, symbols), formalParam.stringRef())
+
   /**
    * Generate the actual parameter expression and bind it to the formal parameter in the symbol table, but
    * leave the function body uncompiled.

@@ -456,7 +456,7 @@ object Query:
     $sourceTags: collection.Seq[(String, ResultTag[?])],
     $having: Option[Expr[Boolean, ?]]) extends Query[ResultType, BagResult]:
     /**
-     * Don't overload filter because having operates on the pre-grouped type.
+     * Do not call it filter because having operates on the pre-grouped type.
      */
     def having(havingFn: ToNonScalarRef[AllSourceTypes] => Expr[Boolean, ?]): Query[ResultType, BagResult] =
       if ($having.isEmpty)
@@ -479,7 +479,7 @@ object Query:
     $selectFn: Fun[SourceType, Expr[ResultType, SelectShape], SelectShape],
     $havingFn: Option[Fun[SourceType, Expr[Boolean, ?], ?]]) extends Query[ResultType, BagResult]:
     /**
-     * Don't overload filter because having operates on the pre-grouped type.
+     * Do not call it filter because having operates on the pre-grouped type.
      */
     def having(p: Ref[SourceType, ?] => Expr[Boolean, ?]): Query[ResultType, BagResult] =
       if ($havingFn.isEmpty)
