@@ -20,6 +20,8 @@ trait CanBeEqualed[T1, T2]
 private[tyql] enum CastTarget:
   case CInt, CString, CDouble, CBool
 
+trait LiteralExpressionsAlsoAllowedInAggregations {}
+
 /** The type of expressions in the query language */
 trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends Selectable:
   /** This type is used to support selection with any of the field names defined by Fields.
@@ -464,7 +466,7 @@ object Expr:
 
   case class Cast[A, B, S <: ExprShape]($x: Expr[A, S], resultType: CastTarget)(using ResultTag[B]) extends Expr[B, S]
 
-  case class NullLit[A]()(using ResultTag[A]) extends Expr[A, NonScalarExpr]
+  case class NullLit[A]()(using ResultTag[A]) extends Expr[A, NonScalarExpr] with LiteralExpressionsAlsoAllowedInAggregations
   case class IsNull[A, S <: ExprShape]($x: Expr[A, S]) extends Expr[Boolean, S]
   case class Coalesce[A, S1 <: ExprShape]($x1: Expr[A, S1], $x2: Expr[A, S1], $xs: Seq[Expr[A, S1]])(using ResultTag[A])
       extends Expr[A, S1]
@@ -472,19 +474,19 @@ object Expr:
       extends Expr[A, CalculatedShape[S1, S2]]
 
   /** Literals are type-specific, tailored to the types that the DB supports */
-  case class IntLit($value: Int) extends Expr[Int, NonScalarExpr]
+  case class IntLit($value: Int) extends Expr[Int, NonScalarExpr] with LiteralExpressionsAlsoAllowedInAggregations
 
   /** Scala values can be lifted into literals by conversions */
   given Conversion[Int, IntLit] = IntLit(_)
   // XXX maybe only from literals with FromDigits?
 
-  case class StringLit($value: String) extends Expr[String, NonScalarExpr] // TODO XXX why is this nonscalar?
+  case class StringLit($value: String) extends Expr[String, NonScalarExpr] with LiteralExpressionsAlsoAllowedInAggregations // TODO XXX why is this nonscalar?
   given Conversion[String, StringLit] = StringLit(_)
 
-  case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr]
+  case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr] with LiteralExpressionsAlsoAllowedInAggregations
   given Conversion[Double, DoubleLit] = DoubleLit(_)
 
-  case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr]
+  case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr] with LiteralExpressionsAlsoAllowedInAggregations
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
   // TODO why does this break things?
 
@@ -544,10 +546,10 @@ object Expr:
 
 end Expr
 
-def lit(x: Int): Expr[Int, NonScalarExpr] = Expr.IntLit(x)
-def lit(x: Double): Expr[Double, NonScalarExpr] = Expr.DoubleLit(x)
-def lit(x: String): Expr[String, NonScalarExpr] = Expr.StringLit(x)
-def lit(x: Boolean): Expr[Boolean, NonScalarExpr] = Expr.BooleanLit(x)
+def lit(x: Int): Expr[Int, NonScalarExpr] & LiteralExpressionsAlsoAllowedInAggregations = Expr.IntLit(x)
+def lit(x: Double): Expr[Double, NonScalarExpr] & LiteralExpressionsAlsoAllowedInAggregations = Expr.DoubleLit(x)
+def lit(x: String): Expr[String, NonScalarExpr] & LiteralExpressionsAlsoAllowedInAggregations = Expr.StringLit(x)
+def lit(x: Boolean): Expr[Boolean, NonScalarExpr] & LiteralExpressionsAlsoAllowedInAggregations = Expr.BooleanLit(x)
 def True = Expr.BooleanLit(true)
 def False = Expr.BooleanLit(false)
 def Null = Expr.NullLit[scala.Null]()

@@ -30,9 +30,8 @@ object AggregationExpr {
       extends AggregationExpr[NamedTuple.Map[A, StripExpr]]
 
   // For now restrict all elements to be agg instead of allowing a mix.
-  type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ScalarExpr]
+  type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< (Expr[?, ScalarExpr] | LiteralExpressionsAlsoAllowedInAggregations)
 
-  // Allow only aggregates in toRow. TODO: allow constants e.g. SELECT AVG(x), 1 FROM db
   extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
     def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): AggProject[A] = AggProject(x)
 
