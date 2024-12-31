@@ -84,16 +84,22 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 //  inline def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Query[B]): Nothing =
 //    error("No aggregation function found in f. Did you mean to use flatMap?")
 
-// TODO: Restrictions for groupBy: all columns in the selectFn must either be in the groupingFn or in an aggregate.
-//  type GetFields[T] <: Tuple = T match
-//    case Expr[t, ?] => GetFields[t]
-//    case NamedTuple[n, v] => n
-// TODO: figure out how to do groupBy on join result.
-//  GroupBy grouping function when applied to the result of a join accesses only columns from the original queries.
-// TODO: Right now groupBy most closely resembles SQL groupBy, not Spark RDD's or pairs.
-//   Do we want to pick one?
-// TODO: Merge groupBy, groupByAggregate, and filterByGroupBy?
-//  Right now separated due to issues with overloading, but in theory could be condensed into a single groupBy method
+// TODO Restrictions for groupBy: all columns in the selectFn must either be in the groupingFn or in an aggregate.
+//      This construction leads to "can't prove" from the compiler.
+//      match on named tuple must be before match on AggrExpr/Expr, otherwise the compiler complains that it cannot prove that a named tuple is disjoint from an expression
+  // type GetFields[T] <: Tuple = T match
+  //   case NamedTuple[n, v] => n
+  //   case Expr[t, ?] => GetFields[t]
+  //   case _ => EmptyTuple
+  // type GetFieldsWithoutAggregates[T] <: Tuple = T match
+  //   case NamedTuple[n, v] => n
+  //   case AggregationExpr[t] => EmptyTuple
+  //   case Expr[t, ?] => GetFields[t]
+  //   case _ => EmptyTuple
+
+// TODO figure out how to do groupBy on join result.
+//      GroupBy grouping function when applied to the result of a join accesses only columns from the original queries.
+// XXX `groupBy`, `groupByAggregate`, and `filterByGroupBy` are now separated due to issues with overloading, but could be condensed into a single groupBy method
   /**
    * groupBy where the grouping clause is NOT an aggregation.
    * Can add a 'having' statement incrementally by calling .having on the result.
@@ -109,9 +115,9 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
    */
   def groupBy[R: ResultTag, GroupResult](
     groupingFn: Ref[A, NonScalarExpr] => Expr[GroupResult, NonScalarExpr],
-    selectFn: Ref[A, ScalarExpr] => Expr[R, ScalarExpr]
-//  (using ev: Tuple.Union[GetFields[A]] <:< Tuple.Union[GetFields[G]])
-   ): Query.GroupBy[A, R, GroupResult, NonScalarExpr, ScalarExpr] =
+    selectFn: Ref[A, ScalarExpr] => Expr[R, ScalarExpr])
+    // (using ev: Tuple.Union[GetFieldsWithoutAggregates[R]] <:< Tuple.Union[GetFields[GroupResult]])
+      : Query.GroupBy[A, R, GroupResult, NonScalarExpr, ScalarExpr] =
     val refG = Ref[A, NonScalarExpr]()
     val groupFun = Fun(refG, groupingFn(refG))
 

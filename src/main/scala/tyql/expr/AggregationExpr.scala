@@ -9,7 +9,7 @@ import Expr.{Fun, Pred, StripExpr}
 /**
  * A scalar operation, e.g. an expression that returns a single result, instead of a collection.
  */
-trait AggregationExpr[Result](using ResultTag[Result]) extends Expr[Result, ScalarExpr] {
+sealed trait AggregationExpr[Result](using ResultTag[Result]) extends Expr[Result, ScalarExpr] {
   def partitionBy(e: Expr[?, NonScalarExpr]*): WindowExpression[Result] = WindExpr(Left(this), e.toList, Seq())
   def orderBy(e: Expr[?, NonScalarExpr], ord: tyql.Ord): WindowExpression[Result] = WindExpr(Left(this), Seq(), Seq((e, ord)))
 }
