@@ -123,12 +123,15 @@ object QueryIRTree:
 
   private def anyToExprConverter(v: Any): Expr[?, ?] =
     v match
+      case _ if v.isInstanceOf[Some[?]]    => anyToExprConverter(v.asInstanceOf[Some[?]].get)
       case _ if v.isInstanceOf[Int]        => lit(v.asInstanceOf[Int])
       case _ if v.isInstanceOf[String]     => lit(v.asInstanceOf[String])
       case _ if v.isInstanceOf[Double]     => lit(v.asInstanceOf[Double])
       case _ if v.isInstanceOf[Boolean]    => lit(v.asInstanceOf[Boolean])
       case _ if v.isInstanceOf[Expr[?, ?]] => v.asInstanceOf[Expr[?, ?]]
-      case _                               => assert(false)
+      case _                               =>
+        println("RECEIVED UNEXPCTED " + v)
+        assert(false)
 
   private[tyql] def generateUpdateToTheDB(ast: UpdateToTheDB, symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match

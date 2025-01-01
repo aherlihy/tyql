@@ -37,6 +37,12 @@ trait InsertableTable[R: ResultTag, Names <: Tuple] {
       list
     }
 
+  inline def insert(values: R*): Insert[R] = {
+    val names = constValueTuple[NamedTuple.Names[NamedTuple.From[R]]].toList.asInstanceOf[List[String]]
+    val valuesSeq = coerceTuplesIntoSeqSeq(values)
+    Insert(underlyingTable, names, valuesSeq)
+  }
+
   inline def insert[S <: Tuple]
     (values: S*)
     (using

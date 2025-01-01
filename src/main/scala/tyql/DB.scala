@@ -23,6 +23,31 @@ class DB(conn: Connection) {
     statement.close()
   }
 
+  def run(dbast: UpdateToTheDB)(using dialect: tyql.Dialect, config: tyql.Config): Unit =
+    val (sqlString, parameters) = dbast.toQueryIR.toSQLQuery()
+    println("SQL << " + sqlString + " >>")
+    for (p <- parameters) {
+      println("Param << " + p + " >>")
+    }
+    val stmt = conn.createStatement()
+    var returnedInt = 0
+    config.parameterStyle match
+      case tyql.ParameterStyle.DriverParametrized =>
+        val ps = conn.prepareStatement(sqlString)
+        for (i <- 0 until parameters.length) do
+          parameters(i) match
+            case null                        => ps.setNull(i + 1, java.sql.Types.NULL)
+            case v if v.isInstanceOf[Long]   => ps.setLong(i + 1, v.asInstanceOf[Long])
+            case v if v.isInstanceOf[Int]    => ps.setInt(i + 1, v.asInstanceOf[Int])
+            case v if v.isInstanceOf[Double] => ps.setDouble(i + 1, v.asInstanceOf[Double])
+            case v if v.isInstanceOf[String] => ps.setString(i + 1, v.asInstanceOf[String])
+            case v                           => ps.setObject(i + 1, v)
+        returnedInt = ps.executeUpdate()
+      case tyql.ParameterStyle.EscapedInline =>
+        returnedInt = stmt.executeUpdate(sqlString)
+    println("returned " + returnedInt)
+    stmt.close()
+
   def run[T]
     (dbast: DatabaseAST[T])
     (using resultTag: ResultTag[T], dialect: tyql.Dialect, config: tyql.Config)
@@ -127,7 +152,7 @@ def driverMain(): Unit = {
   import scala.language.implicitConversions
   val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
   val db = DB(conn)
-  given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.EscapedInline) {}
+  given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.DriverParametrized) {}
   import tyql.Dialect.mariadb.given
   case class Flowers(name: Option[String], flowerSize: Int, cost: Double, likes: Int)
   val t = tyql.Table[Flowers]()
@@ -173,24 +198,27 @@ def driverMain(): Unit = {
   //   )
   // ))
 
-  val z1 = t.partial[("cost", "flowerSize")].insert(
+  pprintln(db.run(t.partial[("cost", "flowerSize")].insert(
     (cost = 12.0, flowerSize = 1),
     (cost = 12.0, flowerSize = 1),
     (cost = 12.0, flowerSize = 1)
-  ).toQueryIR.toSQLQuery()._1
+  )))
 
-  val z2 = t.partial[("cost", "flowerSize")].insert(
+  pprintln(db.run(t.partial[("cost", "flowerSize")].insert(
     (flowerSize = lit(1), cost = lit(12.0) + lit(10.2))
-  ).toQueryIR.toSQLQuery()._1
+  )))
 
-  val z3 = t.partial[Tuple1["cost"]].insert(
-    Tuple(12.0),
-    Tuple(12.0),
-    Tuple(12.0)
-  ).toQueryIR.toSQLQuery()._1
+  pprintln(db.run(
+    t.partial[Tuple1["cost"]].insert(
+      Tuple(12.0),
+      Tuple(12.0),
+      Tuple(12.0)
+  )))
 
-  println("LINEUP!")
-  println(z1)
-  println(z2)
-  println(z3)
+  pprintln(db.run(
+    t.insert(
+      Flowers(Some("rose"), 1, 1.0, 1),
+      Flowers(Some("rose2"), 1, 1.0, 2),
+      Flowers(Some("rose3"), 1, 1.0, 3),
+  )))
 }
