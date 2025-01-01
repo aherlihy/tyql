@@ -86,7 +86,9 @@ case class ValuesLeaf(values: Seq[Seq[QueryIRNode]], names: Seq[String], ast: Qu
     var firstAgain = true
     for row <- values do
       if first then first = false else ctx.sql.append(" UNION ALL ")
-      ctx.sql.append("(SELECT ")
+      if d.shouldHaveParensInsideValuesExpr then
+        ctx.sql.append("(")
+      ctx.sql.append("SELECT ")
       var first2 = true
       for (value, nameHere) <- row.zip(names) do
         if first2 then first2 = false else ctx.sql.append(", ")
@@ -94,7 +96,8 @@ case class ValuesLeaf(values: Seq[Seq[QueryIRNode]], names: Seq[String], ast: Qu
         if firstAgain then
           ctx.sql.append(" as ")
           ctx.sql.append(nameHere)
-      ctx.sql.append(")")
+      if d.shouldHaveParensInsideValuesExpr then
+        ctx.sql.append(")")
       firstAgain = false
     if !flags.contains(SelectFlags.Final) then
       ctx.sql.append(")")

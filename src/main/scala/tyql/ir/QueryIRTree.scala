@@ -776,6 +776,16 @@ object QueryIRTree:
         UnaryExprOp("EXISTS (", generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), ")", p)
       case p: Expr.IsEmpty[?] =>
         UnaryExprOp("NOT EXISTS (", generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), ")", p)
+      case p: Expr.Contains[?] =>
+        BinExprOp(
+          "",
+          generateExpr(p.$expr, symbols),
+          " IN (",
+          generateQuery(p.$query, symbols).appendFlag(SelectFlags.Final),
+          ")",
+          Precedence.Comparison,
+          p
+        )
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
   private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =

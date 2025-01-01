@@ -141,15 +141,16 @@ def driverMain(): Unit = {
   val customers = tyql.Table[Customers]()
   val orders = tyql.Table[Orders]()
 
-
-  val inlineValues = tyql.Values(
-    (a = 1, b = 2.0), (a = 10, b = 12.0)
+  val inlineValues = tyql.Values[(a: Int, b: Double)](
+    (1, 2.0), (10, 12.0)
     )
   println(db.run(
     inlineValues.map(x => (a = x.a + 1, b = x.b + 1.0))
   ))
 
+  val someTable = Values[(a: Int)](Tuple(1), Tuple(2))
   pprintln(db.run(
-    t.filter(x => x.cost.get.between(lit(11.0), lit(19.0)))
-  ))
+    t.filter(x =>
+      someTable.nonEmpty
+  )))
 }

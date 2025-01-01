@@ -46,6 +46,8 @@ trait Dialect:
 
   val `prefers $n over ? for parametrization` = false
 
+  def shouldHaveParensInsideValuesExpr: Boolean = true
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -163,6 +165,7 @@ object Dialect:
       override def needsStringRepeatPolyfill: Boolean = true
       override def needsStringLPadRPadPolyfill: Boolean = true
       override def stringPositionFindingVia: String = "INSTR"
+      override def shouldHaveParensInsideValuesExpr: Boolean = false
 
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}

@@ -716,7 +716,7 @@ class RecursionShortestPathTest extends SQLStringQueryTest[ReachabilityDB, Path]
       path.flatMap(p =>
         testDB.tables.edge
           .filter(e =>
-            e.x == p.endNode && path.filter(p2 => p2.path.contains(e.y)).isEmpty
+            e.x == p.endNode && path.filter(p2 => p2.path.containsElement(e.y)).isEmpty
           )
           .map(e =>
             (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow

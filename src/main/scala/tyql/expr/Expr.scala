@@ -233,7 +233,9 @@ object Expr:
   extension [A](x: Expr[List[A], NonScalarExpr])(using ResultTag[List[A]])
     def prepend(elem: Expr[A, NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListPrepend(elem, x)
     def append(elem: Expr[A, NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListAppend(x, elem)
-    def contains(elem: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] = ListContains(x, elem)
+    // XXX Due to Scala overloading bugs, there can be no two extensions methods named `contains` with similar arguments.
+    // XXX Because the list one is less used, this one is called `containsElement` instead.
+    def containsElement(elem: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] = ListContains(x, elem)
     def length: Expr[Int, NonScalarExpr] = ListLength(x)
 
   // Aggregations
@@ -451,7 +453,7 @@ object Expr:
 
   // Expressions resulting from queries
   // Cannot use Contains with an aggregation
-  case class Contains[A]($this: Query[A, ?], $other: Expr[A, NonScalarExpr]) extends Expr[Boolean, NonScalarExpr]
+  case class Contains[A]($query: Query[A, ?], $expr: Expr[A, NonScalarExpr]) extends Expr[Boolean, NonScalarExpr]
   case class IsEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NonScalarExpr]
   case class NonEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NonScalarExpr]
 

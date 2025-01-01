@@ -618,7 +618,7 @@ class GraphalyticsDAGTest extends SQLStringQueryTest[GraphDB, Path] {
     pathBase.unrestrictedBagFix(path =>
       path.flatMap(p =>
         testDB.tables.edge
-          .filter(e => e.x == p.endNode && !p.path.contains(e.y))
+          .filter(e => e.x == p.endNode && !p.path.containsElement(e.y))
           .map(e =>
             (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow
           )
