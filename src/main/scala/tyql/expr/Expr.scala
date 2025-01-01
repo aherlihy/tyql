@@ -11,9 +11,14 @@ sealed trait ExprShape
 class ScalarExpr extends ExprShape
 class NonScalarExpr extends ExprShape
 
-type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
-  case ScalarExpr    => S2
-  case NonScalarExpr => S1
+// the compiler cannot understand that this meand that combining with NonScalarExpr means identity
+// if you do CalculatedShape[unknownShape, NonScalarExpr] it will not understand that this is equal to unknownShape
+type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape =
+  (S1, S2) match
+    case (ScalarExpr, ScalarExpr)       => ScalarExpr
+    case (ScalarExpr, NonScalarExpr)    => ScalarExpr
+    case (NonScalarExpr, ScalarExpr)    => ScalarExpr
+    case (NonScalarExpr, NonScalarExpr) => NonScalarExpr
 
 trait CanBeEqualed[T1, T2]
 
@@ -44,23 +49,25 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
     : Expr[Boolean, CalculatedShape[Shape, S]] = Expr.NullSafeEq[Shape, S](this, other)
 
   // XXX these are ugly, but hard to remove, since we are running in live Scala, the compiler likes to interpret `==` as a native equality and complain
-  def ==(other: String): Expr[Boolean, Shape] = Expr.Eq(this, Expr.StringLit(other))
-  def ==(other: Int): Expr[Boolean, Shape] = Expr.Eq(this, Expr.IntLit(other))
-  def ==(other: Boolean): Expr[Boolean, Shape] = Expr.Eq(this, Expr.BooleanLit(other))
-  def ==(other: Double): Expr[Boolean, Shape] = Expr.Eq(this, Expr.DoubleLit(other))
+  def ==(other: String): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.StringLit(other))
+  def ==(other: Int): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.IntLit(other))
+  def ==(other: Boolean): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.BooleanLit(other))
+  def ==(other: Double): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.DoubleLit(other))
+  def !=(other: String): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.StringLit(other))
+  def !=(other: Int): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.IntLit(other))
+  def !=(other: Boolean): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.BooleanLit(other))
+  def !=(other: Double): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.DoubleLit(other))
 
-  @targetName("neqNonScalar")
-  def !=[T](other: Expr[T, NonScalarExpr])(using CanBeEqualed[Result, T]): Expr[Boolean, Shape] =
-    Expr.Ne[Shape, NonScalarExpr](this, other)
-  @targetName("neqScalar")
-  def !=[T](other: Expr[T, ScalarExpr])(using CanBeEqualed[Result, T]): Expr[Boolean, ScalarExpr] =
-    Expr.Ne[Shape, ScalarExpr](this, other)
-  @targetName("nullSafeNeqNonScalar")
-  def !==[T](other: Expr[T, NonScalarExpr])(using CanBeEqualed[Result, T]): Expr[Boolean, Shape] =
-    Expr.NullSafeNe[Shape, NonScalarExpr](this, other)
-  @targetName("nullSafeNeqScalar")
-  def !==[T](other: Expr[T, ScalarExpr])(using CanBeEqualed[Result, T]): Expr[Boolean, ScalarExpr] =
-    Expr.NullSafeNe[Shape, ScalarExpr](this, other)
+  def !=[T, Shape2 <: ExprShape]
+    (other: Expr[T, Shape2])
+    (using CanBeEqualed[Result, T])
+    : Expr[Boolean, CalculatedShape[Shape, Shape2]] =
+    Expr.Ne[Shape, Shape2](this, other)
+  def !==[T, Shape2 <: ExprShape]
+    (other: Expr[T, Shape2])
+    (using CanBeEqualed[Result, T])
+    : Expr[Boolean, CalculatedShape[Shape, Shape2]] =
+    Expr.NullSafeNe[Shape, Shape2](this, other)
 
   def isNull[S <: ExprShape]: Expr[Boolean, Shape] = Expr.IsNull(this)
   def nullIf[S <: ExprShape](other: Expr[Result, S]): Expr[Result, CalculatedShape[Shape, S]] = Expr.NullIf(this, other)
