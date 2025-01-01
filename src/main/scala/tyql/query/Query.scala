@@ -344,18 +344,18 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
   inline def insertInto[R, PartialNames <: Tuple]
     (table: InsertableTable[R, PartialNames])
     (using
-        ev0: Subset.IsSubset[PartialNames, NamedTuple.Names[NamedTuple.From[A]]],
-        ev1: Subset.IsSubset[NamedTuple.Names[NamedTuple.From[A]], PartialNames],
-        ev2: Subset.IsAcceptableInsertion[
+        ev0: TypeOperations.IsSubset[PartialNames, NamedTuple.Names[NamedTuple.From[A]]],
+        ev1: TypeOperations.IsSubset[NamedTuple.Names[NamedTuple.From[A]], PartialNames],
+        ev2: TypeOperations.IsAcceptableInsertion[
           Tuple.Map[
-            Subset.SelectByNames[
+            TypeOperations.SelectByNames[
               PartialNames,
               NamedTuple.DropNames[NamedTuple.From[A]],
               NamedTuple.Names[NamedTuple.From[A]]
             ],
             Expr.StripExpr
           ],
-          Subset.SelectByNames[
+          TypeOperations.SelectByNames[
             PartialNames,
             NamedTuple.DropNames[NamedTuple.From[A]],
             NamedTuple.Names[NamedTuple.From[A]]

@@ -5,7 +5,7 @@ import scala.annotation.implicitNotFound
 import scala.quoted.Type
 import org.h2.command.query.Select
 
-object Subset:
+object TypeOperations:
   /** NOTE: not currently used Check if all the element types of X are also element types of Y /!\ Compile-time will be
     * proportial to Length[X] * Length[Y].
     *
@@ -49,6 +49,8 @@ object Subset:
       SelectTypeWithName[name, OriginalNames, OriginalTypes] *: SelectByNames[restNames, OriginalTypes, OriginalNames]
     case EmptyTuple => EmptyTuple
 
+  // XXX Scala compiler will INCORRECTLY compute this if you change it even a little, this is the only working version after 3+ hours of trying
+  // XXX do not split this into helper types, do not use nested type matching, do not abstract it, only extend this by example
   type AcceptableInsertions[TypesA <: Tuple, TypesB <: Tuple] <: Boolean = (TypesA, TypesB) match
     case (EmptyTuple, EmptyTuple)                     => true
     case (Int *: restA, Int *: restB)                 => AcceptableInsertions[restA, restB]

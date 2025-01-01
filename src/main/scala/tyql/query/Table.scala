@@ -12,7 +12,7 @@ case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query
   inline def columnNames: Tuple = constValueTuple[ColumnNames]
 
   def partial[Names <: Tuple]
-    (using ev: Subset.IsSubset[Names, NamedTuple.Names[NamedTuple.From[R]]])
+    (using ev: TypeOperations.IsSubset[Names, NamedTuple.Names[NamedTuple.From[R]]])
     : PartialTable[R, Names] =
     new PartialTable[R, Names](this)
 
@@ -46,9 +46,13 @@ trait InsertableTable[R: ResultTag, Names <: Tuple] {
   inline def insert[S <: Tuple]
     (values: S*)
     (using
-        ev3: Subset.IsAcceptableInsertion[
+        ev3: TypeOperations.IsAcceptableInsertion[
           Tuple.Map[S, Expr.StripExpr],
-          Subset.SelectByNames[Names, NamedTuple.DropNames[NamedTuple.From[R]], NamedTuple.Names[NamedTuple.From[R]]]
+          TypeOperations.SelectByNames[
+            Names,
+            NamedTuple.DropNames[NamedTuple.From[R]],
+            NamedTuple.Names[NamedTuple.From[R]]
+          ]
         ]
     )
     : Insert[R] =
@@ -57,14 +61,18 @@ trait InsertableTable[R: ResultTag, Names <: Tuple] {
   inline def insert[N <: Tuple, T <: Tuple]
     (values: NamedTuple.NamedTuple[N, T]*)
     (using
-        ev1: Subset.IsSubset[N, Names],
-        ev2: Subset.IsSubset[Names, N],
-        ev3: Subset.IsAcceptableInsertion[
+        ev1: TypeOperations.IsSubset[N, Names],
+        ev2: TypeOperations.IsSubset[Names, N],
+        ev3: TypeOperations.IsAcceptableInsertion[
           Tuple.Map[
-            Subset.SelectByNames[Names, T, N],
+            TypeOperations.SelectByNames[Names, T, N],
             Expr.StripExpr
           ],
-          Subset.SelectByNames[Names, NamedTuple.DropNames[NamedTuple.From[R]], NamedTuple.Names[NamedTuple.From[R]]]
+          TypeOperations.SelectByNames[
+            Names,
+            NamedTuple.DropNames[NamedTuple.From[R]],
+            NamedTuple.Names[NamedTuple.From[R]]
+          ]
         ]
     )
     : Insert[R] =
