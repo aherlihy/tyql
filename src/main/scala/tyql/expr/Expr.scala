@@ -444,6 +444,7 @@ object Expr:
   type StripExpr[E] = E match
     case Expr[b, s]         => b
     case AggregationExpr[b] => b
+    case _                  => E
 
   // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2])

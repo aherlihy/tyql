@@ -49,7 +49,7 @@ trait QueryIRNode:
       ?,
       ?,
       ?
-    ] // Best-effort, keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
+    ] | UpdateToTheDB // Best-effort, keep AST around for debugging, TODO: probably remove, or replace only with ResultTag
 
   val precedence: Int = Precedence.Default
   private var cached: java.util.concurrent.ConcurrentHashMap[(Dialect, Config), SQLRenderingContext] =

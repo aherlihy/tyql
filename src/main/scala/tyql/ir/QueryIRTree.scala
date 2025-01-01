@@ -9,6 +9,7 @@ import NamedTupleDecomposition._
 import PolyfillTracking._
 import TreePrettyPrinter._
 import tyql.Expr.Exp
+import tyql.ir.InsertQueryIR
 
 /** Logical query plan tree. Moves all type parameters into terms (using ResultTag). Collapses nested queries where
   * possible.
@@ -128,6 +129,12 @@ object QueryIRTree:
       case _ if v.isInstanceOf[Boolean]    => lit(v.asInstanceOf[Boolean])
       case _ if v.isInstanceOf[Expr[?, ?]] => v.asInstanceOf[Expr[?, ?]]
       case _                               => assert(false)
+
+  private[tyql] def generateUpdateToTheDB(ast: UpdateToTheDB, symbols: SymbolTable)(using d: Dialect): QueryIRNode =
+    ast match
+      case insertAst: Insert[?] =>
+        val newValues = insertAst.values.map(_.map(anyToExprConverter).map(e => generateExpr(e, symbols)))
+        InsertQueryIR(insertAst.table, insertAst.names, newValues, insertAst)
 
   /** Generate top-level or subquery
     *

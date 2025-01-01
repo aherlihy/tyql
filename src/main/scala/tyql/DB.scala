@@ -129,40 +129,68 @@ def driverMain(): Unit = {
   val db = DB(conn)
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.EscapedInline) {}
   import tyql.Dialect.mariadb.given
-  case class Flowers(name: Option[String], flowerSize: Int, cost: Option[Double], likes: Int)
+  case class Flowers(name: Option[String], flowerSize: Int, cost: Double, likes: Int)
   val t = tyql.Table[Flowers]()
 
-  db.runRaw("create table if not exists flowers(name text, flower_size integer, cost double, likes integer);")
-  db.runRaw("create table if not exists customers(cust_id integer primary key, cust_name varchar(255));")
-  db.runRaw("create table if not exists orders(order_id integer primary key, cust_id integer, prod varchar(255));")
+  // type flowernames = t.ColumnNames
+  // val nnames = scala.compiletime.constValueTuple[flowernames]
+  // println("names are " + nnames)
+  // type flowertypes = t.Types
+  // val flowerTypeExprs : flowertypes = (Some("a"), 1, Some(1.0), -1)
+  // println("typevalues are " + flowerTypeExprs)
 
-  case class Customers(custId: Int, custName: String)
-  case class Orders(orderId: Int, custId: Int, prod: String)
-  val customers = tyql.Table[Customers]()
-  val orders = tyql.Table[Orders]()
+  // db.runRaw("create table if not exists flowers(name text, flower_size integer, cost double, likes integer);")
+  // db.runRaw("create table if not exists customers(cust_id integer primary key, cust_name varchar(255));")
+  // db.runRaw("create table if not exists orders(order_id integer primary key, cust_id integer, prod varchar(255));")
 
-  val someTable = Values[(a: Int)](Tuple(1), Tuple(2))
-  pprintln(db.run(
-    t.filter(x =>
-      someTable.containsRow((a = lit(1)).toRow)
-    )
-  ))
+  // case class Customers(custId: Int, custName: String)
+  // case class Orders(orderId: Int, custId: Int, prod: String)
+  // val customers = tyql.Table[Customers]()
+  // val orders = tyql.Table[Orders]()
 
-  pprintln(db.run(
-    t.filter(x =>
-      someTable.containsRow((a = lit(101)).toRow)
-    )
-  ))
+  // val someTable = Values[(a: Int)](Tuple(1), Tuple(2))
+  // pprintln(db.run(
+  //   t.filter(x =>
+  //     someTable.containsRow((a = lit(1)).toRow)
+  //   )
+  // ))
 
-  pprintln(db.run(
-    t.filter(x =>
-      someTable.map(_.a).contains(1)
-    )
-  ))
+  // pprintln(db.run(
+  //   t.filter(x =>
+  //     someTable.containsRow((a = lit(101)).toRow)
+  //   )
+  // ))
 
-  pprintln(db.run(
-    t.filter(x =>
-      someTable.map(_.a).contains(101)
-    )
-  ))
+  // pprintln(db.run(
+  //   t.filter(x =>
+  //     someTable.map(_.a).contains(1)
+  //   )
+  // ))
+
+  // pprintln(db.run(
+  //   t.filter(x =>
+  //     someTable.map(_.a).contains(101)
+  //   )
+  // ))
+
+  val z1 = t.partial[("cost", "flowerSize")].insert(
+    (cost = 12.0, flowerSize = 1),
+    (cost = 12.0, flowerSize = 1),
+    (cost = 12.0, flowerSize = 1)
+  ).toQueryIR.toSQLQuery()._1
+
+  val z2 = t.partial[("cost", "flowerSize")].insert(
+    (flowerSize = lit(1), cost = lit(12.0) + lit(10.2))
+  ).toQueryIR.toSQLQuery()._1
+
+  val z3 = t.partial[Tuple1["cost"]].insert(
+    Tuple(12.0),
+    Tuple(12.0),
+    Tuple(12.0)
+  ).toQueryIR.toSQLQuery()._1
+
+  println("LINEUP!")
+  println(z1)
+  println(z2)
+  println(z3)
 }
