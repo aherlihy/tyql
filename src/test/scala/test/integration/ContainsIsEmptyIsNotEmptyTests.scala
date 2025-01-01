@@ -4,7 +4,7 @@ import munit.FunSuite
 import test.{withDBNoImplicits, withDB, checkExpr, checkExprDialect}
 import java.sql.{Connection, Statement, ResultSet}
 import tyql._
-
+import scala.language.implicitConversions
 
 class ContainsIsEmptyIsNotEmptyTests extends FunSuite {
   def expect(expected: Boolean)(rs: ResultSet) = assertEquals(rs.getBoolean(1), expected)
