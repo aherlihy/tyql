@@ -106,6 +106,18 @@ object Expr:
   extension [S1 <: ExprShape](x: Expr[Int, S1])
     def %[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Int, CalculatedShape[S1, S2]] = Modulo(x, y)
 
+  extension [S1 <: ExprShape](x: Expr[String, S1])
+    def <[S2 <: ExprShape](y: Expr[String, S2]): Expr[Boolean, CalculatedShape[S1, S2]] =
+      Lt(x, y)
+    def <=[S2 <: ExprShape](y: Expr[String, S2]): Expr[Boolean, CalculatedShape[S1, S2]] =
+      Lte(x, y)
+    def >[S2 <: ExprShape](y: Expr[String, S2]): Expr[Boolean, CalculatedShape[S1, S2]] =
+      Gt(x, y)
+    def >=[S2 <: ExprShape](y: Expr[String, S2]): Expr[Boolean, CalculatedShape[S1, S2]] =
+      Gte(x, y)
+    def between[S2 <: ExprShape, S3 <: ExprShape](min: Expr[String, S2], max: Expr[String, S3]): Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]] =
+      Between(x, min, max)
+
   extension [T: Numeric, S1 <: ExprShape](x: Expr[T, S1])(using ResultTag[T])
     def <[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] =
       Lt(x, y)
@@ -289,20 +301,22 @@ object Expr:
   // so that we don't accidentally pick a field name of a constructor class where we want
   // a name in the domain model instead.
 
-  // Some sample constructors for Exprs
-  case class Lt[T1: Numeric, T2: Numeric, S1 <: ExprShape, S2 <: ExprShape]
+  // These case classes could technically contain e.g. 1 < 'a', but there are no user-exposes functions to create such expressions
+  type IsString[T] = T =:= String
+  type Comparable[T] = Numeric[T] | IsString[T]
+  case class Lt[T1: Comparable, T2: Comparable, S1 <: ExprShape, S2 <: ExprShape]
     ($x: Expr[T1, S1], $y: Expr[T2, S2])
     (using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class Lte[T1: Numeric, T2: Numeric, S1 <: ExprShape, S2 <: ExprShape]
+  case class Lte[T1: Comparable, T2: Comparable, S1 <: ExprShape, S2 <: ExprShape]
     ($x: Expr[T1, S1], $y: Expr[T2, S2])
     (using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class Gt[T1: Numeric, T2: Numeric, S1 <: ExprShape, S2 <: ExprShape]
+  case class Gt[T1: Comparable, T2: Comparable, S1 <: ExprShape, S2 <: ExprShape]
     ($x: Expr[T1, S1], $y: Expr[T2, S2])
     (using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class Gte[T1: Numeric, T2: Numeric, S1 <: ExprShape, S2 <: ExprShape]
+  case class Gte[T1: Comparable, T2: Comparable, S1 <: ExprShape, S2 <: ExprShape]
     ($x: Expr[T1, S1], $y: Expr[T2, S2])
     (using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
-  case class Between[T: Numeric, S1 <: ExprShape, S2 <: ExprShape, S3 <: ExprShape]
+  case class Between[T: Comparable, S1 <: ExprShape, S2 <: ExprShape, S3 <: ExprShape]
     ($x: Expr[T, S1], $min: Expr[T, S2], $max: Expr[T, S3])
     (using ResultTag[T]) extends Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]]
 
