@@ -1,7 +1,8 @@
-package tyql.ir
+package tyql
 import tyql._
 
-case class InsertQueryIR[T, Names <: Tuple](table: Table[T], names: List[String], values: Seq[Seq[QueryIRNode]], val ast: UpdateToTheDB) extends QueryIRNode {
+case class InsertQueryIR[T, Names <: Tuple]
+  (table: Table[T], names: List[String], values: Seq[Seq[QueryIRNode]], val ast: UpdateToTheDB) extends QueryIRNode {
   override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
     ctx.sql.append("INSERT INTO ")
     ctx.sql.append(table.$name)
@@ -23,4 +24,16 @@ case class InsertQueryIR[T, Names <: Tuple](table: Table[T], names: List[String]
           ctx.sql.append(", ")
         columnValue.computeSQL(ctx)
       ctx.sql.append(")")
+}
+
+case class InsertFromSelectQueryIR[T](table: Table[T], query: RelationOp, names: List[String], val ast: UpdateToTheDB)
+    extends QueryIRNode {
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append("INSERT INTO ")
+    ctx.sql.append(table.$name)
+    ctx.sql.append(" (")
+    ctx.sql.append(names.map(n => cnf.caseConvention.convert(n)).mkString(", "))
+    ctx.sql.append(")\n")
+    query.appendFlag(SelectFlags.Final)
+    query.computeSQL(ctx)
 }

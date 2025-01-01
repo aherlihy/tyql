@@ -198,27 +198,35 @@ def driverMain(): Unit = {
   //   )
   // ))
 
-  pprintln(db.run(t.partial[("cost", "flowerSize")].insert(
-    (cost = 12.0, flowerSize = 1),
-    (cost = 12.0, flowerSize = 1),
-    (cost = 12.0, flowerSize = 1)
-  )))
+  // pprintln(db.run(t.partial[("cost", "flowerSize")].insert(
+  //   (cost = 12.0, flowerSize = 1),
+  //   (cost = 12.0, flowerSize = 1),
+  //   (cost = 12.0, flowerSize = 1)
+  // )))
 
-  pprintln(db.run(t.partial[("cost", "flowerSize")].insert(
-    (flowerSize = lit(1), cost = lit(12.0) + lit(10.2))
-  )))
+  // pprintln(db.run(t.partial[("cost", "flowerSize")].insert(
+  //   (flowerSize = lit(1), cost = lit(12.0) + lit(10.2))
+  // )))
 
-  pprintln(db.run(
-    t.partial[Tuple1["cost"]].insert(
-      Tuple(12.0),
-      Tuple(12.0),
-      Tuple(12.0)
-  )))
+  // pprintln(db.run(
+  //   t.partial[Tuple1["cost"]].insert(
+  //     Tuple(12.0),
+  //     Tuple(12.0),
+  //     Tuple(12.0)
+  // )))
 
-  pprintln(db.run(
-    t.insert(
-      Flowers(Some("rose"), 1, 1.0, 1),
-      Flowers(Some("rose2"), 1, 1.0, 2),
-      Flowers(Some("rose3"), 1, 1.0, 3),
-  )))
+  // pprintln(db.run(
+  //   t.insert(
+  //     Flowers(Some("rose"), 1, 1.0, 1),
+  //     Flowers(Some("rose2"), 1, 1.0, 2),
+  //     Flowers(Some("rose3"), 1, 1.0, 3),
+  // )))
+
+  // pprintln(db.run(
+  //   t.map(f => (cost = lit(100.12), flowerSize = lit(10) ))
+  // ))
+
+  val qq = t.map(f => (cost = lit(12.125), flowerSize = lit(-1)))
+  val q = qq.insertInto(t.partial[("flowerSize", "cost")])
+  pprintln(db.run(q))
 }

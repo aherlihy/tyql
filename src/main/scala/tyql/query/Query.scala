@@ -341,6 +341,33 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
   def exceptAll(that: Query[A, ?]): Query[A, BagResult] =
     Query.ExceptAll(this, that)
 
+  inline def insertInto[R, PartialNames <: Tuple]
+    (table: InsertableTable[R, PartialNames])
+    (using
+        ev0: Subset.IsSubset[PartialNames, NamedTuple.Names[NamedTuple.From[A]]],
+        ev1: Subset.IsSubset[NamedTuple.Names[NamedTuple.From[A]], PartialNames],
+        ev2: Subset.IsAcceptableInsertion[
+          Tuple.Map[
+            Subset.SelectByNames[
+              PartialNames,
+              NamedTuple.DropNames[NamedTuple.From[A]],
+              NamedTuple.Names[NamedTuple.From[A]]
+            ],
+            Expr.StripExpr
+          ],
+          Subset.SelectByNames[
+            PartialNames,
+            NamedTuple.DropNames[NamedTuple.From[A]],
+            NamedTuple.Names[NamedTuple.From[A]]
+          ]
+        ]
+    )
+    : InsertFromSelect[R, A] = InsertFromSelect(
+    table.underlyingTable,
+    this,
+    constValueTuple[NamedTuple.Names[NamedTuple.From[A]]].toList.asInstanceOf[List[String]]
+  )
+
 end Query // trait
 
 // XXX Due to bugs in Scala compiler, if you replace `: ResultTag` with `using ...` then it will not compile

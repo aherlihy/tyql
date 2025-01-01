@@ -14,8 +14,8 @@ object Subset:
     * instead of requiring 2 calls: table.sort(_.key1, ASC).sort(_.key2, DESC)
     */
   type Kontains[X <: Tuple, Y] <: Boolean = X match
-    case Y *: _ => true
-    case _ *: xs => Kontains[xs, Y]
+    case Y *: _     => true
+    case _ *: xs    => Kontains[xs, Y]
     case EmptyTuple => false
   type Subset[X <: Tuple, Y <: Tuple] <: Boolean = X match
     case x *: xs => Kontains[Y, x] match
@@ -31,43 +31,45 @@ object Subset:
   type SelectTypeWithName[needle, Names, Types] = Names match
     case name *: _ => name match
         case needle => Tuple.Head[Types]
-        case _ => SelectTypeWithName[needle, Tuple.Tail[Names], Tuple.Tail[Types]]
+        case _      => SelectTypeWithName[needle, Tuple.Tail[Names], Tuple.Tail[Types]]
     case _ *: names => SelectTypeWithName[needle, names, Tuple.Tail[Types]]
 
-  type CanBeAssigned[NamesIn <: Tuple, NamesOver <: Tuple, TypesIn <: Tuple, TypesOver <: Tuple] <: Boolean = NamesIn match
-    case EmptyTuple => true
-    case name *: namesInRest => Contains[NamesOver, name] match
-        case false => false
-        case true  => TypesIn match
-           case t *: typesInRest => SelectTypeWithName[name, NamesOver, TypesOver] match
-                case t => CanBeAssigned[namesInRest, NamesOver, typesInRest, TypesOver]
-                case _ => false
+  type CanBeAssigned[NamesIn <: Tuple, NamesOver <: Tuple, TypesIn <: Tuple, TypesOver <: Tuple] <: Boolean =
+    NamesIn match
+      case EmptyTuple => true
+      case name *: namesInRest => Contains[NamesOver, name] match
+          case false => false
+          case true => TypesIn match
+              case t *: typesInRest => SelectTypeWithName[name, NamesOver, TypesOver] match
+                  case t => CanBeAssigned[namesInRest, NamesOver, typesInRest, TypesOver]
+                  case _ => false
 
   type SelectByNames[Names, OriginalTypes, OriginalNames] <: Tuple = Names match
-    case name *: restNames => SelectTypeWithName[name, OriginalNames, OriginalTypes] *: SelectByNames[restNames, OriginalTypes, OriginalNames]
+    case name *: restNames =>
+      SelectTypeWithName[name, OriginalNames, OriginalTypes] *: SelectByNames[restNames, OriginalTypes, OriginalNames]
     case EmptyTuple => EmptyTuple
 
-  type AcceptableInsertions[TypesA, TypesB] = TypesA match
-    case Int *: restA => TypesB match
-      case Option[Int] *: restB => AcceptableInsertions[restA, restB]
-      case Option[Long] *: restB => AcceptableInsertions[restA, restB]
-      case Int *: restB => AcceptableInsertions[restA, restB]
-      case Long *: restB => AcceptableInsertions[restA, restB]
-      case EmptyTuple => false
-    case Double *: restA => TypesB match
-      case Option[Double] *: restB => AcceptableInsertions[restA, restB]
-      case Double *: restB => AcceptableInsertions[restA, restB]
-      case EmptyTuple => false
-    case Float *: restA => TypesB match
-      case Option[Float] *: restB => AcceptableInsertions[restA, restB]
-      case Option[Double] *: restB => AcceptableInsertions[restA, restB]
-      case Float *: restB => AcceptableInsertions[restA, restB]
-      case Double *: restB => AcceptableInsertions[restA, restB]
-      case EmptyTuple => false
-    case EmptyTuple => true
+  type AcceptableInsertions[TypesA <: Tuple, TypesB <: Tuple] <: Boolean = (TypesA, TypesB) match
+    case (EmptyTuple, EmptyTuple)                     => true
+    case (Int *: restA, Int *: restB)                 => AcceptableInsertions[restA, restB]
+    case (Int *: restA, Option[Int] *: restB)         => AcceptableInsertions[restA, restB]
+    case (Int *: restA, Long *: restB)                => AcceptableInsertions[restA, restB]
+    case (Int *: restA, Option[Long] *: restB)        => AcceptableInsertions[restA, restB]
+    case (Long *: restA, Long *: restB)               => AcceptableInsertions[restA, restB]
+    case (Long *: restA, Option[Long] *: restB)       => AcceptableInsertions[restA, restB]
+    case (Double *: restA, Double *: restB)           => AcceptableInsertions[restA, restB]
+    case (Double *: restA, Option[Double] *: restB)   => AcceptableInsertions[restA, restB]
+    case (Float *: restA, Double *: restB)            => AcceptableInsertions[restA, restB]
+    case (Float *: restA, Option[Double] *: restB)    => AcceptableInsertions[restA, restB]
+    case (Float *: restA, Float *: restB)             => AcceptableInsertions[restA, restB]
+    case (Float *: restA, Option[Float] *: restB)     => AcceptableInsertions[restA, restB]
+    case (Boolean *: restA, Boolean *: restB)         => AcceptableInsertions[restA, restB]
+    case (Boolean *: restA, Option[Boolean] *: restB) => AcceptableInsertions[restA, restB]
+    case (String *: restA, String *: restB)           => AcceptableInsertions[restA, restB]
+    case (String *: restA, Option[String] *: restB)   => AcceptableInsertions[restA, restB]
+    case _                                            => false
 
-  type IsAcceptableInsertion[TypesA, TypesB] = AcceptableInsertions[TypesA, TypesB] =:= true
-  type AlsoIsAcceptableInsertion[TypesA, TypesB] = AcceptableInsertions[TypesA, TypesB] =:= true
+  type IsAcceptableInsertion[TypesA <: Tuple, TypesB <: Tuple] = AcceptableInsertions[TypesA, TypesB] =:= true
 
   val a: (Int, String, Double) = (1, "", 1.0)
   val b: (Double, String) = (2.0, " ")
@@ -95,7 +97,7 @@ object Subset:
   type inNames8 = ("FIRST", "SECOND", "THIRD")
   type overNames8 = ("SECOND", "d", "THIRD", "a", "FIRST")
   type inTypes8 = (String, Double, Float)
-  type overTypes8 = (Double, Int, /*3*/Float, Int, /*1*/String)
+  type overTypes8 = (Double, Int, /*3*/ Float, Int, /*1*/ String)
   type canBeAssigned8 = CanBeAssigned[inNames8, overNames8, inTypes8, overTypes8]
 
   // a.foo(b3) // error: (Double, Float) contains types not in (Int, String, Double)

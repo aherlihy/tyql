@@ -9,3 +9,4 @@ trait UpdateToTheDB {
 }
 
 case class Insert[R](table: Table[R], names: List[String], values: Seq[Seq[?]]) extends UpdateToTheDB
+case class InsertFromSelect[R, S](table: Table[R], query: Query[S, ?], names: List[String]) extends UpdateToTheDB

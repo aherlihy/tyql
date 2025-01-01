@@ -46,12 +46,13 @@ trait InsertableTable[R: ResultTag, Names <: Tuple] {
   inline def insert[S <: Tuple]
     (values: S*)
     (using
-        ev3: Subset.AlsoIsAcceptableInsertion[
+        ev3: Subset.IsAcceptableInsertion[
           Tuple.Map[S, Expr.StripExpr],
           Subset.SelectByNames[Names, NamedTuple.DropNames[NamedTuple.From[R]], NamedTuple.Names[NamedTuple.From[R]]]
         ]
     )
-    : Insert[R] = Insert(underlyingTable, constValueTuple[Names].toList.asInstanceOf[List[String]], coerceTuplesIntoSeqSeq(values))
+    : Insert[R] =
+    Insert(underlyingTable, constValueTuple[Names].toList.asInstanceOf[List[String]], coerceTuplesIntoSeqSeq(values))
 
   inline def insert[N <: Tuple, T <: Tuple]
     (values: NamedTuple.NamedTuple[N, T]*)
@@ -66,7 +67,8 @@ trait InsertableTable[R: ResultTag, Names <: Tuple] {
           Subset.SelectByNames[Names, NamedTuple.DropNames[NamedTuple.From[R]], NamedTuple.Names[NamedTuple.From[R]]]
         ]
     )
-    : Insert[R] = Insert(underlyingTable, constValueTuple[N].toList.asInstanceOf[List[String]], coerceTuplesIntoSeqSeq(values))
+    : Insert[R] =
+    Insert(underlyingTable, constValueTuple[N].toList.asInstanceOf[List[String]], coerceTuplesIntoSeqSeq(values))
 }
 
 case class PartialTable[R: ResultTag, Names <: Tuple](table: Table[R]) extends InsertableTable[R, Names] {

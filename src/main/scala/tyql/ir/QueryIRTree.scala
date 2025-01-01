@@ -9,7 +9,6 @@ import NamedTupleDecomposition._
 import PolyfillTracking._
 import TreePrettyPrinter._
 import tyql.Expr.Exp
-import tyql.ir.InsertQueryIR
 
 /** Logical query plan tree. Moves all type parameters into terms (using ResultTag). Collapses nested queries where
   * possible.
@@ -129,7 +128,7 @@ object QueryIRTree:
       case _ if v.isInstanceOf[Double]     => lit(v.asInstanceOf[Double])
       case _ if v.isInstanceOf[Boolean]    => lit(v.asInstanceOf[Boolean])
       case _ if v.isInstanceOf[Expr[?, ?]] => v.asInstanceOf[Expr[?, ?]]
-      case _                               =>
+      case _ =>
         println("RECEIVED UNEXPCTED " + v)
         assert(false)
 
@@ -138,6 +137,9 @@ object QueryIRTree:
       case insertAst: Insert[?] =>
         val newValues = insertAst.values.map(_.map(anyToExprConverter).map(e => generateExpr(e, symbols)))
         InsertQueryIR(insertAst.table, insertAst.names, newValues, insertAst)
+      case insertFromSelectAst: InsertFromSelect[?, ?] =>
+        val selectIR = generateQuery(insertFromSelectAst.query, symbols)
+        InsertFromSelectQueryIR(insertFromSelectAst.table, selectIR, insertFromSelectAst.names, insertFromSelectAst)
 
   /** Generate top-level or subquery
     *

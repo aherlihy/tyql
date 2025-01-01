@@ -65,19 +65,18 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def isNull[S <: ExprShape]: Expr[Boolean, Shape] = Expr.IsNull(this)
   def nullIf[S <: ExprShape](other: Expr[Result, S]): Expr[Result, CalculatedShape[Shape, S]] = Expr.NullIf(this, other)
 
-  // TODO unclear what casts are useful/needed
   // TODO why do we need these `asInstanceOf`?
   @targetName("castToInt")
-  def as[T](using T =:= Int): Expr[Int, Shape] =
+  def asInt: Expr[Int, Shape] =
     Expr.Cast(this, CastTarget.CInt)(using ResultTag.IntTag.asInstanceOf[ResultTag[Int]])
   @targetName("castToString")
-  def as[T](using T =:= String): Expr[String, Shape] = Expr.Cast[Result, String, Shape](this, CastTarget.CString)(using
+  def asString: Expr[String, Shape] = Expr.Cast[Result, String, Shape](this, CastTarget.CString)(using
   ResultTag.StringTag.asInstanceOf[ResultTag[String]])
   @targetName("castToDouble")
-  def as[T](using T =:= Double): Expr[Double, Shape] = Expr.Cast[Result, Double, Shape](this, CastTarget.CDouble)(using
+  def asDouble: Expr[Double, Shape] = Expr.Cast[Result, Double, Shape](this, CastTarget.CDouble)(using
   ResultTag.DoubleTag.asInstanceOf[ResultTag[Double]])
   @targetName("castToBoolean")
-  def as[T](using T =:= Boolean): Expr[Boolean, Shape] =
+  def asBoolean: Expr[Boolean, Shape] =
     Expr.Cast[Result, Boolean, Shape](this, CastTarget.CBool)(using ResultTag.BoolTag.asInstanceOf[ResultTag[Boolean]])
 
   def cases[DestinationT: ResultTag, SV <: ExprShape]
@@ -573,13 +572,13 @@ object Expr:
 
 end Expr
 
-def lit(x: Int): Expr[Int, NonScalarExpr] & LiteralExpression = Expr.IntLit(x)
-def lit(x: Double): Expr[Double, NonScalarExpr] & LiteralExpression = Expr.DoubleLit(x)
-def lit(x: String): Expr[String, NonScalarExpr] & LiteralExpression = Expr.StringLit(x)
-def lit(x: Boolean): Expr[Boolean, NonScalarExpr] & LiteralExpression = Expr.BooleanLit(x)
-def True = Expr.BooleanLit(true)
-def False = Expr.BooleanLit(false)
-def Null = Expr.NullLit[scala.Null]()
+inline def lit(x: Int): Expr[Int, NonScalarExpr] & LiteralExpression = Expr.IntLit(x)
+inline def lit(x: Double): Expr[Double, NonScalarExpr] & LiteralExpression = Expr.DoubleLit(x)
+inline def lit(x: String): Expr[String, NonScalarExpr] & LiteralExpression = Expr.StringLit(x)
+inline def lit(x: Boolean): Expr[Boolean, NonScalarExpr] & LiteralExpression = Expr.BooleanLit(x)
+inline def True = Expr.BooleanLit(true)
+inline def False = Expr.BooleanLit(false)
+inline def Null = Expr.NullLit[scala.Null]()
 // TODO a good place for implicitNotFound
 def Null[T](using ResultTag[T]) = Expr.NullLit[T]()
 private case class ElseToken()
