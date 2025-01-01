@@ -618,9 +618,13 @@ object QueryIRTree:
         FunctionCallOp("COALESCE", (Seq(c.$x1, c.$x2) ++ c.$xs).map(generateExpr(_, symbols)), c)
       case i: Expr.NullIf[?, ?, ?] =>
         FunctionCallOp("NULLIF", Seq(generateExpr(i.$x, symbols), generateExpr(i.$y, symbols)), i)
-      case l: Expr.DoubleLit => LiteralDouble(l.$value, l)
-      case l: Expr.IntLit    => LiteralInteger(l.$value, l)
-      case l: Expr.StringLit => LiteralString(l.$value, insideLikePatternQuoting = false, l)
+      case l: Expr.DoubleLit     => LiteralDouble(l.$value, l)
+      case l: Expr.FloatLit      => LiteralDouble(l.$value, l)
+      case l: Expr.IntLit        => LiteralInteger(l.$value, l)
+      case l: Expr.LongLit       => LiteralInteger(l.$value, l)
+      case l: Expr.BytesLit      => LiteralBytes(l.$value, l)
+      case l: Expr.ByteStreamLit => LiteralByteStream(l.$value, l)
+      case l: Expr.StringLit     => LiteralString(l.$value, insideLikePatternQuoting = false, l)
       case l: Expr.BooleanLit =>
         if l.$value then
           RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"TRUE"), Map(), Precedence.Unary, l)

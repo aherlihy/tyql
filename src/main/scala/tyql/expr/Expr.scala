@@ -78,11 +78,11 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def asLong: Expr[Long, Shape] =
     Expr.Cast(this, CastTarget.CLong)(using ResultTag.LongTag.asInstanceOf[ResultTag[Long]])
   def asString: Expr[String, Shape] = Expr.Cast[Result, String, Shape](this, CastTarget.CString)(using
-    ResultTag.StringTag.asInstanceOf[ResultTag[String]])
+  ResultTag.StringTag.asInstanceOf[ResultTag[String]])
   def asDouble: Expr[Double, Shape] = Expr.Cast[Result, Double, Shape](this, CastTarget.CDouble)(using
-    ResultTag.DoubleTag.asInstanceOf[ResultTag[Double]])
-  def asFloat: Expr[Float, Shape] = Expr.Cast[Result, Float, Shape](this, CastTarget.CFloat)(using
-    ResultTag.FloatTag.asInstanceOf[ResultTag[Float]])
+  ResultTag.DoubleTag.asInstanceOf[ResultTag[Double]])
+  def asFloat: Expr[Float, Shape] =
+    Expr.Cast[Result, Float, Shape](this, CastTarget.CFloat)(using ResultTag.FloatTag.asInstanceOf[ResultTag[Float]])
   def asBoolean: Expr[Boolean, Shape] =
     Expr.Cast[Result, Boolean, Shape](this, CastTarget.CBool)(using ResultTag.BoolTag.asInstanceOf[ResultTag[Boolean]])
 
@@ -506,6 +506,9 @@ object Expr:
       extends Expr[A, CalculatedShape[S1, S2]]
 
   /** Literals are type-specific, tailored to the types that the DB supports */
+  case class BytesLit($value: Array[Byte]) extends Expr[Array[Byte], NonScalarExpr]
+  case class ByteStreamLit($value: () => java.io.InputStream) extends Expr[() => java.io.InputStream, NonScalarExpr]
+
   case class IntLit($value: Int) extends Expr[Int, NonScalarExpr] with LiteralExpression
   case class LongLit($value: Long) extends Expr[Long, NonScalarExpr] with LiteralExpression
 
@@ -583,6 +586,9 @@ object Expr:
 
 end Expr
 
+inline def lit(x: () => java.io.InputStream): Expr[() => java.io.InputStream, NonScalarExpr] = Expr.ByteStreamLit(x)
+inline def lit(x: java.io.InputStream): Expr[() => java.io.InputStream, NonScalarExpr] = Expr.ByteStreamLit(() => x)
+inline def lit(x: Array[Byte]): Expr[Array[Byte], NonScalarExpr] = Expr.BytesLit(x)
 inline def lit(x: Int): Expr[Int, NonScalarExpr] & LiteralExpression = Expr.IntLit(x)
 inline def lit(x: Long): Expr[Long, NonScalarExpr] & LiteralExpression = Expr.LongLit(x)
 inline def lit(x: Double): Expr[Double, NonScalarExpr] & LiteralExpression = Expr.DoubleLit(x)

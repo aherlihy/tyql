@@ -7,6 +7,8 @@ import scala.deriving.Mirror
 
 enum ResultTag[T]:
   case NullTag extends ResultTag[scala.Null]
+  case ByteArrayTag extends ResultTag[Array[Byte]]
+  case ByteStreamTag extends ResultTag[() => java.io.InputStream]
   case IntTag extends ResultTag[Int]
   case LongTag extends ResultTag[Long]
   case FloatTag extends ResultTag[Float]
@@ -26,6 +28,8 @@ enum ResultTag[T]:
 
 object ResultTag:
   given ResultTag[scala.Null] = ResultTag.NullTag
+  given ResultTag[Array[Byte]] = ResultTag.ByteArrayTag
+  given ResultTag[() => java.io.InputStream] = ResultTag.ByteStreamTag
   given ResultTag[Int] = ResultTag.IntTag
   given ResultTag[Long] = ResultTag.LongTag
   given ResultTag[String] = ResultTag.StringTag

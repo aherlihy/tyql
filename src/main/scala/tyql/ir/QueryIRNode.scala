@@ -288,6 +288,26 @@ case class LiteralString(unescapedString: String, insideLikePatternQuoting: Bool
         ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
         ctx.parameters.append(unescapedString)
 
+case class LiteralBytes(bytes: Array[Byte], ast: Expr[?, ?]) extends QueryIRLeaf:
+  override val precedence: Int = Precedence.Literal
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    cnf.parameterStyle match
+      case ParameterStyle.EscapedInline =>
+        ctx.sql.append(bytes.map(b => f"${b}%02x").mkString("x'", "", "'"))
+      case ParameterStyle.DriverParametrized =>
+        ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
+        ctx.parameters.append(bytes.asInstanceOf[Object])
+
+case class LiteralByteStream(bytes: () => java.io.InputStream, ast: Expr[?, ?]) extends QueryIRLeaf:
+  override val precedence: Int = Precedence.Literal
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    cnf.parameterStyle match
+      case ParameterStyle.EscapedInline =>
+        assert(false, "The whole point of byte streams is that they are streamed and not inlined")
+      case ParameterStyle.DriverParametrized =>
+        ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
+        ctx.parameters.append(bytes.asInstanceOf[Object])
+
 case class LiteralInteger(number: Long, ast: Expr[?, ?]) extends QueryIRLeaf:
   override val precedence: Int = Precedence.Literal
   override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
