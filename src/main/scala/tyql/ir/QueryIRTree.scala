@@ -122,12 +122,12 @@ object QueryIRTree:
 
   private def anyToExprConverter(v: Any): Expr[?, ?] =
     v match
-      case _ if v.isInstanceOf[Int] => lit(v.asInstanceOf[Int])
-      case _ if v.isInstanceOf[String] => lit(v.asInstanceOf[String])
-      case _ if v.isInstanceOf[Double] => lit(v.asInstanceOf[Double])
-      case _ if v.isInstanceOf[Boolean] => lit(v.asInstanceOf[Boolean])
-      case _ if v.isInstanceOf[Expr[?,?]] => v.asInstanceOf[Expr[?,?]]
-      case _ => assert(false)
+      case _ if v.isInstanceOf[Int]        => lit(v.asInstanceOf[Int])
+      case _ if v.isInstanceOf[String]     => lit(v.asInstanceOf[String])
+      case _ if v.isInstanceOf[Double]     => lit(v.asInstanceOf[Double])
+      case _ if v.isInstanceOf[Boolean]    => lit(v.asInstanceOf[Boolean])
+      case _ if v.isInstanceOf[Expr[?, ?]] => v.asInstanceOf[Expr[?, ?]]
+      case _                               => assert(false)
 
   /** Generate top-level or subquery
     *
@@ -146,7 +146,8 @@ object QueryIRTree:
           val firstList: List[Any] = firstTuple.toList
           val firstListOfExpr: List[Expr[?, ?]] = firstList.map(anyToExprConverter)
           val firstListOfNodes = firstListOfExpr.map(v => generateExpr(v, symbols))
-          firstListOfNodes)
+          firstListOfNodes
+        )
         ValuesLeaf(nodes, values.$names, values)
       case table: Table[?] =>
         TableLeaf(table.$name, table)
@@ -473,7 +474,12 @@ object QueryIRTree:
         val ae = ("ae", Precedence.Comparison)
         val al = ("al", Precedence.Comparison)
         val au = ("au", Precedence.Comparison)
-        RawSQLInsertOp(SqlSnippet(Precedence.Comparison, snippet"$ae BETWEEN $al AND $au"), Map(ae._1 -> expr, al._1 -> lower, au._1 -> upper), Precedence.Comparison, b)
+        RawSQLInsertOp(
+          SqlSnippet(Precedence.Comparison, snippet"$ae BETWEEN $al AND $au"),
+          Map(ae._1 -> expr, al._1 -> lower, au._1 -> upper),
+          Precedence.Comparison,
+          b
+        )
       case a: Expr.And[?, ?] =>
         BinExprOp("", generateExpr(a.$x, symbols), " AND ", generateExpr(a.$y, symbols), "", Precedence.And, a)
       case a: Expr.Or[?, ?] =>
@@ -777,10 +783,12 @@ object QueryIRTree:
       case p: Expr.IsEmpty[?] =>
         UnaryExprOp("NOT EXISTS (", generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), ")", p)
       case p: Expr.Contains[?] =>
+        val inner = generateExpr(p.$expr, symbols)
+        val needsParens = !isLiteral(inner)
         BinExprOp(
-          "",
-          generateExpr(p.$expr, symbols),
-          " IN (",
+          if needsParens then "(" else "",
+          removeAliases(inner),
+          (if needsParens then ")" else "") + " IN (",
           generateQuery(p.$query, symbols).appendFlag(SelectFlags.Final),
           ")",
           Precedence.Comparison,
@@ -796,3 +804,16 @@ object QueryIRTree:
       case s: AggregationExpr.Max[?]        => UnaryExprOp("MAX(", generateExpr(s.$a, symbols), ")", s)
       case c: AggregationExpr.Count[?]      => UnaryExprOp("COUNT(", generateExpr(c.$a, symbols), ")", c)
       case p: AggregationExpr.AggProject[?] => generateProjection(p, symbols)
+
+  private def removeAliases(x: QueryIRNode): QueryIRNode =
+    x match
+      case ProjectClause(children, ast) => ProjectClause(children.map(removeAliases), ast)
+      case AttrExpr(child, name, ast)   => AttrExpr(child, None, ast)
+      case _                            => x
+
+  private def isLiteral(x: QueryIRNode): Boolean =
+    x match
+      case LiteralInteger(_, _)   => true
+      case LiteralDouble(_, _)    => true
+      case LiteralString(_, _, _) => true
+      case _                      => false

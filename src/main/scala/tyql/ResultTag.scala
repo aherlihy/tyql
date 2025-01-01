@@ -49,7 +49,9 @@ object ResultTag:
 
 // XXX Due to bugs in Scala compiler, you cannot use `using ev: SimpleTypeResultTag[T]` but must use it via ` : SimpleTypeResultTag[T]`.
 // XXX the @implicitNotFound therefore cannot be used on the use-site, but must be placed on this trait.
-@scala.annotation.implicitNotFound("You can only call contains on queries that return a simple list of values, like Double. You might want to map your result like this: q.map(row => row.price)")
+@scala.annotation.implicitNotFound(
+  "You can only call contains on queries that return a simple list of values, like Double. You might want to map your result like this: q.map(row => row.price)"
+)
 trait SimpleTypeResultTag[T] {}
 object SimpleTypeResultTag:
   given SimpleTypeResultTag[scala.Null] = new SimpleTypeResultTag {}

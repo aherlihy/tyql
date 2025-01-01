@@ -115,7 +115,9 @@ object Expr:
       Gt(x, y)
     def >=[S2 <: ExprShape](y: Expr[String, S2]): Expr[Boolean, CalculatedShape[S1, S2]] =
       Gte(x, y)
-    def between[S2 <: ExprShape, S3 <: ExprShape](min: Expr[String, S2], max: Expr[String, S3]): Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]] =
+    def between[S2 <: ExprShape, S3 <: ExprShape]
+      (min: Expr[String, S2], max: Expr[String, S3])
+      : Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]] =
       Between(x, min, max)
 
   extension [T: Numeric, S1 <: ExprShape](x: Expr[T, S1])(using ResultTag[T])
@@ -127,7 +129,9 @@ object Expr:
       Gt(x, y)
     def >=[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] =
       Gte(x, y)
-    def between[S2 <: ExprShape, S3 <: ExprShape](min: Expr[T, S2], max: Expr[T, S3]): Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]] =
+    def between[S2 <: ExprShape, S3 <: ExprShape]
+      (min: Expr[T, S2], max: Expr[T, S3])
+      : Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]] =
       Between(x, min, max)
 
     def +[S2 <: ExprShape](y: Expr[T, S2]): Expr[T, CalculatedShape[S1, S2]] = Plus(x, y)
@@ -501,7 +505,8 @@ object Expr:
   given Conversion[Int, IntLit] = IntLit(_)
   // XXX maybe only from literals with FromDigits?
 
-  case class StringLit($value: String) extends Expr[String, NonScalarExpr] with LiteralExpression // TODO XXX why is this nonscalar?
+  case class StringLit($value: String) extends Expr[String, NonScalarExpr]
+      with LiteralExpression // TODO XXX why is this nonscalar?
   given Conversion[String, StringLit] = StringLit(_)
 
   case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr] with LiteralExpression

@@ -92,6 +92,14 @@ object withDB:
     h2(f)
   }
 
+  def allWithoutDuckDB[A](f: Connection => Dialect ?=> A): Unit = {
+    postgres(f)
+    mysql(f)
+    mariadb(f)
+    sqlite(f)
+    h2(f)
+  }
+
   def allmysql[A](f: Connection => Dialect ?=> A): Unit = {
     mysql(f)
     mariadb(f)

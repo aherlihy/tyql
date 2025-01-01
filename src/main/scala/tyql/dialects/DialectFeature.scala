@@ -7,3 +7,5 @@ object DialectFeature:
   trait RandomIntegerInInclusiveRange extends DialectFeature
 
   trait ReversibleStrings extends DialectFeature
+
+  trait INCanHandleRows extends DialectFeature

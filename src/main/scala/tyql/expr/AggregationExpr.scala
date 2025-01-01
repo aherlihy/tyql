@@ -30,7 +30,8 @@ object AggregationExpr {
       extends AggregationExpr[NamedTuple.Map[A, StripExpr]]
 
   // For now restrict all elements to be agg instead of allowing a mix.
-  type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< (Expr[?, ScalarExpr] | LiteralExpression)
+  type IsTupleOfAgg[A <: AnyNamedTuple] =
+    Tuple.Union[NamedTuple.DropNames[A]] <:< (Expr[?, ScalarExpr] | LiteralExpression)
 
   extension [A <: AnyNamedTuple : IsTupleOfAgg](x: A)
     def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): AggProject[A] = AggProject(x)
@@ -44,5 +45,7 @@ object AggregationExpr {
     def toGroupingRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): AggProject[A] = AggProject(x)
 
   /** Same as _.toRow, as an implicit conversion */
-  // given [A <: AnyNamedTuple : IsTupleOfAgg](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, AggProject[A]] = AggProject(_)
+  given [A <: AnyNamedTuple : IsTupleOfAgg]
+    (using ResultTag[NamedTuple.Map[A, StripExpr]])
+    : Conversion[A, AggProject[A]] = AggProject(_)
 }

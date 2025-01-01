@@ -64,6 +64,7 @@ object Dialect:
   object ansi:
     given Dialect = Dialect.given_Dialect
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
+    given INCanHandleRows = new INCanHandleRows {}
 
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                        PostgreSQL Dialect                          ║
@@ -90,6 +91,7 @@ object Dialect:
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
+    given INCanHandleRows = new INCanHandleRows {}
     given ReversibleStrings = new ReversibleStrings {}
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
     // TODO later support more options here (?)
@@ -124,6 +126,7 @@ object Dialect:
       override val stringCast: String = "CHAR"
 
     given RandomUUID = new RandomUUID {}
+    given INCanHandleRows = new INCanHandleRows {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
     given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
@@ -138,6 +141,7 @@ object Dialect:
       override def name() = "MariaDB Dialect"
 
     given RandomUUID = mysql.given_RandomUUID
+    given INCanHandleRows = new INCanHandleRows {}
     given RandomIntegerInInclusiveRange = mysql.given_RandomIntegerInInclusiveRange
     given ReversibleStrings = mysql.given_ReversibleStrings
     given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
@@ -167,6 +171,7 @@ object Dialect:
       override def stringPositionFindingVia: String = "INSTR"
       override def shouldHaveParensInsideValuesExpr: Boolean = false
 
+    given INCanHandleRows = new INCanHandleRows {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
     given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
@@ -192,6 +197,7 @@ object Dialect:
           snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)"
         )
 
+    given INCanHandleRows = new INCanHandleRows {}
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}

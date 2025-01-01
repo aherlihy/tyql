@@ -344,14 +344,24 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 end Query // trait
 
 // XXX Due to bugs in Scala compiler, if you replace `: ResultTag` with `using ...` then it will not compile
-extension [A: ResultTag : SimpleTypeResultTag, Category <: ResultCategory](q: Query[A, Category])
+extension [A: ResultTag, Category <: ResultCategory](using DialectFeature.INCanHandleRows)(q: Query[A, Category])
+  def containsRow(expr: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] =
+    Expr.Contains(q, expr)
+
+extension [A : SimpleTypeResultTag : ResultTag, Category <: ResultCategory](q: Query[A, Category])
   def contains(expr: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] =
     Expr.Contains(q, expr)
 
 // type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?]
-inline def Values[A <: AnyNamedTuple](v: NamedTuple.DropNames[A]*)(using ResultTag[NamedTuple[NamedTuple.Names[A], NamedTuple.DropNames[A]]]): Query[NamedTuple[NamedTuple.Names[A], NamedTuple.DropNames[A]], BagResult] =
+inline def Values[A <: AnyNamedTuple]
+  (v: NamedTuple.DropNames[A]*)
+  (using ResultTag[NamedTuple[NamedTuple.Names[A], NamedTuple.DropNames[A]]])
+  : Query[NamedTuple[NamedTuple.Names[A], NamedTuple.DropNames[A]], BagResult] =
   ValuesInner[NamedTuple.Names[A], NamedTuple.DropNames[A]](v.map(z => z.withNames[NamedTuple.Names[A]]))
-private inline def ValuesInner[N <: Tuple, T <: Tuple](v: Seq[NamedTuple[N, T]])(using ResultTag[NamedTuple[N, T]]): Query[NamedTuple[N, T], BagResult] =
+private inline def ValuesInner[N <: Tuple, T <: Tuple]
+  (v: Seq[NamedTuple[N, T]])
+  (using ResultTag[NamedTuple[N, T]])
+  : Query[NamedTuple[N, T], BagResult] =
   Query.Values(v.map(z => z.asInstanceOf[Tuple]), constValueTuple[N].toList.asInstanceOf[List[String]])
 
 object Query:
