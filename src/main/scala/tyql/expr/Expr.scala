@@ -115,6 +115,8 @@ object Expr:
       Gt(x, y)
     def >=[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] =
       Gte(x, y)
+    def between[S2 <: ExprShape, S3 <: ExprShape](min: Expr[T, S2], max: Expr[T, S3]): Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]] =
+      Between(x, min, max)
 
     def +[S2 <: ExprShape](y: Expr[T, S2]): Expr[T, CalculatedShape[S1, S2]] = Plus(x, y)
     def -[S2 <: ExprShape](y: Expr[T, S2]): Expr[T, CalculatedShape[S1, S2]] = Minus(x, y)
@@ -300,6 +302,9 @@ object Expr:
   case class Gte[T1: Numeric, T2: Numeric, S1 <: ExprShape, S2 <: ExprShape]
     ($x: Expr[T1, S1], $y: Expr[T2, S2])
     (using ResultTag[T1], ResultTag[T2]) extends Expr[Boolean, CalculatedShape[S1, S2]]
+  case class Between[T: Numeric, S1 <: ExprShape, S2 <: ExprShape, S3 <: ExprShape]
+    ($x: Expr[T, S1], $min: Expr[T, S2], $max: Expr[T, S3])
+    (using ResultTag[T]) extends Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]]
 
   // TODO maybe remove these FunctionCall_, for now they only exist to create fake AST trees for debug purposes...
   case class FunctionCall0[R](name: String)(using ResultTag[R])

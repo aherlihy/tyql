@@ -466,6 +466,14 @@ object QueryIRTree:
         BinExprOp("", generateExpr(g.$x, symbols), " <= ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
       case g: Expr.Gte[?, ?, ?, ?] =>
         BinExprOp("", generateExpr(g.$x, symbols), " >= ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case b: Expr.Between[?, ?, ?, ?] =>
+        val expr = generateExpr(b.$x, symbols)
+        val lower = generateExpr(b.$min, symbols)
+        val upper = generateExpr(b.$max, symbols)
+        val ae = ("ae", Precedence.Comparison)
+        val al = ("al", Precedence.Comparison)
+        val au = ("au", Precedence.Comparison)
+        RawSQLInsertOp(SqlSnippet(Precedence.Comparison, snippet"$ae BETWEEN $al AND $au"), Map(ae._1 -> expr, al._1 -> lower, au._1 -> upper), Precedence.Comparison, b)
       case a: Expr.And[?, ?] =>
         BinExprOp("", generateExpr(a.$x, symbols), " AND ", generateExpr(a.$y, symbols), "", Precedence.And, a)
       case a: Expr.Or[?, ?] =>

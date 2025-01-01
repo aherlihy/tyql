@@ -150,8 +150,6 @@ def driverMain(): Unit = {
   ))
 
   pprintln(db.run(
-    t.flatMap(fs =>
-        Values((a=1), (a=2), (a=10)).map(vs => (name = fs.name, idx = vs.a))
-      )
+    t.filter(x => x.cost.get.between(lit(11.0), lit(19.0)))
   ))
 }
