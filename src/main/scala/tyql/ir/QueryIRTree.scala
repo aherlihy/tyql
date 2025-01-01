@@ -685,6 +685,8 @@ object QueryIRTree:
           UnaryExprOp("OCTET_LENGTH(ENCODE(", generateExpr(l.$x, symbols), "))", l)
         else
           UnaryExprOp("OCTET_LENGTH(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.ByteByteLength[?] =>
+        UnaryExprOp("OCTET_LENGTH(", generateExpr(l.$x, symbols), ")", l)
       case l: Expr.StrRepeat[?, ?] =>
         if !d.needsStringRepeatPolyfill then
           FunctionCallOp("REPEAT", Seq(generateExpr(l.$s, symbols), generateExpr(l.$n, symbols)), l)

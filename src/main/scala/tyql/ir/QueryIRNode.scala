@@ -293,7 +293,9 @@ case class LiteralBytes(bytes: Array[Byte], ast: Expr[?, ?]) extends QueryIRLeaf
   override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
     cnf.parameterStyle match
       case ParameterStyle.EscapedInline =>
-        ctx.sql.append(bytes.map(b => f"${b}%02x").mkString("x'", "", "'"))
+        d.needsByteByByteEscapingOfBlobs match
+          case true  => ctx.sql.append(bytes.map(b => f"\\X${b}%02x").mkString("x'", "", "'") + "::BLOB")
+          case false => ctx.sql.append(bytes.map(b => f"${b}%02x").mkString("x'", "", "'"))
       case ParameterStyle.DriverParametrized =>
         ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
         ctx.parameters.append(bytes.asInstanceOf[Object])

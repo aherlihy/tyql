@@ -50,6 +50,8 @@ trait Dialect:
 
   def shouldHaveParensInsideValuesExpr: Boolean = true
 
+  def needsByteByByteEscapingOfBlobs: Boolean = false
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -231,6 +233,7 @@ object Dialect:
         )
       override def stringPositionFindingVia: String = "POSITION"
       override val `prefers $n over ? for parametrization` = true
+      override def needsByteByByteEscapingOfBlobs: Boolean = true
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}

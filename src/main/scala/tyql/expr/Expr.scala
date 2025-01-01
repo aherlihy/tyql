@@ -182,6 +182,15 @@ object Expr:
     // TODO unclear how to implement flatMap
     // TODO somehow use options in aggregations
 
+  extension [S1 <: ExprShape](x: Expr[Array[Byte], S1])
+    @targetName("byteLengthForArrayByte")
+    def byteLength: Expr[Int, S1] =
+      Expr.ByteByteLength(x.asInstanceOf[Expr[(Array[Byte] | Function0[java.io.InputStream]), S1]])
+  extension [S1 <: ExprShape](x: Expr[() => java.io.InputStream, S1])
+    @targetName("byteLengthForjavaioInputStream")
+    def byteLength: Expr[Int, S1] =
+      Expr.ByteByteLength(x.asInstanceOf[Expr[(Array[Byte] | Function0[java.io.InputStream]), S1]])
+
   extension [S1 <: ExprShape](x: Expr[String, S1])
     def toLowerCase: Expr[String, S1] = Expr.Lower(x)
     def toUpperCase: Expr[String, S1] = Expr.Upper(x)
@@ -354,6 +363,9 @@ object Expr:
       extends Expr[Boolean, CalculatedShape[S1, S2]]
   case class Not[S1 <: ExprShape]($x: Expr[Boolean, S1]) extends Expr[Boolean, S1]
   case class Xor[S1 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S1]) extends Expr[Boolean, S1]
+
+  case class ByteByteLength[S <: ExprShape]($x: Expr[(Array[Byte] | Function0[java.io.InputStream]), S])
+      extends Expr[Int, S]
 
   case class Upper[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
   case class Lower[S <: ExprShape]($x: Expr[String, S]) extends Expr[String, S]
