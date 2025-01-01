@@ -36,12 +36,14 @@ class DB(conn: Connection) {
         val ps = conn.prepareStatement(sqlString)
         for (i <- 0 until parameters.length) do
           parameters(i) match
-            case null                        => ps.setNull(i + 1, java.sql.Types.NULL)
-            case v if v.isInstanceOf[Long]   => ps.setLong(i + 1, v.asInstanceOf[Long])
-            case v if v.isInstanceOf[Int]    => ps.setInt(i + 1, v.asInstanceOf[Int])
-            case v if v.isInstanceOf[Double] => ps.setDouble(i + 1, v.asInstanceOf[Double])
-            case v if v.isInstanceOf[String] => ps.setString(i + 1, v.asInstanceOf[String])
-            case v                           => ps.setObject(i + 1, v)
+            case null                         => ps.setNull(i + 1, java.sql.Types.NULL)
+            case v if v.isInstanceOf[Long]    => ps.setLong(i + 1, v.asInstanceOf[Long])
+            case v if v.isInstanceOf[Int]     => ps.setInt(i + 1, v.asInstanceOf[Int])
+            case v if v.isInstanceOf[Double]  => ps.setDouble(i + 1, v.asInstanceOf[Double])
+            case v if v.isInstanceOf[Float]   => ps.setFloat(i + 1, v.asInstanceOf[Float])
+            case v if v.isInstanceOf[Boolean] => ps.setBoolean(i + 1, v.asInstanceOf[Boolean])
+            case v if v.isInstanceOf[String]  => ps.setString(i + 1, v.asInstanceOf[String])
+            case v                            => ps.setObject(i + 1, v)
         returnedInt = ps.executeUpdate()
       case tyql.ParameterStyle.EscapedInline =>
         returnedInt = stmt.executeUpdate(sqlString)
@@ -64,12 +66,14 @@ class DB(conn: Connection) {
         val ps = conn.prepareStatement(sqlString)
         for (i <- 0 until parameters.length) do
           parameters(i) match
-            case null                        => ps.setNull(i + 1, java.sql.Types.NULL)
-            case v if v.isInstanceOf[Long]   => ps.setLong(i + 1, v.asInstanceOf[Long])
-            case v if v.isInstanceOf[Int]    => ps.setInt(i + 1, v.asInstanceOf[Int])
-            case v if v.isInstanceOf[Double] => ps.setDouble(i + 1, v.asInstanceOf[Double])
-            case v if v.isInstanceOf[String] => ps.setString(i + 1, v.asInstanceOf[String])
-            case v                           => ps.setObject(i + 1, v)
+            case null                         => ps.setNull(i + 1, java.sql.Types.NULL)
+            case v if v.isInstanceOf[Long]    => ps.setLong(i + 1, v.asInstanceOf[Long])
+            case v if v.isInstanceOf[Int]     => ps.setInt(i + 1, v.asInstanceOf[Int])
+            case v if v.isInstanceOf[Double]  => ps.setDouble(i + 1, v.asInstanceOf[Double])
+            case v if v.isInstanceOf[Float]   => ps.setFloat(i + 1, v.asInstanceOf[Float])
+            case v if v.isInstanceOf[Boolean] => ps.setBoolean(i + 1, v.asInstanceOf[Boolean])
+            case v if v.isInstanceOf[String]  => ps.setString(i + 1, v.asInstanceOf[String])
+            case v                            => ps.setObject(i + 1, v)
         rs = ps.executeQuery()
       case tyql.ParameterStyle.EscapedInline =>
         rs = stmt.executeQuery(sqlString)
@@ -79,7 +83,9 @@ class DB(conn: Connection) {
     while (rs.next()) {
       val row = resultTag match
         case ResultTag.IntTag    => rs.getInt(1)
+        case ResultTag.LongTag   => rs.getLong(1)
         case ResultTag.DoubleTag => rs.getDouble(1)
+        case ResultTag.FloatTag  => rs.getFloat(1)
         case ResultTag.StringTag => rs.getString(1)
         case ResultTag.BoolTag   => rs.getBoolean(1)
         case ResultTag.OptionalTag(e) => {
@@ -88,7 +94,9 @@ class DB(conn: Connection) {
           else
             e match
               case ResultTag.IntTag    => Some(got.asInstanceOf[Int])
+              case ResultTag.LongTag   => Some(got.asInstanceOf[Long])
               case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+              case ResultTag.FloatTag  => Some(got.asInstanceOf[Float])
               case ResultTag.StringTag => Some(got.asInstanceOf[String])
               case ResultTag.BoolTag   => Some(got.asInstanceOf[Boolean])
               case _                   => assert(false, "Unsupported type")
@@ -99,7 +107,9 @@ class DB(conn: Connection) {
             val col = idx + 1 // XXX if you want to use `name` here, you must case-convert it
             tag match
               case ResultTag.IntTag    => rs.getInt(col)
+              case ResultTag.LongTag   => rs.getLong(col)
               case ResultTag.DoubleTag => rs.getDouble(col)
+              case ResultTag.FloatTag  => rs.getFloat(col)
               case ResultTag.StringTag => rs.getString(col)
               case ResultTag.BoolTag   => rs.getBoolean(col)
               case ResultTag.OptionalTag(e) => {
@@ -108,7 +118,9 @@ class DB(conn: Connection) {
                 else
                   e match
                     case ResultTag.IntTag    => Some(got.asInstanceOf[Int])
+                    case ResultTag.LongTag   => Some(got.asInstanceOf[Long])
                     case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+                    case ResultTag.FloatTag  => Some(got.asInstanceOf[Float])
                     case ResultTag.StringTag => Some(got.asInstanceOf[String])
                     case ResultTag.BoolTag   => Some(got.asInstanceOf[Boolean])
                     case _                   => assert(false, "Unsupported type")
@@ -122,7 +134,9 @@ class DB(conn: Connection) {
             val col = idx + 1 // XXX if you want to use `name` here, you must case-convert it
             tag match
               case ResultTag.IntTag    => rs.getInt(col)
+              case ResultTag.LongTag   => rs.getLong(col)
               case ResultTag.DoubleTag => rs.getDouble(col)
+              case ResultTag.FloatTag  => rs.getFloat(col)
               case ResultTag.StringTag => rs.getString(col)
               case ResultTag.BoolTag   => rs.getBoolean(col)
               case ResultTag.OptionalTag(e) => {
@@ -131,7 +145,9 @@ class DB(conn: Connection) {
                 else
                   e match
                     case ResultTag.IntTag    => Some(got.asInstanceOf[Int])
+                    case ResultTag.LongTag   => Some(got.asInstanceOf[Long])
                     case ResultTag.DoubleTag => Some(got.asInstanceOf[Double])
+                    case ResultTag.FloatTag  => Some(got.asInstanceOf[Float])
                     case ResultTag.StringTag => Some(got.asInstanceOf[String])
                     case ResultTag.BoolTag   => Some(got.asInstanceOf[Boolean])
                     case _                   => assert(false, "Unsupported type")

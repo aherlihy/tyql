@@ -8,6 +8,8 @@ import scala.deriving.Mirror
 enum ResultTag[T]:
   case NullTag extends ResultTag[scala.Null]
   case IntTag extends ResultTag[Int]
+  case LongTag extends ResultTag[Long]
+  case FloatTag extends ResultTag[Float]
   case DoubleTag extends ResultTag[Double]
   case StringTag extends ResultTag[String]
   case BoolTag extends ResultTag[Boolean]
@@ -21,13 +23,15 @@ enum ResultTag[T]:
   case ListTag[T](elementType: ResultTag[T]) extends ResultTag[List[T]]
   case OptionalTag[T](elementType: ResultTag[T]) extends ResultTag[Option[T]]
   case AnyTag extends ResultTag[Any]
-// TODO: Add more types, specialize for DB backend
+
 object ResultTag:
   given ResultTag[scala.Null] = ResultTag.NullTag
   given ResultTag[Int] = ResultTag.IntTag
+  given ResultTag[Long] = ResultTag.LongTag
   given ResultTag[String] = ResultTag.StringTag
   given ResultTag[Boolean] = ResultTag.BoolTag
   given ResultTag[Double] = ResultTag.DoubleTag
+  given ResultTag[Float] = ResultTag.FloatTag
   given ResultTag[LocalDate] = ResultTag.LocalDateTag
   given [T](using e: ResultTag[T]): ResultTag[Option[T]] = ResultTag.OptionalTag(e)
 //  inline given [T <: Tuple]: ResultTag[Tuple] =
@@ -56,7 +60,9 @@ trait SimpleTypeResultTag[T] {}
 object SimpleTypeResultTag:
   given SimpleTypeResultTag[scala.Null] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[Int] = new SimpleTypeResultTag {}
+  given SimpleTypeResultTag[Long] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[String] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[Boolean] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[Double] = new SimpleTypeResultTag {}
+  given SimpleTypeResultTag[Float] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[LocalDate] = new SimpleTypeResultTag {}

@@ -43,6 +43,8 @@ trait Dialect:
   val integerCast: String = "INTEGER"
   val doubleCast: String = "DOUBLE PRECISION"
   val stringCast: String = "VARCHAR"
+  val floatCast: String = "FLOAT"
+  val longCast: String = "BIGINT"
 
   val `prefers $n over ? for parametrization` = false
 
@@ -124,6 +126,7 @@ object Dialect:
       override val integerCast: String = "DECIMAL"
       override val doubleCast: String = "DOUBLE"
       override val stringCast: String = "CHAR"
+      override val longCast: String = "SIGNED INTEGER"
 
     given RandomUUID = new RandomUUID {}
     given INCanHandleRows = new INCanHandleRows {}

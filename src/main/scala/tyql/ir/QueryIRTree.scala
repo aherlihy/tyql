@@ -465,6 +465,8 @@ object QueryIRTree:
           case CastTarget.CBool   => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.booleanCast})", c)
           case CastTarget.CDouble => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.doubleCast})", c)
           case CastTarget.CInt    => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.integerCast})", c)
+          case CastTarget.CFloat  => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.floatCast})", c)
+          case CastTarget.CLong   => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.longCast})", c)
       case w: WindExpr[?] =>
         val ae = w.ae match
           case Left(aggrExpr)    => generateExpr(aggrExpr, symbols)

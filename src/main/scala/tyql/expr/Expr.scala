@@ -23,7 +23,7 @@ type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape =
 trait CanBeEqualed[T1, T2]
 
 private[tyql] enum CastTarget:
-  case CInt, CString, CDouble, CBool
+  case CInt, CString, CDouble, CBool, CFloat, CLong
 
 trait LiteralExpression {}
 
@@ -73,16 +73,16 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
   def nullIf[S <: ExprShape](other: Expr[Result, S]): Expr[Result, CalculatedShape[Shape, S]] = Expr.NullIf(this, other)
 
   // TODO why do we need these `asInstanceOf`?
-  @targetName("castToInt")
   def asInt: Expr[Int, Shape] =
     Expr.Cast(this, CastTarget.CInt)(using ResultTag.IntTag.asInstanceOf[ResultTag[Int]])
-  @targetName("castToString")
+  def asLong: Expr[Long, Shape] =
+    Expr.Cast(this, CastTarget.CLong)(using ResultTag.LongTag.asInstanceOf[ResultTag[Long]])
   def asString: Expr[String, Shape] = Expr.Cast[Result, String, Shape](this, CastTarget.CString)(using
-  ResultTag.StringTag.asInstanceOf[ResultTag[String]])
-  @targetName("castToDouble")
+    ResultTag.StringTag.asInstanceOf[ResultTag[String]])
   def asDouble: Expr[Double, Shape] = Expr.Cast[Result, Double, Shape](this, CastTarget.CDouble)(using
-  ResultTag.DoubleTag.asInstanceOf[ResultTag[Double]])
-  @targetName("castToBoolean")
+    ResultTag.DoubleTag.asInstanceOf[ResultTag[Double]])
+  def asFloat: Expr[Float, Shape] = Expr.Cast[Result, Float, Shape](this, CastTarget.CFloat)(using
+    ResultTag.FloatTag.asInstanceOf[ResultTag[Float]])
   def asBoolean: Expr[Boolean, Shape] =
     Expr.Cast[Result, Boolean, Shape](this, CastTarget.CBool)(using ResultTag.BoolTag.asInstanceOf[ResultTag[Boolean]])
 
@@ -507,6 +507,7 @@ object Expr:
 
   /** Literals are type-specific, tailored to the types that the DB supports */
   case class IntLit($value: Int) extends Expr[Int, NonScalarExpr] with LiteralExpression
+  case class LongLit($value: Long) extends Expr[Long, NonScalarExpr] with LiteralExpression
 
   /** Scala values can be lifted into literals by conversions */
   given Conversion[Int, IntLit] = IntLit(_)
@@ -518,6 +519,9 @@ object Expr:
 
   case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr] with LiteralExpression
   given Conversion[Double, DoubleLit] = DoubleLit(_)
+
+  case class FloatLit($value: Float) extends Expr[Float, NonScalarExpr] with LiteralExpression
+  given Conversion[Float, FloatLit] = FloatLit(_)
 
   case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr] with LiteralExpression
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
@@ -580,7 +584,9 @@ object Expr:
 end Expr
 
 inline def lit(x: Int): Expr[Int, NonScalarExpr] & LiteralExpression = Expr.IntLit(x)
+inline def lit(x: Long): Expr[Long, NonScalarExpr] & LiteralExpression = Expr.LongLit(x)
 inline def lit(x: Double): Expr[Double, NonScalarExpr] & LiteralExpression = Expr.DoubleLit(x)
+inline def lit(x: Float): Expr[Float, NonScalarExpr] & LiteralExpression = Expr.FloatLit(x)
 inline def lit(x: String): Expr[String, NonScalarExpr] & LiteralExpression = Expr.StringLit(x)
 inline def lit(x: Boolean): Expr[Boolean, NonScalarExpr] & LiteralExpression = Expr.BooleanLit(x)
 inline def True = Expr.BooleanLit(true)
