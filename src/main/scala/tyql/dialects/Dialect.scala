@@ -135,6 +135,7 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     given AcceptsLimitInDeletes = new AcceptsLimitInDeletes {}
     given AcceptsOrderByInDeletes = new AcceptsOrderByInDeletes {}
+    given AcceptsLimitAndOrderByInUpdates = new AcceptsLimitAndOrderByInUpdates {}
     given INCanHandleRows = new INCanHandleRows {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
@@ -153,6 +154,7 @@ object Dialect:
     given INCanHandleRows = new INCanHandleRows {}
     given AcceptsLimitInDeletes = new AcceptsLimitInDeletes {}
     given AcceptsOrderByInDeletes = new AcceptsOrderByInDeletes {}
+    given AcceptsLimitAndOrderByInUpdates = new AcceptsLimitAndOrderByInUpdates {}
     given RandomIntegerInInclusiveRange = mysql.given_RandomIntegerInInclusiveRange
     given ReversibleStrings = mysql.given_ReversibleStrings
     given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
@@ -216,6 +218,7 @@ object Dialect:
     given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
     given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
     given AcceptsLimitInDeletes = new AcceptsLimitInDeletes {}
+    given AcceptsLimitAndOrderByInUpdates = new AcceptsLimitAndOrderByInUpdates {}
 
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                         DuckDB Dialect                             ║

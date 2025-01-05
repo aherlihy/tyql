@@ -151,6 +151,18 @@ object QueryIRTree:
           (generateFun(ord._1, tableRelOp, allSymbols), ord._2)
         )
         DeleteQueryIR(deleteAst.table, predicateExpr, orderBys, limitExpr, deleteAst)
+      case updateAst: Update[?] =>
+        val tableRelOp = TableLeaf(updateAst.table.$name, updateAst.table, overrideAlias = Some(updateAst.table.$name))
+        val allSymbols = symbols.bind(tableRelOp.carriedSymbols).bind(updateAst.setExprRef.stringRef(), tableRelOp)
+        val setExprs = updateAst.setExprs.map(e => generateExpr(e.asInstanceOf[Expr[?, NonScalarExpr]], allSymbols))
+        val whereExpr = updateAst.where.map(p => generateFun(p, tableRelOp, allSymbols))
+        var limitExpr: Option[QueryIRNode] = None
+        if updateAst.limit.isDefined then
+          limitExpr = Some(LiteralInteger(updateAst.limit.get, Expr.LongLit(updateAst.limit.get)))
+        val orderBys = updateAst.orderBys.map(ord =>
+          (generateFun(ord._1, tableRelOp, allSymbols), ord._2)
+        )
+        UpdateQueryIR(updateAst.table, updateAst.setNames, setExprs, whereExpr, orderBys, limitExpr, updateAst)
 
   /** Generate top-level or subquery
     *

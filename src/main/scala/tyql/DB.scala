@@ -199,13 +199,11 @@ def driverMain(): Unit = {
   case class Flowers(name: Option[String], flowerSize: Int, cost: Double, likes: Int)
   val t = tyql.Table[Flowers]()
 
-  val d = t.delete(f => f.name.get === "Rose")
+  val uu =
+    t.update(k => (cost = lit(123.2), likes = k.likes + lit(1))).where(z => z.flowerSize > lit(12)).limit(12).orderBy(
+      k => k.likes - 12,
+      Ord.DESC
+    )
 
-  pprintln(d.toQueryIR.toSQLQuery()._1)
-
-  println(t.delete(f => f.cost > 10.14).limit(1233).toQueryIR.toSQLQuery()._1)
-
-  println(t.delete(f => f.cost > 10.14).limit(1233).orderBy(f => f.cost + lit(123), tyql.Ord.DESC).orderBy(k => k.likes)
-    .toQueryIR.toSQLQuery()._1)
-
+  println(uu.toQueryIR.toSQLQuery()._1)
 }

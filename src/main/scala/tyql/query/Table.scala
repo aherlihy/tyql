@@ -9,7 +9,7 @@ case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query
     with InsertableTable[R, NamedTuple.Names[NamedTuple.From[R]]] {
   type ColumnNames = NamedTuple.Names[NamedTuple.From[R]]
   type Types = NamedTuple.DropNames[NamedTuple.From[R]]
-  inline def columnNames: Tuple = constValueTuple[ColumnNames]
+  override def underlyingTable = this
 
   def partial[Names <: Tuple]
     (using ev: TypeOperations.IsSubset[Names, NamedTuple.Names[NamedTuple.From[R]]])
@@ -20,7 +20,24 @@ case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query
     val ref = Expr.Ref[R, NonScalarExpr]()
     Delete(this, Expr.Fun(ref, p(ref)), Seq(), None)
 
-  override def underlyingTable = this
+  // update works similatly to inserts, there is a type-level check to ensure that the named tuple is assignable
+  inline def update[N <: Tuple, T <: Tuple]
+    (values: Expr.Ref[R, NonScalarExpr] => NamedTuple.NamedTuple[N, T])
+    (using
+        ev1: TypeOperations.IsSubset[N, NamedTuple.Names[NamedTuple.From[R]]],
+        ev3: TypeOperations.IsAcceptableInsertion[
+          Tuple.Map[T, Expr.StripExpr],
+          TypeOperations.SelectByNames[
+            N,
+            NamedTuple.DropNames[NamedTuple.From[R]],
+            NamedTuple.Names[NamedTuple.From[R]]
+          ]
+        ]
+    )
+    : Update[R] =
+    val ref = Expr.Ref[R, NonScalarExpr]()
+    val valuesTuple = values(ref)
+    Update(this, constValueTuple[N].toList.asInstanceOf[List[String]], ref, valuesTuple.toList, None, Seq(), None)
 }
 
 object Table {
@@ -33,13 +50,6 @@ object Table {
 trait InsertableTable[R: ResultTag, Names <: Tuple] {
 
   def underlyingTable: Table[R]
-
-  private def coerceTuplesIntoSeqSeq[S](values: Seq[S]): Seq[Seq[Any]] =
-    (0 until values.length) map { (i: Int) =>
-      val x = values(i)
-      val list = x.asInstanceOf[Tuple].toList
-      list
-    }
 
   inline def insert(values: R*): Insert[R] = {
     val names = constValueTuple[NamedTuple.Names[NamedTuple.From[R]]].toList.asInstanceOf[List[String]]
@@ -86,3 +96,10 @@ trait InsertableTable[R: ResultTag, Names <: Tuple] {
 case class PartialTable[R: ResultTag, Names <: Tuple](table: Table[R]) extends InsertableTable[R, Names] {
   override def underlyingTable = table
 }
+
+private def coerceTuplesIntoSeqSeq[S](values: Seq[S]): Seq[Seq[Any]] =
+  (0 until values.length) map { (i: Int) =>
+    val x = values(i)
+    val list = x.asInstanceOf[Tuple].toList
+    list
+  }

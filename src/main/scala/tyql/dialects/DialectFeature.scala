@@ -12,3 +12,5 @@ object DialectFeature:
 
   trait AcceptsLimitInDeletes extends DialectFeature
   trait AcceptsOrderByInDeletes extends DialectFeature
+
+  trait AcceptsLimitAndOrderByInUpdates extends DialectFeature
