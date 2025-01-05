@@ -6,6 +6,7 @@ import NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.deriving.*
 import scala.compiletime.{erasedValue, summonInline}
 import tyql.DialectFeature
+import scala.util.NotGiven
 
 sealed trait ExprShape
 class ScalarExpr extends ExprShape
@@ -48,16 +49,6 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
     (using CanBeEqualed[Result, T])
     : Expr[Boolean, CalculatedShape[Shape, S]] = Expr.NullSafeEq[Shape, S](this, other)
 
-  // XXX these are ugly, but hard to remove, since we are running in live Scala, the compiler likes to interpret `==` as a native equality and complain
-  def ==(other: String): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.StringLit(other))
-  def ==(other: Int): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.IntLit(other))
-  def ==(other: Boolean): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.BooleanLit(other))
-  def ==(other: Double): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.DoubleLit(other))
-  def !=(other: String): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.StringLit(other))
-  def !=(other: Int): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.IntLit(other))
-  def !=(other: Boolean): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.BooleanLit(other))
-  def !=(other: Double): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.DoubleLit(other))
-
   def !=[T, Shape2 <: ExprShape]
     (other: Expr[T, Shape2])
     (using CanBeEqualed[Result, T])
@@ -68,6 +59,16 @@ trait Expr[Result, Shape <: ExprShape](using val tag: ResultTag[Result]) extends
     (using CanBeEqualed[Result, T])
     : Expr[Boolean, CalculatedShape[Shape, Shape2]] =
     Expr.NullSafeNe[Shape, Shape2](this, other)
+
+  // XXX these are ugly, but hard to remove, since we are running in live Scala, the compiler likes to interpret `==` as a native equality and complain
+  def ==(other: String): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.StringLit(other))
+  def ==(other: Int): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.IntLit(other))
+  def ==(other: Boolean): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.BooleanLit(other))
+  def ==(other: Double): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Eq(this, Expr.DoubleLit(other))
+  def !=(other: String): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.StringLit(other))
+  def !=(other: Int): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.IntLit(other))
+  def !=(other: Boolean): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.BooleanLit(other))
+  def !=(other: Double): Expr[Boolean, CalculatedShape[Shape, NonScalarExpr]] = Expr.Ne(this, Expr.DoubleLit(other))
 
   def isNull[S <: ExprShape]: Expr[Boolean, Shape] = Expr.IsNull(this)
   def nullIf[S <: ExprShape](other: Expr[Result, S]): Expr[Result, CalculatedShape[Shape, S]] = Expr.NullIf(this, other)

@@ -73,6 +73,8 @@ object TypeOperations:
 
   type IsAcceptableInsertion[TypesA <: Tuple, TypesB <: Tuple] = AcceptableInsertions[TypesA, TypesB] =:= true
 
+  // ---------------------------------
+
   val a: (Int, String, Double) = (1, "", 1.0)
   val b: (Double, String) = (2.0, " ")
   val b2: (Double, Double) = (2.0, 3.0)

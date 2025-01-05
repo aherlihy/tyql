@@ -199,11 +199,5 @@ def driverMain(): Unit = {
   case class Flowers(name: Option[String], flowerSize: Int, cost: Double, likes: Int)
   val t = tyql.Table[Flowers]()
 
-  val uu =
-    t.update(k => (cost = lit(123.2), likes = k.likes + lit(1))).where(z => z.flowerSize > lit(12)).limit(12).orderBy(
-      k => k.likes - 12,
-      Ord.DESC
-    )
-
-  println(uu.toQueryIR.toSQLQuery()._1)
+  t.map(k => k.name == k.name)
 }

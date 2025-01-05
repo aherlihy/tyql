@@ -70,6 +70,7 @@ object Dialect:
   object ansi:
     given Dialect = Dialect.given_Dialect
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
+    given [T1: Numeric, T2: Numeric]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
     given INCanHandleRows = new INCanHandleRows {}
 
 // ╔════════════════════════════════════════════════════════════════════╗
@@ -100,9 +101,7 @@ object Dialect:
     given INCanHandleRows = new INCanHandleRows {}
     given ReversibleStrings = new ReversibleStrings {}
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
-    // TODO later support more options here (?)
-    given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
-    given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
+    given [T1: Numeric, T2: Numeric]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
 
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                          MySQL Dialect                             ║
@@ -214,9 +213,7 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
-    // TODO later support more options here (?)
-    given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
-    given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
+    given [T1: Numeric, T2: Numeric]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
     given AcceptsLimitInDeletes = new AcceptsLimitInDeletes {}
     given AcceptsLimitAndOrderByInUpdates = new AcceptsLimitAndOrderByInUpdates {}
 
@@ -249,6 +246,4 @@ object Dialect:
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
-    // TODO later support more options here (?)
-    given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
-    given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
+    given [T1: Numeric, T2: Numeric]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
