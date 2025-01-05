@@ -5,6 +5,9 @@ import scala.NamedTuple.NamedTuple
 import scala.compiletime.{constValue, constValueTuple, summonAll}
 import scala.deriving.Mirror
 
+// XXX Do not remove simple types form ResultTag, that would make the driver more annoying.
+// XXX This slight code duplication is OK since there are so few simple types.
+
 enum ResultTag[T]:
   case NullTag extends ResultTag[scala.Null]
   case ByteArrayTag extends ResultTag[Array[Byte]]
@@ -16,10 +19,8 @@ enum ResultTag[T]:
   case StringTag extends ResultTag[String]
   case BoolTag extends ResultTag[Boolean]
   case LocalDateTag extends ResultTag[LocalDate]
-  // names is a var to special case when we want to treat a named tuple like a regular tuple without going through type conversion
   case NamedTupleTag[N <: Tuple, V <: Tuple](var names: List[String], types: List[ResultTag[?]])
       extends ResultTag[NamedTuple[N, V]]
-//  case TupleTag[T <: Tuple](types: List[ResultTag[?]]) extends ResultTag[Tuple]
   case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]], m: Mirror.ProductOf[T])
       extends ResultTag[T]
   case ListTag[T](elementType: ResultTag[T]) extends ResultTag[List[T]]
@@ -38,17 +39,14 @@ object ResultTag:
   given ResultTag[Float] = ResultTag.FloatTag
   given ResultTag[LocalDate] = ResultTag.LocalDateTag
   given [T](using e: ResultTag[T]): ResultTag[Option[T]] = ResultTag.OptionalTag(e)
-//  inline given [T <: Tuple]: ResultTag[Tuple] =
-//    val tpes = summonAll[Tuple.Map[T, ResultTag]]
-//    TupleTag(tpes.toList.asInstanceOf[List[ResultTag[?]]])
   inline given [N <: Tuple, V <: Tuple]: ResultTag[NamedTuple[N, V]] =
     val names = constValueTuple[N]
     val tpes = summonAll[Tuple.Map[V, ResultTag]]
     NamedTupleTag(names.toList.asInstanceOf[List[String]], tpes.toList.asInstanceOf[List[ResultTag[?]]])
 
-  // We don't really need `fields` and could use `m` for everything, but maybe we can share a cached
-  // version of `fields`.
-  // Alternatively if we don't care about the case class name we could use only `fields`.
+  // XXX We don't really need `fields` and could use `m` for everything, but maybe we can share a cached
+  // XXX version of `fields`.
+  // XXX Alternatively if we don't care about the case class name we could use only `fields`.
   inline given [T](using m: Mirror.ProductOf[T], fields: ResultTag[NamedTuple.From[T]]): ResultTag[T] =
     val productName = constValue[m.MirroredLabel]
     ProductTag(productName, fields, m)
