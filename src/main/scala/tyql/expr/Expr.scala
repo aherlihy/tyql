@@ -451,7 +451,7 @@ object Expr:
       extends Expr[
         A,
         NonScalarExpr
-      ] // TODO is this type correct? X is of type A and it's child under `name` is also of type A?
+      ]
 
   case class Concat[A <: AnyNamedTuple, B <: AnyNamedTuple, S1 <: ExprShape, S2 <: ExprShape]
     ($x: Expr[A, S1], $y: Expr[B, S2])
@@ -463,7 +463,7 @@ object Expr:
   type StripExpr[E] = E match
     case Expr[b, s]         => b
     case AggregationExpr[b] => b
-    case _                  => E
+    case _                  => E // XXX this branch is used for the added flexibility of using literal directly in the insertions and updates
 
   // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2])
@@ -482,8 +482,9 @@ object Expr:
   case class NonEmpty[A]($this: Query[A, ?]) extends Expr[Boolean, NonScalarExpr]
 
   /** References are placeholders for parameters */
-  private var refCount = 0 // TODO: do we want to recount from 0 for each query?
-  private var exprRefCount = 0
+  // XXX currently queries share this counter, which might result in larger numbers over time, but should not be dangerous since these are longs
+  private var refCount = 0L
+  private var exprRefCount = 0L
 
   // References to relations
   case class Ref[A: ResultTag, S <: ExprShape](idx: Int = -1) extends Expr[A, S]:

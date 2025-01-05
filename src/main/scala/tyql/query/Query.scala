@@ -542,7 +542,8 @@ object Query:
     ($param: List[RestrictedQueryRef[?, ?, ?]], $subquery: List[Query[?, ?]], $resultQuery: Query[R, ?])
     (using ResultTag[R]) extends Query[R, SetResult]
 
-  private var refCount = 0
+  // XXX currently queries share this counter, which might result in larger numbers over time, but should not be dangerous since these are longs
+  private var refCount = 0L
   case class QueryRef[A: ResultTag, C <: ResultCategory]() extends Query[A, C]:
     private val id = refCount
     refCount += 1

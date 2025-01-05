@@ -22,7 +22,8 @@ object QueryIRTree:
 
   /** Globally unique reference counter for identifiers, used for making aliases unique.
     */
-  var idCount = 0
+  // XXX currently queries share this counter, which might result in larger numbers over time, but should not be dangerous since these are longs
+  var idCount = 0L
 
   /** Convert table.filter(p1).filter(p2) => table.filter(p1 && p2). Example of a heuristic tree
     * transformation/optimization
