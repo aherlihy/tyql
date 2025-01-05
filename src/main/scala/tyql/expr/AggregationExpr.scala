@@ -9,7 +9,7 @@ import Expr.{Fun, Pred, StripExpr}
   */
 sealed trait AggregationExpr[Result](using ResultTag[Result]) extends Expr[Result, ScalarExpr] {
   def partitionBy(e: Expr[?, NonScalarExpr]*): WindowExpression[Result] = WindExpr(Left(this), e.toList, Seq())
-  def orderBy(e: Expr[?, NonScalarExpr], ord: tyql.Ord): WindowExpression[Result] =
+  def orderBy(e: Expr[?, NonScalarExpr], ord: tyql.Ord = tyql.Ord.ASC): WindowExpression[Result] =
     WindExpr(Left(this), Seq(), Seq((e, ord)))
 }
 

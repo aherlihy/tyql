@@ -37,3 +37,32 @@ case class InsertFromSelectQueryIR[T](table: Table[T], query: RelationOp, names:
     query.appendFlag(SelectFlags.Final)
     query.computeSQL(ctx)
 }
+
+case class DeleteQueryIR[T, S <: ExprShape]
+  (
+      table: Table[T],
+      where: QueryIRNode,
+      orderBys: Seq[(QueryIRNode, tyql.Ord)],
+      limit: Option[QueryIRNode],
+      val ast: UpdateToTheDB
+  ) extends QueryIRNode {
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    ctx.sql.append("DELETE FROM ")
+    ctx.sql.append(table.$name)
+    ctx.sql.append(" WHERE ")
+    where.computeSQL(ctx)
+    if orderBys.nonEmpty then
+      ctx.sql.append(" ORDER BY ")
+      var first = true
+      for (expr, ord) <- orderBys do
+        if first then
+          first = false
+        else
+          ctx.sql.append(", ")
+        expr.computeSQL(ctx)
+        ctx.sql.append(" ")
+        ctx.sql.append(ord.toString)
+    if limit.isDefined then
+      ctx.sql.append(" LIMIT ")
+      limit.get.computeSQL(ctx)
+}

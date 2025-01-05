@@ -16,6 +16,10 @@ case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query
     : PartialTable[R, Names] =
     new PartialTable[R, Names](this)
 
+  def delete(p: Expr.Ref[R, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Delete[R] =
+    val ref = Expr.Ref[R, NonScalarExpr]()
+    Delete(this, Expr.Fun(ref, p(ref)), Seq(), None)
+
   override def underlyingTable = this
 }
 

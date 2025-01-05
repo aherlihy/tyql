@@ -10,13 +10,13 @@ case class WindExpr[R]
   )
   (using ResultTag[R]) extends WindowExpression[R] {
   def partitionBy(e: Expr[?, NonScalarExpr]*): WindowExpression[R] = WindExpr(ae, partitionBy ++ e, Seq())
-  def orderBy(e: Expr[?, NonScalarExpr], ord: tyql.Ord): WindowExpression[R] =
+  def orderBy(e: Expr[?, NonScalarExpr], ord: tyql.Ord = tyql.Ord.ASC): WindowExpression[R] =
     WindExpr(ae, partitionBy, orderBy :+ (e, ord))
 }
 
 sealed trait ExprInWindowPosition[R](using ResultTag[R]) {
   def partitionBy(e: Expr[?, NonScalarExpr]*): WindowExpression[R] = WindExpr(Right(this), e.toList, Seq())
-  def orderBy(e: Expr[?, NonScalarExpr], ord: tyql.Ord): WindowExpression[R] =
+  def orderBy(e: Expr[?, NonScalarExpr], ord: tyql.Ord = tyql.Ord.ASC): WindowExpression[R] =
     WindExpr(Right(this), Seq(), Seq((e, ord)))
 }
 

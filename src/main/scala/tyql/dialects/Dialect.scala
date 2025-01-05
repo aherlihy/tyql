@@ -52,6 +52,8 @@ trait Dialect:
 
   def needsByteByByteEscapingOfBlobs: Boolean = false
 
+  def acceptsLimitInDeleteQueries: Boolean = false
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -131,6 +133,8 @@ object Dialect:
       override val longCast: String = "SIGNED INTEGER"
 
     given RandomUUID = new RandomUUID {}
+    given AcceptsLimitInDeletes = new AcceptsLimitInDeletes {}
+    given AcceptsOrderByInDeletes = new AcceptsOrderByInDeletes {}
     given INCanHandleRows = new INCanHandleRows {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
@@ -147,6 +151,8 @@ object Dialect:
 
     given RandomUUID = mysql.given_RandomUUID
     given INCanHandleRows = new INCanHandleRows {}
+    given AcceptsLimitInDeletes = new AcceptsLimitInDeletes {}
+    given AcceptsOrderByInDeletes = new AcceptsOrderByInDeletes {}
     given RandomIntegerInInclusiveRange = mysql.given_RandomIntegerInInclusiveRange
     given ReversibleStrings = mysql.given_ReversibleStrings
     given [T1, T2]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
@@ -209,6 +215,7 @@ object Dialect:
     // TODO later support more options here (?)
     given CanBeEqualed[Double, Int] = new CanBeEqualed[Double, Int] {}
     given CanBeEqualed[Int, Double] = new CanBeEqualed[Int, Double] {}
+    given AcceptsLimitInDeletes = new AcceptsLimitInDeletes {}
 
 // ╔════════════════════════════════════════════════════════════════════╗
 // ║                         DuckDB Dialect                             ║

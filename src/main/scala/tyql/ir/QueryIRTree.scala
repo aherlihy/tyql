@@ -140,6 +140,17 @@ object QueryIRTree:
       case insertFromSelectAst: InsertFromSelect[?, ?] =>
         val selectIR = generateQuery(insertFromSelectAst.query, symbols)
         InsertFromSelectQueryIR(insertFromSelectAst.table, selectIR, insertFromSelectAst.names, insertFromSelectAst)
+      case deleteAst: Delete[?] =>
+        val tableRelOp = TableLeaf(deleteAst.table.$name, deleteAst.table, overrideAlias = Some(deleteAst.table.$name))
+        val allSymbols = symbols.bind(tableRelOp.carriedSymbols)
+        val predicateExpr = generateFun(deleteAst.p, tableRelOp, allSymbols)
+        var limitExpr: Option[QueryIRNode] = None
+        if deleteAst.limit.isDefined then
+          limitExpr = Some(LiteralInteger(deleteAst.limit.get, Expr.LongLit(deleteAst.limit.get)))
+        val orderBys = deleteAst.orderBys.map(ord =>
+          (generateFun(ord._1, tableRelOp, allSymbols), ord._2)
+        )
+        DeleteQueryIR(deleteAst.table, predicateExpr, orderBys, limitExpr, deleteAst)
 
   /** Generate top-level or subquery
     *

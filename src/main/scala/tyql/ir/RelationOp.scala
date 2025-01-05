@@ -144,8 +144,9 @@ case class ValuesLeaf(values: Seq[Seq[QueryIRNode]], names: Seq[String], ast: Qu
 
 /** Simple table read.
   */
-case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with QueryIRLeaf:
-  val name = s"$tableName${QueryIRTree.idCount}"
+case class TableLeaf(tableName: String, ast: Table[?], overrideAlias: Option[String] = None) extends RelationOp
+    with QueryIRLeaf:
+  val name = overrideAlias.getOrElse(s"$tableName${QueryIRTree.idCount}")
   QueryIRTree.idCount += 1
   override def alias = name
   override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
