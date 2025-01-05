@@ -121,8 +121,8 @@ class SelectModifiersSort2bTest extends SQLStringQueryTest[AllCommerceDBs, (name
     testDB.tables.products
       .map: prod =>
         (name2 = prod.name, id2 = prod.id, price2 = prod.price).toRow
-      .sort(_.id2, Ord.ASC)
-      .sort(_.price2, Ord.DESC)
+      .sort(_.id2)
+      .sortDesc(_.price2)
       .sort(_.name2, Ord.DESC)
 
   def expectedQueryPattern: String =

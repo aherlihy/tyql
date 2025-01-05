@@ -11,6 +11,8 @@ sealed trait AggregationExpr[Result](using ResultTag[Result]) extends Expr[Resul
   def partitionBy(e: Expr[?, NonScalarExpr]*): WindowExpression[Result] = WindExpr(Left(this), e.toList, Seq())
   def orderBy(e: Expr[?, NonScalarExpr], ord: tyql.Ord = tyql.Ord.ASC): WindowExpression[Result] =
     WindExpr(Left(this), Seq(), Seq((e, ord)))
+  def orderByDesc(e: Expr[?, NonScalarExpr]): WindowExpression[Result] =
+    WindExpr(Left(this), Seq(), Seq((e, Ord.DESC)))
 }
 
 object AggregationExpr {

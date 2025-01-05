@@ -2,8 +2,7 @@ package tyql
 
 import tyql.SelectFlags.Final
 
-// TODO in this file we probably lose the original ASTs when merging, they're only replaced with the second operand's AST
-// TODO in `mergeWith`, some cases are missing, unclear if the catch-all implementation is enough
+// XXX In this file we probably lose the original ASTs when merging when we apply some simplification operations, for now when don't know that to do, pick the second ast
 
 /** Modifiers for query generation, e.g. queries at the expression level need surrounding parens.
   */

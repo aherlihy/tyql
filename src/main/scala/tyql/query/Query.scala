@@ -292,9 +292,11 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
 
   /** When there is only one relation to be defined recursively.
     */
-  def sort[B](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr], ord: Ord): Query[A, Category] =
+  def sort[B](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr], ord: Ord = Ord.ASC): Query[A, Category] =
     val ref = Ref[A, NonScalarExpr]()
     Query.Sort(this, Fun(ref, f(ref)), ord)
+
+  def sortDesc[B](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr]): Query[A, Category] = sort[B](f, Ord.DESC)
 
   // offset and not drop since _.take.drop and _.drop.take are not equivalent like in SQL
   def take(lim: Int): Query[A, Category] = Query.Limit(this, lim)
