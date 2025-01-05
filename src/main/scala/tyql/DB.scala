@@ -199,5 +199,9 @@ def driverMain(): Unit = {
   case class Flowers(name: Option[String], flowerSize: Int, cost: Double, likes: Int)
   val t = tyql.Table[Flowers]()
 
-  t.map(k => k.name == k.name)
+  pprintln(db.run(
+    Values[(a: Int)](Tuple(1)).map(k =>
+      (a = lit(10) / lit(20), b = lit(10.2f) / lit(2), c = lit(120L) / lit(2), d = lit(0.2f) / lit(20.31))
+    )
+  ))
 }

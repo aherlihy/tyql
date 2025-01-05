@@ -558,6 +558,8 @@ object QueryIRTree:
         BinExprOp("", generateExpr(a.$x, symbols), " + ", generateExpr(a.$y, symbols), "", Precedence.Additive, a)
       case a: Expr.Minus[?, ?, ?] =>
         BinExprOp("", generateExpr(a.$x, symbols), " - ", generateExpr(a.$y, symbols), "", Precedence.Additive, a)
+      case a: Expr.Div[?, ?, ?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " / ", generateExpr(a.$y, symbols), "", Precedence.Multiplicative, a)
       case a: Expr.Times[?, ?, ?] =>
         BinExprOp("", generateExpr(a.$x, symbols), " * ", generateExpr(a.$y, symbols), "", Precedence.Multiplicative, a)
       case a: Expr.Eq[?, ?] =>

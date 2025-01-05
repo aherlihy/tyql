@@ -127,6 +127,45 @@ object Expr:
       : Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]] =
       Between(x, min, max)
 
+  // DIVISION OPERATORS
+  /// XXX generated, this actually cannot be done via defining traits FloatingNumber/IntegralNumber since then Scala compiler will complain about ambiguous overloads
+  extension [S1 <: ExprShape](x: Expr[Double, S1])
+    @targetName("DivDoubleDouble") def /[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivDoubleFloat") def /[S2 <: ExprShape](y: Expr[Float, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivDoubleLong") def /[S2 <: ExprShape](y: Expr[Long, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivDoubleInt") def /[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+  extension [S1 <: ExprShape](x: Expr[Float, S1])
+    @targetName("DivFloatDouble") def /[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivFloatFloat") def /[S2 <: ExprShape](y: Expr[Float, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivFloatLong") def /[S2 <: ExprShape](y: Expr[Long, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivFloatInt") def /[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+  extension [S1 <: ExprShape](x: Expr[Long, S1])
+    @targetName("DivLongDouble") def /[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivLongFloat") def /[S2 <: ExprShape](y: Expr[Float, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivLongLong") def /[S2 <: ExprShape](y: Expr[Long, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(Cast[Long, Double, S1](x, CastTarget.CDouble), y)
+    @targetName("DivLongInt") def /[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(Cast[Long, Double, S1](x, CastTarget.CDouble), y)
+  extension [S1 <: ExprShape](x: Expr[Int, S1])
+    @targetName("DivIntDouble") def /[S2 <: ExprShape](y: Expr[Double, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivIntFloat") def /[S2 <: ExprShape](y: Expr[Float, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(x, y)
+    @targetName("DivIntLong") def /[S2 <: ExprShape](y: Expr[Long, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(Cast[Int, Double, S1](x, CastTarget.CDouble), y)
+    @targetName("DivIntInt") def /[S2 <: ExprShape](y: Expr[Int, S2]): Expr[Double, CalculatedShape[S1, S2]] =
+      Div(Cast[Int, Double, S1](x, CastTarget.CDouble), y)
+
   extension [T: Numeric, S1 <: ExprShape](x: Expr[T, S1])(using ResultTag[T])
     def <[T2: Numeric, S2 <: ExprShape](y: Expr[T2, S2])(using ResultTag[T2]): Expr[Boolean, CalculatedShape[S1, S2]] =
       Lt(x, y)
@@ -357,6 +396,10 @@ object Expr:
       extends Expr[T, CalculatedShape[S1, S2]]
   case class Times[S1 <: ExprShape, S2 <: ExprShape, T: Numeric]($x: Expr[T, S1], $y: Expr[T, S2])(using ResultTag[T])
       extends Expr[T, CalculatedShape[S1, S2]]
+  case class Div[S1 <: ExprShape, S2 <: ExprShape, T1, T2]
+    ($x: Expr[T1, S1], $y: Expr[T2, S2])
+    (using ResultTag[T1], ResultTag[T2])
+      extends Expr[Double, CalculatedShape[S1, S2]]
 
   case class And[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Boolean, S1], $y: Expr[Boolean, S2])
       extends Expr[Boolean, CalculatedShape[S1, S2]]
@@ -463,7 +506,8 @@ object Expr:
   type StripExpr[E] = E match
     case Expr[b, s]         => b
     case AggregationExpr[b] => b
-    case _                  => E // XXX this branch is used for the added flexibility of using literal directly in the insertions and updates
+    case _ =>
+      E // XXX this branch is used for the added flexibility of using literal directly in the insertions and updates
 
   // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[?, S1], $y: Expr[?, S2])
