@@ -18,6 +18,34 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
   import Expr.{Fun, Ref}
   val tag: ResultTag[A] = qTag
 
+  // XXX currently ugly and cannot be abstracted due to the `copy` method existing only in case classes
+  protected def copyWith
+    (requestedJoinType: Option[JoinType], requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]])
+    : Query[A, Category]
+
+  var requestedJoinType: Option[JoinType] = None
+  var requestedJoinOn: Option[Fun[?, Expr[Boolean, NonScalarExpr], NonScalarExpr]] = None
+
+  def joinOn(f: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] =
+    val ref = Ref[A, NonScalarExpr]()
+    val ret = copyWith(Some(JoinType.InnerExplicit), Some(Fun(ref, f(ref))))
+    ret
+
+  def leftJoinOn(f: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] =
+    val ref = Ref[A, NonScalarExpr]()
+    val ret = copyWith(Some(JoinType.LeftOuter), Some(Fun(ref, f(ref))))
+    ret
+
+  def rightJoinOn(f: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] =
+    val ref = Ref[A, NonScalarExpr]()
+    val ret = copyWith(Some(JoinType.RightOuter), Some(Fun(ref, f(ref))))
+    ret
+
+  def fullOuterJoinOn(f: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] =
+    val ref = Ref[A, NonScalarExpr]()
+    val ret = copyWith(Some(JoinType.FullOuter), Some(Fun(ref, f(ref))))
+    ret
+
   /** Classic flatMap with an inner Query that will likely be flattened into a join.
     *
     * @param f
@@ -29,7 +57,10 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     */
   def flatMap[B: ResultTag](f: Ref[A, NonScalarExpr] => Query[B, ?]): Query[B, BagResult] =
     val ref = Ref[A, NonScalarExpr]()
-    Query.FlatMap(this, Fun(ref, f(ref)))
+    val r = Query.FlatMap(this, Fun(ref, f(ref)))
+    r.requestedJoinOn = requestedJoinOn
+    r.requestedJoinType = requestedJoinType
+    r
 
   /** Classic flatMap with an inner query that is a RestrictedQuery. This turns the result query into a RestrictedQuery.
     * Exists to support doing BaseCaseRelation.flatMap(...) within a fix
@@ -44,7 +75,10 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     (f: Ref[A, NonScalarExpr] => RestrictedQuery[B, ?, D])
     : RestrictedQuery[B, BagResult, D] =
     val ref = Ref[A, NonScalarExpr]()
-    RestrictedQuery(Query.FlatMap(this, Fun(ref, f(ref).toQuery)))
+    val r = Query.FlatMap(this, Fun(ref, f(ref).toQuery))
+    r.requestedJoinOn = requestedJoinOn
+    r.requestedJoinType = requestedJoinType
+    RestrictedQuery(r)
 
   /** Equivalent to flatMap(f: Ref => Aggregation). NOTE: make Ref of type NExpr so that relation.id is counted as
     * NExpr, not ScalarExpr
@@ -239,7 +273,10 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     */
   def map[B: ResultTag](f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr]): Query[B, BagResult] =
     val ref = Ref[A, NonScalarExpr]()
-    Query.Map(this, Fun(ref, f(ref)))
+    val r = Query.Map(this, Fun(ref, f(ref)))
+    r.requestedJoinOn = requestedJoinOn
+    r.requestedJoinType = requestedJoinType
+    r
 
   /** A version of the above-defined map that allows users to skip calling toRow on the result in f.
     *
@@ -256,7 +293,10 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     : Query[NamedTuple.Map[B, Expr.StripExpr], BagResult] =
     import Expr.toRow
     val ref = Ref[A, NonScalarExpr]()
-    Query.Map(this, Fun(ref, f(ref).toRow))
+    val r = Query.Map(this, Fun(ref, f(ref).toRow))
+    r.requestedJoinOn = requestedJoinOn
+    r.requestedJoinType = requestedJoinType
+    r
 
   def fix(p: RestrictedQueryRef[A, ?, 0] => RestrictedQuery[A, SetResult, Tuple1[0]]): Query[A, SetResult] =
     type QT = Tuple1[Query[A, ?]]
@@ -281,7 +321,6 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val ref = Ref[A, NonScalarExpr]()
     Query.Filter(this, Fun(ref, p(ref)))
 
-  // TODO what about filtering by multiple variables?
   def filter(p: Ref[A, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Query[A, Category] = withFilter(p)
 
   def nonEmpty: Expr[Boolean, NonScalarExpr] =
@@ -542,7 +581,18 @@ object Query:
   // TODO: in the case we want to allow bag semantics within recursive queries, set $bag
   case class MultiRecursive[R]
     ($param: List[RestrictedQueryRef[?, ?, ?]], $subquery: List[Query[?, ?]], $resultQuery: Query[R, ?])
-    (using ResultTag[R]) extends Query[R, SetResult]
+    (using ResultTag[R]) extends Query[R, SetResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[R, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[R, SetResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
 
   // XXX currently queries share this counter, which might result in larger numbers over time, but should not be dangerous since these are longs
   private var refCount = 0L
@@ -551,27 +601,191 @@ object Query:
     refCount += 1
     def stringRef() = s"recref$id"
     override def toString: String = s"QueryRef[${stringRef()}]"
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, C] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret.asInstanceOf[Query[A, C]]
 
   case class Filter[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $pred: Pred[A, NonScalarExpr])
-      extends Query[A, C]
-  case class Map[A, B: ResultTag]($from: Query[A, ?], $query: Fun[A, Expr[B, ?], ?]) extends Query[B, BagResult]
+      extends Query[A, C] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, C] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class Map[A, B: ResultTag]($from: Query[A, ?], $query: Fun[A, Expr[B, ?], ?]) extends Query[B, BagResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[B, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[B, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
   case class FlatMap[A, B: ResultTag]($from: Query[A, ?], $query: Fun[A, Query[B, ?], NonScalarExpr])
-      extends Query[B, BagResult]
+      extends Query[B, BagResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[B, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[B, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
   // case class Sort[A]($q: Query[A], $o: Ordering[A]) extends Query[A] // alternative syntax to avoid chaining .sort for multi-key sort
   case class Sort[A: ResultTag, B, C <: ResultCategory]
-    ($from: Query[A, C], $body: Fun[A, Expr[B, NonScalarExpr], NonScalarExpr], $ord: Ord) extends Query[A, C]
-  case class Limit[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $limit: Int) extends Query[A, C]
-  case class Offset[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $offset: Int) extends Query[A, C]
-  case class Distinct[A: ResultTag]($from: Query[A, ?]) extends Query[A, SetResult]
+    ($from: Query[A, C], $body: Fun[A, Expr[B, NonScalarExpr], NonScalarExpr], $ord: Ord) extends Query[A, C] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, C] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class Limit[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $limit: Int) extends Query[A, C] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, C] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class Offset[A: ResultTag, C <: ResultCategory]($from: Query[A, C], $offset: Int) extends Query[A, C] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, C] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class Distinct[A: ResultTag]($from: Query[A, ?]) extends Query[A, SetResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, SetResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
 
-  case class Union[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
-  case class UnionAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
-  case class Intersect[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
-  case class IntersectAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
-  case class Except[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult]
-  case class ExceptAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult]
+  case class Union[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, SetResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class UnionAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class Intersect[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, SetResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class IntersectAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class Except[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, SetResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, SetResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+  case class ExceptAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
 
-  case class Values[A]($values: Seq[Tuple], $names: Seq[String])(using ResultTag[A]) extends Query[A, BagResult]
+  case class Values[A]($values: Seq[Tuple], $names: Seq[String])(using ResultTag[A]) extends Query[A, BagResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
 
   case class NewGroupBy[
       AllSourceTypes <: Tuple,
@@ -597,6 +811,17 @@ object Query:
       else
         throw new Exception("Error: can only support a single having statement after groupBy")
 
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[ResultType, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[ResultType, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+
   // NOTE: GroupBy is technically an aggregation but will return an interator of at least 1, like a query
   case class GroupBy[
       SourceType,
@@ -620,6 +845,17 @@ object Query:
         GroupBy($source, $groupingFn, $selectFn, Some(fun))
       else
         throw new Exception("Error: can only support a single having statement after groupBy")
+
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[ResultType, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[ResultType, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
 
 end Query // object
 

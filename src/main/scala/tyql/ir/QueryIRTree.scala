@@ -48,39 +48,55 @@ object QueryIRTree:
     * table3.map(t3 => (k1 = t1, k2 = t2, k3 = t3))) => SELECT t1 as k1, t2 as k3, t3 as k3 FROM table1, table2, table3
     */
   private def collapseFlatMap
-    (sources: Seq[RelationOp], symbols: SymbolTable, body: Any)
+    (sources: Seq[(RelationOp, JoinType, Option[QueryIRNode])], symbols: SymbolTable, body: Any)
     (using d: Dialect)
-    : (Seq[RelationOp], QueryIRNode) =
+    : (Seq[(RelationOp, JoinType, Option[QueryIRNode])], QueryIRNode) =
     body match
       case map: Query.Map[?, ?] =>
         val actualParam = generateActualParam(map.$from, map.$query.$param, symbols)
         val bodyIR = generateFun(map.$query, actualParam, symbols)
-        (sources :+ actualParam, bodyIR)
+        val onExpr = map.requestedJoinOn.map(actualOn =>
+          generateFun(actualOn, actualParam, symbols.bind(actualOn.$param.stringRef(), actualParam))
+        )
+        (sources :+ (actualParam, map.requestedJoinType.getOrElse(JoinType.InnerOrCrossImplicit), onExpr), bodyIR)
       case flatMap: Query.FlatMap[?, ?] => // found a flatMap to collapse
         val actualParam = generateActualParam(flatMap.$from, flatMap.$query.$param, symbols)
+        val onExpr = flatMap.requestedJoinOn.map(actualOn =>
+          generateFun(actualOn, actualParam, symbols.bind(actualOn.$param.stringRef(), actualParam))
+        )
         val (unevaluated, boundST) = partiallyGenerateFun(flatMap.$query, actualParam, symbols)
         collapseFlatMap(
-          sources :+ actualParam,
+          sources :+ (actualParam, flatMap.requestedJoinType.getOrElse(JoinType.InnerOrCrossImplicit), onExpr),
           boundST,
           unevaluated
         )
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
         val actualParam = generateActualParam(aggFlatMap.$from, aggFlatMap.$query.$param, symbols)
         val (unevaluated, boundST) = partiallyGenerateFun(aggFlatMap.$query, actualParam, symbols)
+        val onExpr = aggFlatMap.$from.requestedJoinOn.map(actualOn =>
+          generateFun(actualOn, actualParam, symbols.bind(actualOn.$param.stringRef(), actualParam))
+        )
         unevaluated match
           case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
             collapseFlatMap(
-              sources :+ actualParam,
+              sources :+ (
+                actualParam,
+                aggFlatMap.$from.requestedJoinType.getOrElse(JoinType.InnerOrCrossImplicit),
+                onExpr
+              ),
               boundST,
               recur
             )
           case _ => // base case
             val innerBodyIR = finishGeneratingFun(unevaluated, boundST)
-            (sources :+ actualParam, innerBodyIR)
+            (sources :+ (actualParam, JoinType.InnerOrCrossImplicit, None), innerBodyIR)
       // Found an operation that cannot be collapsed
       case otherOp: DatabaseAST[?] =>
         val fromNode = generateQuery(otherOp, symbols)
-        (sources :+ fromNode, ProjectClause(Seq(QueryIRVar(fromNode, fromNode.alias, null)), null))
+        (
+          sources :+ (fromNode, JoinType.InnerOrCrossImplicit, None),
+          ProjectClause(Seq(QueryIRVar(fromNode, fromNode.alias, null)), null)
+        )
       case _ => // Expr
         throw Exception(s"""
             Unimplemented: collapsing flatMap on type $body.
@@ -116,9 +132,12 @@ object QueryIRTree:
 
   private def collapseMap(lhs: QueryIRNode, rhs: QueryIRNode): RelationOp = ???
 
-  private def unnest(fromNodes: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
+  private def unnest
+    (fromNodes: Seq[(RelationOp, JoinType, Option[QueryIRNode])], projectIR: QueryIRNode, flatMap: DatabaseAST[?])
+    : RelationOp =
     fromNodes
-      .reduce((q1, q2) => q1.mergeWith(q2, astOther = flatMap))
+      .reduceLeft((q1, q2) => (q1._1.mergeWith(q2._1, q2._2, q2._3, astOther = flatMap), null, null))
+      ._1
       .appendProject(projectIR, astOther = flatMap)
 
   private def anyToExprConverter(v: Any): Expr[?, ?] =
@@ -221,13 +240,13 @@ object QueryIRTree:
         val (unevaluated, boundST) =
           partiallyGenerateFun(flatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
         val (fromNodes, projectIR) = collapseFlatMap(
-          Seq(actualParam),
+          Seq((actualParam, JoinType.InnerOrCrossImplicit, None)),
           boundST,
           unevaluated
         )
 
-        /** TODO this is where could create more complex join nodes, for now just r1.filter(f1).flatMap(a1 =>
-          * r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
+        /** for now r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE
+          * f1 AND f2
           */
         unnest(fromNodes, projectIR, flatMap)
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
@@ -237,13 +256,13 @@ object QueryIRTree:
         val (fromNodes, projectIR) = unevaluated match
           case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
             collapseFlatMap(
-              Seq(actualParam),
+              Seq((actualParam, JoinType.InnerOrCrossImplicit, None)),
               boundST,
               recur
             )
           case _ => // base case
             val innerBodyIR = finishGeneratingFun(unevaluated, boundST)
-            (Seq(actualParam), innerBodyIR)
+            (Seq((actualParam, JoinType.InnerOrCrossImplicit, None)), innerBodyIR)
         unnest(fromNodes, projectIR, aggFlatMap)
       case relOp: (Query.Union[?] | Query.UnionAll[?] | Query.Intersect[?] | Query.IntersectAll[?] | Query.Except[
             ?
@@ -305,7 +324,12 @@ object QueryIRTree:
         val finalQ = multiRecursive.$resultQuery match
           case ref: QueryRef[?, ?] =>
             val v = vars.find((id, _) => id == ref.stringRef()).get._2
-            SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery)
+            SelectAllQuery(
+              Seq((v, JoinType.InnerOrCrossImplicit, None)),
+              Seq(),
+              Some(v.alias),
+              multiRecursive.$resultQuery
+            )
           case q => ??? // generateQuery(q, allSymbols, multiRecursive.$resultQuery)
 
         MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive)
@@ -320,10 +344,10 @@ object QueryIRTree:
             if from.length != tags.length then throw new Exception("Unimplemented: groupBy on complex query")
             from
           case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _) =>
-            carriedSymbols.map(_._2)
+            carriedSymbols.map(_._2).map(v => (v, JoinType.InnerOrCrossImplicit, None))
           case _ => throw new Exception("Unimplemented: groupBy on complex query")
 
-        val newSymbols = symbols.bind(sourceRefs.zipWithIndex.map((r, i) => (r.stringRef(), sourceTables(i))))
+        val newSymbols = symbols.bind(sourceRefs.zipWithIndex.map((r, i) => (r.stringRef(), sourceTables(i)._1)))
         // Turn off the attribute names for the grouping clause since no aliases needed
         grouping.tag match
           case t: NamedTupleTag[?, ?] => t.names = List()
@@ -348,7 +372,13 @@ object QueryIRTree:
             MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, ast)
           case _ =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
-            SelectQuery(select, Seq(fromIR), Seq(), None, groupBy) // force subquery
+            SelectQuery(
+              select,
+              Seq((fromIR, JoinType.InnerOrCrossImplicit, None)),
+              Seq(),
+              None,
+              groupBy
+            ) // force subquery
 
         val source = getSource(fromIR)
 

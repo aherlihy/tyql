@@ -199,9 +199,17 @@ def driverMain(): Unit = {
   case class Flowers(name: Option[String], flowerSize: Int, cost: Double, likes: Int)
   val t = tyql.Table[Flowers]()
 
-  pprintln(db.run(
-    Values[(a: Int)](Tuple(1)).map(k =>
-      (a = lit(10) / lit(20), b = lit(10.2f) / lit(2), c = lit(120L) / lit(2), d = lit(0.2f) / lit(20.31))
-    )
-  ))
+  val q =
+    for
+      f1 <- t
+      f2 <- t.leftJoinOn(f3 => f3.name == f1.name)
+    yield (a = f1.name, b = f2.name, c = f1.cost + f2.cost)
+
+  val q2 = t.flatMap(f1 =>
+    t.leftJoinOn(u => u.name == f1.name)
+      .map(u => (sfdsf = u.cost, fskdfds = u.likes))
+  )
+
+  println(q.toQueryIR.toSQLString())
+  println(q2.toQueryIR.toSQLString())
 }

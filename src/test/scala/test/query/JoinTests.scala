@@ -80,24 +80,23 @@ FROM buyers as buyers$A, product as product$B
 WHERE (buyers$A.name = 'string constant' AND product$B.id = buyers$A.id)
       """
 }
-// TODO: Not implemented yet, Join flavors, cross/left/etc
-//
-//class JoinSimple5Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
-//  def testDescription = "Join: two-table simple join with &&"
-//  def query() =
-//    for
-//      b <- testDB.tables.buyers
-//      pr <- testDB.tables.products
-//      if b.name == pr.name && pr.id == b.id
-//    yield (buyerName = b.name, productName = pr.name, price = pr.price).toRow
-//
-//  def expectedQueryPattern: String = """
-//SELECT b.name AS buyerName, p.name AS productName, p.price
-//FROM buyers b
-//JOIN products p ON (b.name = p.name AND p.id = b.id)
-//      """
-//}
-//
+
+class JoinSimple5Test
+    extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
+  def testDescription = "Join: two-table simple join with &&"
+  def query() =
+    for
+      b <- testDB.tables.buyers
+      pr <- testDB.tables.products.joinOn(pr => b.name == pr.name && pr.id == b.id)
+    yield (buyerName = b.name, productName = pr.name, price = pr.price).toRow
+
+  def expectedQueryPattern: String = """
+SELECT buyers$A.name as buyerName, product$B.name as productName, product$B.price as price
+FROM buyers as buyers$A
+JOIN product as product$B ON buyers$A.name = product$B.name AND product$B.id = buyers$A.id
+     """
+}
+
 //class JoinSimple6Test extends SQLStringQueryTest[AllCommerceDBs, (buyerName: String, productName: String, price: Double)] {
 //  def testDescription = "Join: two-table simple join with && and string literal"
 //  def query() =

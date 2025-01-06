@@ -267,7 +267,11 @@ object TreePrettyPrinter {
         s"${indent(depth)}TableLeaf{${relationOp.alias}{${relationOp.flags.mkString(",")}}(${tableLeaf.tableName}$astPrint)"
       case selectQuery: SelectQuery =>
         val projectPrint = indentWithKey(depth + 1, "project", selectQuery.project.prettyPrintIR(depth + 1, printAST))
-        val fromPrint = indentListWithKey(depth + 1, "from", selectQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
+        val fromPrint = indentListWithKey(
+          depth + 1,
+          "from",
+          selectQuery.from.map(_._1.prettyPrintIR(depth + 2, printAST))
+        ) // TODO print join type
         val wherePrint =
           indentListWithKey(depth + 1, "where", selectQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
         val astPrint =
@@ -275,7 +279,11 @@ object TreePrettyPrinter {
         s"${indent(depth)}SelectQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$projectPrint,\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
       case selectAllQuery: SelectAllQuery =>
         val fromPrint =
-          indentListWithKey(depth + 1, "from", selectAllQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
+          indentListWithKey(
+            depth + 1,
+            "from",
+            selectAllQuery.from.map(_._1.prettyPrintIR(depth + 2, printAST))
+          ) // TODO print join type
         val wherePrint =
           indentListWithKey(depth + 1, "where", selectAllQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
         val astPrint =

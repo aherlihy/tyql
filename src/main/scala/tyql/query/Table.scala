@@ -38,6 +38,17 @@ case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query
     val ref = Expr.Ref[R, NonScalarExpr]()
     val valuesTuple = values(ref)
     Update(this, constValueTuple[N].toList.asInstanceOf[List[String]], ref, valuesTuple.toList, None, Seq(), None)
+
+  override def copyWith
+    (
+        requestedJoinType: Option[JoinType],
+        requestedJoinOn: Option[Expr.Fun[R, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+    )
+    : Query[R, BagResult] =
+    val ret = this.copy()
+    ret.requestedJoinOn = requestedJoinOn
+    ret.requestedJoinType = requestedJoinType
+    ret
 }
 
 object Table {
