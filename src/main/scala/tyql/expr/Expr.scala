@@ -306,17 +306,15 @@ object Expr:
     def length: Expr[Int, NonScalarExpr] = ListLength(x)
 
   // Aggregations
-  def sum(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
-  @targetName("doubleSum")
-  def sum(x: Expr[Double, ?]): AggregationExpr[Double] = AggregationExpr.Sum(x) // TODO: require summable type?
-  def avg[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
-  @targetName("doubleAvg")
-  def avg(x: Expr[Double, ?]): AggregationExpr[Double] = AggregationExpr.Avg(x)
-  def max[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
-  def min[T: ResultTag](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
-  def count(x: Expr[Int, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
-  @targetName("stringCnt")
-  def count(x: Expr[String, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
+  def sum[T: ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Sum(x)
+  def avg[T: ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
+  def max[T: ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
+  def min[T: ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
+  @targetName("maxAggForStrings")
+  def max(x: Expr[String, ?]): AggregationExpr[String] = AggregationExpr.Max(x)
+  @targetName("minAggForStrings")
+  def min(x: Expr[String, ?]): AggregationExpr[String] = AggregationExpr.Min(x)
+  def count[T: ResultTag](x: Expr[T, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
 
   // Window function expressions
   def rowNumber: ExprInWindowPosition[Int] = RowNumber()
