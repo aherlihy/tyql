@@ -212,4 +212,8 @@ def driverMain(): Unit = {
 
   println(q.toQueryIR.toSQLString())
   println(q2.toQueryIR.toSQLString())
+
+  val mq = t.map(u => (hello = u.name.map(a => a.length).map(a => a + 12)))
+
+  println(mq.toQueryIR.toSQLString())
 }

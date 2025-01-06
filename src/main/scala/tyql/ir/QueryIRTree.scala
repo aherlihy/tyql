@@ -527,6 +527,17 @@ object QueryIRTree:
           case Right(windowExpr) => generateExprInWindowPosition(windowExpr, symbols)
         val partitionBy = w.partitionBy.map(generateExpr(_, symbols))
         WindowFunctionOp(ae, partitionBy, Seq(), w)
+      case om: Expr.OptionMap[?, ?, ?] =>
+        val mapExpr = om.$f.asInstanceOf[Expr[?, NonScalarExpr] => Expr[?, NonScalarExpr]](om.$x.asInstanceOf[Expr[
+          ?,
+          NonScalarExpr
+        ]])
+        val wholeExpr = tyql.cases(
+          om.$x.isNull -> tyql.Null,
+          tyql.Else -> mapExpr.asInstanceOf[Expr[Null, NonScalarExpr]]
+        )
+        val compiledExpr = generateExpr(wholeExpr, symbols)
+        compiledExpr
       case g: Expr.Gt[?, ?, ?, ?] =>
         BinExprOp("", generateExpr(g.$x, symbols), " > ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
       case g: Expr.Lt[?, ?, ?, ?] =>

@@ -2,8 +2,7 @@ package test.integration.cases
 
 import munit.FunSuite
 import test.{withDB, checkExprDialect}
-import tyql.Expr.cases
-import tyql.{lit, True, False, Else}
+import tyql._
 import java.sql.ResultSet
 import tyql.NonScalarExpr
 

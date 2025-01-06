@@ -217,9 +217,17 @@ object Expr:
     def isDefined: Expr[Boolean, S1] = Not(Expr.IsNull(x))
     def get: Expr[T, S1] = x.asInstanceOf[Expr[T, S1]] // TODO should this error silently?
     def getOrElse(default: Expr[T, S1]): Expr[T, S1] = coalesce(x.asInstanceOf[Expr[T, S1]], default)
-    def map[U: ResultTag, S2 <: ExprShape](f: Ref[T, NonScalarExpr] => Expr[U, NonScalarExpr]): Expr[Option[U], S1] =
+    /* ABSTRACTION: To abstract over expressions (not relations) in the DSL, the DSL needs some kind of abstraction/application operation.
+      Option 1: (already supported) use host-level abstraction e.g. define a lambda.
+      Option 2: Use a macro to do substitution, but then lose the macro-free claim.
+      Option 3: You could define an expression-level substitution, but since the case classes in this file use type parameters
+                constrained by e.g. Numeric, it would be very annoying to write a type-safe substitution that replaces the expression reference
+                by another expression in some larger expression.
+      Because we do not want to use macros and the Option.map is expected to have little code, we pick the lambda.
+     */
+    def map[U](f: Expr[T, NonScalarExpr] => Expr[U, NonScalarExpr])(using ResultTag[U]): Expr[Option[U], S1] =
       OptionMap(x, f)
-    // TODO unclear how to implement flatMap
+
     // TODO somehow use options in aggregations
 
   extension [S1 <: ExprShape](x: Expr[Array[Byte], S1])
@@ -332,31 +340,6 @@ object Expr:
   def firstValue[R, S <: ExprShape](e: Expr[R, S])(using ResultTag[R]): ExprInWindowPosition[R] = FirstValue(e)
   def lastValue[R, S <: ExprShape](e: Expr[R, S])(using ResultTag[R]): ExprInWindowPosition[R] = LastValue(e)
   def nthValue[R, S <: ExprShape](e: Expr[R, S], n: Int)(using ResultTag[R]): ExprInWindowPosition[R] = NthValue(e, n)
-
-  // TODO aren't these types too restrictive?
-  def cases[T: ResultTag, SC <: ExprShape, SV <: ExprShape]
-    (
-        firstCase: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV]),
-        restOfCases: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV])*
-    )
-    : Expr[T, SV] =
-    var mainCases: collection.mutable.ArrayBuffer[(Expr[Boolean, SC], Expr[T, SV])] =
-      collection.mutable.ArrayBuffer.empty
-    var elseCase: Option[Expr[T, SV]] = None
-    val cases = Seq(firstCase) ++ restOfCases
-    for (((condition, value), index) <- cases.zipWithIndex) {
-      condition match
-        case _: ElseToken =>
-          assert(index == cases.size - 1, "The default condition must be last")
-          elseCase = Some(value)
-        case true =>
-          assert(index == cases.size - 1, "The default condition must be last")
-          elseCase = Some(value)
-        case false => assert(false, "what do you mean, false?")
-        case _: Expr[?, ?] =>
-          mainCases += ((condition.asInstanceOf[Expr[Boolean, SC]], value))
-    }
-    SearchedCase(mainCases.toList, elseCase)
 
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
@@ -551,7 +534,7 @@ object Expr:
     (using ResultTag[TE], ResultTag[TR]) extends Expr[TR, SR]
 
   case class OptionMap[A, B, S <: ExprShape]
-    ($x: Expr[Option[A], S], $f: Ref[A, NonScalarExpr] => Expr[B, NonScalarExpr])
+    ($x: Expr[Option[A], S], $f: Expr[A, NonScalarExpr] => Expr[B, NonScalarExpr])
     (using ResultTag[A], ResultTag[B]) extends Expr[Option[B], S]
 
   case class Cast[A, B, S <: ExprShape]($x: Expr[A, S], resultType: CastTarget)(using ResultTag[B]) extends Expr[B, S]
@@ -595,7 +578,6 @@ object Expr:
     (using r: DialectFeature.RandomIntegerInInclusiveRange)
     : Expr[Int, CalculatedShape[S1, S2]] =
     // TODO maybe add a check for (a <= b) if we know both components at generation time?
-    // TODO what about parentheses? Do we really not need them?
     RandomInt(a, b)
 
   /** Should be able to rely on the implicit conversions, but not always. One approach is to overload, another is to
@@ -607,22 +589,6 @@ object Expr:
 //    case t:String => StringLit(t)
 //    case t:Boolean => BooleanLit(t)
 
-  /* ABSTRACTION: if we want to abstract over expressions (not relations) in the DSL, to enable better composability,
-  then the DSL needs some kind of abstraction/application operation.
-  Option 1: (already supported) use host-level abstraction e.g. define a lambda.
-  Option 2: (below) define a substitution method, WIP.
-  Option 3: Use a macro to do substitution, but then lose the macro-free claim.
-   */
-  case class RefExpr[A: ResultTag, S <: ExprShape]() extends Expr[A, S]:
-    private val id = exprRefCount
-    exprRefCount += 1
-    def stringRef() = s"exprRef$id"
-    override def toString: String = s"ExprRef[${stringRef()}]"
-
-  case class AbstractedExpr[A, B, S <: ExprShape]($param: RefExpr[A, S], $body: Expr[B, S]):
-    def apply(exprArg: Expr[A, S]): Expr[B, S] =
-      substitute($body, $param, exprArg)
-    private def substitute[C](expr: Expr[B, S], formalP: RefExpr[A, S], actualP: Expr[A, S]): Expr[B, S] = ???
   type Pred[A, S <: ExprShape] = Fun[A, Expr[Boolean, S], S]
 
   type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, NonScalarExpr]
@@ -643,6 +609,31 @@ object Expr:
 //  given [A <: AnyNamedTuple : IsTupleOfExpr](using ResultTag[NamedTuple.Map[A, StripExpr]]): Conversion[A, Expr.Project[A]] = Expr.Project(_)
 
 end Expr
+
+// TODO aren't these types too restrictive?
+def cases[T: ResultTag, SC <: ExprShape, SV <: ExprShape]
+  (
+      firstCase: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV]),
+      restOfCases: (Expr[Boolean, SC] | true | ElseToken, Expr[T, SV])*
+  )
+  : Expr[T, SV] =
+  var mainCases: collection.mutable.ArrayBuffer[(Expr[Boolean, SC], Expr[T, SV])] =
+    collection.mutable.ArrayBuffer.empty
+  var elseCase: Option[Expr[T, SV]] = None
+  val cases = Seq(firstCase) ++ restOfCases
+  for (((condition, value), index) <- cases.zipWithIndex) {
+    condition match
+      case _: ElseToken =>
+        assert(index == cases.size - 1, "The default condition must be last")
+        elseCase = Some(value)
+      case true =>
+        assert(index == cases.size - 1, "The default condition must be last")
+        elseCase = Some(value)
+      case false => assert(false, "what do you mean, false?")
+      case _: Expr[?, ?] =>
+        mainCases += ((condition.asInstanceOf[Expr[Boolean, SC]], value))
+  }
+  Expr.SearchedCase(mainCases.toList, elseCase)
 
 inline def lit(x: () => java.io.InputStream): Expr[() => java.io.InputStream, NonScalarExpr] = Expr.ByteStreamLit(x)
 inline def lit(x: java.io.InputStream): Expr[() => java.io.InputStream, NonScalarExpr] = Expr.ByteStreamLit(() => x)
