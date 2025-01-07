@@ -212,7 +212,7 @@ object Expr:
     def unary_! = Not(x)
     def ^(y: Expr[Boolean, S1]): Expr[Boolean, S1] = Xor(x, y)
 
-  extension [S1 <: ExprShape, T](x: Expr[Option[T], S1])(using ResultTag[T])
+  extension [S1 <: ExprShape, T](x: Expr[Option[T], S1])(using ResultTag[T], SimpleTypeResultTag[T])
     def isEmpty: Expr[Boolean, S1] = Expr.IsNull(x)
     def isDefined: Expr[Boolean, S1] = Not(Expr.IsNull(x))
     def get: Expr[T, S1] = x.asInstanceOf[Expr[T, S1]] // TODO should this error silently?
