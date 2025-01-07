@@ -10,7 +10,7 @@ import tyql.RestrictedQuery.ToRestrictedQueryRef
 import scala.deriving.Mirror
 import scala.compiletime.constValueTuple
 
-trait ResultCategory
+sealed trait ResultCategory
 class SetResult extends ResultCategory
 class BagResult extends ResultCategory
 

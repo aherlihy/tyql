@@ -241,6 +241,14 @@ object Expr:
 
   extension [S1 <: ExprShape](x: Expr[String, S1])
     def toLowerCase: Expr[String, S1] = Expr.Lower(x)
+    /**
+      * Convert the string to upper case via the UPPER SQL function, which will depend on
+      * - the collation of the input string,
+      * - the backend database,
+      * - and the database-specific collation settings.
+      *
+      * @return Expr[String, S] where S is the same ExprShape as the input.
+      */
     def toUpperCase: Expr[String, S1] = Expr.Upper(x)
     def charLength: Expr[Int, S1] = Expr.StringCharLength(x)
     def length: Expr[Int, S1] = charLength
