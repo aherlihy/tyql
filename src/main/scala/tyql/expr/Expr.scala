@@ -458,8 +458,8 @@ object Expr:
   case class Acos[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
   case class Atan[S1 <: ExprShape, T: Numeric]($x: Expr[T, S1])(using ResultTag[T]) extends Expr[Double, S1]
 
-  case class RandomUUID() extends Expr[String, NonScalarExpr] // XXX NonScalarExpr?
-  case class RandomFloat() extends Expr[Double, NonScalarExpr] // XXX NonScalarExpr?
+  case class RandomUUID() extends Expr[String, NonScalarExpr]
+  case class RandomFloat() extends Expr[Double, NonScalarExpr]
   case class RandomInt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2])
       extends Expr[Int, CalculatedShape[S1, S2]]
 

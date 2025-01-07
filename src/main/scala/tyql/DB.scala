@@ -225,8 +225,8 @@ def driverMain(): Unit = {
 
 
 
-  val q = Table[Flowers]().map(
-    f => (upperName = f.name.map(name => name.toUpperCase))
+  val q = Table[Flowers]().filter(
+    f => f.cost > 10.0 + 12.03
   )
   println("SQL: " + q.toQueryIR.toSQLString())
 
