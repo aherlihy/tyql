@@ -15,7 +15,7 @@ import Helpers.*
 class TyQLBenchmarkX {
   var duckDB = DuckDBBackend()
   val benchmarks = Map(
-    "tc" -> TCQuery(),
+    // "tc" -> TCQuery(),
     "sssp" -> SSSPQuery(),
     "ancestry" -> AncestryQuery(),
     "andersens" -> AndersensQuery(),

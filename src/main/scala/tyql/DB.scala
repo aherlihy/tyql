@@ -25,10 +25,10 @@ class DB(conn: Connection) {
 
   def run(dbast: UpdateToTheDB)(using dialect: tyql.Dialect, config: tyql.Config): Unit =
     val (sqlString, parameters) = dbast.toQueryIR.toSQLQuery()
-    println("SQL << " + sqlString + " >>")
-    for (p <- parameters) {
-      println("Param << " + p + " >>")
-    }
+    // println("SQL << " + sqlString + " >>")
+    // for (p <- parameters) {
+      // println("Param << " + p + " >>")
+    // }
     val stmt = conn.createStatement()
     var returnedInt = 0
     config.parameterStyle match
@@ -50,7 +50,7 @@ class DB(conn: Connection) {
         returnedInt = ps.executeUpdate()
       case tyql.ParameterStyle.EscapedInline =>
         returnedInt = stmt.executeUpdate(sqlString)
-    println("returned " + returnedInt)
+    // println("returned " + returnedInt)
     stmt.close()
 
   def run[T]
@@ -58,10 +58,10 @@ class DB(conn: Connection) {
     (using resultTag: ResultTag[T], dialect: tyql.Dialect, config: tyql.Config)
     : List[T] = {
     val (sqlString, parameters) = dbast.toQueryIR.toSQLQuery()
-    println("SQL << " + sqlString + " >>")
-    for (p <- parameters) {
-      println("Param << " + p + " >>")
-    }
+    // println("SQL << " + sqlString + " >>")
+    // for (p <- parameters) {
+    //   println("Param << " + p + " >>")
+    // }
     val stmt = conn.createStatement()
     var rs: java.sql.ResultSet = null
     config.parameterStyle match
@@ -131,21 +131,35 @@ class DB(conn: Connection) {
                 val rememberedStream = rs.getBinaryStream(col)
                 () => rememberedStream
               case ResultTag.OptionalTag(e) => {
-                val got = rs.getObject(col)
-                if got == null then None
-                else
-                  e match
-                    case ResultTag.IntTag       => Some(got.asInstanceOf[Int])
-                    case ResultTag.LongTag      => Some(got.asInstanceOf[Long])
-                    case ResultTag.DoubleTag    => Some(got.asInstanceOf[Double])
-                    case ResultTag.FloatTag     => Some(got.asInstanceOf[Float])
-                    case ResultTag.StringTag    => Some(got.asInstanceOf[String])
-                    case ResultTag.BoolTag      => Some(got.asInstanceOf[Boolean])
-                    case ResultTag.ByteArrayTag => Some(got.asInstanceOf[Array[Byte]])
-                    case ResultTag.ByteStreamTag =>
+                e match
+                  case ResultTag.IntTag       =>
+                    val got = rs.getInt(col)
+                    if rs.wasNull() then None else Some(got)
+                  case ResultTag.LongTag      =>
+                    val got = rs.getLong(col)
+                    if rs.wasNull() then None else Some(got)
+                  case ResultTag.DoubleTag    =>
+                    val got = rs.getDouble(col)
+                    if rs.wasNull() then None else Some(got)
+                  case ResultTag.FloatTag     =>
+                    val got = rs.getFloat(col)
+                    if rs.wasNull() then None else Some(got)
+                  case ResultTag.StringTag    =>
+                    val got = rs.getString(col)
+                    if rs.wasNull() then None else Some(got.asInstanceOf[String])
+                  case ResultTag.BoolTag      =>
+                    val got = rs.getBoolean(col)
+                    if rs.wasNull() then None else Some(got)
+                  case ResultTag.ByteArrayTag =>
+                    val got = rs.getObject(col)
+                    if rs.wasNull() then None else Some(got.asInstanceOf[Array[Byte]])
+                  case ResultTag.ByteStreamTag =>
+                    val got = rs.getObject(col)
+                    if rs.wasNull() then None
+                    else
                       val rememberedStream = got.asInstanceOf[java.io.InputStream]
                       Some(() => rememberedStream)
-                    case _ => assert(false, "Unsupported type")
+                  case _ => assert(false, "Unsupported type")
               }
               case _ => assert(false, "Unsupported type")
           }
@@ -192,42 +206,26 @@ class DB(conn: Connection) {
 
 def driverMain(): Unit = {
   import scala.language.implicitConversions
-  val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
+  val conn = java.sql.DriverManager.getConnection("jdbc:mysql://localhost:3307/testdb", "testuser", "testpass")
+  // val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
   val db = DB(conn)
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.EscapedInline) {}
   import tyql.Dialect.mariadb.given
-  case class Flowers(name: Option[String], flowerSize: Int, cost: Double, likes: Int)
-  val t = tyql.Table[Flowers]()
-
-  // val q =
-  //   for
-  //     f1 <- t
-  //     f2 <- t.leftJoinOn(f3 => f3.name == f1.name)
-  //   yield (a = f1.name, b = f2.name, c = f1.cost + f2.cost)
 
 
+  final case class Person(pid: Long, name: String, age: Int)
+  final case class Orders(oid: Long, personId: Long, orderDate: String)
 
+  final case class Data(a: Option[Long], b: Option[Long], c: Option[Double], d: Option[Double], e: Option[String], f: Option[String])
 
-  // val q = Table[Flowers]().map(
-  //   f1 => (increasedCost = f1.cost + 10.2, size = f1.flowerSize)
-  // ).map(f2 =>
-  //   (finalCost = f2.increasedCost)
-  // )
+  // println("!!!!")
+  // println(Table[Data]().limit(10).toQueryIR.toSQLString())
 
-
-
-
-
-
-
-
-
-
-
-
-  val q = Table[Flowers]().filter(
-    f => f.cost > 10.0 + 12.03
+  println("START")
+  val got = (
+    db.run(
+    Table[Data]()
   )
-  println("SQL: " + q.toQueryIR.toSQLString())
-
+  )
+  println("END")
 }

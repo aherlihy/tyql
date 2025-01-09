@@ -15,7 +15,7 @@ import Helpers.*
 class CollectionsBenchmarkX {
   def run(bm: String) = benchmarks(bm).executeCollections()
   val benchmarks = Map(
-    "tc" -> TCQuery(),
+    // "tc" -> TCQuery(),
     "sssp" -> SSSPQuery(),
     "ancestry" -> AncestryQuery(),
     "andersens" -> AndersensQuery(),

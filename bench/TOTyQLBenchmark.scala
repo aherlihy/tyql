@@ -38,7 +38,7 @@ class TOTyQLBenchmark {
   var duckDB = DuckDBBackend(timeout = timeoutMins)
 
   val benchmarks = Map(
-    "tc" -> TOTCQuery(),
+    // "tc" -> TOTCQuery(),
     "sssp" -> TOSSSPQuery(),
     "ancestry" -> TOAncestryQuery(),
     "andersens" -> TOAndersensQuery(),

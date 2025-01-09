@@ -25,6 +25,9 @@ object TypeOperations:
   @implicitNotFound("${X} contains types not in ${Y}")
   type IsSubset[X <: Tuple, Y <: Tuple] = Subset[X, Y] =:= true
 
+  @implicitNotFound("${Y} cannot be found inside ${X}")
+  type DoesContain[X <: Tuple, Y] = Kontains[X, Y] =:= true
+
   extension [T <: Tuple](t: T)
     def fitsOver[S <: Tuple](s: S)(using IsSubset[S, T]) = {}
 

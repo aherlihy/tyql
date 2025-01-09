@@ -135,8 +135,8 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
       Fun(ref, row.asInstanceOf[Expr[NamedTuple.Map[B, Expr.StripExpr], ScalarExpr]])
     )
 
-//  inline def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Query[B]): Nothing =
-//    error("No aggregation function found in f. Did you mean to use flatMap?")
+  // inline def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Query[B]): Nothing =
+    // error("No aggregation function found in f. Did you mean to use flatMap?")
 
 // TODO Restrictions for groupBy: all columns in the selectFn must either be in the groupingFn or in an aggregate.
 //      This construction leads to "can't prove" from the compiler.
