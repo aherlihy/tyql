@@ -23,7 +23,7 @@ class DB(conn: Connection) {
     statement.close()
   }
 
-  def run(dbast: UpdateToTheDB)(using dialect: tyql.Dialect, config: tyql.Config): Unit =
+  def runUpdate(dbast: UpdateToTheDB)(using dialect: tyql.Dialect, config: tyql.Config): Unit =
     val (sqlString, parameters) = dbast.toQueryIR.toSQLQuery()
     // println("SQL << " + sqlString + " >>")
     // for (p <- parameters) {
@@ -52,6 +52,9 @@ class DB(conn: Connection) {
         returnedInt = stmt.executeUpdate(sqlString)
     // println("returned " + returnedInt)
     stmt.close()
+
+  inline def run(dbast: UpdateToTheDB)(using dialect: tyql.Dialect, config: tyql.Config): Nothing =
+    scala.compiletime.error("Update queries do not return results")
 
   def run[T]
     (dbast: DatabaseAST[T])
@@ -228,4 +231,10 @@ def driverMain(): Unit = {
   )
   )
   println("END")
+
+  val u = Table[Data]().partial[("a", "b")].insert((a = 1L, b = 2L))
+
+
+  // db.run()
+
 }
