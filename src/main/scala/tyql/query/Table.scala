@@ -3,6 +3,7 @@ package tyql
 import scala.deriving.Mirror
 import scala.compiletime.constValueTuple
 import scala.collection.immutable.LazyList.cons
+import scala.annotation.implicitNotFound
 
 /** The type of query references to database tables */
 case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query[R, BagResult]
@@ -13,18 +14,10 @@ case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query
 
   def partial[Names <: Tuple]
     (using
-    ev: TypeOperations.IsSubset[Names, NamedTuple.Names[NamedTuple.From[R]]],
-           )
+      ev: TypeOperations.IsSubset[Names, NamedTuple.Names[NamedTuple.From[R]]],
+    )
     : PartialTable[R, Names] =
     new PartialTable[R, Names](this)
-
-  def partial2[Name <: String]
-    (using
-    ev: TypeOperations.DoesContain[NamedTuple.Names[NamedTuple.From[R]], Name],
-           )
-    : PartialTable[R, (Name *: EmptyTuple)] =
-    new PartialTable[R, (Name *: EmptyTuple)](this)
-
 
   def delete(p: Expr.Ref[R, NonScalarExpr] => Expr[Boolean, NonScalarExpr]): Delete[R] =
     val ref = Expr.Ref[R, NonScalarExpr]()

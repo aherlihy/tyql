@@ -15,6 +15,7 @@ inThisBuild(Seq(
     "com.h2database" % "h2" % "2.3.232",
     "com.lihaoyi" %% "scalasql" % "0.1.11",
     "io.getquill" %% "quill-jdbc-zio" % "4.8.4",
+    "tools.profiler" % "async-profiler" % "2.9",
   )
 ))
 

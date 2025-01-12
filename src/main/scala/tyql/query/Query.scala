@@ -387,8 +387,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     (using
         ev0: TypeOperations.IsSubset[PartialNames, NamedTuple.Names[NamedTuple.From[A]]],
         ev1: TypeOperations.IsSubset[NamedTuple.Names[NamedTuple.From[A]], PartialNames],
-        ev2: TypeOperations.IsAcceptableInsertion[
-          Tuple.Map[
+        ev2: TypeOperations.IsAcceptableInsertion[Tuple.Map[
             TypeOperations.SelectByNames[
               PartialNames,
               NamedTuple.DropNames[NamedTuple.From[A]],
@@ -400,8 +399,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
             PartialNames,
             NamedTuple.DropNames[NamedTuple.From[A]],
             NamedTuple.Names[NamedTuple.From[A]]
-          ]
-        ]
+          ]] =:= true
     )
     : InsertFromSelect[R, A] = InsertFromSelect(
     table.underlyingTable,
@@ -430,7 +428,7 @@ private inline def ValuesInner[N <: Tuple, T <: Tuple]
   (v: Seq[NamedTuple[N, T]])
   (using ResultTag[NamedTuple[N, T]])
   : Query[NamedTuple[N, T], BagResult] =
-  Query.Values(v.map(z => z.asInstanceOf[Tuple]), constValueTuple[N].toList.asInstanceOf[List[String]])
+  Query.ValuesQuery(v.map(z => z.asInstanceOf[Tuple]), constValueTuple[N].toList.asInstanceOf[List[String]])
 
 object Query:
   import Expr.{Pred, Fun, Ref}
@@ -774,7 +772,7 @@ object Query:
       ret
   }
 
-  case class Values[A]($values: Seq[Tuple], $names: Seq[String])(using ResultTag[A]) extends Query[A, BagResult] {
+  case class ValuesQuery[A]($values: Seq[Tuple], $names: Seq[String])(using ResultTag[A]) extends Query[A, BagResult] {
     override def copyWith
       (
           requestedJoinType: Option[JoinType],

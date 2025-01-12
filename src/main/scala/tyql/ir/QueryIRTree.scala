@@ -194,14 +194,9 @@ object QueryIRTree:
     */
   private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     ast match
-      case values: Query.Values[?] =>
-        val listOfTuples: List[Tuple] = values.$values.toList.asInstanceOf[List[Tuple]]
-        val nodes = (0 until listOfTuples.length).map(i => // XXX the usual map here crashes the compiler
-          val firstTuple = listOfTuples(i)
-          val firstList: List[Any] = firstTuple.toList
-          val firstListOfExpr: List[Expr[?, ?]] = firstList.map(anyToExprConverter)
-          val firstListOfNodes = firstListOfExpr.map(v => generateExpr(v, symbols))
-          firstListOfNodes
+      case values: Query.ValuesQuery[?] =>
+        val nodes = values.$values.toList.asInstanceOf[List[Tuple]].map(firstTuple =>
+          firstTuple.toList.map(anyToExprConverter).map(v => generateExpr(v, symbols))
         )
         ValuesLeaf(nodes, values.$names, values)
       case table: Table[?] =>

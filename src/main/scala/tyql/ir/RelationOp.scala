@@ -86,7 +86,7 @@ trait RelationOp extends QueryIRNode:
 
 /** VALUES (1, 2), (3, 4) clause
   */
-case class ValuesLeaf(values: Seq[Seq[QueryIRNode]], names: Seq[String], ast: Query.Values[?]) extends RelationOp
+case class ValuesLeaf(values: Seq[Seq[QueryIRNode]], names: Seq[String], ast: Query.ValuesQuery[?]) extends RelationOp
     with QueryIRLeaf:
   val name = s"values${QueryIRTree.idCount}"
   QueryIRTree.idCount += 1

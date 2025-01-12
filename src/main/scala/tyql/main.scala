@@ -6,6 +6,5 @@ import NamedTuple.{AnyNamedTuple, NamedTuple}
 import tyql.*
 import scala.annotation.implicitNotFound
 
-
 @main def main(): Unit =
   driverMain()

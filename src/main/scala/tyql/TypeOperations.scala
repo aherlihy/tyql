@@ -3,16 +3,8 @@ package tyql
 import scala.Tuple.*
 import scala.annotation.implicitNotFound
 import scala.quoted.Type
-import org.h2.command.query.Select
 
 object TypeOperations:
-  /** NOTE: not currently used Check if all the element types of X are also element types of Y /!\ Compile-time will be
-    * proportial to Length[X] * Length[Y].
-    *
-    * This is useful if we want to specify sort orders (or other query metadata) via a tuple of (key: property) but want
-    * to make sure that the keys are present in the provided tuple. Example: table.sort((key1: ASC, key2: DESC, ...))
-    * instead of requiring 2 calls: table.sort(_.key1, ASC).sort(_.key2, DESC)
-    */
   type Kontains[X <: Tuple, Y] <: Boolean = X match
     case Y *: _     => true
     case _ *: xs    => Kontains[xs, Y]
@@ -27,9 +19,6 @@ object TypeOperations:
 
   @implicitNotFound("${Y} cannot be found inside ${X}")
   type DoesContain[X <: Tuple, Y] = Kontains[X, Y] =:= true
-
-  extension [T <: Tuple](t: T)
-    def fitsOver[S <: Tuple](s: S)(using IsSubset[S, T]) = {}
 
   type SelectTypeWithName[needle, Names, Types] = Names match
     case name *: _ => name match
@@ -75,36 +64,3 @@ object TypeOperations:
     case _                                            => false
 
   type IsAcceptableInsertion[TypesA <: Tuple, TypesB <: Tuple] = AcceptableInsertions[TypesA, TypesB] =:= true
-
-  // ---------------------------------
-
-  val a: (Int, String, Double) = (1, "", 1.0)
-  val b: (Double, String) = (2.0, " ")
-  val b2: (Double, Double) = (2.0, 3.0)
-  val b3: (Double, String, String) = (2.0, " ", " ")
-  val startsWithFloat: (Float, String) = (2.0f, " ")
-
-  val justOneString: Tuple1[String] = Tuple(" ")
-  val twoStrings: (String, String) = (" ", " ")
-
-  a.fitsOver(b) // ok
-
-  a.fitsOver(b2) // also ok
-
-  twoStrings.fitsOver(justOneString)
-
-  justOneString.fitsOver(twoStrings) // error: Tuple1[String] contains types not in (String, String)
-
-  type names112 = ("a", "b", "c")
-  type needle112 = "c"
-  type types112 = (Int, String, Double)
-  type selectedType = SelectTypeWithName[needle112, names112, types112]
-  val diditwork112: selectedType = 1.0
-
-  type inNames8 = ("FIRST", "SECOND", "THIRD")
-  type overNames8 = ("SECOND", "d", "THIRD", "a", "FIRST")
-  type inTypes8 = (String, Double, Float)
-  type overTypes8 = (Double, Int, /*3*/ Float, Int, /*1*/ String)
-  type canBeAssigned8 = CanBeAssigned[inNames8, overNames8, inTypes8, overTypes8]
-
-  // a.foo(b3) // error: (Double, Float) contains types not in (Int, String, Double)

@@ -215,26 +215,6 @@ def driverMain(): Unit = {
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.EscapedInline) {}
   import tyql.Dialect.mariadb.given
 
-
   final case class Person(pid: Long, name: String, age: Int)
   final case class Orders(oid: Long, personId: Long, orderDate: String)
-
-  final case class Data(a: Option[Long], b: Option[Long], c: Option[Double], d: Option[Double], e: Option[String], f: Option[String])
-
-  // println("!!!!")
-  // println(Table[Data]().limit(10).toQueryIR.toSQLString())
-
-  println("START")
-  val got = (
-    db.run(
-    Table[Data]()
-  )
-  )
-  println("END")
-
-  val u = Table[Data]().partial[("a", "b")].insert((a = 1L, b = 2L))
-
-
-  // db.run()
-
 }
