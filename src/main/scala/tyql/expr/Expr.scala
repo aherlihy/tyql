@@ -7,6 +7,7 @@ import scala.deriving.*
 import scala.compiletime.{erasedValue, summonInline}
 import tyql.DialectFeature
 import scala.util.NotGiven
+import scala.annotation.implicitNotFound
 
 sealed trait ExprShape
 class ScalarExpr extends ExprShape
@@ -21,6 +22,9 @@ type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape =
     case (NonScalarExpr, ScalarExpr)    => ScalarExpr
     case (NonScalarExpr, NonScalarExpr) => NonScalarExpr
 
+@implicitNotFound(
+  "Equality semenaitcs differs between dialects. E.g. in Postgres you can only compare similar types. To express equality or inequality, please import a dialect like this: `import tyql.Dialect.mysql.given`. If you have imported a dialect, then the selected dialect does not support equalit between ${T1} and ${T2}."
+)
 trait CanBeEqualed[T1, T2]
 
 private[tyql] enum CastTarget:
@@ -212,7 +216,14 @@ object Expr:
     def unary_! = Not(x)
     def ^(y: Expr[Boolean, S1]): Expr[Boolean, S1] = Xor(x, y)
 
-  extension [S1 <: ExprShape, T](x: Expr[Option[T], S1])(using ResultTag[T], SimpleTypeResultTag[T])
+  extension [S1 <: ExprShape, T]
+    (x: Expr[Option[T], S1])
+    (using
+        ev0: ResultTag[T],
+        @implicitNotFound(
+          "Only simple types like Double can be used inside Option. This is not a simpel type: ${T}"
+        ) ev1: SimpleTypeResultTag[T]
+    )
     def isEmpty: Expr[Boolean, S1] = Expr.IsNull(x)
     def isDefined: Expr[Boolean, S1] = Not(Expr.IsNull(x))
     def get: Expr[T, S1] = x.asInstanceOf[Expr[T, S1]] // TODO should this error silently?
@@ -691,7 +702,6 @@ inline def lit(x: java.time.LocalDateTime): Expr[java.time.LocalDateTime, NonSca
 inline def True = Expr.BooleanLit(true)
 inline def False = Expr.BooleanLit(false)
 inline def Null = Expr.NullLit[scala.Null]()
-// TODO a good place for implicitNotFound
 def Null[T](using ResultTag[T]) = Expr.NullLit[T]()
 private case class ElseToken()
 val Else = new ElseToken()

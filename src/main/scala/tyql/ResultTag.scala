@@ -8,6 +8,7 @@ import scala.deriving.Mirror
 // XXX Do not remove simple types form ResultTag, that would make the driver more annoying.
 // XXX This slight code duplication is OK since there are so few simple types.
 
+@annotation.implicitNotFound("Tyql only supports certain types of results. This type is unsupported: ${T}")
 enum ResultTag[T]:
   case NullTag extends ResultTag[scala.Null]
   case ByteArrayTag extends ResultTag[Array[Byte]]
@@ -55,11 +56,6 @@ object ResultTag:
 
   inline given [T](using elementType: ResultTag[T]): ResultTag[List[T]] = ResultTag.ListTag(elementType)
 
-// XXX Due to bugs in Scala compiler, you cannot use `using ev: SimpleTypeResultTag[T]` but must use it via ` : SimpleTypeResultTag[T]`.
-// XXX the @implicitNotFound therefore cannot be used on the use-site, but must be placed on this trait.
-@scala.annotation.implicitNotFound(
-  "You can only call contains on queries that return a simple list of values, like Double. You might want to map your result like this: q.map(row => row.price)"
-)
 trait SimpleTypeResultTag[T] {}
 object SimpleTypeResultTag:
   given SimpleTypeResultTag[scala.Null] = new SimpleTypeResultTag {}

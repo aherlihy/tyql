@@ -385,8 +385,17 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
   inline def insertInto[R, PartialNames <: Tuple]
     (table: InsertableTable[R, PartialNames])
     (using
+        @implicitNotFound(
+          "The column names you insert must be the same you insert into. If needed, use table.partial to select the names you insert into. You are selecting into ${PartialNames}."
+        )
         ev0: TypeOperations.IsSubset[PartialNames, NamedTuple.Names[NamedTuple.From[A]]],
+        @implicitNotFound(
+          "The column names you insert must be the same you insert into. If needed, use table.partial to select the names you insert into. You are selecting into ${PartialNames}."
+        )
         ev1: TypeOperations.IsSubset[NamedTuple.Names[NamedTuple.From[A]], PartialNames],
+        @implicitNotFound(
+          "The types you insert into must be acceptable for their target types. E.g. you can insert Int into a Long or Option[Int] or Int."
+        )
         ev2: TypeOperations.IsAcceptableInsertion[
           Tuple.Map[
             TypeOperations.SelectByNames[
@@ -416,7 +425,13 @@ extension [A: ResultTag, Category <: ResultCategory](using DialectFeature.INCanH
   def containsRow(expr: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] =
     Expr.Contains(q, expr)
 
-extension [A : SimpleTypeResultTag : ResultTag, Category <: ResultCategory](q: Query[A, Category])
+extension [A: ResultTag, Category <: ResultCategory]
+  (q: Query[A, Category])
+  (using
+      @implicitNotFound(
+        "You can only call contains on queries that return a simple list of values, like Double. You might want to map your result like this: q.map(row => row.price)"
+      ) ev: SimpleTypeResultTag[A]
+  )
   def contains(expr: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] =
     Expr.Contains(q, expr)
 
