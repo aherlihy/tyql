@@ -14,7 +14,7 @@ case class Table[R] private ($name: String)(using r: ResultTag[R]) extends Query
 
   def partial[Names <: Tuple]
     (using
-      ev: TypeOperations.IsSubset[Names, NamedTuple.Names[NamedTuple.From[R]]],
+        ev: TypeOperations.IsSubset[Names, NamedTuple.Names[NamedTuple.From[R]]],
     )
     : PartialTable[R, Names] =
     new PartialTable[R, Names](this)

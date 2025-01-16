@@ -144,8 +144,10 @@ object QueryIRTree:
     v match
       case _ if v.isInstanceOf[Some[?]]    => anyToExprConverter(v.asInstanceOf[Some[?]].get)
       case _ if v.isInstanceOf[Int]        => lit(v.asInstanceOf[Int])
+      case _ if v.isInstanceOf[Long]       => lit(v.asInstanceOf[Long])
       case _ if v.isInstanceOf[String]     => lit(v.asInstanceOf[String])
       case _ if v.isInstanceOf[Double]     => lit(v.asInstanceOf[Double])
+      case _ if v.isInstanceOf[Float]      => lit(v.asInstanceOf[Float])
       case _ if v.isInstanceOf[Boolean]    => lit(v.asInstanceOf[Boolean])
       case _ if v.isInstanceOf[Expr[?, ?]] => v.asInstanceOf[Expr[?, ?]]
       case _ =>
@@ -199,6 +201,9 @@ object QueryIRTree:
           firstTuple.toList.map(anyToExprConverter).map(v => generateExpr(v, symbols))
         )
         ValuesLeaf(nodes, values.$names, values)
+      case exprs: Query.ExprsQuery[?] =>
+        val nodes = exprs.$values.toList.map(anyToExprConverter).map(v => generateExpr(v, symbols))
+        SelectExprsLeaf(nodes, exprs.$names, exprs)
       case table: Table[?] =>
         TableLeaf(table.$name, table)
       case map: Query.Map[?, ?] =>

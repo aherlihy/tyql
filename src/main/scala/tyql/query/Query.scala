@@ -136,7 +136,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     )
 
   // inline def aggregate[B: ResultTag](f: Ref[A, ScalarExpr] => Query[B]): Nothing =
-    // error("No aggregation function found in f. Did you mean to use flatMap?")
+  // error("No aggregation function found in f. Did you mean to use flatMap?")
 
 // TODO Restrictions for groupBy: all columns in the selectFn must either be in the groupingFn or in an aggregate.
 //      This construction leads to "can't prove" from the compiler.
@@ -387,7 +387,8 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     (using
         ev0: TypeOperations.IsSubset[PartialNames, NamedTuple.Names[NamedTuple.From[A]]],
         ev1: TypeOperations.IsSubset[NamedTuple.Names[NamedTuple.From[A]], PartialNames],
-        ev2: TypeOperations.IsAcceptableInsertion[Tuple.Map[
+        ev2: TypeOperations.IsAcceptableInsertion[
+          Tuple.Map[
             TypeOperations.SelectByNames[
               PartialNames,
               NamedTuple.DropNames[NamedTuple.From[A]],
@@ -399,7 +400,8 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
             PartialNames,
             NamedTuple.DropNames[NamedTuple.From[A]],
             NamedTuple.Names[NamedTuple.From[A]]
-          ]] =:= true
+          ]
+        ] =:= true
     )
     : InsertFromSelect[R, A] = InsertFromSelect(
     table.underlyingTable,
@@ -429,6 +431,19 @@ private inline def ValuesInner[N <: Tuple, T <: Tuple]
   (using ResultTag[NamedTuple[N, T]])
   : Query[NamedTuple[N, T], BagResult] =
   Query.ValuesQuery(v.map(z => z.asInstanceOf[Tuple]), constValueTuple[N].toList.asInstanceOf[List[String]])
+
+type ListOfExprsOrRaws[T <: Tuple] = T match
+  case EmptyTuple => EmptyTuple
+  case t *: ts    => (Expr[t, NonScalarExpr] | t) *: ListOfExprsOrRaws[ts]
+
+inline def Exprs[A <: AnyNamedTuple]
+  (v: ListOfExprsOrRaws[NamedTuple.DropNames[A]])
+  (using ResultTag[A])
+  : Query[A, BagResult] =
+  Query.ExprsQuery[A](
+    v.asInstanceOf[Tuple].toList,
+    constValueTuple[NamedTuple.Names[A]].toList.asInstanceOf[List[String]]
+  )
 
 object Query:
   import Expr.{Pred, Fun, Ref}
@@ -760,6 +775,20 @@ object Query:
       ret
   }
   case class ExceptAll[A: ResultTag]($this: Query[A, ?], $other: Query[A, ?]) extends Query[A, BagResult] {
+    override def copyWith
+      (
+          requestedJoinType: Option[JoinType],
+          requestedJoinOn: Option[Fun[A, Expr[Boolean, NonScalarExpr], NonScalarExpr]]
+      )
+      : Query[A, BagResult] =
+      val ret = this.copy()
+      ret.requestedJoinOn = requestedJoinOn
+      ret.requestedJoinType = requestedJoinType
+      ret
+  }
+
+  // XXX could be either bag or set result, let's leave bag for now
+  case class ExprsQuery[A]($values: List[?], $names: List[String])(using ResultTag[A]) extends Query[A, BagResult] {
     override def copyWith
       (
           requestedJoinType: Option[JoinType],

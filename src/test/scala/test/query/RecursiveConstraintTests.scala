@@ -364,9 +364,10 @@ class RecursiveConstraintLinearFailInline0Test extends munit.FunSuite {
 class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 2 usages of path, inline fix"
 
-  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
+  def expectedError: String =
+    "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
   // def expectedError: String =
-    // "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.SetResult, ((0 : Int), (0 : Int))]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  // "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.SetResult, ((0 : Int), (0 : Int))]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
   test(testDescription) {
     val error: String =
       compileErrors(

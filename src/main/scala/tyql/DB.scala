@@ -27,7 +27,7 @@ class DB(conn: Connection) {
     val (sqlString, parameters) = dbast.toQueryIR.toSQLQuery()
     // println("SQL << " + sqlString + " >>")
     // for (p <- parameters) {
-      // println("Param << " + p + " >>")
+    // println("Param << " + p + " >>")
     // }
     val stmt = conn.createStatement()
     var returnedInt = 0
@@ -135,22 +135,22 @@ class DB(conn: Connection) {
                 () => rememberedStream
               case ResultTag.OptionalTag(e) => {
                 e match
-                  case ResultTag.IntTag       =>
+                  case ResultTag.IntTag =>
                     val got = rs.getInt(col)
                     if rs.wasNull() then None else Some(got)
-                  case ResultTag.LongTag      =>
+                  case ResultTag.LongTag =>
                     val got = rs.getLong(col)
                     if rs.wasNull() then None else Some(got)
-                  case ResultTag.DoubleTag    =>
+                  case ResultTag.DoubleTag =>
                     val got = rs.getDouble(col)
                     if rs.wasNull() then None else Some(got)
-                  case ResultTag.FloatTag     =>
+                  case ResultTag.FloatTag =>
                     val got = rs.getFloat(col)
                     if rs.wasNull() then None else Some(got)
-                  case ResultTag.StringTag    =>
+                  case ResultTag.StringTag =>
                     val got = rs.getString(col)
                     if rs.wasNull() then None else Some(got.asInstanceOf[String])
-                  case ResultTag.BoolTag      =>
+                  case ResultTag.BoolTag =>
                     val got = rs.getBoolean(col)
                     if rs.wasNull() then None else Some(got)
                   case ResultTag.ByteArrayTag =>
@@ -217,4 +217,12 @@ def driverMain(): Unit = {
 
   final case class Person(pid: Long, name: String, age: Int)
   final case class Orders(oid: Long, personId: Long, orderDate: String)
+
+  val q = Exprs[(a: Long, b: String)]((12L, "hello"))
+  println(q.toQueryIR.toSQLQuery()._1)
+  println(db.run(q))
+
+  val q2 = Exprs[(a: Long, b: String)]((12L, lit("hello") + lit(" world!")))
+  println(q2.toQueryIR.toSQLQuery()._1)
+  println(db.run(q2))
 }

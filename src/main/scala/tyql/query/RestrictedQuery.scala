@@ -35,7 +35,11 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
   @targetName("restrictedQueryFlatMapRestricted")
   def flatMap[B: ResultTag, D2 <: Tuple]
     (f: Expr.Ref[A, NonScalarExpr] => RestrictedQuery[B, ?, D2])
-                                       (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true)
+    (using
+        @implicitNotFound(
+          "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
+        ) ev: Tuple.Disjoint[D, D2] =:= true
+    )
     : RestrictedQuery[B, BagResult, Tuple.Concat[D, D2]] =
     val toR: Expr.Ref[A, NonScalarExpr] => Query[B, ?] = arg => f(arg).toQuery
     RestrictedQuery(wrapped.flatMap(toR))

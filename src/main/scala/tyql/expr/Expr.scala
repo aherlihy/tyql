@@ -241,13 +241,14 @@ object Expr:
 
   extension [S1 <: ExprShape](x: Expr[String, S1])
     def toLowerCase: Expr[String, S1] = Expr.Lower(x)
-    /**
-      * Convert the string to upper case via the UPPER SQL function, which will depend on
-      * - the collation of the input string,
-      * - the backend database,
-      * - and the database-specific collation settings.
+
+    /** Convert the string to upper case via the UPPER SQL function, which will depend on
+      *   - the collation of the input string,
+      *   - the backend database,
+      *   - and the database-specific collation settings.
       *
-      * @return Expr[String, S] where S is the same ExprShape as the input.
+      * @return
+      *   Expr[String, S] where S is the same ExprShape as the input.
       */
     def toUpperCase: Expr[String, S1] = Expr.Upper(x)
     def charLength: Expr[Int, S1] = Expr.StringCharLength(x)
@@ -314,10 +315,10 @@ object Expr:
     def length: Expr[Int, NonScalarExpr] = ListLength(x)
 
   // Aggregations
-  def sum[T: ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Sum(x)
-  def avg[T: ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
-  def max[T: ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
-  def min[T: ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
+  def sum[T : ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Sum(x)
+  def avg[T : ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Avg(x)
+  def max[T : ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
+  def min[T : ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
   @targetName("maxAggForStrings")
   def max(x: Expr[String, ?]): AggregationExpr[String] = AggregationExpr.Max(x)
   @targetName("minAggForStrings")
@@ -494,6 +495,7 @@ object Expr:
 
   type StripExpr[E] = E match
     case Expr[b, s]         => b
+    case Expr[b, ?]         => b
     case AggregationExpr[b] => b
     case _ =>
       E // XXX this branch is used for the added flexibility of using literal directly in the insertions and updates

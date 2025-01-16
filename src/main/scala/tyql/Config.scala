@@ -35,8 +35,8 @@ enum ParameterStyle:
 
 trait Config
   (
-    val caseConvention: CaseConvention = CaseConvention.Exact,
-    val parameterStyle: ParameterStyle = ParameterStyle.EscapedInline,
+      val caseConvention: CaseConvention = CaseConvention.Exact,
+      val parameterStyle: ParameterStyle = ParameterStyle.EscapedInline,
   )
 
 object Config:
