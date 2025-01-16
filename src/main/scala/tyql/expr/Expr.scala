@@ -325,6 +325,19 @@ object Expr:
   def min(x: Expr[String, ?]): AggregationExpr[String] = AggregationExpr.Min(x)
   def count[T: ResultTag](x: Expr[T, ?]): AggregationExpr[Int] = AggregationExpr.Count(x)
 
+  // date extractions
+  extension (d: Expr[java.time.LocalDate, NonScalarExpr])
+    def year = DateYear(d)
+    def month = DateMonth(d)
+    def day = DateDay(d)
+  extension (d: Expr[java.time.LocalDateTime, NonScalarExpr])
+    def year = TimestampYear(d)
+    def month = TimestampMonth(d)
+    def day = TimestampDay(d)
+    def hour = TimestampHours(d)
+    def minute = TimestampMinutes(d)
+    def second = TimestampSeconds(d)
+
   // Window function expressions
   def rowNumber: ExprInWindowPosition[Int] = RowNumber()
   def rank: ExprInWindowPosition[Int] = Rank()
@@ -371,9 +384,11 @@ object Expr:
     ($x: Expr[T, S1], $min: Expr[T, S2], $max: Expr[T, S3])
     (using ResultTag[T]) extends Expr[Boolean, CalculatedShape[S1, CalculatedShape[S2, S3]]]
 
-  // TODO maybe remove these FunctionCall_, for now they only exist to create fake AST trees for debug purposes...
+  case class FunctionCall0NoParentheses[R](name: String)(using ResultTag[R])
+      extends Expr[R, NonScalarExpr]
+  // XXX maybe remove these FunctionCall_, for now they only exist to create fake AST trees for debug purposes...
   case class FunctionCall0[R](name: String)(using ResultTag[R])
-      extends Expr[R, NonScalarExpr] // XXX TODO NonScalarExpr?
+      extends Expr[R, NonScalarExpr]
   case class FunctionCall1[A1, R, S1 <: ExprShape](name: String, $a1: Expr[A1, S1])(using ResultTag[R])
       extends Expr[R, S1]
   case class FunctionCall2[A1, A2, R, S1 <: ExprShape, S2 <: ExprShape]
@@ -464,6 +479,16 @@ object Expr:
   case class RandomInt[S1 <: ExprShape, S2 <: ExprShape]($x: Expr[Int, S1], $y: Expr[Int, S2])
       extends Expr[Int, CalculatedShape[S1, S2]]
 
+  case class DateYear[S <: ExprShape]($x: Expr[java.time.LocalDate, S]) extends Expr[Int, S]
+  case class DateMonth[S <: ExprShape]($x: Expr[java.time.LocalDate, S]) extends Expr[Int, S]
+  case class DateDay[S <: ExprShape]($x: Expr[java.time.LocalDate, S]) extends Expr[Int, S]
+  case class TimestampYear[S <: ExprShape]($x: Expr[java.time.LocalDateTime, S]) extends Expr[Int, S]
+  case class TimestampMonth[S <: ExprShape]($x: Expr[java.time.LocalDateTime, S]) extends Expr[Int, S]
+  case class TimestampDay[S <: ExprShape]($x: Expr[java.time.LocalDateTime, S]) extends Expr[Int, S]
+  case class TimestampHours[S <: ExprShape]($x: Expr[java.time.LocalDateTime, S]) extends Expr[Int, S]
+  case class TimestampMinutes[S <: ExprShape]($x: Expr[java.time.LocalDateTime, S]) extends Expr[Int, S]
+  case class TimestampSeconds[S <: ExprShape]($x: Expr[java.time.LocalDateTime, S]) extends Expr[Int, S]
+
   case class ListExpr[A]($elements: List[Expr[A, NonScalarExpr]])(using ResultTag[List[A]])
       extends Expr[List[A], NonScalarExpr]
   extension [A, E <: Expr[A, NonScalarExpr]](x: List[E])
@@ -553,6 +578,13 @@ object Expr:
       extends Expr[A, S1]
   case class NullIf[A, S1 <: ExprShape, S2 <: ExprShape]($x: Expr[A, S1], $y: Expr[A, S2])(using ResultTag[A])
       extends Expr[A, CalculatedShape[S1, S2]]
+
+  case class LocalDateLit($value: java.time.LocalDate) extends Expr[java.time.LocalDate, NonScalarExpr]
+      with LiteralExpression
+  given Conversion[java.time.LocalDate, LocalDateLit] = LocalDateLit(_)
+  case class LocalDateTimeLit($value: java.time.LocalDateTime) extends Expr[java.time.LocalDateTime, NonScalarExpr]
+      with LiteralExpression
+  given Conversion[java.time.LocalDateTime, LocalDateTimeLit] = LocalDateTimeLit(_)
 
   /** Literals are type-specific, tailored to the types that the DB supports */
   case class BytesLit($value: Array[Byte]) extends Expr[Array[Byte], NonScalarExpr]
@@ -652,6 +684,10 @@ inline def lit(x: Double): Expr[Double, NonScalarExpr] & LiteralExpression = Exp
 inline def lit(x: Float): Expr[Float, NonScalarExpr] & LiteralExpression = Expr.FloatLit(x)
 inline def lit(x: String): Expr[String, NonScalarExpr] & LiteralExpression = Expr.StringLit(x)
 inline def lit(x: Boolean): Expr[Boolean, NonScalarExpr] & LiteralExpression = Expr.BooleanLit(x)
+inline def lit(x: java.time.LocalDate): Expr[java.time.LocalDate, NonScalarExpr] & LiteralExpression =
+  Expr.LocalDateLit(x)
+inline def lit(x: java.time.LocalDateTime): Expr[java.time.LocalDateTime, NonScalarExpr] & LiteralExpression =
+  Expr.LocalDateTimeLit(x)
 inline def True = Expr.BooleanLit(true)
 inline def False = Expr.BooleanLit(false)
 inline def Null = Expr.NullLit[scala.Null]()
@@ -659,3 +695,5 @@ inline def Null = Expr.NullLit[scala.Null]()
 def Null[T](using ResultTag[T]) = Expr.NullLit[T]()
 private case class ElseToken()
 val Else = new ElseToken()
+val CurrentTime = Expr.FunctionCall0NoParentheses[java.time.LocalDateTime]("CURRENT_TIMESTAMP")
+val CurrentDate = Expr.FunctionCall0NoParentheses[java.time.LocalDate]("CURRENT_DATE")

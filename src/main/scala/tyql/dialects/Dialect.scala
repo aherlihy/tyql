@@ -54,6 +54,8 @@ trait Dialect:
 
   def acceptsLimitInDeleteQueries: Boolean = false
 
+  def canExtractDateTimeComponentsNatively: Boolean = true
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -182,6 +184,7 @@ object Dialect:
       override def needsStringLPadRPadPolyfill: Boolean = true
       override def stringPositionFindingVia: String = "INSTR"
       override def shouldHaveParensInsideValuesExpr: Boolean = false
+      override def canExtractDateTimeComponentsNatively: Boolean = false
 
     given INCanHandleRows = new INCanHandleRows {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}

@@ -572,8 +572,9 @@ object QueryIRTree:
           case false =>
             polyfillWasUsed()
             BinExprOp("(", generateExpr(x.$x, symbols), " = TRUE) <> (", generateExpr(x.$y, symbols), " = TRUE)", 43, x)
-      case f0: Expr.FunctionCall0[?]       => FunctionCallOp(f0.name, Seq(), f0)
-      case f1: Expr.FunctionCall1[?, ?, ?] => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
+      case f0: Expr.FunctionCall0NoParentheses[?] => FunctionCallOp(f0.name, Seq(), f0, false)
+      case f0: Expr.FunctionCall0[?]              => FunctionCallOp(f0.name, Seq(), f0)
+      case f1: Expr.FunctionCall1[?, ?, ?]        => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
       case f2: Expr.FunctionCall2[?, ?, ?, ?, ?] =>
         FunctionCallOp(f2.name, Seq(f2.$a1, f2.$a1).map(generateExpr(_, symbols)), f2)
       case u: Expr.RandomUUID => FunctionCallOp(d.feature_RandomUUID_functionName, Seq(), u)
@@ -660,6 +661,51 @@ object QueryIRTree:
       case s: Expr.Asin[?, ?] => FunctionCallOp("ASIN", Seq(generateExpr(s.$x, symbols)), s)
       case s: Expr.Acos[?, ?] => FunctionCallOp("ACOS", Seq(generateExpr(s.$x, symbols)), s)
       case s: Expr.Atan[?, ?] => FunctionCallOp("ATAN", Seq(generateExpr(s.$x, symbols)), s)
+      case e: Expr.DateYear[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(YEAR FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%Y', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.DateMonth[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(MONTH FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%m', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.DateDay[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(DAY FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%d', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampYear[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(YEAR FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%Y', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampMonth[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(MONTH FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%m', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampDay[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(DAY FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%d', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampHours[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(HOUR FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%H', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampMinutes[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(MINUTE FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%M', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampSeconds[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(SECOND FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%S', ", generateExpr(e.$x, symbols), ") as INT)", e)
       case a: Expr.Concat[?, ?, ?, ?] =>
         val lhsIR = generateExpr(a.$x, symbols) match
           case p: ProjectClause => p
@@ -685,13 +731,15 @@ object QueryIRTree:
         FunctionCallOp("COALESCE", (Seq(c.$x1, c.$x2) ++ c.$xs).map(generateExpr(_, symbols)), c)
       case i: Expr.NullIf[?, ?, ?] =>
         FunctionCallOp("NULLIF", Seq(generateExpr(i.$x, symbols), generateExpr(i.$y, symbols)), i)
-      case l: Expr.DoubleLit     => LiteralDouble(l.$value, l)
-      case l: Expr.FloatLit      => LiteralDouble(l.$value, l)
-      case l: Expr.IntLit        => LiteralInteger(l.$value, l)
-      case l: Expr.LongLit       => LiteralInteger(l.$value, l)
-      case l: Expr.BytesLit      => LiteralBytes(l.$value, l)
-      case l: Expr.ByteStreamLit => LiteralByteStream(l.$value, l)
-      case l: Expr.StringLit     => LiteralString(l.$value, insideLikePatternQuoting = false, l)
+      case l: Expr.DoubleLit        => LiteralDouble(l.$value, l)
+      case l: Expr.FloatLit         => LiteralDouble(l.$value, l)
+      case l: Expr.IntLit           => LiteralInteger(l.$value, l)
+      case l: Expr.LongLit          => LiteralInteger(l.$value, l)
+      case l: Expr.LocalDateLit     => LiteralLocalDate(l.$value, l)
+      case l: Expr.LocalDateTimeLit => LiteralLocalDateTime(l.$value, l)
+      case l: Expr.BytesLit         => LiteralBytes(l.$value, l)
+      case l: Expr.ByteStreamLit    => LiteralByteStream(l.$value, l)
+      case l: Expr.StringLit        => LiteralString(l.$value, insideLikePatternQuoting = false, l)
       case l: Expr.BooleanLit =>
         if l.$value then
           RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"TRUE"), Map(), Precedence.Unary, l)

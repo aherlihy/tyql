@@ -73,10 +73,12 @@ object TreePrettyPrinter {
       case Lower(x) => s"${indent(depth)}Lower(${x.prettyPrint(depth + 1)})"
       case Concat(x, y) =>
         s"${indent(depth)}Concat(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case IntLit(value)     => s"${indent(depth)}IntLit($value)"
-      case StringLit(value)  => s"${indent(depth)}StringLit($value)"
-      case DoubleLit(value)  => s"${indent(depth)}DoubleLit($value)"
-      case BooleanLit(value) => s"${indent(depth)}BooleanLit($value)"
+      case IntLit(value)           => s"${indent(depth)}IntLit($value)"
+      case StringLit(value)        => s"${indent(depth)}StringLit($value)"
+      case DoubleLit(value)        => s"${indent(depth)}DoubleLit($value)"
+      case BooleanLit(value)       => s"${indent(depth)}BooleanLit($value)"
+      case LocalDateLit(value)     => s"${indent(depth)}LocalDateLit(${value})"
+      case LocalDateTimeLit(value) => s"${indent(depth)}LocalDateTimeLit(${value})"
       case Project(inner) =>
         val a =
           NamedTuple.toTuple(

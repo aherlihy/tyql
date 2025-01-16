@@ -1,6 +1,6 @@
 package tyql
 
-import java.time.LocalDate
+import java.time.{LocalDate, LocalDateTime}
 import scala.NamedTuple.NamedTuple
 import scala.compiletime.{constValue, constValueTuple, summonAll}
 import scala.deriving.Mirror
@@ -19,6 +19,7 @@ enum ResultTag[T]:
   case StringTag extends ResultTag[String]
   case BoolTag extends ResultTag[Boolean]
   case LocalDateTag extends ResultTag[LocalDate]
+  case LocalDateTimeTag extends ResultTag[LocalDateTime]
   case NamedTupleTag[N <: Tuple, V <: Tuple](var names: List[String], types: List[ResultTag[?]])
       extends ResultTag[NamedTuple[N, V]]
   case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]], m: Mirror.ProductOf[T])
@@ -38,6 +39,7 @@ object ResultTag:
   given ResultTag[Double] = ResultTag.DoubleTag
   given ResultTag[Float] = ResultTag.FloatTag
   given ResultTag[LocalDate] = ResultTag.LocalDateTag
+  given ResultTag[LocalDateTime] = ResultTag.LocalDateTimeTag
   given [T](using e: ResultTag[T]): ResultTag[Option[T]] = ResultTag.OptionalTag(e)
   inline given [N <: Tuple, V <: Tuple]: ResultTag[NamedTuple[N, V]] =
     val names = constValueTuple[N]
@@ -68,3 +70,4 @@ object SimpleTypeResultTag:
   given SimpleTypeResultTag[Double] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[Float] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[LocalDate] = new SimpleTypeResultTag {}
+  given SimpleTypeResultTag[LocalDateTime] = new SimpleTypeResultTag {}

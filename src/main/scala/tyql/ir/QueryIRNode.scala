@@ -135,11 +135,16 @@ case class UnaryExprOp(pre: String, child: QueryIRNode, post: String, ast: Expr[
     child.computeSQL(ctx)
     ctx.sql.append(post)
 
-case class FunctionCallOp(name: String, children: Seq[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
+case class FunctionCallOp(name: String, children: Seq[QueryIRNode], ast: Expr[?, ?], includeParens: Boolean = true)
+    extends QueryIRNode:
   override val precedence = Precedence.Literal
   override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
     ctx.sql.append(name)
-    ctx.mkString(children, "(", ", ", ")")
+    if includeParens then
+      ctx.mkString(children, "(", ", ", ")")
+    else
+      assert(children.isEmpty)
+      ctx.mkString(children, "", ", ", "")
 
 /** CASE statement called "searched" in the standard. This is like a multi-arm if-else statement.
   */
@@ -313,6 +318,34 @@ case class LiteralByteStream(bytes: () => java.io.InputStream, ast: Expr[?, ?]) 
       case ParameterStyle.DriverParametrized =>
         ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
         ctx.parameters.append(bytes.asInstanceOf[Object])
+
+case class LiteralLocalDate(ld: java.time.LocalDate, ast: Expr[?, ?]) extends QueryIRLeaf:
+  override val precedence: Int = Precedence.Literal
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    cnf.parameterStyle match
+      case ParameterStyle.EscapedInline =>
+        if d.canExtractDateTimeComponentsNatively then
+          ctx.sql.append("DATE'" + ld.format(java.time.format.DateTimeFormatter.ISO_DATE) + "'")
+        else
+          ctx.sql.append("'" + ld.format(java.time.format.DateTimeFormatter.ISO_DATE) + "'")
+      case ParameterStyle.DriverParametrized =>
+        ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
+        ctx.parameters.append(ld.asInstanceOf[Object])
+
+case class LiteralLocalDateTime(ldt: java.time.LocalDateTime, ast: Expr[?, ?]) extends QueryIRLeaf:
+  override val precedence: Int = Precedence.Literal
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    cnf.parameterStyle match
+      case ParameterStyle.EscapedInline =>
+        if d.canExtractDateTimeComponentsNatively then
+          ctx.sql.append(
+            "TIMESTAMP'" + ldt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "'"
+          )
+        else
+          ctx.sql.append("'" + ldt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "'")
+      case ParameterStyle.DriverParametrized =>
+        ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
+        ctx.parameters.append(ldt.asInstanceOf[Object])
 
 case class LiteralInteger(number: Long, ast: Expr[?, ?]) extends QueryIRLeaf:
   override val precedence: Int = Precedence.Literal
