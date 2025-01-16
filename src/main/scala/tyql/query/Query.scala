@@ -382,6 +382,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
   def exceptAll(that: Query[A, ?]): Query[A, BagResult] =
     Query.ExceptAll(this, that)
 
+  // XXX we are waiting for https://github.com/scala/scala3/issues/22392
   inline def insertInto[R, PartialNames <: Tuple]
     (table: InsertableTable[R, PartialNames])
     (using
