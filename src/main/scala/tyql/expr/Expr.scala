@@ -620,14 +620,14 @@ object Expr:
 
   case class Cast[A, B, S <: ExprShape]($x: Expr[A, S], resultType: CastTarget)(using ResultTag[B]) extends Expr[B, S]
 
-  case class NullLit[A]()(using ResultTag[A]) extends Expr[A, NonScalarExpr] with LiteralExpression
+  final case class NullLit[A]()(using ResultTag[A]) extends Expr[A, NonScalarExpr] with LiteralExpression
   case class IsNull[A, S <: ExprShape]($x: Expr[A, S]) extends Expr[Boolean, S]
   case class Coalesce[A, S1 <: ExprShape]($x1: Expr[A, S1], $x2: Expr[A, S1], $xs: Seq[Expr[A, S1]])(using ResultTag[A])
       extends Expr[A, S1]
   case class NullIf[A, S1 <: ExprShape, S2 <: ExprShape]($x: Expr[A, S1], $y: Expr[A, S2])(using ResultTag[A])
       extends Expr[A, CalculatedShape[S1, S2]]
 
-  case class LocalDateLit($value: java.time.LocalDate) extends Expr[java.time.LocalDate, NonScalarExpr]
+  final case class LocalDateLit($value: java.time.LocalDate) extends Expr[java.time.LocalDate, NonScalarExpr]
       with LiteralExpression
   given Conversion[java.time.LocalDate, LocalDateLit] = LocalDateLit(_)
   case class LocalDateTimeLit($value: java.time.LocalDateTime) extends Expr[java.time.LocalDateTime, NonScalarExpr]
@@ -635,26 +635,26 @@ object Expr:
   given Conversion[java.time.LocalDateTime, LocalDateTimeLit] = LocalDateTimeLit(_)
 
   /** Literals are type-specific, tailored to the types that the DB supports */
-  case class BytesLit($value: Array[Byte]) extends Expr[Array[Byte], NonScalarExpr]
-  case class ByteStreamLit($value: () => java.io.InputStream) extends Expr[() => java.io.InputStream, NonScalarExpr]
+  final case class BytesLit($value: Array[Byte]) extends Expr[Array[Byte], NonScalarExpr]
+  final case class ByteStreamLit($value: () => java.io.InputStream) extends Expr[() => java.io.InputStream, NonScalarExpr]
 
-  case class IntLit($value: Int) extends Expr[Int, NonScalarExpr] with LiteralExpression
-  case class LongLit($value: Long) extends Expr[Long, NonScalarExpr] with LiteralExpression
+  final case class IntLit($value: Int) extends Expr[Int, NonScalarExpr] with LiteralExpression
+  final case class LongLit($value: Long) extends Expr[Long, NonScalarExpr] with LiteralExpression
 
   /** Scala values can be lifted into literals by conversions */
   given Conversion[Int, IntLit] = IntLit(_)
   given Conversion[Long, LongLit] = LongLit(_)
 
-  case class StringLit($value: String) extends Expr[String, NonScalarExpr] with LiteralExpression
+  final case class StringLit($value: String) extends Expr[String, NonScalarExpr] with LiteralExpression
   given Conversion[String, StringLit] = StringLit(_)
 
-  case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr] with LiteralExpression
+  final case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr] with LiteralExpression
   given Conversion[Double, DoubleLit] = DoubleLit(_)
 
-  case class FloatLit($value: Float) extends Expr[Float, NonScalarExpr] with LiteralExpression
+  final case class FloatLit($value: Float) extends Expr[Float, NonScalarExpr] with LiteralExpression
   given Conversion[Float, FloatLit] = FloatLit(_)
 
-  case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr] with LiteralExpression
+  final case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr] with LiteralExpression
   // given Conversion[Boolean, BooleanLit] = BooleanLit(_) // XXX this one breaks everything by inlining complex expressions as FALSE everywhere
 
   def randomFloat(): Expr[Double, NonScalarExpr] = RandomFloat()
