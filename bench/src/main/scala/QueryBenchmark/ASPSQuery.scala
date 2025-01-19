@@ -14,6 +14,8 @@ import scala.NamedTuple.*
 import tyql.{Ord, Table}
 import tyql.Expr.min
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class ASPSQuery extends QueryBenchmark {
   override def name = "asps"
@@ -75,32 +77,39 @@ class ASPSQuery extends QueryBenchmark {
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.edge
       .aggregate(e =>
-        (src = e.src, dst = e.dst, cost = min(e.cost)).toGroupingRow)
+        (src = e.src, dst = e.dst, cost = min(e.cost)).toGroupingRow
+      )
       .groupBySource(e =>
-        (src = e._1.src, dst = e._1.dst).toRow)
+        (src = e._1.src, dst = e._1.dst).toRow
+      )
 
     val asps = base.unrestrictedFix(path =>
       path.aggregate(p =>
-          path
-            .filter(e =>
-              p.dst == e.src)
-            .aggregate(e =>
-              (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow))
+        path
+          .filter(e =>
+            p.dst == e.src
+          )
+          .aggregate(e =>
+            (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow
+          )
+      )
         .groupBySource(p =>
-          (g1 = p._1.src, g2 = p._2.dst).toRow).distinct
+          (g1 = p._1.src, g2 = p._2.dst).toRow
+        ).distinct
     )
     val query = asps
       .aggregate(a =>
-        (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow)
+        (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow
+      )
       .groupBySource(p =>
-        (g1 = p._1.src, g2 = p._1.dst).toRow)
+        (g1 = p._1.src, g2 = p._1.dst).toRow
+      )
       .sort(_.dst, Ord.ASC)
       .sort(_.src, Ord.ASC)
       .sort(_.cost, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
-
 
   def executeCollections(): Unit =
     val base = collectionsDB.edge.groupBy(s => (s.src, s.dst)).mapValues(_.minBy(_.cost)).values.toSeq
@@ -120,14 +129,15 @@ class ASPSQuery extends QueryBenchmark {
       .sortBy(_.src)
       .sortBy(_.cost)
 
-
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
     val toTuple = (c: WEdgeSS[?]) => (c.src, c.dst, c.cost)
 
     val initBase = () =>
       //  workaround since groupBy does not work with ScalaSQL + postgres
-      val initAgg = db.runRaw[(Int, Int, Int)](s"SELECT s.src, s.dst, MIN(s.cost) FROM ${ScalaSQLTable.name(asps_edge)} as s GROUP BY s.src, s.dst;")
+      val initAgg = db.runRaw[(Int, Int, Int)](
+        s"SELECT s.src, s.dst, MIN(s.cost) FROM ${ScalaSQLTable.name(asps_edge)} as s GROUP BY s.src, s.dst;"
+      )
       db.values(initAgg)
 
     val fixFn: ScalaSQLTable[WEdgeSS] => query.Select[(Expr[Int], Expr[Int], Expr[Int]), (Int, Int, Int)] = path =>
@@ -135,13 +145,18 @@ class ASPSQuery extends QueryBenchmark {
         s"SELECT path1.src, path2.dst, MIN(path1.cost + path2.cost) FROM ${ScalaSQLTable.name(path)} path1, ${ScalaSQLTable.name(path)} path2 WHERE path1.dst = path2.src GROUP BY path1.src, path2.dst;"
       )
       if (fixAgg.isEmpty) // workaround scalasql doesn't allow empty values
-         asps_tmp.select.map(c => (c.src, c.dst, c.cost))
+        asps_tmp.select.map(c => (c.src, c.dst, c.cost))
       else
         db.values(fixAgg)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, asps_delta, asps_tmp, asps_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[WEdgeSS] => query.Select[Any, Any]])
+      ddb,
+      asps_delta,
+      asps_tmp,
+      asps_derived
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[WEdgeSS] => query.Select[Any, Any]]
+    )
 
     //  workaround since groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(s"SELECT s.src as src, s.dst as dst, MIN(s.cost) as cost " +

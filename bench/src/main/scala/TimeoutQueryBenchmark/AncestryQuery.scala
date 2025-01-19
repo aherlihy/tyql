@@ -14,6 +14,8 @@ import scala.NamedTuple.*
 import tyql.{Ord, Table}
 import tyql.Expr.{IntLit, min}
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TOAncestryQuery extends QueryBenchmark {
   override def name = "ancestry"
@@ -26,7 +28,7 @@ class TOAncestryQuery extends QueryBenchmark {
   type AncestryDB = (parents: Parent)
   val tyqlDB = (
     parents = Table[Parent]("ancestry_parents")
-    )
+  )
 
   // Collections data model + initialization
   case class ParentCC(parent: String, child: String)
@@ -86,16 +88,18 @@ class TOAncestryQuery extends QueryBenchmark {
     val base = collectionsDB.parents.filter(p => p.parent == parentName).map(e => GenCC(name = e.child, gen = 1))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(sp =>
       it += 1
-        collectionsDB.parents.flatMap(parent =>
-          if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-          sp
-            .filter(g =>
-              if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-              parent.parent == g.name)
-            .map(g =>
-              if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-              GenCC(name = parent.child, gen = g.gen + 1))
-        ).distinct
+      collectionsDB.parents.flatMap(parent =>
+        if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
+        sp
+          .filter(g =>
+            if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
+            parent.parent == g.name
+          )
+          .map(g =>
+            if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
+            GenCC(name = parent.child, gen = g.gen + 1)
+          )
+      ).distinct
     ).filter(g => g.gen == 2).map(g => ResultCC(name = g.name)).sortBy(_.name)
     println(s"\nIT,$name,collections,$it")
 
@@ -118,8 +122,13 @@ class TOAncestryQuery extends QueryBenchmark {
       } yield (parents.child, add1(base.gen))
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, ancestry_delta, ancestry_tmp, ancestry_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]])
+      ddb,
+      ancestry_delta,
+      ancestry_tmp,
+      ancestry_derived
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[ResultSS] => query.Select[Any, Any]]
+    )
 
     val result = ancestry_derived.select
       .filter(_.gen === 2)

@@ -42,35 +42,36 @@ object TestComparitor {
       mappings.getOrElseUpdate(variableName, collection.mutable.Map.empty)
 
       // Find the matching variable in the actual query
-      correspondingActualPattern.findFirstMatchIn(transformedActualQuery.substring(currentPosition)).foreach { matchActual =>
-        val actualNumber = matchActual.matched.stripPrefix(variableName)
-        val matchStart = matchActual.start + currentPosition
-        val matchEnd = matchActual.end + currentPosition
+      correspondingActualPattern.findFirstMatchIn(transformedActualQuery.substring(currentPosition)).foreach {
+        matchActual =>
+          val actualNumber = matchActual.matched.stripPrefix(variableName)
+          val matchStart = matchActual.start + currentPosition
+          val matchEnd = matchActual.end + currentPosition
 
-        // Check if this placeholder has been seen before
-        mappings(variableName).get(placeholder) match {
-          case Some(mappedNumber) =>
-            // If it has, ensure the same number is used
-            if (mappedNumber != actualNumber) {
-              val debugMessage = s"Expected $mappedNumber for $placeholder but found $actualNumber in actual query."
-              boundary.break((false, debugMessage)) // Use boundary.break to return early
-            }
-          case None =>
-            // If it's the first time seeing this placeholder, store the mapping
-            if (mappings(variableName).values.exists(_ == actualNumber)) {
-              val debugMessage = s"Multiple placeholders pointing to the same number: $actualNumber."
-              boundary.break((false, debugMessage)) // Use boundary.break to return early
-            }
-            mappings(variableName).addOne(placeholder, actualNumber)
-        }
+          // Check if this placeholder has been seen before
+          mappings(variableName).get(placeholder) match {
+            case Some(mappedNumber) =>
+              // If it has, ensure the same number is used
+              if (mappedNumber != actualNumber) {
+                val debugMessage = s"Expected $mappedNumber for $placeholder but found $actualNumber in actual query."
+                boundary.break((false, debugMessage)) // Use boundary.break to return early
+              }
+            case None =>
+              // If it's the first time seeing this placeholder, store the mapping
+              if (mappings(variableName).values.exists(_ == actualNumber)) {
+                val debugMessage = s"Multiple placeholders pointing to the same number: $actualNumber."
+                boundary.break((false, debugMessage)) // Use boundary.break to return early
+              }
+              mappings(variableName).addOne(placeholder, actualNumber)
+          }
 
-        // Replace the actual variable (e.g., product373) with the placeholder (e.g., product$A)
-        transformedActualQuery = transformedActualQuery.substring(0, matchStart) +
-          placeholder +
-          transformedActualQuery.substring(matchEnd)
+          // Replace the actual variable (e.g., product373) with the placeholder (e.g., product$A)
+          transformedActualQuery = transformedActualQuery.substring(0, matchStart) +
+            placeholder +
+            transformedActualQuery.substring(matchEnd)
 
-        // Move currentPosition past this match
-        currentPosition = matchEnd
+          // Move currentPosition past this match
+          currentPosition = matchEnd
       }
     }
 
@@ -97,8 +98,8 @@ object TestComparitor {
 
 }
 
-
-trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extends munit.FunSuite with TestQuery[Rows, ReturnShape] {
+trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extends munit.FunSuite
+    with TestQuery[Rows, ReturnShape] {
 
   import tyql.TreePrettyPrinter.*
   test(testDescription) {
@@ -196,7 +197,7 @@ class TestSuiteTest extends munit.FunSuite {
   }
 }
 
-abstract class SQLStringQueryTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
-  extends TestSQLString[Rows, Query[Return, ?]] with TestQuery[Rows, Query[Return, ?]]
-abstract class SQLStringAggregationTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows]) 
-  extends TestSQLString[Rows, Aggregation[?, Return]] with TestQuery[Rows, Aggregation[?, Return]]
+abstract class SQLStringQueryTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows])
+    extends TestSQLString[Rows, Query[Return, ?]] with TestQuery[Rows, Query[Return, ?]]
+abstract class SQLStringAggregationTest[Rows <: AnyNamedTuple, Return](using TestDatabase[Rows])
+    extends TestSQLString[Rows, Aggregation[?, Return]] with TestQuery[Rows, Aggregation[?, Return]]

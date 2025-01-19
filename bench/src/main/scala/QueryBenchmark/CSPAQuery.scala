@@ -15,6 +15,8 @@ import tyql.Query.unrestrictedFix
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class CSPAQuery extends QueryBenchmark {
   override def name = "cspa"
@@ -99,46 +101,49 @@ class CSPAQuery extends QueryBenchmark {
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, tyqlDB.empty, memoryAliasBase)(
-      (valueFlow, valueAlias, memoryAlias) =>
-        val vfDef1 =
-          for
-            a <- assign
-            m <- memoryAlias
-            if a.p2 == m.p1
-          yield (p1 = a.p1, p2 = m.p2).toRow
-        val vfDef2 =
-          for
-            vf1 <- valueFlow
-            vf2 <- valueFlow
-            if vf1.p2 == vf2.p1
-          yield (p1 = vf1.p1, p2 = vf2.p2).toRow
-        val VF = vfDef1.union(vfDef2)
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(
+      valueFlowBase,
+      tyqlDB.empty,
+      memoryAliasBase
+    )((valueFlow, valueAlias, memoryAlias) =>
+      val vfDef1 =
+        for
+          a <- assign
+          m <- memoryAlias
+          if a.p2 == m.p1
+        yield (p1 = a.p1, p2 = m.p2).toRow
+      val vfDef2 =
+        for
+          vf1 <- valueFlow
+          vf2 <- valueFlow
+          if vf1.p2 == vf2.p1
+        yield (p1 = vf1.p1, p2 = vf2.p2).toRow
+      val VF = vfDef1.union(vfDef2)
 
-        val MA =
-          for
-            d1 <- dereference
-            va <- valueAlias
-            d2 <- dereference
-            if d1.p1 == va.p1 && va.p2 == d2.p1
-          yield (p1 = d1.p2, p2 = d2.p2).toRow
+      val MA =
+        for
+          d1 <- dereference
+          va <- valueAlias
+          d2 <- dereference
+          if d1.p1 == va.p1 && va.p2 == d2.p1
+        yield (p1 = d1.p2, p2 = d2.p2).toRow
 
-        val vaDef1 =
-          for
-            vf1 <- valueFlow
-            vf2 <- valueFlow
-            if vf1.p1 == vf2.p1
-          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
-        val vaDef2 =
-          for
-            vf1 <- valueFlow
-            m <- memoryAlias
-            vf2 <- valueFlow
-            if vf1.p1 == m.p1 && vf2.p1 == m.p2
-          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
-        val VA = vaDef1.union(vaDef2)
+      val vaDef1 =
+        for
+          vf1 <- valueFlow
+          vf2 <- valueFlow
+          if vf1.p1 == vf2.p1
+        yield (p1 = vf1.p2, p2 = vf2.p2).toRow
+      val vaDef2 =
+        for
+          vf1 <- valueFlow
+          m <- memoryAlias
+          vf2 <- valueFlow
+          if vf1.p1 == m.p1 && vf2.p1 == m.p2
+        yield (p1 = vf1.p2, p2 = vf2.p2).toRow
+      val VA = vaDef1.union(vaDef2)
 
-        (VF, MA.distinct, VA)
+      (VF, MA.distinct, VA)
     )
 
     val queryStr = valueFlowFinal.sort(_.p2, Ord.ASC).sort(_.p1, Ord.ASC).toQueryIR.toSQLString()
@@ -156,55 +161,56 @@ class CSPAQuery extends QueryBenchmark {
     val valueFlowBase = if set then (vf1 ++ vf2 ++ vf3).distinct else vf1 ++ vf2 ++ vf3
 
     var it = 0
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = FixedPointQuery.multiFix(true)((valueFlowBase, Seq[PairCC](), memoryAliasBase), (Seq(), Seq(), Seq()))(
-      (recur, acc) => {
-        val (valueFlow, valueAlias, memoryAlias) = recur
-        val (valueFlowAcc, valueAliasAcc, memoryAliasAcc) = if it == 0 then (valueFlowBase, Seq[PairCC](), memoryAliasBase) else acc
-        it += 1
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = FixedPointQuery.multiFix(true)(
+      (valueFlowBase, Seq[PairCC](), memoryAliasBase),
+      (Seq(), Seq(), Seq())
+    )((recur, acc) => {
+      val (valueFlow, valueAlias, memoryAlias) = recur
+      val (valueFlowAcc, valueAliasAcc, memoryAliasAcc) =
+        if it == 0 then (valueFlowBase, Seq[PairCC](), memoryAliasBase) else acc
+      it += 1
 
-        val valueFlowDef1 =
-          for
-            a <- collectionsDB.assign
-            m <- memoryAliasAcc
-            if a.p2 == m.p1
-          yield PairCC(p1 = a.p1, p2 = m.p2)
-        val valueFlowDef2 =
-          for
-            vf1 <- valueFlow
-            vf2 <- valueFlow
-            if vf1.p2 == vf2.p1
-          yield PairCC(p1 = vf1.p1, p2 = vf2.p2)
-        val VF = (valueFlowDef1 ++ valueFlowDef2).distinct
+      val valueFlowDef1 =
+        for
+          a <- collectionsDB.assign
+          m <- memoryAliasAcc
+          if a.p2 == m.p1
+        yield PairCC(p1 = a.p1, p2 = m.p2)
+      val valueFlowDef2 =
+        for
+          vf1 <- valueFlow
+          vf2 <- valueFlow
+          if vf1.p2 == vf2.p1
+        yield PairCC(p1 = vf1.p1, p2 = vf2.p2)
+      val VF = (valueFlowDef1 ++ valueFlowDef2).distinct
 
-        val memoryAliasDef =
-          for
-            d1 <- collectionsDB.dereference
-            va <- valueAliasAcc
-            d2 <- collectionsDB.dereference
-            if d1.p1 == va.p1 && va.p2 == d2.p1
-          yield PairCC(p1 = d1.p2, p2 = d2.p2)
-        val MA = memoryAliasDef.distinct
+      val memoryAliasDef =
+        for
+          d1 <- collectionsDB.dereference
+          va <- valueAliasAcc
+          d2 <- collectionsDB.dereference
+          if d1.p1 == va.p1 && va.p2 == d2.p1
+        yield PairCC(p1 = d1.p2, p2 = d2.p2)
+      val MA = memoryAliasDef.distinct
 
-        val valueAliasDef1 =
-          for
-            vf1 <- valueFlowAcc
-            vf2 <- valueFlowAcc
-            if vf1.p1 == vf2.p1
-          yield PairCC(p1 = vf1.p2, p2 = vf2.p2)
-        val valueAliasDef2 =
-          for
-            vf1 <- valueFlowAcc
-            m <- memoryAliasAcc
-            vf2 <- valueFlowAcc
-            if vf1.p1 == m.p1 && vf2.p1 == m.p2
-          yield PairCC(p1 = vf1.p2, p2 = vf2.p2)
-        val VA = (valueAliasDef1 ++ valueAliasDef2).distinct
+      val valueAliasDef1 =
+        for
+          vf1 <- valueFlowAcc
+          vf2 <- valueFlowAcc
+          if vf1.p1 == vf2.p1
+        yield PairCC(p1 = vf1.p2, p2 = vf2.p2)
+      val valueAliasDef2 =
+        for
+          vf1 <- valueFlowAcc
+          m <- memoryAliasAcc
+          vf2 <- valueFlowAcc
+          if vf1.p1 == m.p1 && vf2.p1 == m.p2
+        yield PairCC(p1 = vf1.p2, p2 = vf2.p2)
+      val VA = (valueAliasDef1 ++ valueAliasDef2).distinct
 
-        (VF, MA, VA)
-      }
-    )
+      (VF, MA, VA)
+    })
     resultCollections = valueFlowFinal.sortBy(_.p2).sortBy(_.p1)
-
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
@@ -215,23 +221,32 @@ class CSPAQuery extends QueryBenchmark {
         .map(a => (a.p2, a.p2))
         .union(
           cspa_assign.select
-            .map(a => (a.p1, a.p1)))
+            .map(a => (a.p1, a.p1))
+        )
 
       val valueFlowBase =
         cspa_assign.select.map(a => (a.p1, a.p2))
           .union(
             cspa_assign.select
-              .map(a => (a.p1, a.p1)))
+              .map(a => (a.p1, a.p1))
+          )
           .union(
-            cspa_assign.select.map(a => (a.p2, a.p2)))
+            cspa_assign.select.map(a => (a.p2, a.p2))
+          )
       (memoryAliasBase, cspa_empty.select.map(s => (s.p1, s.p2)), valueFlowBase)
     }
 
     var it = 0
-    val fixFn: ((ScalaSQLTable[PairSS], ScalaSQLTable[PairSS], ScalaSQLTable[PairSS])) => (query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)]) =
+    val fixFn
+      : ((ScalaSQLTable[PairSS], ScalaSQLTable[PairSS], ScalaSQLTable[PairSS])) => (
+          query.Select[(Expr[Int], Expr[Int]), (Int, Int)],
+          query.Select[(Expr[Int], Expr[Int]), (Int, Int)],
+          query.Select[(Expr[Int], Expr[Int]), (Int, Int)]
+      ) =
       recur => {
         val (valueFlow, valueAlias, memoryAlias) = recur
-        val (valueFlowAcc, valueAliasAcc, memoryAliasAcc) = if it == 0 then (cspa_delta1, cspa_delta2, cspa_delta3) else (cspa_derived1, cspa_derived2, cspa_derived3)
+        val (valueFlowAcc, valueAliasAcc, memoryAliasAcc) =
+          if it == 0 then (cspa_delta1, cspa_delta2, cspa_delta3) else (cspa_derived1, cspa_derived2, cspa_derived3)
         it += 1
 
         //        println(s"***iteration $it")
@@ -280,16 +295,22 @@ class CSPAQuery extends QueryBenchmark {
       }
 
     FixedPointQuery.scalaSQLSemiNaiveTHREE(set)(
-      ddb, (cspa_delta1, cspa_delta2, cspa_delta3), (cspa_tmp1, cspa_tmp2, cspa_tmp3), (cspa_derived1, cspa_derived2, cspa_derived3)
+      ddb,
+      (cspa_delta1, cspa_delta2, cspa_delta3),
+      (cspa_tmp1, cspa_tmp2, cspa_tmp3),
+      (cspa_derived1, cspa_derived2, cspa_derived3)
     )(
       (toTuple, toTuple, toTuple)
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[PairSS], ScalaSQLTable[PairSS], ScalaSQLTable[PairSS])) => (query.Select[Any, Any], query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[PairSS], ScalaSQLTable[PairSS], ScalaSQLTable[PairSS])) => (
+        query.Select[Any, Any],
+        query.Select[Any, Any],
+        query.Select[Any, Any]
+    )])
 
     val result = cspa_derived1.select.sortBy(_.p2).sortBy(_.p1)
     resultScalaSQL = db.run(result)
-
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

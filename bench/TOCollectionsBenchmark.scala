@@ -11,7 +11,7 @@ import Helpers.*
 @experimental
 @Fork(1)
 @Warmup(iterations = 0, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
-@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
+@Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize = 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class TOCollectionsBenchmark {
@@ -37,7 +37,7 @@ class TOCollectionsBenchmark {
   }
 
   val benchmarks = Map(
-    "tc" -> TOTCQuery(),
+    // "tc" -> TOTCQuery(),
     "sssp" -> TOSSSPQuery(),
     "ancestry" -> TOAncestryQuery(),
     "andersens" -> TOAndersensQuery(),
@@ -69,7 +69,8 @@ class TOCollectionsBenchmark {
     )
   }
 
-  /*******************Boilerplate*****************/
+  /** *****************Boilerplate****************
+    */
   @Benchmark def tc_large(blackhole: Blackhole): Unit = {
     runWithTimeout("tc", blackhole)
   }

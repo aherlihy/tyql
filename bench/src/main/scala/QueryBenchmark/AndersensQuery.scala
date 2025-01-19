@@ -14,6 +14,8 @@ import scala.NamedTuple.*
 import tyql.{Ord, Table}
 import tyql.Expr.{IntLit, min}
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class AndersensQuery extends QueryBenchmark {
   override def name = "andersens"
@@ -25,11 +27,11 @@ class AndersensQuery extends QueryBenchmark {
   type AndersensDB = (addressOf: Edge, assign: Edge, loadT: Edge, store: Edge)
 
   val tyqlDB = (
-      addressOf = Table[Edge]("andersens_addressOf"),
-      assign = Table[Edge]("andersens_assign"),
-      loadT = Table[Edge]("andersens_loadT"),
-      store = Table[Edge]("andersens_store")
-    )
+    addressOf = Table[Edge]("andersens_addressOf"),
+    assign = Table[Edge]("andersens_assign"),
+    loadT = Table[Edge]("andersens_loadT"),
+    store = Table[Edge]("andersens_store")
+  )
 
   // Collections data model + initialization
   case class EdgeCC(x: String, y: String)
@@ -56,7 +58,8 @@ class AndersensQuery extends QueryBenchmark {
   case class EdgeSS[T[_]](x: T[String], y: T[String])
 
   def fromSSRes(r: EdgeSS[?]): Seq[String] = Seq(
-    r.x.toString, r.y.toString
+    r.x.toString,
+    r.y.toString
   )
 
   object andersens_addressOf extends ScalaSQLTable[EdgeSS]
@@ -78,20 +81,29 @@ class AndersensQuery extends QueryBenchmark {
     val base = tyqlDB.addressOf.map(a => (x = a.x, y = a.y).toRow)
     val query = base.unrestrictedFix(pointsTo =>
       tyqlDB.assign.flatMap(a =>
-          pointsTo.filter(p => a.y == p.x).map(p =>
-            (x = a.x, y = p.y).toRow))
+        pointsTo.filter(p => a.y == p.x).map(p =>
+          (x = a.x, y = p.y).toRow
+        )
+      )
         .union(tyqlDB.loadT.flatMap(l =>
           pointsTo.flatMap(pt1 =>
             pointsTo
               .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
               .map(pt2 =>
-                (x = l.x, y = pt2.y).toRow))))
+                (x = l.x, y = pt2.y).toRow
+              )
+          )
+        ))
         .union(tyqlDB.store.flatMap(s =>
           pointsTo.flatMap(pt1 =>
             pointsTo
               .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
               .map(pt2 =>
-                (x = pt1.y, y = pt2.y).toRow)))))
+                (x = pt1.y, y = pt2.y).toRow
+              )
+          )
+        ))
+    )
       .sort(_.y, Ord.ASC).sort(_.x, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
@@ -101,20 +113,28 @@ class AndersensQuery extends QueryBenchmark {
     val base = collectionsDB.addressOf.map(a => EdgeCC(x = a.x, y = a.y))
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(pointsTo =>
       val v1 = collectionsDB.assign.flatMap(a =>
-          pointsTo.filter(p => a.y == p.x).map(p =>
-            EdgeCC(x = a.x, y = p.y)))
+        pointsTo.filter(p => a.y == p.x).map(p =>
+          EdgeCC(x = a.x, y = p.y)
+        )
+      )
       val v2 = collectionsDB.loadT.flatMap(l =>
-          pointsTo.flatMap(pt1 =>
-            pointsTo
-              .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
-              .map(pt2 =>
-                EdgeCC(x = l.x, y = pt2.y))))
+        pointsTo.flatMap(pt1 =>
+          pointsTo
+            .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
+            .map(pt2 =>
+              EdgeCC(x = l.x, y = pt2.y)
+            )
+        )
+      )
       val v3 = collectionsDB.store.flatMap(s =>
-          pointsTo.flatMap(pt1 =>
-            pointsTo
-              .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
-              .map(pt2 =>
-                EdgeCC(x = pt1.y, y = pt2.y))))
+        pointsTo.flatMap(pt1 =>
+          pointsTo
+            .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
+            .map(pt2 =>
+              EdgeCC(x = pt1.y, y = pt2.y)
+            )
+        )
+      )
       if set then (v1 ++ v2 ++ v3).distinct else v1 ++ v2 ++ v3
     )
       .sortBy(_.y).sortBy(_.x)
@@ -145,10 +165,14 @@ class AndersensQuery extends QueryBenchmark {
 
       innerQ1.union(innerQ2).union(innerQ3)
 
-
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, andersens_delta, andersens_tmp, andersens_derived
-    )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]])
+      ddb,
+      andersens_delta,
+      andersens_tmp,
+      andersens_derived
+    )((c: EdgeSS[?]) => (c.x, c.y))(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[EdgeSS] => query.Select[Any, Any]]
+    )
 
     val result = andersens_derived.select.sortBy(_.y).sortBy(_.x)
     resultScalaSQL = db.run(result)

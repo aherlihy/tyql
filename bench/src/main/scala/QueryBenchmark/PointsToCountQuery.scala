@@ -15,6 +15,8 @@ import tyql.Query.{fix, unrestrictedFix}
 import tyql.Expr.{IntLit, StringLit, min, sum}
 import Helpers.*
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class PointsToCountQuery extends QueryBenchmark {
   override def name = "pointstocount"
@@ -24,13 +26,14 @@ class PointsToCountQuery extends QueryBenchmark {
   // TYQL data model
   type ProgramHeapOp = (x: String, y: String, h: String)
   type ProgramOp = (x: String, y: String)
-  type PointsToDB = (newT: ProgramOp, assign: ProgramOp, loadT: ProgramHeapOp, store: ProgramHeapOp, baseHPT: ProgramHeapOp)
+  type PointsToDB =
+    (newT: ProgramOp, assign: ProgramOp, loadT: ProgramHeapOp, store: ProgramHeapOp, baseHPT: ProgramHeapOp)
   val tyqlDB = (
     newT = Table[ProgramOp]("pointstocount_new"),
     assign = Table[ProgramOp]("pointstocount_assign"),
     loadT = Table[ProgramHeapOp]("pointstocount_loadT"),
     store = Table[ProgramHeapOp]("pointstocount_store"),
-    baseHPT= Table[ProgramHeapOp]("pointstocount_hpt")
+    baseHPT = Table[ProgramHeapOp]("pointstocount_hpt")
   )
 
   // Collections data model + initialization
@@ -38,7 +41,14 @@ class PointsToCountQuery extends QueryBenchmark {
   case class PointsToCC(x: String, y: String)
   def toCollRow1(row: Seq[String]): PointsToCC = PointsToCC(row(0), row(1))
   def toCollRow2(row: Seq[String]): ProgramHeapCC = ProgramHeapCC(row(0), row(1), row(2))
-  case class CollectionsDB(newT: Seq[PointsToCC], assign: Seq[PointsToCC], loadT: Seq[ProgramHeapCC], store: Seq[ProgramHeapCC], hpt: Seq[ProgramHeapCC])
+  case class CollectionsDB
+    (
+        newT: Seq[PointsToCC],
+        assign: Seq[PointsToCC],
+        loadT: Seq[ProgramHeapCC],
+        store: Seq[ProgramHeapCC],
+        hpt: Seq[ProgramHeapCC]
+    )
   def fromCollRes1(r: PointsToCC): Seq[String] = Seq(
     r.x.toString,
     r.y.toString
@@ -66,8 +76,10 @@ class PointsToCountQuery extends QueryBenchmark {
       (name, loaded)
     ).toMap
     collectionsDB = CollectionsDB(
-      tables("new").asInstanceOf[Seq[PointsToCC]], tables("assign").asInstanceOf[Seq[PointsToCC]],
-      tables("loadT").asInstanceOf[Seq[ProgramHeapCC]], tables("store").asInstanceOf[Seq[ProgramHeapCC]],
+      tables("new").asInstanceOf[Seq[PointsToCC]],
+      tables("assign").asInstanceOf[Seq[PointsToCC]],
+      tables("loadT").asInstanceOf[Seq[ProgramHeapCC]],
+      tables("store").asInstanceOf[Seq[ProgramHeapCC]],
       Seq()
     )
 
@@ -157,14 +169,14 @@ class PointsToCountQuery extends QueryBenchmark {
         )
       )
       val vpt2 = collectionsDB.loadT.flatMap(l =>
-          heapPointsToAcc.flatMap(hpt =>
-            varPointsTo
-              .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
-              .map(pt2 =>
-                PointsToCC(x = l.x, y = hpt.h)
-              )
-          )
+        heapPointsToAcc.flatMap(hpt =>
+          varPointsTo
+            .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
+            .map(pt2 =>
+              PointsToCC(x = l.x, y = hpt.h)
+            )
         )
+      )
 
       val vpt = (vpt1 ++ vpt2).distinct
       val hpt = collectionsDB.store.flatMap(s =>
@@ -185,20 +197,24 @@ class PointsToCountQuery extends QueryBenchmark {
     val db = ddb.scalaSqlDb.getAutoCommitClientConnection
 
     val initBase = () =>
-      (pointstocount_new.select.map(c => (c.x, c.y)),
-        pointstocount_hpt.select.map(c => (c.x, c.y, c.h)))
+      (pointstocount_new.select.map(c => (c.x, c.y)), pointstocount_hpt.select.map(c => (c.x, c.y, c.h)))
 
     var it = 0
-    val fixFn: ((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[(Expr[String], Expr[String]), (String, String)], query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]) =
+    val fixFn
+      : ((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (
+          query.Select[(Expr[String], Expr[String]), (String, String)],
+          query.Select[(Expr[String], Expr[String], Expr[String]), (String, String, String)]
+      ) =
       recur =>
         val (varPointsTo, heapPointsTo) = recur
-        val (varPointsToAcc, heapPointsToAcc) = if it == 0 then (pointstocount_delta1, pointstocount_delta2) else (pointstocount_derived1, pointstocount_derived2)
+        val (varPointsToAcc, heapPointsToAcc) = if it == 0 then (pointstocount_delta1, pointstocount_delta2)
+        else (pointstocount_derived1, pointstocount_derived2)
         it += 1
         val vpt1 = for {
           a <- pointstocount_assign.select
           p <- varPointsTo.crossJoin()
           if a.y === p.x
-        } yield  (a.x, p.y)
+        } yield (a.x, p.y)
         val vpt2 = for {
           l <- pointstocount_loadT.select
           hpt <- heapPointsToAcc.crossJoin()
@@ -217,16 +233,23 @@ class PointsToCountQuery extends QueryBenchmark {
         (vpt, hpt)
 
     FixedPointQuery.scalaSQLSemiNaiveTWO(set)(
-      ddb, (pointstocount_delta1, pointstocount_delta2), (pointstocount_tmp1, pointstocount_tmp2), (pointstocount_derived1, pointstocount_derived2)
+      ddb,
+      (pointstocount_delta1, pointstocount_delta2),
+      (pointstocount_tmp1, pointstocount_tmp2),
+      (pointstocount_derived1, pointstocount_derived2)
     )(
       ((c: PointsToSS[?]) => (c.x, c.y), (c: ProgramHeapSS[?]) => (c.x, c.y, c.h))
     )(
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
-    )(fixFn.asInstanceOf[((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
+    )(fixFn.asInstanceOf[((ScalaSQLTable[PointsToSS], ScalaSQLTable[ProgramHeapSS])) => (
+        query.Select[Any, Any],
+        query.Select[Any, Any]
+    )])
 
 //    val result = pointstocount_derived2.select.filter(_.x === "r").size // this does not work!!!!!
 //    println(s"FINAL RES=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY r.x")}")
-    backupResultScalaSql = ddb.runQuery(s"SELECT COUNT(1) FROM ${ScalaSQLTable.name(pointstocount_derived2)} as r WHERE r.x = 'r'")
+    backupResultScalaSql =
+      ddb.runQuery(s"SELECT COUNT(1) FROM ${ScalaSQLTable.name(pointstocount_derived2)} as r WHERE r.x = 'r'")
 
 //    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY x, y")
 

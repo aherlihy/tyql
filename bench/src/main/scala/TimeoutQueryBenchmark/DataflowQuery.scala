@@ -14,6 +14,8 @@ import scala.NamedTuple.*
 import tyql.{Ord, Table}
 import tyql.Expr.{IntLit, min}
 
+import tyql.Dialect.ansi.given
+
 @experimental
 class TODataflowQuery extends QueryBenchmark {
   override def name = "dataflow"
@@ -26,10 +28,10 @@ class TODataflowQuery extends QueryBenchmark {
   type FlowDB = (readOp: Instruction, writeOp: Instruction, jumpOp: Jump)
 
   val tyqlDB = (
-      readOp = Table[Instruction]("dataflow_readOp"),
-      writeOp = Table[Instruction]("dataflow_writeOp"),
-      jumpOp = Table[Jump]("dataflow_jumpOp")
-    )
+    readOp = Table[Instruction]("dataflow_readOp"),
+    writeOp = Table[Instruction]("dataflow_writeOp"),
+    jumpOp = Table[Jump]("dataflow_jumpOp")
+  )
 
   // Collections data model + initialization
   case class InstructionCC(opN: String, varN: String)
@@ -60,7 +62,8 @@ class TODataflowQuery extends QueryBenchmark {
     collectionsDB = CollectionsDB(
       tables("readOp").asInstanceOf[Seq[InstructionCC]],
       tables("writeOp").asInstanceOf[Seq[InstructionCC]],
-      tables("jumpOp").asInstanceOf[Seq[JumpCC]])
+      tables("jumpOp").asInstanceOf[Seq[JumpCC]]
+    )
 
   //   ScalaSQL data model
   case class InstructionSS[T[_]](opN: T[String], varN: T[String])
@@ -92,24 +95,34 @@ class TODataflowQuery extends QueryBenchmark {
           .unrestrictedFix(flow =>
             flow.flatMap(f1 =>
               flow.filter(f2 => f1.b == f2.a).map(f2 =>
-                (a = f1.a, b = f2.b).toRow)))
+                (a = f1.a, b = f2.b).toRow
+              )
+            )
+          )
           .flatMap(f =>
             tyqlDB.readOp.flatMap(r =>
               tyqlDB.writeOp
                 .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
-                .map(w => (r = r.opN, w = w.opN).toRow)))
+                .map(w => (r = r.opN, w = w.opN).toRow)
+            )
+          )
           .sort(_.r, Ord.ASC).sort(_.w, Ord.ASC)
       else
         tyqlDB.jumpOp
           .unrestrictedBagFix(flow =>
             flow.flatMap(f1 =>
               flow.filter(f2 => f1.b == f2.a).map(f2 =>
-                (a = f1.a, b = f2.b).toRow)))
+                (a = f1.a, b = f2.b).toRow
+              )
+            )
+          )
           .flatMap(f =>
             tyqlDB.readOp.flatMap(r =>
               tyqlDB.writeOp
                 .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
-                .map(w => (r = r.opN, w = w.opN).toRow)))
+                .map(w => (r = r.opN, w = w.opN).toRow)
+            )
+          )
           .sort(_.r, Ord.ASC).sort(_.w, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
@@ -125,10 +138,14 @@ class TODataflowQuery extends QueryBenchmark {
         flow
           .filter(f2 =>
             if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-            f1.b == f2.a)
+            f1.b == f2.a
+          )
           .map(f2 =>
             if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-            JumpCC(a = f1.a, b = f2.b))))
+            JumpCC(a = f1.a, b = f2.b)
+          )
+      )
+    )
       .flatMap(f =>
         if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
         collectionsDB.readOp.flatMap(r =>
@@ -136,13 +153,16 @@ class TODataflowQuery extends QueryBenchmark {
           collectionsDB.writeOp
             .filter(w =>
               if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-              w.opN == f.a && w.varN == r.varN && f.b == r.opN)
+              w.opN == f.a && w.varN == r.varN && f.b == r.opN
+            )
             .map(w =>
               if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
-              ResultCC(r = r.opN, w = w.opN))))
+              ResultCC(r = r.opN, w = w.opN)
+            )
+        )
+      )
       .sortBy(_.r).sortBy(_.w)
     println(s"\nIT,$name,collections,$it")
-
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -160,8 +180,13 @@ class TODataflowQuery extends QueryBenchmark {
       } yield (f1.a, f2.b)
 
     FixedPointQuery.scalaSQLSemiNaive(set)(
-      ddb, dataflow_delta, dataflow_tmp, dataflow_derived
-    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[JumpSS] => query.Select[Any, Any]])
+      ddb,
+      dataflow_delta,
+      dataflow_tmp,
+      dataflow_derived
+    )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(
+      fixFn.asInstanceOf[ScalaSQLTable[JumpSS] => query.Select[Any, Any]]
+    )
 
 // Multi-join not working
 //    val result =
@@ -172,8 +197,8 @@ class TODataflowQuery extends QueryBenchmark {
 //      } yield (r.opN, w.opN)
 
     val result = "SELECT readOp168.opN as r, writeOp169.opN as w " +
-    s"FROM ${ScalaSQLTable.name(dataflow_derived)} as recref13, ${ScalaSQLTable.name(dataflow_readOp)} as readOp168, ${ScalaSQLTable.name(dataflow_writeOp)} as writeOp169 " +
-    "WHERE writeOp169.opN = recref13.a AND writeOp169.varN = readOp168.varN AND recref13.b = readOp168.opN ORDER BY w ASC, r ASC;"
+      s"FROM ${ScalaSQLTable.name(dataflow_derived)} as recref13, ${ScalaSQLTable.name(dataflow_readOp)} as readOp168, ${ScalaSQLTable.name(dataflow_writeOp)} as writeOp169 " +
+      "WHERE writeOp169.opN = recref13.a AND writeOp169.varN = readOp168.varN AND recref13.b = readOp168.opN ORDER BY w ASC, r ASC;"
     backupResultScalaSql = ddb.runQuery(result)
 
     println(s"\nIT,$name,scalasql,$it")

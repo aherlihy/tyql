@@ -5,24 +5,32 @@ import tyql.ResultTag.NamedTupleTag
 
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
-import NamedTupleDecomposition.*
+import NamedTupleDecomposition._
+import PolyfillTracking._
+import TreePrettyPrinter._
+import tyql.Expr.Exp
 
-/**
- * Logical query plan tree.
- * Moves all type parameters into terms (using ResultTag).
- * Collapses nested queries where possible.
- */
+/** Logical query plan tree. Moves all type parameters into terms (using ResultTag). Collapses nested queries where
+  * possible.
+  */
 object QueryIRTree:
 
-  def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
+  /** Wrapper around `generateQuery` that appends the Final flag to not include the surrounding ()s on the top-level.
+    */
+  def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
     generateQuery(ast, symbols).appendFlag(SelectFlags.Final) // ignore top-level parens
 
-  var idCount = 0
-  /**
-   * Convert table.filter(p1).filter(p2) => table.filter(p1 && p2).
-   * Example of a heuristic tree transformation/optimization
-   */
-  private def collapseFilters(filters: Seq[Expr.Fun[?, ?, ?]], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[Expr.Fun[?, ?, ?]], DatabaseAST[?]) =
+  /** Globally unique reference counter for identifiers, used for making aliases unique.
+    */
+  // XXX currently queries share this counter, which might result in larger numbers over time, but should not be dangerous since these are longs
+  var idCount = 0L
+
+  /** Convert table.filter(p1).filter(p2) => table.filter(p1 && p2). Example of a heuristic tree
+    * transformation/optimization
+    */
+  private def collapseFilters
+    (filters: Seq[Expr.Fun[?, ?, ?]], comprehension: DatabaseAST[?], symbols: SymbolTable)
+    : (Seq[Expr.Fun[?, ?, ?]], DatabaseAST[?]) =
     comprehension match
       case filter: Query.Filter[?, ?] =>
         collapseFilters(filters :+ filter.$pred, filter.$from, symbols)
@@ -36,42 +44,59 @@ object QueryIRTree:
         RecursiveIRVar(pointsToAlias, newRef, ast)
       case p => p
 
-  /**
-   * Convert n subsequent calls to flatMap into an n-way join.
-   * e.g. table.flatMap(t1 => table2.flatMap(t2 => table3.map(t3 => (k1 = t1, k2 = t2, k3 = t3))) =>
-   *    SELECT t1 as k1, t2 as k3, t3 as k3 FROM table1, table2, table3
-   */
-  private def collapseFlatMap(sources: Seq[RelationOp], symbols: SymbolTable, body: Any): (Seq[RelationOp], QueryIRNode) =
+  /** Convert n subsequent calls to flatMap into an n-way join. e.g. table.flatMap(t1 => table2.flatMap(t2 =>
+    * table3.map(t3 => (k1 = t1, k2 = t2, k3 = t3))) => SELECT t1 as k1, t2 as k3, t3 as k3 FROM table1, table2, table3
+    */
+  private def collapseFlatMap
+    (sources: Seq[(RelationOp, JoinType, Option[QueryIRNode])], symbols: SymbolTable, body: Any)
+    (using d: Dialect)
+    : (Seq[(RelationOp, JoinType, Option[QueryIRNode])], QueryIRNode) =
     body match
       case map: Query.Map[?, ?] =>
         val actualParam = generateActualParam(map.$from, map.$query.$param, symbols)
         val bodyIR = generateFun(map.$query, actualParam, symbols)
-        (sources :+ actualParam, bodyIR)
+        val onExpr = map.requestedJoinOn.map(actualOn =>
+          generateFun(actualOn, actualParam, symbols.bind(actualOn.$param.stringRef(), actualParam))
+        )
+        (sources :+ (actualParam, map.requestedJoinType.getOrElse(JoinType.InnerOrCrossImplicit), onExpr), bodyIR)
       case flatMap: Query.FlatMap[?, ?] => // found a flatMap to collapse
         val actualParam = generateActualParam(flatMap.$from, flatMap.$query.$param, symbols)
+        val onExpr = flatMap.requestedJoinOn.map(actualOn =>
+          generateFun(actualOn, actualParam, symbols.bind(actualOn.$param.stringRef(), actualParam))
+        )
         val (unevaluated, boundST) = partiallyGenerateFun(flatMap.$query, actualParam, symbols)
         collapseFlatMap(
-          sources :+ actualParam,
+          sources :+ (actualParam, flatMap.requestedJoinType.getOrElse(JoinType.InnerOrCrossImplicit), onExpr),
           boundST,
           unevaluated
         )
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
         val actualParam = generateActualParam(aggFlatMap.$from, aggFlatMap.$query.$param, symbols)
         val (unevaluated, boundST) = partiallyGenerateFun(aggFlatMap.$query, actualParam, symbols)
+        val onExpr = aggFlatMap.$from.requestedJoinOn.map(actualOn =>
+          generateFun(actualOn, actualParam, symbols.bind(actualOn.$param.stringRef(), actualParam))
+        )
         unevaluated match
           case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
             collapseFlatMap(
-              sources :+ actualParam,
+              sources :+ (
+                actualParam,
+                aggFlatMap.$from.requestedJoinType.getOrElse(JoinType.InnerOrCrossImplicit),
+                onExpr
+              ),
               boundST,
               recur
             )
           case _ => // base case
             val innerBodyIR = finishGeneratingFun(unevaluated, boundST)
-            (sources :+ actualParam, innerBodyIR)
+            (sources :+ (actualParam, JoinType.InnerOrCrossImplicit, None), innerBodyIR)
       // Found an operation that cannot be collapsed
       case otherOp: DatabaseAST[?] =>
         val fromNode = generateQuery(otherOp, symbols)
-        (sources :+ fromNode, ProjectClause(Seq(QueryIRVar(fromNode, fromNode.alias, null)), null))
+        (
+          sources :+ (fromNode, JoinType.InnerOrCrossImplicit, None),
+          ProjectClause(Seq(QueryIRVar(fromNode, fromNode.alias, null)), null)
+        )
       case _ => // Expr
         throw Exception(s"""
             Unimplemented: collapsing flatMap on type $body.
@@ -79,49 +104,111 @@ object QueryIRTree:
             TODO: decide semantics, e.g. should it automatically flatten? Nested data types? etc.
             """)
 
-
-  private def collapseSort(sorts: Seq[(Expr.Fun[?, ?, ?], Ord)], comprehension: DatabaseAST[?], symbols: SymbolTable): (Seq[(Expr.Fun[?, ?, ?], Ord)], DatabaseAST[?]) =
+  private def collapseSort
+    (sorts: Seq[(Expr.Fun[?, ?, ?], Ord)], comprehension: DatabaseAST[?], symbols: SymbolTable)
+    : (Seq[(Expr.Fun[?, ?, ?], Ord)], DatabaseAST[?]) =
     comprehension match
+      // TODO are you sure about this order? now _.sort().sort() will have different semantics than in Scala!
       case sort: Query.Sort[?, ?, ?] =>
         collapseSort(sorts :+ (sort.$body, sort.$ord), sort.$from, symbols)
       case _ => (sorts, comprehension)
 
-  // TODO: verify set vs. bag operator precendence is preserved in the generated queries
+  // TODO verify set vs. bag operator precendence is preserved in the generated queries
   private def collapseNaryOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: DatabaseAST[?]): NaryRelationOp =
-    val flattened = (
-      lhs match
-        case NaryRelationOp(lhsChildren, lhsOp, lhsAst) if op == lhsOp =>
-          lhsChildren
-        case _ => Seq(lhs)
+    val flattened =
+      (
+        lhs match
+          case NaryRelationOp(lhsChildren, lhsOp, lhsAst) if op == lhsOp =>
+            lhsChildren
+          case _ => Seq(lhs)
       ) ++ (
-      rhs match
-        case NaryRelationOp(rhsChildren, rhsOp, rhsAST) if op == rhsOp =>
-          rhsChildren
-        case _ => Seq(rhs)
+        rhs match
+          case NaryRelationOp(rhsChildren, rhsOp, rhsAST) if op == rhsOp =>
+            rhsChildren
+          case _ => Seq(rhs)
       )
 
     NaryRelationOp(flattened, op, ast)
 
-  private def collapseMap(lhs: QueryIRNode, rhs: QueryIRNode): RelationOp =
-    ???
+  private def collapseMap(lhs: QueryIRNode, rhs: QueryIRNode): RelationOp = ???
 
-  private def unnest(fromNodes: Seq[RelationOp], projectIR: QueryIRNode, flatMap: DatabaseAST[?]): RelationOp =
-    fromNodes.reduce((q1, q2) =>
-      val res = q1.mergeWith(q2, flatMap)
-      res
-    ).appendProject(projectIR, flatMap)
+  private def unnest
+    (fromNodes: Seq[(RelationOp, JoinType, Option[QueryIRNode])], projectIR: QueryIRNode, flatMap: DatabaseAST[?])
+    : RelationOp =
+    fromNodes
+      .reduceLeft((q1, q2) => (q1._1.mergeWith(q2._1, q2._2, q2._3, astOther = flatMap), null, null))
+      ._1
+      .appendProject(projectIR, astOther = flatMap)
 
-  /**
-   * Generate top-level or subquery
-   *
-   * @param ast Query AST
-   * @param symbols Symbol table, e.g. list of aliases in scope
-   * @return
-   */
-  private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
-    import TreePrettyPrinter.*
-//    println(s"genQuery: ast=$ast")
+  private def anyToExprConverter(v: Any): Expr[?, ?] =
+    v match
+      case _ if v.isInstanceOf[Some[?]]    => anyToExprConverter(v.asInstanceOf[Some[?]].get)
+      case _ if v.isInstanceOf[Int]        => lit(v.asInstanceOf[Int])
+      case _ if v.isInstanceOf[Long]       => lit(v.asInstanceOf[Long])
+      case _ if v.isInstanceOf[String]     => lit(v.asInstanceOf[String])
+      case _ if v.isInstanceOf[Double]     => lit(v.asInstanceOf[Double])
+      case _ if v.isInstanceOf[Float]      => lit(v.asInstanceOf[Float])
+      case _ if v.isInstanceOf[Boolean]    => lit(v.asInstanceOf[Boolean])
+      case _ if v.isInstanceOf[Expr[?, ?]] => v.asInstanceOf[Expr[?, ?]]
+      case _ if v.isInstanceOf[List[?]] =>
+        tyql.Expr.ListExpr[Any](v.asInstanceOf[List[?]].map(anyToExprConverter).asInstanceOf[List[Expr[
+          Any,
+          NonScalarExpr
+        ]]])(using ResultTag.ListTag(ResultTag.AnyTag))
+      case _ =>
+        println("RECEIVED UNEXPCTED " + v)
+        assert(false)
+
+  private[tyql] def generateUpdateToTheDB(ast: UpdateToTheDB, symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match
+      case insertAst: Insert[?] =>
+        val newValues = insertAst.values.map(_.map(anyToExprConverter).map(e => generateExpr(e, symbols)))
+        InsertQueryIR(insertAst.table, insertAst.names, newValues, insertAst)
+      case insertFromSelectAst: InsertFromSelect[?, ?] =>
+        val selectIR = generateQuery(insertFromSelectAst.query, symbols)
+        InsertFromSelectQueryIR(insertFromSelectAst.table, selectIR, insertFromSelectAst.names, insertFromSelectAst)
+      case deleteAst: Delete[?] =>
+        val tableRelOp = TableLeaf(deleteAst.table.$name, deleteAst.table, overrideAlias = Some(deleteAst.table.$name))
+        val allSymbols = symbols.bind(tableRelOp.carriedSymbols)
+        val predicateExpr = generateFun(deleteAst.p, tableRelOp, allSymbols)
+        var limitExpr: Option[QueryIRNode] = None
+        if deleteAst.limit.isDefined then
+          limitExpr = Some(LiteralInteger(deleteAst.limit.get, Expr.LongLit(deleteAst.limit.get)))
+        val orderBys = deleteAst.orderBys.map(ord =>
+          (generateFun(ord._1, tableRelOp, allSymbols), ord._2)
+        )
+        DeleteQueryIR(deleteAst.table, predicateExpr, orderBys, limitExpr, deleteAst)
+      case updateAst: Update[?] =>
+        val tableRelOp = TableLeaf(updateAst.table.$name, updateAst.table, overrideAlias = Some(updateAst.table.$name))
+        val allSymbols = symbols.bind(tableRelOp.carriedSymbols).bind(updateAst.setExprRef.stringRef(), tableRelOp)
+        val setExprs = updateAst.setExprs.map(e => generateExpr(e.asInstanceOf[Expr[?, NonScalarExpr]], allSymbols))
+        val whereExpr = updateAst.where.map(p => generateFun(p, tableRelOp, allSymbols))
+        var limitExpr: Option[QueryIRNode] = None
+        if updateAst.limit.isDefined then
+          limitExpr = Some(LiteralInteger(updateAst.limit.get, Expr.LongLit(updateAst.limit.get)))
+        val orderBys = updateAst.orderBys.map(ord =>
+          (generateFun(ord._1, tableRelOp, allSymbols), ord._2)
+        )
+        UpdateQueryIR(updateAst.table, updateAst.setNames, setExprs, whereExpr, orderBys, limitExpr, updateAst)
+
+  /** Generate top-level or subquery
+    *
+    * @param ast
+    *   Query AST
+    * @param symbols
+    *   Symbol table, e.g. list of aliases in scope
+    * @return
+    */
+  private def generateQuery(ast: DatabaseAST[?], symbols: SymbolTable)(using d: Dialect): RelationOp =
+    ast match
+      case values: Query.ValuesQuery[?] =>
+        val nodes = values.$values.toList.asInstanceOf[List[Tuple]].map(firstTuple =>
+          firstTuple.toList.map(anyToExprConverter).map(v => generateExpr(v, symbols))
+        )
+        ValuesLeaf(nodes, values.$names, values)
+      case exprs: Query.ExprsQuery[?] =>
+        val nodes = exprs.$values.toList.map(anyToExprConverter).map(v => generateExpr(v, symbols))
+        SelectExprsLeaf(nodes, exprs.$names, exprs)
       case table: Table[?] =>
         TableLeaf(table.$name, table)
       case map: Query.Map[?, ?] =>
@@ -137,11 +224,12 @@ object QueryIRTree:
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         actualParam.appendWhere(where, filter)
-      case filter: Aggregation.AggFilter[?] =>
+      case filter: Aggregation.AggFilter[?] => // same as for Query.Filter
         val (predicateASTs, fromNodeAST) = collapseFilters(Seq(), filter, symbols)
         val actualParam = generateActualParam(fromNodeAST, filter.$pred.$param, symbols)
+        val allSymbols = symbols.bind(actualParam.carriedSymbols)
         val predicateExprs = predicateASTs.map(pred =>
-          generateFun(pred, actualParam, symbols.bind(actualParam.carriedSymbols))
+          generateFun(pred, actualParam, allSymbols)
         )
         val where = WhereClause(predicateExprs, filter.$pred.$body)
         actualParam.appendWhere(where, filter)
@@ -149,54 +237,67 @@ object QueryIRTree:
         val (orderByASTs, fromNodeAST) = collapseSort(Seq(), sort, symbols)
         val actualParam = generateActualParam(fromNodeAST, sort.$body.$param, symbols)
         val orderByExprs = orderByASTs.map(ord =>
-          val res = generateFun(ord._1, actualParam, symbols)
-          (res, ord._2)
+          (generateFun(ord._1, actualParam, symbols), ord._2)
         )
         OrderedQuery(actualParam.appendFlag(SelectFlags.Final), orderByExprs, sort)
       case flatMap: Query.FlatMap[?, ?] =>
         val actualParam = generateActualParam(flatMap.$from, flatMap.$query.$param, symbols)
-        val (unevaluated, boundST) = partiallyGenerateFun(flatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
+        val (unevaluated, boundST) =
+          partiallyGenerateFun(flatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
         val (fromNodes, projectIR) = collapseFlatMap(
-          Seq(actualParam),
+          Seq((actualParam, JoinType.InnerOrCrossImplicit, None)),
           boundST,
           unevaluated
         )
-        import TreePrettyPrinter.*
-        /** TODO: this is where could create more complex join nodes,
-         * for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
-         */
+
+        /** for now r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE
+          * f1 AND f2
+          */
         unnest(fromNodes, projectIR, flatMap)
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
         val actualParam = generateActualParam(aggFlatMap.$from, aggFlatMap.$query.$param, symbols)
-        val (unevaluated, boundST) = partiallyGenerateFun(aggFlatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
+        val (unevaluated, boundST) =
+          partiallyGenerateFun(aggFlatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
         val (fromNodes, projectIR) = unevaluated match
-         case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
-           collapseFlatMap(
-             Seq(actualParam),
-             boundST,
-             recur
-           )
-         case _ => // base case
+          case recur: (Query.Map[?, ?] | Query.FlatMap[?, ?] | Aggregation.AggFlatMap[?, ?]) =>
+            collapseFlatMap(
+              Seq((actualParam, JoinType.InnerOrCrossImplicit, None)),
+              boundST,
+              recur
+            )
+          case _ => // base case
             val innerBodyIR = finishGeneratingFun(unevaluated, boundST)
-            (Seq(actualParam), innerBodyIR)
+            (Seq((actualParam, JoinType.InnerOrCrossImplicit, None)), innerBodyIR)
         unnest(fromNodes, projectIR, aggFlatMap)
-      case relOp: (Query.Union[?] | Query.UnionAll[?] | Query.Intersect[?] | Query.IntersectAll[?] | Query.Except[?] | Query.ExceptAll[?]) =>
+      case relOp: (Query.Union[?] | Query.UnionAll[?] | Query.Intersect[?] | Query.IntersectAll[?] | Query.Except[
+            ?
+          ] | Query.ExceptAll[?]) =>
         val (thisN, thatN, category, op) = relOp match
-          case set: Query.Union[?] => (set.$this, set.$other, "", "UNION")
-          case bag: Query.UnionAll[?] => (bag.$this, bag.$other, " ALL", "UNION")
-          case set: Query.Intersect[?] => (set.$this, set.$other, "", "INTERSECT")
+          case set: Query.Union[?]        => (set.$this, set.$other, "", "UNION")
+          case bag: Query.UnionAll[?]     => (bag.$this, bag.$other, " ALL", "UNION")
+          case set: Query.Intersect[?]    => (set.$this, set.$other, "", "INTERSECT")
           case bag: Query.IntersectAll[?] => (bag.$this, bag.$other, " ALL", "INTERSECT")
-          case set: Query.Except[?] => (set.$this, set.$other, "", "EXCEPT")
-          case bag: Query.ExceptAll[?] => (bag.$this, bag.$other, " ALL", "EXCEPT")
+          case set: Query.Except[?]       => (set.$this, set.$other, "", "EXCEPT")
+          case bag: Query.ExceptAll[?]    => (bag.$this, bag.$other, " ALL", "EXCEPT")
         val lhs = generateQuery(thisN, symbols).appendFlag(SelectFlags.ExprLevel)
         val rhs = generateQuery(thatN, symbols).appendFlag(SelectFlags.ExprLevel)
         collapseNaryOp(lhs, rhs, s"$op$category", relOp)
       case limit: Query.Limit[?, ?] =>
         val from = generateQuery(limit.$from, symbols)
-        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, Expr.IntLit(limit.$limit)), "LIMIT", limit)
+        collapseNaryOp(
+          from.appendFlag(SelectFlags.Final),
+          LiteralInteger(limit.$limit, Expr.IntLit(limit.$limit)),
+          "LIMIT",
+          limit
+        )
       case offset: Query.Offset[?, ?] =>
         val from = generateQuery(offset.$from, symbols)
-        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, Expr.IntLit(offset.$offset)), "OFFSET", offset)
+        collapseNaryOp(
+          from.appendFlag(SelectFlags.Final),
+          LiteralInteger(offset.$offset, Expr.IntLit(offset.$offset)),
+          "OFFSET",
+          offset
+        )
       case distinct: Query.Distinct[?] =>
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
       case queryRef: Query.QueryRef[?, ?] =>
@@ -228,8 +329,13 @@ object QueryIRTree:
         val finalQ = multiRecursive.$resultQuery match
           case ref: QueryRef[?, ?] =>
             val v = vars.find((id, _) => id == ref.stringRef()).get._2
-            SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery)
-          case q => ??? //generateQuery(q, allSymbols, multiRecursive.$resultQuery)
+            SelectAllQuery(
+              Seq((v, JoinType.InnerOrCrossImplicit, None)),
+              Seq(),
+              Some(v.alias),
+              multiRecursive.$resultQuery
+            )
+          case q => ??? // generateQuery(q, allSymbols, multiRecursive.$resultQuery)
 
         MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive)
 
@@ -243,13 +349,14 @@ object QueryIRTree:
             if from.length != tags.length then throw new Exception("Unimplemented: groupBy on complex query")
             from
           case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _) =>
-            carriedSymbols.map(_._2)
+            carriedSymbols.map(_._2).map(v => (v, JoinType.InnerOrCrossImplicit, None))
           case _ => throw new Exception("Unimplemented: groupBy on complex query")
 
-        val newSymbols = symbols.bind(sourceRefs.zipWithIndex.map((r, i) => (r.stringRef(), sourceTables(i))))
+        val newSymbols = symbols.bind(sourceRefs.zipWithIndex.map((r, i) => (r.stringRef(), sourceTables(i)._1)))
+        // Turn off the attribute names for the grouping clause since no aliases needed
         grouping.tag match
           case t: NamedTupleTag[?, ?] => t.names = List()
-          case _ =>
+          case _                      =>
         val groupingIR = generateExpr(grouping, newSymbols)
         val havingIR = having.map(h => generateExpr(h, newSymbols))
 
@@ -261,7 +368,7 @@ object QueryIRTree:
         def getSource(f: RelationOp): RelationOp = f match
           case SelectQuery(project, from, where, overrideAlias, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
-            SelectQuery(collapseMap(select, project), from, where, None, groupBy)
+            SelectQuery(collapseMap(select, project), from, where, None, groupBy) // TODO implement
           case SelectAllQuery(from, where, overrideAlias, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, from, where, None, groupBy)
@@ -270,59 +377,74 @@ object QueryIRTree:
             MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, ast)
           case _ =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
-            SelectQuery(select, Seq(fromIR), Seq(), None, groupBy) // force subquery
+            SelectQuery(
+              select,
+              Seq((fromIR, JoinType.InnerOrCrossImplicit, None)),
+              Seq(),
+              None,
+              groupBy
+            ) // force subquery
 
         val source = getSource(fromIR)
 
         // Turn off the attribute names for the grouping clause since no aliases needed
         groupBy.$groupingFn.$body.tag match
           case t: NamedTupleTag[?, ?] => t.names = List()
-          case _ =>
+          case _                      =>
         val groupByIR = generateFun(groupBy.$groupingFn, fromIR, symbols)
         val havingIR = groupBy.$havingFn.map(f => generateFun(f, fromIR, symbols))
         GroupByQuery(source.appendFlag(SelectFlags.Final), groupByIR, havingIR, overrideAlias = None, ast = groupBy)
 
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
-
-  private def generateActualParam(from: DatabaseAST[?], formalParam: Expr.Ref[?, ?], symbols: SymbolTable): RelationOp =
+  private def generateActualParam
+    (from: DatabaseAST[?], formalParam: Expr.Ref[?, ?], symbols: SymbolTable)
+    (using d: Dialect)
+    : RelationOp =
     lookupRecursiveRef(generateQuery(from, symbols), formalParam.stringRef())
-  /**
-   * Generate the actual parameter expression and bind it to the formal parameter in the symbol table, but
-   * leave the function body uncompiled.
-   */
-  private def partiallyGenerateFun(fun: Expr.Fun[?, ?, ?], actualParam: RelationOp, symbols: SymbolTable): (Any, SymbolTable) =
+
+  /** Generate the actual parameter expression and bind it to the formal parameter in the symbol table, but leave the
+    * function body uncompiled.
+    */
+  private def partiallyGenerateFun
+    (fun: Expr.Fun[?, ?, ?], actualParam: RelationOp, symbols: SymbolTable)
+    : (Any, SymbolTable) =
     val boundST = symbols.bind(fun.$param.stringRef(), actualParam)
     (fun.$body, boundST)
 
-  /**
-   * Compile the function body.
-   */
-  private def finishGeneratingFun(funBody: Any, boundST: SymbolTable): QueryIRNode =
+  /** Compile the function body.
+    */
+  private def finishGeneratingFun(funBody: Any, boundST: SymbolTable)(using d: Dialect): QueryIRNode =
     funBody match
       //      case r: Expr.Ref[?] if r.stringRef() == fun.$param.stringRef() => SelectAllExpr() // special case identity function
-      case e: Expr[?, ?] => generateExpr(e, boundST)
+      case e: Expr[?, ?]     => generateExpr(e, boundST)
       case d: DatabaseAST[?] => generateQuery(d, boundST)
-      case _ => ??? // TODO: find better way to differentiate
+      case _                 => ??? // TODO: find better way to differentiate
 
-  /**
-   * Generate a function, return the actual parameter and the function body.
-   * Sometimes, want to split this function into separate steps, for the cases where you want to collate multiple
-   * function bodies within a single expression.
-   */
-  private def generateFun(fun: Expr.Fun[?, ?, ?], appliedTo: RelationOp, symbols: SymbolTable): QueryIRNode =
+  /** Generate a function, return the actual parameter and the function body. Sometimes, want to split this function
+    * into separate steps, for the cases where you want to collate multiple function bodies within a single expression.
+    */
+  private def generateFun
+    (fun: Expr.Fun[?, ?, ?], appliedTo: RelationOp, symbols: SymbolTable)
+    (using d: Dialect)
+    : QueryIRNode =
     val (body, boundSymbols) = partiallyGenerateFun(fun, appliedTo, symbols)
     finishGeneratingFun(body, boundSymbols)
 
-
-  private def generateProjection(p: Expr.Project[?] | AggregationExpr.AggProject[?], symbols: SymbolTable): QueryIRNode =
+  private def generateProjection
+    (p: Expr.Project[?] | AggregationExpr.AggProject[?], symbols: SymbolTable)
+    (using d: Dialect)
+    : QueryIRNode =
     val projectAST = p match
-      case e: Expr.Project[?] => e.$a
+      case e: Expr.Project[?]               => e.$a
       case a: AggregationExpr.AggProject[?] => a.$a
-    val tupleOfProject = NamedTuple.toTuple(projectAST.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
+    val tupleOfProject =
+      NamedTuple.toTuple(
+        projectAST.asInstanceOf[NamedTuple[Tuple, Tuple]]
+      ) // TODO: bug? See https://github.com/scala/scala3/issues/21157
     val namedTupleNames = p.tag match
       case ResultTag.NamedTupleTag(names, types) => names.lift
-      case _ => Seq()
+      case _                                     => Seq()
     val children = tupleOfProject.toList.zipWithIndex
       .map((expr, idx) =>
         val e = expr.asInstanceOf[Expr[?, ?]]
@@ -330,63 +452,518 @@ object QueryIRTree:
       )
     ProjectClause(children, p)
 
-  private def generateExpr(ast: Expr[?, ?], symbols: SymbolTable): QueryIRNode =
+  private def generateExprInWindowPosition
+    (ast: ExprInWindowPosition[?], symbols: SymbolTable)
+    (using d: Dialect)
+    : QueryIRNode =
+    ast match
+      case _: RowNumber => FunctionCallOp("ROW_NUMBER", Seq(), Expr.FunctionCall0[Int]("ROW_NUMBER"))
+      case _: Rank      => FunctionCallOp("RANK", Seq(), Expr.FunctionCall0[Int]("RANK"))
+      case _: DenseRank => FunctionCallOp("DENSE_RANK", Seq(), Expr.FunctionCall0[Int]("DENSE_RANK"))
+      case n: NTile => FunctionCallOp(
+          "NTILE",
+          Seq(LiteralInteger(n.n, Expr.IntLit(n.n))),
+          Expr.FunctionCall1[Int, Int, NonScalarExpr]("NTILE", Expr.IntLit(n.n))
+        )
+      case l: Lag[?, ?] =>
+        if l.default.isDefined then
+          FunctionCallOp(
+            "LAG",
+            Seq(
+              generateExpr(l.e, symbols),
+              LiteralInteger(l.offset.get, Expr.IntLit(l.offset.get)),
+              generateExpr(l.default.get, symbols)
+            ),
+            null
+          )
+        else if l.offset.isDefined then
+          FunctionCallOp(
+            "LAG",
+            Seq(generateExpr(l.e, symbols), LiteralInteger(l.offset.get, Expr.IntLit(l.offset.get))),
+            null
+          )
+        else
+          FunctionCallOp("LAG", Seq(generateExpr(l.e, symbols)), null)
+      case l: Lead[?, ?] =>
+        if l.default.isDefined then
+          FunctionCallOp(
+            "LEAD",
+            Seq(
+              generateExpr(l.e, symbols),
+              LiteralInteger(l.offset.get, Expr.IntLit(l.offset.get)),
+              generateExpr(l.default.get, symbols)
+            ),
+            null
+          )
+        else if l.offset.isDefined then
+          FunctionCallOp(
+            "LEAD",
+            Seq(generateExpr(l.e, symbols), LiteralInteger(l.offset.get, Expr.IntLit(l.offset.get))),
+            null
+          )
+        else
+          FunctionCallOp("LEAD", Seq(generateExpr(l.e, symbols)), null)
+      case l: FirstValue[?, ?] =>
+        FunctionCallOp("FIRST_VALUE", Seq(generateExpr(l.e, symbols)), null)
+      case l: LastValue[?, ?] =>
+        FunctionCallOp("LAST_VALUE", Seq(generateExpr(l.e, symbols)), null)
+      case l: NthValue[?, ?] =>
+        FunctionCallOp("NTH_VALUE", Seq(generateExpr(l.e, symbols), LiteralInteger(l.n, Expr.IntLit(l.n))), null)
+
+  private def generateExpr(ast: Expr[?, ?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match
       case ref: Expr.Ref[?, ?] =>
         val name = ref.stringRef()
         val sub = symbols(name)
         QueryIRVar(sub, name, ref) // TODO: singleton?
-      case s: Expr.Select[?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
+      case s: Expr.Select[?]  => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
       case p: Expr.Project[?] => generateProjection(p, symbols)
-      case g: Expr.Gt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
-      case g: Expr.Lt[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
-      case g: Expr.Lte[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", g)
-      case g: Expr.GtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
-      case g: Expr.LtDouble[?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
-      case a: Expr.And[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", a)
-      case n: Expr.Not[?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", n)
-      case a: Expr.Plus[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", a)
-      case a: Expr.Times[?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", a)
-      case a: Expr.Eq[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", a)
-      case a: Expr.Ne[?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", a)
+      case c: Expr.Cast[?, ?, ?] =>
+        c.resultType match
+          case CastTarget.CString => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.stringCast})", c)
+          case CastTarget.CBool   => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.booleanCast})", c)
+          case CastTarget.CDouble => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.doubleCast})", c)
+          case CastTarget.CInt    => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.integerCast})", c)
+          case CastTarget.CFloat  => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.floatCast})", c)
+          case CastTarget.CLong   => UnaryExprOp("CAST(", generateExpr(c.$x, symbols), s" AS ${d.longCast})", c)
+      case w: WindExpr[?] =>
+        val ae = w.ae match
+          case Left(aggrExpr)    => generateExpr(aggrExpr, symbols)
+          case Right(windowExpr) => generateExprInWindowPosition(windowExpr, symbols)
+        val partitionBy = w.partitionBy.map(generateExpr(_, symbols))
+        WindowFunctionOp(ae, partitionBy, Seq(), w)
+      case om: Expr.OptionMap[?, ?, ?] =>
+        val mapExpr = om.$f.asInstanceOf[Expr[?, NonScalarExpr] => Expr[?, NonScalarExpr]](om.$x.asInstanceOf[Expr[
+          ?,
+          NonScalarExpr
+        ]])
+        val wholeExpr = tyql.cases(
+          om.$x.isNull -> tyql.Null,
+          tyql.Else -> mapExpr.asInstanceOf[Expr[Null, NonScalarExpr]]
+        )
+        val compiledExpr = generateExpr(wholeExpr, symbols)
+        compiledExpr
+      case g: Expr.Gt[?, ?, ?, ?] =>
+        BinExprOp("", generateExpr(g.$x, symbols), " > ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case g: Expr.Lt[?, ?, ?, ?] =>
+        BinExprOp("", generateExpr(g.$x, symbols), " < ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case g: Expr.Lte[?, ?, ?, ?] =>
+        BinExprOp("", generateExpr(g.$x, symbols), " <= ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case g: Expr.Gte[?, ?, ?, ?] =>
+        BinExprOp("", generateExpr(g.$x, symbols), " >= ", generateExpr(g.$y, symbols), "", Precedence.Comparison, g)
+      case b: Expr.Between[?, ?, ?, ?] =>
+        val expr = generateExpr(b.$x, symbols)
+        val lower = generateExpr(b.$min, symbols)
+        val upper = generateExpr(b.$max, symbols)
+        val ae = ("ae", Precedence.Comparison)
+        val al = ("al", Precedence.Comparison)
+        val au = ("au", Precedence.Comparison)
+        RawSQLInsertOp(
+          SqlSnippet(Precedence.Comparison, snippet"$ae BETWEEN $al AND $au"),
+          Map(ae._1 -> expr, al._1 -> lower, au._1 -> upper),
+          Precedence.Comparison,
+          b
+        )
+      case a: Expr.And[?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " AND ", generateExpr(a.$y, symbols), "", Precedence.And, a)
+      case a: Expr.Or[?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " OR ", generateExpr(a.$y, symbols), "", Precedence.Or, a)
+      case Expr.Not(inner: Expr.IsNull[?, ?]) => UnaryExprOp("", generateExpr(inner.$x, symbols), " IS NOT NULL", ast)
+      case n: Expr.Not[?]                     => UnaryExprOp("NOT ", generateExpr(n.$x, symbols), "", n)
+      case x: Expr.Xor[?] =>
+        d.xorOperatorSupportedNatively match
+          case true =>
+            BinExprOp("", generateExpr(x.$x, symbols), " XOR ", generateExpr(x.$y, symbols), "", 45, x)
+          case false =>
+            polyfillWasUsed()
+            BinExprOp("(", generateExpr(x.$x, symbols), " = TRUE) <> (", generateExpr(x.$y, symbols), " = TRUE)", 43, x)
+      case f0: Expr.FunctionCall0NoParentheses[?] => FunctionCallOp(f0.name, Seq(), f0, false)
+      case f0: Expr.FunctionCall0[?]              => FunctionCallOp(f0.name, Seq(), f0)
+      case f1: Expr.FunctionCall1[?, ?, ?]        => FunctionCallOp(f1.name, Seq(generateExpr(f1.$a1, symbols)), f1)
+      case f2: Expr.FunctionCall2[?, ?, ?, ?, ?] =>
+        FunctionCallOp(f2.name, Seq(f2.$a1, f2.$a1).map(generateExpr(_, symbols)), f2)
+      case u: Expr.RandomUUID => FunctionCallOp(d.feature_RandomUUID_functionName, Seq(), u)
+      case f: Expr.RandomFloat =>
+        assert(
+          d.feature_RandomFloat_functionName.isDefined != d.feature_RandomFloat_rawSQL.isDefined,
+          "RandomFloat dialect feature must have either a function name or raw SQL"
+        )
+        if d.feature_RandomFloat_functionName.isDefined then
+          FunctionCallOp(d.feature_RandomFloat_functionName.get, Seq(), f)
+        else
+          polyfillWasUsed()
+          RawSQLInsertOp(d.feature_RandomFloat_rawSQL.get, Map(), d.feature_RandomFloat_rawSQL.get.precedence, f)
+      case i: Expr.RandomInt[?, ?] =>
+        polyfillWasUsed()
+        RawSQLInsertOp(
+          d.feature_RandomInt_rawSQL,
+          Map("a" -> generateExpr(i.$x, symbols), "b" -> generateExpr(i.$y, symbols)),
+          d.feature_RandomInt_rawSQL.precedence,
+          i
+        )
+      case a: Expr.Plus[?, ?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " + ", generateExpr(a.$y, symbols), "", Precedence.Additive, a)
+      case a: Expr.Minus[?, ?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " - ", generateExpr(a.$y, symbols), "", Precedence.Additive, a)
+      case a: Expr.Div[?, ?, ?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " / ", generateExpr(a.$y, symbols), "", Precedence.Multiplicative, a)
+      case a: Expr.Times[?, ?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " * ", generateExpr(a.$y, symbols), "", Precedence.Multiplicative, a)
+      case a: Expr.Eq[?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " = ", generateExpr(a.$y, symbols), "", Precedence.Comparison, a)
+      case a: Expr.Ne[?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " <> ", generateExpr(a.$y, symbols), "", Precedence.Comparison, a)
+      case e: Expr.NullSafeEq[?, ?] =>
+        val a = ("a", Precedence.Comparison)
+        val b = ("b", Precedence.Comparison)
+        RawSQLInsertOp(
+          SqlSnippet(
+            Precedence.Comparison,
+            if d.nullSafeEqualityViaSpecialOperator then
+              snippet"$a <=> $b"
+            else
+              snippet"$a IS NOT DISTINCT FROM $b"
+          ),
+          Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)),
+          Precedence.Comparison,
+          e
+        )
+      case e: Expr.NullSafeNe[?, ?] =>
+        val a = ("a", Precedence.Comparison)
+        val b = ("b", Precedence.Comparison)
+        if d.nullSafeEqualityViaSpecialOperator then
+          RawSQLInsertOp(
+            SqlSnippet(Precedence.Unary, snippet"NOT($a <=> $b)"),
+            Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)),
+            Precedence.Unary,
+            e
+          )
+        else
+          RawSQLInsertOp(
+            SqlSnippet(Precedence.Comparison, snippet"$a IS DISTINCT FROM $b"),
+            Map(a._1 -> generateExpr(e.$x, symbols), b._1 -> generateExpr(e.$y, symbols)),
+            Precedence.Comparison,
+            e
+          )
+      case a: Expr.Modulo[?, ?] =>
+        BinExprOp("", generateExpr(a.$x, symbols), " % ", generateExpr(a.$y, symbols), "", Precedence.Multiplicative, a)
+      case r: Expr.Round[?, ?] => FunctionCallOp("ROUND", Seq(generateExpr(r.$x, symbols)), r)
+      case r: Expr.RoundWithPrecision[?, ?, ?] =>
+        FunctionCallOp("ROUND", Seq(generateExpr(r.$x, symbols), generateExpr(r.$precision, symbols)), r)
+      case c: Expr.Ceil[?, ?]  => FunctionCallOp("CEIL", Seq(generateExpr(c.$x, symbols)), c)
+      case f: Expr.Floor[?, ?] => FunctionCallOp("FLOOR", Seq(generateExpr(f.$x, symbols)), f)
+      case p: Expr.Power[?, ?, ?, ?] =>
+        FunctionCallOp("POWER", Seq(generateExpr(p.$x, symbols), generateExpr(p.$y, symbols)), p)
+      case s: Expr.Sqrt[?, ?]       => FunctionCallOp("SQRT", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Sign[?, ?]       => FunctionCallOp("SIGN", Seq(generateExpr(s.$x, symbols)), s)
+      case l: Expr.LogNatural[?, ?] => FunctionCallOp("LN", Seq(generateExpr(l.$x, symbols)), l)
+      case l: Expr.Log[?, ?, ?, ?] =>
+        FunctionCallOp("LOG", Seq(generateExpr(l.$base, symbols), generateExpr(l.$x, symbols)), l)
+      case e: Expr.Exp[?, ?]  => FunctionCallOp("EXP", Seq(generateExpr(e.$x, symbols)), e)
+      case s: Expr.Sin[?, ?]  => FunctionCallOp("SIN", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Cos[?, ?]  => FunctionCallOp("COS", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Tan[?, ?]  => FunctionCallOp("TAN", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Asin[?, ?] => FunctionCallOp("ASIN", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Acos[?, ?] => FunctionCallOp("ACOS", Seq(generateExpr(s.$x, symbols)), s)
+      case s: Expr.Atan[?, ?] => FunctionCallOp("ATAN", Seq(generateExpr(s.$x, symbols)), s)
+      case e: Expr.DateYear[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(YEAR FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%Y', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.DateMonth[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(MONTH FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%m', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.DateDay[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(DAY FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%d', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampYear[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(YEAR FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%Y', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampMonth[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(MONTH FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%m', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampDay[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(DAY FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%d', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampHours[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(HOUR FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%H', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampMinutes[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(MINUTE FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%M', ", generateExpr(e.$x, symbols), ") as INT)", e)
+      case e: Expr.TimestampSeconds[?] =>
+        if d.canExtractDateTimeComponentsNatively then
+          UnaryExprOp("EXTRACT(SECOND FROM ", generateExpr(e.$x, symbols), ")", e)
+        else
+          UnaryExprOp("CAST(strftime('%S', ", generateExpr(e.$x, symbols), ") as INT)", e)
       case a: Expr.Concat[?, ?, ?, ?] =>
         val lhsIR = generateExpr(a.$x, symbols) match
           case p: ProjectClause => p
-          case v: QueryIRVar => SelectExpr("*", v, a.$x)
+          case v: QueryIRVar    => SelectExpr("*", v, a.$x)
           case _ => throw new Exception("Unimplemented: concatting something that is not a literal nor a variable")
         val rhsIR = generateExpr(a.$y, symbols) match
           case p: ProjectClause => p
-          case v: QueryIRVar => SelectExpr("*", v, a.$y)
+          case v: QueryIRVar    => SelectExpr("*", v, a.$y)
           case _ => throw new Exception("Unimplemented: concatting something that is not a literal nor a variable")
 
         BinExprOp(
+          "",
           lhsIR,
+          ", ",
           rhsIR,
-          (l, r) => s"$l, $r",
+          "",
+          Precedence.Concat,
           a
         )
-      case l: Expr.DoubleLit => Literal(s"${l.$value}", l)
-      case l: Expr.IntLit => Literal(s"${l.$value}", l)
-      case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
-      case l: Expr.BooleanLit => Literal(s"\"${l.$value}\"", l)
-      case l: Expr.Lower[?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
-      case a: AggregationExpr[?] => generateAggregation(a, symbols)
-      case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
+      case n: Expr.NullLit[?] => RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"NULL"), Map(), Precedence.Unary, n)
+      case i: Expr.IsNull[?, ?] => UnaryExprOp("", generateExpr(i.$x, symbols), " IS NULL", i)
+      case c: Expr.Coalesce[?, ?] =>
+        FunctionCallOp("COALESCE", (Seq(c.$x1, c.$x2) ++ c.$xs).map(generateExpr(_, symbols)), c)
+      case i: Expr.NullIf[?, ?, ?] =>
+        FunctionCallOp("NULLIF", Seq(generateExpr(i.$x, symbols), generateExpr(i.$y, symbols)), i)
+      case l: Expr.DoubleLit        => LiteralDouble(l.$value, l)
+      case l: Expr.FloatLit         => LiteralDouble(l.$value, l)
+      case l: Expr.IntLit           => LiteralInteger(l.$value, l)
+      case l: Expr.LongLit          => LiteralInteger(l.$value, l)
+      case l: Expr.LocalDateLit     => LiteralLocalDate(l.$value, l)
+      case l: Expr.LocalDateTimeLit => LiteralLocalDateTime(l.$value, l)
+      case l: Expr.BytesLit         => LiteralBytes(l.$value, l)
+      case l: Expr.ByteStreamLit    => LiteralByteStream(l.$value, l)
+      case l: Expr.StringLit        => LiteralString(l.$value, insideLikePatternQuoting = false, l)
+      case l: Expr.BooleanLit =>
+        if l.$value then
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"TRUE"), Map(), Precedence.Unary, l)
+        else
+          RawSQLInsertOp(SqlSnippet(Precedence.Unary, snippet"FALSE"), Map(), Precedence.Unary, l)
+      case c: Expr.SearchedCase[?, ?, ?] => SearchedCaseOp(
+          c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))),
+          c.$else.map(generateExpr(_, symbols)),
+          c
+        )
+      case c: Expr.SimpleCase[?, ?, ?, ?] => SimpleCaseOp(
+          generateExpr(c.$expr, symbols),
+          c.$cases.map(w => (generateExpr(w._1, symbols), generateExpr(w._2, symbols))),
+          c.$else.map(generateExpr(_, symbols)),
+          c
+        )
+      case l: Expr.Lower[?]      => UnaryExprOp("LOWER(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.Upper[?]      => UnaryExprOp("UPPER(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.StrReverse[?] => UnaryExprOp("REVERSE(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.Trim[?]       => UnaryExprOp("TRIM(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.LTrim[?]      => UnaryExprOp("LTRIM(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.RTrim[?]      => UnaryExprOp("RTRIM(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.StrReplace[?, ?] => FunctionCallOp(
+          "REPLACE",
+          Seq(generateExpr(l.$s, symbols), generateExpr(l.$from, symbols), generateExpr(l.$to, symbols)),
+          l
+        )
+      case l: Expr.StrLike[?, ?] =>
+        l.$pattern match
+          case Expr.StringLit(pattern) => BinExprOp(
+              "",
+              generateExpr(l.$s, symbols),
+              "LIKE ",
+              LiteralString(pattern, insideLikePatternQuoting = true, l.$pattern),
+              "",
+              Precedence.Comparison,
+              l
+            )
+          case _ => assert(false, "LIKE pattern must be a string literal")
+      case l: Expr.Substring[?, ?] =>
+        if l.$len.isEmpty then
+          FunctionCallOp("SUBSTRING", Seq(generateExpr(l.$s, symbols), generateExpr(l.$from, symbols)), l)
+        else
+          FunctionCallOp(
+            "SUBSTRING",
+            Seq(generateExpr(l.$s, symbols), generateExpr(l.$from, symbols), generateExpr(l.$len.get, symbols)),
+            l
+          )
+      case l: Expr.StrConcat[?, ?] => FunctionCallOp("CONCAT", (Seq(l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
+      case l: Expr.StrConcatUniform[?] =>
+        FunctionCallOp("CONCAT", (Seq(l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
+      case l: Expr.StrConcatSeparator[?, ?] =>
+        FunctionCallOp("CONCAT_WS", (Seq(l.$sep, l.$x) ++ l.$xs).map(generateExpr(_, symbols)), l)
+      case l: Expr.StringCharLength[?] =>
+        UnaryExprOp(d.stringLengthByCharacters + "(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.StringByteLength[?] =>
+        if d.stringLengthBytesNeedsEncodeFirst then
+          UnaryExprOp("OCTET_LENGTH(ENCODE(", generateExpr(l.$x, symbols), "))", l)
+        else
+          UnaryExprOp("OCTET_LENGTH(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.ByteByteLength[?] =>
+        UnaryExprOp("OCTET_LENGTH(", generateExpr(l.$x, symbols), ")", l)
+      case l: Expr.StrRepeat[?, ?] =>
+        if !d.needsStringRepeatPolyfill then
+          FunctionCallOp("REPEAT", Seq(generateExpr(l.$s, symbols), generateExpr(l.$n, symbols)), l)
+        else
+          val str = ("str", Precedence.Concat)
+          val num = ("num", Precedence.Concat)
+          polyfillWasUsed()
+          RawSQLInsertOp(
+            SqlSnippet(
+              Precedence.Unary,
+              snippet"(with stringRepeatParameters as (select $str as str, $num as num) select SUBSTR(REPLACE(PRINTF('%.*c', num, 'x'), 'x', str), 1, length(str)*num) from stringRepeatParameters)"
+            ),
+            Map(str._1 -> generateExpr(l.$s, symbols), num._1 -> generateExpr(l.$n, symbols)),
+            Precedence.Unary,
+            l
+          )
+      case l: Expr.StrLPad[?, ?] =>
+        if !d.needsStringLPadRPadPolyfill then
+          FunctionCallOp(
+            "LPAD",
+            Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)),
+            l
+          )
+        else
+          val str = ("str", Precedence.Concat)
+          val pad = ("pad", Precedence.Concat)
+          val num = ("num", Precedence.Concat)
+          polyfillWasUsed()
+          RawSQLInsertOp(
+            SqlSnippet(
+              Precedence.Unary,
+              snippet"(with lpadParameters as (select $str as str, $pad as pad, $num as num) select substr(substr(replace(hex(zeroblob(num)), '00', pad), 1, num - length(str)) || str, 1, num) from lpadParameters)"
+            ),
+            Map(
+              str._1 -> generateExpr(l.$s, symbols),
+              pad._1 -> generateExpr(l.$pad, symbols),
+              num._1 -> generateExpr(l.$len, symbols)
+            ),
+            Precedence.Unary,
+            l
+          )
+      case l: Expr.StrRPad[?, ?] =>
+        if !d.needsStringLPadRPadPolyfill then
+          FunctionCallOp(
+            "RPAD",
+            Seq(generateExpr(l.$s, symbols), generateExpr(l.$len, symbols), generateExpr(l.$pad, symbols)),
+            l
+          )
+        else
+          val str = ("str", Precedence.Concat)
+          val pad = ("pad", Precedence.Concat)
+          val num = ("num", Precedence.Concat)
+          polyfillWasUsed()
+          RawSQLInsertOp(
+            SqlSnippet(
+              Precedence.Unary,
+              snippet"(with rpadParameters as (select $str as str, $pad as pad, $num as num) select substr(str || substr(replace(hex(zeroblob(num)), '00', pad), 1, num - length(str)), 1, num) from rpadParameters)"
+            ),
+            Map(
+              str._1 -> generateExpr(l.$s, symbols),
+              pad._1 -> generateExpr(l.$pad, symbols),
+              num._1 -> generateExpr(l.$len, symbols)
+            ),
+            Precedence.Unary,
+            l
+          )
+      case l: Expr.StrPositionIn[?, ?] => d.stringPositionFindingVia match
+          case "POSITION" => BinExprOp(
+              "POSITION(",
+              generateExpr(l.$substr, symbols),
+              " IN ",
+              generateExpr(l.$string, symbols),
+              ")",
+              Precedence.Unary,
+              l
+            )
+          case "LOCATE" =>
+            FunctionCallOp("LOCATE", Seq(generateExpr(l.$substr, symbols), generateExpr(l.$string, symbols)), l)
+          case "INSTR" =>
+            FunctionCallOp("INSTR", Seq(generateExpr(l.$string, symbols), generateExpr(l.$substr, symbols)), l)
+      case a: AggregationExpr[?]  => generateAggregation(a, symbols)
+      case a: Aggregation[?, ?]   => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
-      case p: Expr.ListPrepend[?] => BinExprOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), (l, r) => s"list_prepend($l, $r)", p)
-      case p: Expr.ListAppend[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_append($l, $r)", p)
-      case p: Expr.ListContains[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_contains($l, $r)", p)
-      case p: Expr.ListLength[?] => UnaryExprOp(generateExpr(p.$list, symbols), s => s"length($s)", p)
-      case p: Expr.NonEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"EXISTS ($s)", p)
-      case p: Expr.IsEmpty[?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"NOT EXISTS ($s)", p)
+      case c: Expr.ListConcat[?] =>
+        BinExprOp(
+          "",
+          generateExpr(c.$xs, symbols),
+          " || ",
+          generateExpr(c.$ys, symbols),
+          "",
+          Precedence.Concat,
+          c
+        )
+      case p: Expr.ListPrepend[?] => BinExprOp(
+          d.arrayPrependFunctionName + "(",
+          generateExpr(p.$x, symbols),
+          ", ",
+          generateExpr(p.$list, symbols),
+          ")",
+          Precedence.Unary,
+          p
+        )
+      case p: Expr.ListAppend[?] => BinExprOp(
+          "ARRAY_APPEND(",
+          generateExpr(p.$list, symbols),
+          ", ",
+          generateExpr(p.$x, symbols),
+          ")",
+          Precedence.Unary,
+          p
+        )
+      case p: Expr.ListContains[?] => BinExprOp(
+          "",
+          generateExpr(p.$x, symbols),
+          " = ANY(",
+          generateExpr(p.$list, symbols),
+          ")",
+          Precedence.Unary,
+          p
+        )
+      case p: Expr.ListLength[?] => UnaryExprOp(d.arrayLengthFunctionName + "(", generateExpr(p.$list, symbols), ")", p)
+      case p: Expr.NonEmpty[?] =>
+        UnaryExprOp("EXISTS (", generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), ")", p)
+      case p: Expr.IsEmpty[?] =>
+        UnaryExprOp("NOT EXISTS (", generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), ")", p)
+      case p: Expr.Contains[?] =>
+        val inner = generateExpr(p.$expr, symbols)
+        val needsParens = !isLiteral(inner)
+        BinExprOp(
+          if needsParens then "(" else "",
+          removeAliases(inner),
+          (if needsParens then ")" else "") + " IN (",
+          generateQuery(p.$query, symbols).appendFlag(SelectFlags.Final),
+          ")",
+          Precedence.Comparison,
+          p
+        )
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
-  private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable): QueryIRNode =
+  private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match
-      case s: AggregationExpr.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
-      case s: AggregationExpr.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
-      case s: AggregationExpr.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
-      case s: AggregationExpr.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
-      case c: AggregationExpr.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT($o)", c)
+      case s: AggregationExpr.Sum[?]        => UnaryExprOp("SUM(", generateExpr(s.$a, symbols), ")", s)
+      case s: AggregationExpr.Avg[?]        => UnaryExprOp("AVG(", generateExpr(s.$a, symbols), ")", s)
+      case s: AggregationExpr.Min[?]        => UnaryExprOp("MIN(", generateExpr(s.$a, symbols), ")", s)
+      case s: AggregationExpr.Max[?]        => UnaryExprOp("MAX(", generateExpr(s.$a, symbols), ")", s)
+      case c: AggregationExpr.Count[?]      => UnaryExprOp("COUNT(", generateExpr(c.$a, symbols), ")", c)
       case p: AggregationExpr.AggProject[?] => generateProjection(p, symbols)
-      case _ => throw new Exception(s"Unimplemented aggregation op: $ast")
+
+  private def removeAliases(x: QueryIRNode): QueryIRNode =
+    x match
+      case ProjectClause(children, ast) => ProjectClause(children.map(removeAliases), ast)
+      case AttrExpr(child, name, ast)   => AttrExpr(child, None, ast)
+      case _                            => x
+
+  private def isLiteral(x: QueryIRNode): Boolean =
+    x match
+      case LiteralInteger(_, _)   => true
+      case LiteralDouble(_, _)    => true
+      case LiteralString(_, _, _) => true
+      case _                      => false

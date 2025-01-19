@@ -5,6 +5,8 @@ import tyql.*
 import test.query.{commerceDBs, AllCommerceDBs}
 import language.experimental.namedTuples
 
+import Dialect.ansi.given
+
 class MissingAttributeCompileErrorTest extends munit.FunSuite {
   def testDescription: String = "named tuples require attributes to exist"
   def expectedError: String = "doesNotExist is not a member of"
@@ -43,7 +45,8 @@ class MissingAttributeCompileErrorTest extends munit.FunSuite {
              tables.shipInfos.map(si =>
                (name = b.name, shippingDate = si.doesNotExist).toRow
              )
-        """)
+        """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -88,7 +91,8 @@ class MapMapProjectCompileErrorTest extends munit.FunSuite {
                (name = b.name, shippingDate = si.shippingDate).toRow
              )
            )
-        """)
+        """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -133,7 +137,8 @@ class MapMapToRowCompileErrorTest extends munit.FunSuite {
               (name = b.name, shippingDate = si.shippingDate).toRow
             )
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -178,7 +183,8 @@ class MapMapAggregateCompileErrorTest extends munit.FunSuite {
               Expr.sum(si.buyerId)
             )
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -223,7 +229,8 @@ class MapMapAggregateProjectCompileErrorTest extends munit.FunSuite {
               (e = Expr.sum(si.buyerId)).toRow
             )
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -264,7 +271,8 @@ class AggregateFluentMapCompileErrorTest extends munit.FunSuite {
 
           // TEST
           tables.products.withFilter(p => p.price != 0).sum(_.price).map(_) // should fail to compile because cannot call query methods on aggregation result
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -307,7 +315,8 @@ class FlatmapExprCompileErrorTest extends munit.FunSuite {
           tables.buyers.flatMap(b =>
             (bName = b.name, bId = b.id).toRow
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -352,7 +361,8 @@ class FlatmapFlatmapCompileErrorTest extends munit.FunSuite {
               (name = b.name, shippingDate = si.shippingDate).toRow
             )
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -397,7 +407,8 @@ class MapFlatmapCompileErrorTest extends munit.FunSuite {
               (name = b.name, shippingDate = si.shippingDate).toRow
             )
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -439,7 +450,8 @@ class AggregateWithoutAggregationCompileErrorTest extends munit.FunSuite {
           // TEST
           tables.products
             .aggregate(p => p.price)
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -482,7 +494,8 @@ class AggregateWithoutAggregationProjectCompileErrorTest extends munit.FunSuite 
           import AggregationExpr.toRow
           tables.products
             .aggregate(p => (pr = p.price, pid = p.id).toRow)
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -523,7 +536,8 @@ class AggregateFluentFilterCompileErrorTest extends munit.FunSuite {
 
           // TEST
           tables.products.aggregate(p => (avgPrice = Expr.avg(p.price))).filter(r => r == 10)
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -566,7 +580,8 @@ class AggregateInMapErrorTest extends munit.FunSuite {
           tables.shipInfos.map(si =>
             Expr.sum(si.buyerId)
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -609,7 +624,8 @@ class AggregateInMapProjectErrorTest extends munit.FunSuite {
           tables.shipInfos.map(si =>
             (s = Expr.sum(si.buyerId)).toRow
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -653,7 +669,8 @@ class AggregateInMapSubexpressionErrorTest extends munit.FunSuite {
           tables.shipInfos.map(si =>
             (s = si.id == Expr.sum(si.buyerId)).toRow
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -696,7 +713,8 @@ class AggregateInFlatmapErrorTest extends munit.FunSuite {
           tables.shipInfos.flatMap(si =>
             Expr.sum(si.buyerId)
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -739,7 +757,8 @@ class AggregateInFlatmapProjectErrorTest extends munit.FunSuite {
           tables.shipInfos.flatMap(si =>
             (e = Expr.sum(si.buyerId)).toRow
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -784,7 +803,8 @@ class AggregateInNestedFlatmapErrorTest extends munit.FunSuite {
               Expr.sum(si.buyerId)
             )
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -831,7 +851,8 @@ class MapInNestedAggregateErrorTest extends munit.FunSuite {
               (newId = si.id, bId = b.id).toRow
             )
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -876,7 +897,8 @@ class MixedProjectAggregateErrorTest extends munit.FunSuite {
           tables.buyers.aggregate(b =>
             (maxbId=Expr.max(b.id), bId = b.id).toRow
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
@@ -919,10 +941,8 @@ class MixedProjectMapErrorTest extends munit.FunSuite {
           tables.buyers.map(b =>
             (maxbId=Expr.max(b.id), bId = b.id).toRow
           )
-          """)
+          """
+      )
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
-
-
-
