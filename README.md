@@ -78,7 +78,7 @@ db.run(q)
 The query will be computed and rendered only once, no matter how many times it is run with different parameters.
 
 ### What about transactions and other driver-specific functionality?
-We do not replace JDBC, only wrap its `Connection` with oue `DB`.
+We do not replace JDBC, only wrap its `Connection` with our `DB`.
 ```scala
 try {
   conn.setAutoCommit(false)
@@ -92,3 +92,10 @@ try {
   conn.close()
 }
 ```
+
+### Limits of compile-time correctness checking
+So far known things that we do not check at compile-time:
+* correctness of casts (like `person.name.asDouble`) *(design decision)*,
+* that selected expressions in `GROUP BY` queries are either aggregations or groupings *(bug, work in progress)*,
+* out-of-bound index access, e.g. `lit(List(1,2,3))(10)` (which compiles to `ARRAY[1,2,3][11]`) *(unsure if this should be supported for literals)*,
+* existence of tables/relations, as well as permissions *(design decision)*.
