@@ -14,7 +14,10 @@ class ArrayTest extends FunSuite {
       val q = Exprs[(a: List[String])](Tuple1(List("a", "b", "c")))
       val got = db.run(q)
       assertEquals(got.length, 1)
-      assertEquals(got(0).toList(0), List("a", "b", "c")) // workaround around using got.head.a which triggers some bug in the compiler
+      assertEquals(
+        got(0).toList(0),
+        List("a", "b", "c")
+      ) // workaround around using got.head.a which triggers some bug in the compiler
     }
 
     withDB.allWithArraySupport { conn =>
@@ -22,7 +25,10 @@ class ArrayTest extends FunSuite {
       val q = Exprs[(a: List[Long])](Tuple1(List(1L, 2L, 5L)))
       val got = db.run(q)
       assertEquals(got.length, 1)
-      assertEquals(got(0).toList(0), List(1L, 2L, 5L)) // workaround around using got.head.a which triggers some bug in the compiler
+      assertEquals(
+        got(0).toList(0),
+        List(1L, 2L, 5L)
+      ) // workaround around using got.head.a which triggers some bug in the compiler
     }
 
     withDB.allWithArraySupport { conn =>
@@ -30,7 +36,10 @@ class ArrayTest extends FunSuite {
       val q = Exprs[(a: List[Boolean])](Tuple1(tyql.Expr.ListExpr[Boolean](List(lit(true), lit(false), lit(false)))))
       val got = db.run(q)
       assertEquals(got.length, 1)
-      assertEquals(got(0).toList(0), List(true, false, false)) // workaround around using got.head.a which triggers some bug in the compiler
+      assertEquals(
+        got(0).toList(0),
+        List(true, false, false)
+      ) // workaround around using got.head.a which triggers some bug in the compiler
     }
   }
 
