@@ -31,7 +31,7 @@ You can then examine the SQL
 println(q.toSQLString())
 ```
 or run it against the database and receive Scala-native data structures back
-```
+```scala
 val conn = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5433/testdb", "testuser", "testpass")
 val db = tyql.DB(conn)
 db.run(q)
