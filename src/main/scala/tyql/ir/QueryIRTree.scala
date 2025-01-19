@@ -510,12 +510,14 @@ object QueryIRTree:
       case l: NthValue[?, ?] =>
         FunctionCallOp("NTH_VALUE", Seq(generateExpr(l.e, symbols), LiteralInteger(l.n, Expr.IntLit(l.n))), null)
 
-  private def generateExpr(ast: Expr[?, ?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
+  private[tyql] def generateExpr(ast: Expr[?, ?], symbols: SymbolTable)(using d: Dialect): QueryIRNode =
     ast match
       case ref: Expr.Ref[?, ?] =>
         val name = ref.stringRef()
         val sub = symbols(name)
         QueryIRVar(sub, name, ref) // TODO: singleton?
+      case vi: Expr.VariableInput[?] =>
+        VariableInputOp(vi, vi)
       case s: Expr.Select[?]  => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
       case p: Expr.Project[?] => generateProjection(p, symbols)
       case c: Expr.Cast[?, ?, ?] =>

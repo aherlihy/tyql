@@ -381,6 +381,25 @@ object Expr:
   // so that we don't accidentally pick a field name of a constructor class where we want
   // a name in the domain model instead.
 
+  case class VariableInput[T]($thunk: () => T)(using t: ResultTag[T], s: SimpleTypeResultTag[T])
+      extends Expr[T, NonScalarExpr] {
+    def evaluateToLiteral(): Expr[T, NonScalarExpr] = {
+      val got = $thunk()
+      if got == null then return tyql.Null
+      t match
+        case ResultTag.NullTag          => tyql.Null
+        case ResultTag.IntTag           => IntLit(got.asInstanceOf[Int])
+        case ResultTag.LongTag          => LongLit(got.asInstanceOf[Long])
+        case ResultTag.DoubleTag        => DoubleLit(got.asInstanceOf[Double])
+        case ResultTag.FloatTag         => FloatLit(got.asInstanceOf[Float])
+        case ResultTag.StringTag        => StringLit(got.asInstanceOf[String])
+        case ResultTag.BoolTag          => BooleanLit(got.asInstanceOf[Boolean])
+        case ResultTag.LocalDateTag     => LocalDateLit(got.asInstanceOf[java.time.LocalDate])
+        case ResultTag.LocalDateTimeTag => LocalDateTimeLit(got.asInstanceOf[java.time.LocalDateTime])
+        case _                          => assert(false, "Unexpected type " + t)
+    }
+  }
+
   // These case classes could technically contain e.g. 1 < 'a', but there are no user-exposes functions to create such expressions
   type IsString[T] = T =:= String
   type Comparable[T] = Numeric[T] | IsString[T]
@@ -743,3 +762,7 @@ private case class ElseToken()
 val Else = new ElseToken()
 val CurrentTime = Expr.FunctionCall0NoParentheses[java.time.LocalDateTime]("CURRENT_TIMESTAMP")
 val CurrentDate = Expr.FunctionCall0NoParentheses[java.time.LocalDate]("CURRENT_DATE")
+
+def Var[T](thunk: => T)(using ResultTag[T], SimpleTypeResultTag[T]): Expr[T, NonScalarExpr] = Expr.VariableInput(() => {
+  thunk
+})

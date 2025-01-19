@@ -165,6 +165,19 @@ case class RawSQLInsertOp
           replacements(name).computeSQL(ctx)
     }.mkString
 
+/** Variable inputs so we can utilize the cache between different invocations */
+case class VariableInputOp[T](vi: Expr.VariableInput[T], val ast: Expr[?, ?]) extends QueryIRNode:
+  override val precedence: Int = Precedence.Literal
+  override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
+    cnf.parameterStyle match
+      case ParameterStyle.EscapedInline =>
+        val exprHere = vi.evaluateToLiteral()
+        val qHere = QueryIRTree.generateExpr(exprHere, SymbolTable())
+        qHere.computeSQL(ctx)
+      case ParameterStyle.DriverParametrized =>
+        ctx.sql.append(preferredPlaceholder(ctx, ctx.parameters.size + 1))
+        ctx.parameters.append(vi)
+
 case class WindowFunctionOp
   (expr: QueryIRNode, partitionBy: Seq[QueryIRNode], orderBy: Seq[(QueryIRNode, tyql.Ord)], ast: Expr[?, ?])
     extends QueryIRNode:

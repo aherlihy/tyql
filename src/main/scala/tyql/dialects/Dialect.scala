@@ -97,7 +97,7 @@ object Dialect:
           snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(random() * (b - a + 1) + a)::integer from randomIntParameters)"
         )
       override def stringPositionFindingVia: String = "POSITION"
-      override val `prefers $n over ? for parametrization` = true
+      // override val `prefers $n over ? for parametrization` = false
       override def arrayLengthFunctionName: String = "CARDINALITY"
 
     given RandomUUID = new RandomUUID {}

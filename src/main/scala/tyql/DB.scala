@@ -89,6 +89,22 @@ class DB(conn: Connection) {
               ps.setTimestamp(i + 1, java.sql.Timestamp.valueOf(v.asInstanceOf[LocalDateTime]))
             case v if v.isInstanceOf[Function0[?]] =>
               ps.setBinaryStream(i + 1, v.asInstanceOf[() => java.io.InputStream]())
+            case v if v.isInstanceOf[Expr.VariableInput[?]] =>
+              val objNow = v.asInstanceOf[Expr.VariableInput[?]].$thunk()
+              if objNow == null then ps.setNull(i + 1, java.sql.Types.NULL)
+              else
+                objNow match
+                  case v if v.isInstanceOf[Long]    => ps.setLong(i + 1, v.asInstanceOf[Long])
+                  case v if v.isInstanceOf[Int]     => ps.setInt(i + 1, v.asInstanceOf[Int])
+                  case v if v.isInstanceOf[Double]  => ps.setDouble(i + 1, v.asInstanceOf[Double])
+                  case v if v.isInstanceOf[Float]   => ps.setFloat(i + 1, v.asInstanceOf[Float])
+                  case v if v.isInstanceOf[Boolean] => ps.setBoolean(i + 1, v.asInstanceOf[Boolean])
+                  case v if v.isInstanceOf[String]  => ps.setString(i + 1, v.asInstanceOf[String])
+                  case v if v.isInstanceOf[LocalDate] =>
+                    ps.setDate(i + 1, java.sql.Date.valueOf(v.asInstanceOf[LocalDate]))
+                  case v if v.isInstanceOf[LocalDateTime] =>
+                    ps.setTimestamp(i + 1, java.sql.Timestamp.valueOf(v.asInstanceOf[LocalDateTime]))
+                  case _ => assert(false, "Unexpected type out of the VariableInput's thunk.")
             case v => ps.setObject(i + 1, v)
         rs = ps.executeQuery()
       case tyql.ParameterStyle.EscapedInline =>
@@ -301,7 +317,7 @@ def driverMain(): Unit = {
   // println(q.toQueryIR.toSQLQuery()._1)
   // println(db.run(q))
 
-  val q2 = Exprs[(a: List[Long])](Tuple1(ListExpr(List(1L, 2L, 3L))))
+  val q2 = Exprs[(a: Int)](Tuple1(lit(10) + VariableInput(() => 20)))
   println(q2.toQueryIR.toSQLQuery()._1)
   pprintln(db.run(q2))
 }
