@@ -11,6 +11,7 @@ import tyql.Dialect.ansi.given
 class PrecedenceTests extends FunSuite {
   def expectB(expected: Boolean)(rs: ResultSet) = assertEquals(rs.getBoolean(1), expected)
   def expectI(expected: Int)(rs: ResultSet) = assertEquals(rs.getInt(1), expected)
+  def expectD(expected: Double)(rs: ResultSet) = assertEquals(rs.getDouble(1), expected)
 
   val t = tyql.True
   val f = tyql.False
@@ -71,11 +72,10 @@ class PrecedenceTests extends FunSuite {
     checkExprDialect[Boolean](t ^ t || f, expectB(false))(withDB.all)
   }
 
-  test("integer precedence -- division and subtraction".ignore) {
-    // TODO we currently do not handle / as it's very dialect specific and not yet implemented
-    // checkExprDialect[Int](i3 / i1 - i2, expectI(2))(withDB.all)
-    // checkExprDialect[Int](i3 - i1 / i2, expectI(2))(withDB.all)
-    // checkExprDialect[Int](i3 / (i1 - i2), expectI(-3))(withDB.all)
+  test("integer precedence -- division and subtraction") {
+    checkExprDialect[Double](i3 / i1 - i2.asDouble, expectD(1.0))(withDB.all)
+    checkExprDialect[Double](i3.asDouble - i1 / i2, expectD(2.5))(withDB.all)
+    checkExprDialect[Double](i3 / (i1 - i2), expectD(-3.0))(withDB.all)
   }
 
   test("mixed precedence -- arithmetic with boolean") {
