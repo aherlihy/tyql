@@ -1,50 +1,5 @@
 package tyql
 
-import com.mysql.cj.xdevapi.SqlResult
-
-// Mostly compatible with https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
-object Precedence {
-  val Literal = 100 // literals, identifiers
-  val ListOps = 95 // list_append, list_prepend, list_contains
-  val Unary = 90 // NOT, EXIST, etc
-  val Multiplicative = 80 // *, /
-  val Additive = 70 // +, -
-  val Comparison = 60 // =, <>, <, >, <=, >=
-  val And = 50 // AND
-  val Or = 40 // OR
-  val Concat = 10 // , in select clause
-  val Default = 0
-}
-
-// I profiled query generation with Async Profiler and I have not noticed anything standing out, it probably does not make sense to
-// optimize this further, but we should verify that string generation takes more time than query generation, since benchmarks with
-// JHM tell me that query generation vs string generation is 60 vs 40% and Async Profiler tells me that string generation is 60 vs 40%.
-// To use Async Profiler I had to, on my machine, do
-// sudo sysctl kernel.kptr_restrict=0  # from 0
-// sudo sysctl kernel.perf_event_paranoid=1  # from 4
-class SQLRenderingContext {
-  val sql = new StringBuilder
-  val parameters = new scala.collection.mutable.ArrayBuffer[Object]
-
-  def mkString(elements: Seq[QueryIRNode], sep: String)(using d: Dialect)(using cnf: Config): Unit =
-    mkString(elements, "", sep, "")(using d)(using cnf)
-
-  def mkString
-    (elements: Seq[QueryIRNode], start: String, sep: String, end: String)
-    (using d: Dialect)
-    (using cnf: Config)
-    : Unit =
-    sql.append(start)
-    var first = true
-    for e <- elements do
-      if first then
-        first = false
-      else
-        sql.append(sep)
-      e.computeSQL(this)
-    sql.append(end)
-}
-
 /** Nodes in the query IR tree, representing expressions / subclauses
   */
 trait QueryIRNode:
