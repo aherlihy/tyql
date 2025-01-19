@@ -890,6 +890,15 @@ object QueryIRTree:
       case a: AggregationExpr[?]  => generateAggregation(a, symbols)
       case a: Aggregation[?, ?]   => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
+      case g: Expr.ListGet[?] => BinExprOp(
+          "",
+          generateExpr(g.$list, symbols),
+          "[",
+          generateExpr(g.$i, symbols),
+          "]",
+          Precedence.Comparison,
+          g
+        )
       case c: Expr.ListConcat[?] =>
         BinExprOp(
           "",

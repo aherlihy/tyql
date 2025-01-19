@@ -53,6 +53,32 @@ class ArrayTest extends FunSuite {
     }
   }
 
+  test("array indexing") {
+    withDB.allWithArraySupport { conn =>
+      val db = tyql.DB(conn)
+      val q = Exprs[(a: String)](Tuple1(lit(List("a", "b", "c", "e"))(0)))
+      val got = db.run(q)
+      assertEquals(got.length, 1)
+      assertEquals(got.head.toList.head, "a")
+    }
+
+    withDB.allWithArraySupport { conn =>
+      val db = tyql.DB(conn)
+      val q = Exprs[(a: String)](Tuple1(lit(List("a", "b", "c", "e"))(2)))
+      val got = db.run(q)
+      assertEquals(got.length, 1)
+      assertEquals(got.head.toList.head, "c")
+    }
+
+    withDB.allWithArraySupport { conn =>
+      val db = tyql.DB(conn)
+      val q = Exprs[(a: String)](Tuple1(lit(List("a", "b", "c", "e"))(3)))
+      val got = db.run(q)
+      assertEquals(got.length, 1)
+      assertEquals(got.head.toList.head, "e")
+    }
+  }
+
   test("array concat") {
     withDB.allWithArraySupport { conn =>
       val db = tyql.DB(conn)

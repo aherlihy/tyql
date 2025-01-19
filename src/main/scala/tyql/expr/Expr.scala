@@ -320,7 +320,7 @@ object Expr:
     assert(strs.nonEmpty, "concatWith requires at least one argument")
     StrConcatSeparator(sep, strs.head, strs.tail)
 
-  extension [A](x: Expr[List[A], NonScalarExpr])(using ResultTag[List[A]])
+  extension [A](x: Expr[List[A], NonScalarExpr])(using ResultTag[A], ResultTag[List[A]])
     def prepend(elem: Expr[A, NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListPrepend(elem, x)
     def append(elem: Expr[A, NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListAppend(x, elem)
     // XXX Due to Scala overloading bugs, there can be no two extensions methods named `contains` with similar arguments.
@@ -328,6 +328,7 @@ object Expr:
     def containsElement(elem: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] = ListContains(x, elem)
     def length: Expr[Int, NonScalarExpr] = ListLength(x)
     def ++(other: Expr[List[A], NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListConcat(x, other)
+    def apply(i: Expr[Int, NonScalarExpr]): Expr[A, NonScalarExpr] = ListGet(x, Expr.Plus(i, Expr.IntLit(1)))
 
   // Aggregations
   def sum[T : ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Sum(x)
@@ -524,6 +525,8 @@ object Expr:
   case class ListContains[A]($list: Expr[List[A], NonScalarExpr], $x: Expr[A, NonScalarExpr])(using ResultTag[Boolean])
       extends Expr[Boolean, NonScalarExpr]
   case class ListLength[A]($list: Expr[List[A], NonScalarExpr])(using ResultTag[Int]) extends Expr[Int, NonScalarExpr]
+  case class ListGet[A]($list: Expr[List[A], NonScalarExpr], $i: Expr[Int, NonScalarExpr])(using ResultTag[A])
+      extends Expr[A, NonScalarExpr]
   case class ListConcat[A]
     ($xs: Expr[List[A], NonScalarExpr], $ys: Expr[List[A], NonScalarExpr])
     (using ResultTag[List[A]])
