@@ -2,6 +2,7 @@ package tyql
 
 import tyql.SelectFlags.Final
 import scala.compiletime.ops.double
+import tyql.TreePrettyPrinter.prettyPrintIR
 
 // XXX In this file we probably lose the original ASTs when merging when we apply some simplification operations, for now when don't know that to do, pick the second ast
 
@@ -477,6 +478,7 @@ case class SelectQuery
     ctx.sql.append("SELECT ")
     if flags.contains(SelectFlags.Distinct) then ctx.sql.append("DISTINCT ")
     project.computeSQL(ctx)
+    if project.isInstanceOf[QueryIRVar] then ctx.sql.append(".*")
     ctx.sql.append(" FROM ")
     from.head._1.computeSQL(ctx)
     var first = true

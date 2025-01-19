@@ -392,8 +392,8 @@ class NestedJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, String] 
     """
       SELECT subquery$A.name
       FROM
-        (SELECT product$X FROM purchase as purchase$Y, product as product$X) as subquery$A,
-        (SELECT product$R FROM purchase as purchase$S, product as product$R) as subquery$B
+        (SELECT product$X.* FROM purchase as purchase$Y, product as product$X) as subquery$A,
+        (SELECT product$R.* FROM purchase as purchase$S, product as product$R) as subquery$B
     """
 }
 
@@ -636,10 +636,10 @@ class NestedJoinSubquery13Test extends SQLStringQueryTest[AllCommerceDBs, Buyer]
   def expectedQueryPattern =
     """
       SELECT
-        buyers$B
+        buyers$B.*
       FROM
         (SELECT
-           product$D
+           product$D.*
          FROM
             purchase as purchase$C,
             product as product$D) as subquery$A,

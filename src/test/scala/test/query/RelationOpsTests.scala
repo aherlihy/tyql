@@ -33,10 +33,10 @@ class RelationOpsUnion2Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
       .map(prod => prod)
       .union(testDB.tables.products.map(purch => purch))
   def expectedQueryPattern: String = """
-        (SELECT product$A
+        (SELECT product$A.*
         FROM product as product$A)
         UNION
-        (SELECT product$B
+        (SELECT product$B.*
         FROM product as product$B)
       """
 }
@@ -52,13 +52,13 @@ class RelationOpsUnion3Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
 
   def expectedQueryPattern: String =
     """
-          (SELECT product$A
+          (SELECT product$A.*
           FROM product as product$A)
           UNION
-          (SELECT product$B
+          (SELECT product$B.*
           FROM product as product$B)
           UNION
-          (SELECT product$C
+          (SELECT product$C.*
           FROM product as product$C)
         """
 }
@@ -74,16 +74,16 @@ class RelationOpsUnion4Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
 
   def expectedQueryPattern: String =
     """
-            (SELECT product$A
+            (SELECT product$A.*
             FROM product as product$A)
             UNION
-            (SELECT product$B
+            (SELECT product$B.*
             FROM product as product$B)
             UNION
-            (SELECT product$C
+            (SELECT product$C.*
             FROM product as product$C)
             UNION
-            (SELECT product$D
+            (SELECT product$D.*
             FROM product as product$D)
           """
 }
@@ -100,16 +100,16 @@ class RelationOpsUnion5Test extends SQLStringQueryTest[AllCommerceDBs, Product] 
 
   def expectedQueryPattern: String =
     """
-              (SELECT product$A
+              (SELECT product$A.*
               FROM product as product$A)
               UNION
-              (SELECT product$B
+              (SELECT product$B.*
               FROM product as product$B)
               UNION
-              (SELECT product$C
+              (SELECT product$C.*
               FROM product as product$C)
               UNION
-              (SELECT product$D
+              (SELECT product$D.*
               FROM product as product$D)
             """
 }

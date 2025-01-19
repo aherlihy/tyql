@@ -16,7 +16,7 @@ class VariableInputTest extends FunSuite {
 
       val db = tyql.DB(conn)
       val q = Exprs[(a: Int, b: Long, c: String)](Var(doIt()), Var(2L), Var("c"))
-      for (outer <- List(1,2,3)) {
+      for (outer <- List(1, 2, 3)) {
         assert(q.toQueryIR.toSQLQuery()._1.contains("as a, 2 as b, 'c' as c"))
         val got = db.run(q)
         assertEquals(got.length, 1)
@@ -37,9 +37,11 @@ class VariableInputTest extends FunSuite {
     // XXX why does it not work with H2?
     withDB.allWithoutH2 { conn =>
       val db = tyql.DB(conn)
-      for (outer <- List(1,2,3)) {
+      for (outer <- List(1, 2, 3)) {
         val sqlOutputted = q.toQueryIR.toSQLQuery()._1
-        assert((sqlOutputted.contains("$1 as a, $2 as b, $3 as c")) || (sqlOutputted.contains("? as a, ? as b, ? as c")))
+        assert(
+          (sqlOutputted.contains("$1 as a, $2 as b, $3 as c")) || (sqlOutputted.contains("? as a, ? as b, ? as c"))
+        )
         val got = db.run(q)
         assertEquals(got.length, 1)
         assertEquals(
@@ -62,9 +64,11 @@ class VariableInputTest extends FunSuite {
 
     withDB.postgres { conn =>
       val db = tyql.DB(conn)
-      for (outer <- List(1,2,3)) {
+      for (outer <- List(1, 2, 3)) {
         val sqlOutputted = q.toQueryIR.toSQLQuery()._1
-        assert((sqlOutputted.contains("$1 as a, $2 as b, $3 as c")) || (sqlOutputted.contains("? as a, ? as b, ? as c")))
+        assert(
+          (sqlOutputted.contains("$1 as a, $2 as b, $3 as c")) || (sqlOutputted.contains("? as a, ? as b, ? as c"))
+        )
         val got = db.run(q)
         assertEquals(got.length, 1)
         assertEquals(

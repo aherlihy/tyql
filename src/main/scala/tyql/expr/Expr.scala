@@ -636,7 +636,8 @@ object Expr:
 
   /** Literals are type-specific, tailored to the types that the DB supports */
   final case class BytesLit($value: Array[Byte]) extends Expr[Array[Byte], NonScalarExpr]
-  final case class ByteStreamLit($value: () => java.io.InputStream) extends Expr[() => java.io.InputStream, NonScalarExpr]
+  final case class ByteStreamLit($value: () => java.io.InputStream)
+      extends Expr[() => java.io.InputStream, NonScalarExpr]
 
   final case class IntLit($value: Int) extends Expr[Int, NonScalarExpr] with LiteralExpression
   final case class LongLit($value: Long) extends Expr[Long, NonScalarExpr] with LiteralExpression

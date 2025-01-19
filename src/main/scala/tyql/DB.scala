@@ -313,11 +313,8 @@ def driverMain(): Unit = {
   final case class Person(pid: Long, name: String, age: Int)
   final case class Orders(oid: Long, personId: Long, orderDate: String)
 
-  // val q = Exprs[(y: Int, m: Int, d: Int)]((CurrentTime.year, CurrentTime.month, lit(java.time.LocalDateTime.now()).day))
-  // println(q.toQueryIR.toSQLQuery()._1)
-  // println(db.run(q))
-
-  val q2 = Exprs[(a: Int)](Tuple1(lit(10) + VariableInput(() => 20)))
-  println(q2.toQueryIR.toSQLQuery()._1)
-  pprintln(db.run(q2))
+  val q = Table[Person]().map(p => p)
+  println(q.toQueryIR.toSQLQuery()._1)
+  // println(q.toQueryIR.prettyPrintIR(0, true))
+  // println(Table[Person]().toQueryIR.toSQLQuery()._1)
 }

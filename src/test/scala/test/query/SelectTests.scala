@@ -63,7 +63,7 @@ class SelectWithSelfNestTest extends SQLStringQueryTest[CityDB, CityT] {
       if city.name == alt.name && city.zipCode != alt.zipCode
     yield city
   def expectedQueryPattern: String =
-    "SELECT cities$A FROM cities as cities$A, cities as cities$B WHERE cities$A.name = cities$B.name AND cities$A.zipCode <> cities$B.zipCode"
+    "SELECT cities$A.* FROM cities as cities$A, cities as cities$B WHERE cities$A.name = cities$B.name AND cities$A.zipCode <> cities$B.zipCode"
 }
 
 // TODO: Nested types require more thought
@@ -76,7 +76,7 @@ class SelectNested extends SQLStringQueryTest[AllLocDBs, CityT] {
       if city == address.city
     yield city
   def expectedQueryPattern: String =
-    "SELECT cities$A FROM cities as cities$A, addresses as addresses$B WHERE cities$A = addresses$B.city"
+    "SELECT cities$A.* FROM cities as cities$A, addresses as addresses$B WHERE cities$A = addresses$B.city"
 }
 
 class SelectWithProjectTestToRow extends SQLStringQueryTest[CityDB, (name: String, zipCode: Int)] {

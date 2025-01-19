@@ -95,7 +95,7 @@ class ProjectTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def query() =
     testDB.tables.products.map: c =>
       c
-  def expectedQueryPattern: String = """SELECT product$A
+  def expectedQueryPattern: String = """SELECT product$A.*
 FROM product as product$A
       """
 }
