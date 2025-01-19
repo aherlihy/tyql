@@ -7,6 +7,15 @@ A Scala3 SQL query generator
 - guides the user with nice error messages,
 - is usable (feature coverage, speed).
 
+| TOC  |
+|---------|
+|  [Tyql - A Scala3 SQL query generator](#tyql) |
+|  [How do i use it?](#how-do-i-use-it) |
+|  [How do I configure it?](#how-do-i-configure-it) |
+|  [How fast is it in practice?](#how-fast-is-it-in-practice) |
+|  [What about caching queries with changing inputs?](#what-about-caching-queries-with-changing-inputs) |
+|  [What about transactions and other driver-specific functionality?](#what-about-transactions-and-other-driver-specific-functionality) |
+|  [Limits of compile-time correctness checking](#limits-of-compile-time-correctness-checking) |
 
 ### How do i use it?
 First, import a dialect (`postgres`, `mysql`, `mariadb`, `duckdb`, `sqlite`, `h2`) like this
@@ -42,7 +51,7 @@ db.run(q)
 */
 ```
 
-#### How do I configure it?
+### How do I configure it?
 ```scala
 given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.EscapedInline) {}
 ```
