@@ -372,7 +372,12 @@ case class LiteralDouble(number: Double, ast: Expr[?, ?]) extends QueryIRLeaf:
 case class ListTypeExpr(elements: List[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
   override val precedence: Int = Precedence.Literal
   override def computeSQL(using d: Dialect)(using cnf: Config)(ctx: SQLRenderingContext): Unit =
-    ctx.mkString(elements, "[", ", ", "]")
+    ctx.mkString(
+      elements,
+      "(ARRAY[",
+      ", ",
+      "])"
+    ) // ()s are needed in Postgres for indexing, ARRAY[1,2,3][1] will not work there
 
 /** Empty leaf node, to avoid Options everywhere.
   */

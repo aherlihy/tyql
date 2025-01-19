@@ -4,6 +4,7 @@ import munit.FunSuite
 import test.{withDB, checkExprDialect}
 import java.sql.ResultSet
 import tyql.Expr
+import scala.language.implicitConversions
 
 import tyql.Dialect.ansi.given
 

@@ -630,14 +630,14 @@ class GraphalyticsDAGTest extends SQLStringQueryTest[GraphDB, Path] {
     """
       WITH RECURSIVE
         recursive$174 AS
-          ((SELECT edge$174.x as startNode, edge$174.y as endNode, [edge$174.x, edge$174.y] as path
+          ((SELECT edge$174.x as startNode, edge$174.y as endNode, (ARRAY[edge$174.x, edge$174.y]) as path
             FROM edge as edge$174
             WHERE edge$174.x = 1)
               UNION ALL
-          ((SELECT ref$94.startNode as startNode, edge$176.y as endNode, list_append(ref$94.path, edge$176.y) as path
+          ((SELECT ref$94.startNode as startNode, edge$176.y as endNode, ARRAY_APPEND(ref$94.path, edge$176.y) as path
             FROM recursive$174 as ref$94, edge as edge$176
-            WHERE edge$176.x = ref$94.endNode AND NOT list_contains(ref$94.path, edge$176.y))))
-      SELECT * FROM recursive$174 as recref$15 ORDER BY length(recref$15.path) ASC, path ASC
+            WHERE edge$176.x = ref$94.endNode AND NOT edge$176.y = ANY(ref$94.path))))
+      SELECT * FROM recursive$174 as recref$15 ORDER BY ARRAY_LENGTH(recref$15.path) ASC, path ASC
       """
 }
 

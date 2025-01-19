@@ -32,3 +32,8 @@ object DialectFeature:
     "LIMIT and ORDER BY clauses in UPDATE queries are supported only in MySQL, MariaDB and H2 dialects. Please use supported dialect."
   )
   trait AcceptsLimitAndOrderByInUpdates extends DialectFeature
+
+  @annotation.implicitNotFound(
+    "Only Postgres, DuckDB, and H2 support singledimensional arrays. Please use supported dialect, e.g. with `import tyql.dialects.postgresql.given`."
+  )
+  trait HomogenousArraysOf1D extends DialectFeature

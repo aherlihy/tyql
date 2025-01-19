@@ -41,7 +41,9 @@ object ResultTag:
   given ResultTag[Float] = ResultTag.FloatTag
   given ResultTag[LocalDate] = ResultTag.LocalDateTag
   given ResultTag[LocalDateTime] = ResultTag.LocalDateTimeTag
-  given [T](using e: ResultTag[T]): ResultTag[Option[T]] = ResultTag.OptionalTag(e)
+  given [T](using e: ResultTag[T], e2: SimpleTypeResultTag[T]): ResultTag[Option[T]] = ResultTag.OptionalTag(e)
+  inline given [T](using elementType: ResultTag[T], simpleElementType: SimpleTypeResultTag[T]): ResultTag[List[T]] =
+    ResultTag.ListTag(elementType)
   inline given [N <: Tuple, V <: Tuple]: ResultTag[NamedTuple[N, V]] =
     val names = constValueTuple[N]
     val tpes = summonAll[Tuple.Map[V, ResultTag]]
@@ -54,8 +56,6 @@ object ResultTag:
     val productName = constValue[m.MirroredLabel]
     ProductTag(productName, fields, m)
 
-  inline given [T](using elementType: ResultTag[T]): ResultTag[List[T]] = ResultTag.ListTag(elementType)
-
 trait SimpleTypeResultTag[T] {}
 object SimpleTypeResultTag:
   given SimpleTypeResultTag[scala.Null] = new SimpleTypeResultTag {}
@@ -67,3 +67,4 @@ object SimpleTypeResultTag:
   given SimpleTypeResultTag[Float] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[LocalDate] = new SimpleTypeResultTag {}
   given SimpleTypeResultTag[LocalDateTime] = new SimpleTypeResultTag {}
+  given SimpleTypeResultTag[Any] = new SimpleTypeResultTag {}

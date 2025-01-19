@@ -150,6 +150,11 @@ object QueryIRTree:
       case _ if v.isInstanceOf[Float]      => lit(v.asInstanceOf[Float])
       case _ if v.isInstanceOf[Boolean]    => lit(v.asInstanceOf[Boolean])
       case _ if v.isInstanceOf[Expr[?, ?]] => v.asInstanceOf[Expr[?, ?]]
+      case _ if v.isInstanceOf[List[?]] =>
+        tyql.Expr.ListExpr[Any](v.asInstanceOf[List[?]].map(anyToExprConverter).asInstanceOf[List[Expr[
+          Any,
+          NonScalarExpr
+        ]]])(using ResultTag.ListTag(ResultTag.AnyTag))
       case _ =>
         println("RECEIVED UNEXPCTED " + v)
         assert(false)
@@ -885,8 +890,18 @@ object QueryIRTree:
       case a: AggregationExpr[?]  => generateAggregation(a, symbols)
       case a: Aggregation[?, ?]   => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
+      case c: Expr.ListConcat[?] =>
+        BinExprOp(
+          "",
+          generateExpr(c.$xs, symbols),
+          " || ",
+          generateExpr(c.$ys, symbols),
+          "",
+          Precedence.Concat,
+          c
+        )
       case p: Expr.ListPrepend[?] => BinExprOp(
-          "list_prepend(",
+          d.arrayPrependFunctionName + "(",
           generateExpr(p.$x, symbols),
           ", ",
           generateExpr(p.$list, symbols),
@@ -895,7 +910,7 @@ object QueryIRTree:
           p
         )
       case p: Expr.ListAppend[?] => BinExprOp(
-          "list_append(",
+          "ARRAY_APPEND(",
           generateExpr(p.$list, symbols),
           ", ",
           generateExpr(p.$x, symbols),
@@ -904,15 +919,15 @@ object QueryIRTree:
           p
         )
       case p: Expr.ListContains[?] => BinExprOp(
-          "list_contains(",
-          generateExpr(p.$list, symbols),
-          ", ",
+          "",
           generateExpr(p.$x, symbols),
+          " = ANY(",
+          generateExpr(p.$list, symbols),
           ")",
           Precedence.Unary,
           p
         )
-      case p: Expr.ListLength[?] => UnaryExprOp("length(", generateExpr(p.$list, symbols), ")", p)
+      case p: Expr.ListLength[?] => UnaryExprOp(d.arrayLengthFunctionName + "(", generateExpr(p.$list, symbols), ")", p)
       case p: Expr.NonEmpty[?] =>
         UnaryExprOp("EXISTS (", generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), ")", p)
       case p: Expr.IsEmpty[?] =>

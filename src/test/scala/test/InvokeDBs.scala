@@ -105,6 +105,12 @@ object withDB:
     mariadb(f)
   }
 
+  def allWithArraySupport[A](f: Connection => Dialect ?=> A): Unit = {
+    postgres(f)
+    duckdb(f)
+    h2(f)
+  }
+
 object withDBNoImplicits:
   def postgres[A](f: Connection => A): A = {
     // XXX postgres driver needs to be poked first

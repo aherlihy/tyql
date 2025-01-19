@@ -677,12 +677,12 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
       WITH RECURSIVE
         recursive$62 AS
           ((SELECT
-              tag$62.id as id, tag$62.name as source, [tag$62.name] as path
+              tag$62.id as id, tag$62.name as source, (ARRAY[tag$62.name]) as path
            FROM tag as tag$62
            WHERE tag$62.subclassof IS NULL)
                 UNION
            ((SELECT
-              tag$64.id as id, tag$64.name as source, list_prepend(tag$64.name, ref$30.path) as path
+              tag$64.id as id, tag$64.name as source, ARRAY_PREPEND(tag$64.name, ref$30.path) as path
             FROM recursive$62 as ref$30, tag as tag$64
             WHERE tag$64.subclassof = ref$30.id)))
       SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = 'Oasis'
@@ -729,17 +729,17 @@ class RecursionShortestPathTest extends SQLStringQueryTest[ReachabilityDB, Path]
       WITH RECURSIVE
           recursive$116 AS
             ((SELECT * FROM
-              (SELECT edge$116.x as startNode, edge$116.y as endNode, [edge$116.x, edge$116.y] as path
+              (SELECT edge$116.x as startNode, edge$116.y as endNode, (ARRAY[edge$116.x, edge$116.y]) as path
                FROM edge as edge$116) as subquery$117
              WHERE subquery$117.startNode = 1)
                 UNION
             ((SELECT
-                ref$58.startNode as startNode, edge$118.y as endNode, list_append(ref$58.path, edge$118.y) as path
+                ref$58.startNode as startNode, edge$118.y as endNode, ARRAY_APPEND(ref$58.path, edge$118.y) as path
              FROM recursive$116 as ref$58, edge as edge$118
              WHERE edge$118.x = ref$58.endNode
                 AND
-             NOT EXISTS (SELECT * FROM recursive$116 as ref$60 WHERE list_contains(ref$60.path, edge$118.y)))))
-      SELECT * FROM recursive$116 as recref$9 ORDER BY length(recref$9.path) ASC, path ASC
+             NOT EXISTS (SELECT * FROM recursive$116 as ref$60 WHERE edge$118.y = ANY(ref$60.path)))))
+      SELECT * FROM recursive$116 as recref$9 ORDER BY ARRAY_LENGTH(recref$9.path) ASC, path ASC
       """
 }
 

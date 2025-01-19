@@ -183,6 +183,26 @@ class DB(conn: Connection) {
                     if rs.wasNull() then None else Some(got.toLocalDateTime)
                   case _ => assert(false, "Unsupported type")
               }
+              case ResultTag.ListTag(e) => {
+                val gottenArray = rs.getArray(col).getArray()
+                e match
+                  case ResultTag.IntTag => gottenArray.asInstanceOf[Array[Integer]].toList
+                  case ResultTag.LongTag => gottenArray.asInstanceOf[Array[Object]].toList.map(o =>
+                      if o.isInstanceOf[Integer] then o.asInstanceOf[Integer].toLong else Long.unbox(o)
+                    ) // XXX postgres will return this as integers
+                  case ResultTag.DoubleTag =>
+                    gottenArray.asInstanceOf[Array[java.math.BigDecimal]].toList.toList.map(_.doubleValue())
+                  case ResultTag.FloatTag =>
+                    gottenArray.asInstanceOf[Array[java.math.BigDecimal]].toList.map(_.floatValue())
+                  case ResultTag.StringTag => gottenArray.asInstanceOf[Array[Object]].toList.map(_.toString)
+                  case ResultTag.BoolTag =>
+                    gottenArray.asInstanceOf[Array[Object]].toList.map(a => a.asInstanceOf[Boolean])
+                  case ResultTag.LocalDateTag =>
+                    gottenArray.asInstanceOf[Array[java.sql.Date]].toList.map(_.toLocalDate())
+                  case ResultTag.LocalDateTimeTag =>
+                    gottenArray.asInstanceOf[Array[java.sql.Timestamp]].toList.map(_.toLocalDateTime())
+                  case _ => assert(false, "Unsupported type inside an array")
+              }
               case _ => assert(false, "Unsupported type")
           }
           m.fromProduct(Tuple.fromArray(fieldValues.toArray))
@@ -218,9 +238,44 @@ class DB(conn: Connection) {
                     case ResultTag.LocalDateTimeTag => Some(got.asInstanceOf[java.sql.Timestamp].toLocalDateTime)
                     case _                          => assert(false, "Unsupported type")
               }
+              case ResultTag.ListTag(elementType) =>
+                val gottenArray = rs.getArray(col).getArray()
+                elementType match
+                  case ResultTag.IntTag => gottenArray.asInstanceOf[Array[Integer]].toList
+                  case ResultTag.LongTag => gottenArray.asInstanceOf[Array[Object]].toList.map(o =>
+                      if o.isInstanceOf[Integer] then o.asInstanceOf[Integer].toLong else Long.unbox(o)
+                    ) // XXX postgres will return this as integers
+                  case ResultTag.DoubleTag =>
+                    gottenArray.asInstanceOf[Array[java.math.BigDecimal]].toList.toList.map(_.doubleValue())
+                  case ResultTag.FloatTag =>
+                    gottenArray.asInstanceOf[Array[java.math.BigDecimal]].toList.map(_.floatValue())
+                  case ResultTag.StringTag => gottenArray.asInstanceOf[Array[Object]].toList.map(_.toString)
+                  case ResultTag.BoolTag =>
+                    gottenArray.asInstanceOf[Array[Object]].toList.map(a => a.asInstanceOf[Boolean])
+                  case ResultTag.LocalDateTag =>
+                    gottenArray.asInstanceOf[Array[java.sql.Date]].toList.map(_.toLocalDate())
+                  case ResultTag.LocalDateTimeTag =>
+                    gottenArray.asInstanceOf[Array[java.sql.Timestamp]].toList.map(_.toLocalDateTime())
+                  case _ => assert(false, "Unsupported type inside an array")
               case _ => assert(false, "Unsupported type")
           }
           Tuple.fromArray(fieldValues.toArray)
+        case ResultTag.ListTag(elementType) =>
+          val gottenArray = rs.getArray(1).getArray()
+          elementType match
+            case ResultTag.IntTag => gottenArray.asInstanceOf[Array[Integer]].toList
+            case ResultTag.LongTag => gottenArray.asInstanceOf[Array[Object]].toList.map(o =>
+                if o.isInstanceOf[Integer] then o.asInstanceOf[Integer].toLong else Long.unbox(o)
+              ) // XXX postgres will return this as integers
+            case ResultTag.DoubleTag =>
+              gottenArray.asInstanceOf[Array[java.math.BigDecimal]].toList.toList.map(_.doubleValue())
+            case ResultTag.FloatTag  => gottenArray.asInstanceOf[Array[java.math.BigDecimal]].toList.map(_.floatValue())
+            case ResultTag.StringTag => gottenArray.asInstanceOf[Array[Object]].toList.map(_.toString)
+            case ResultTag.BoolTag   => gottenArray.asInstanceOf[Array[Object]].toList.map(a => a.asInstanceOf[Boolean])
+            case ResultTag.LocalDateTag => gottenArray.asInstanceOf[Array[java.sql.Date]].toList.map(_.toLocalDate())
+            case ResultTag.LocalDateTimeTag =>
+              gottenArray.asInstanceOf[Array[java.sql.Timestamp]].toList.map(_.toLocalDateTime())
+            case _ => assert(false, "Unsupported type inside an array")
         case _ => assert(false, "Unsupported type")
       results = row.asInstanceOf[T] :: results
     }
@@ -232,16 +287,21 @@ class DB(conn: Connection) {
 
 def driverMain(): Unit = {
   import scala.language.implicitConversions
-  val conn = java.sql.DriverManager.getConnection("jdbc:mysql://localhost:3307/testdb", "testuser", "testpass")
+  val conn = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5433/testdb", "testuser", "testpass")
+  // val conn = java.sql.DriverManager.getConnection("jdbc:mysql://localhost:3307/testdb", "testuser", "testpass")
   // val conn = DriverManager.getConnection("jdbc:mariadb://localhost:3308/testdb", "testuser", "testpass")
   val db = DB(conn)
   given tyql.Config = new tyql.Config(tyql.CaseConvention.Underscores, tyql.ParameterStyle.EscapedInline) {}
-  import tyql.Dialect.mariadb.given
+  import tyql.Dialect.postgresql.given
 
   final case class Person(pid: Long, name: String, age: Int)
   final case class Orders(oid: Long, personId: Long, orderDate: String)
 
-  val q = Exprs[(y: Int, m: Int, d: Int)]((CurrentTime.year, CurrentTime.month, lit(java.time.LocalDateTime.now()).day))
-  println(q.toQueryIR.toSQLQuery()._1)
-  println(db.run(q))
+  // val q = Exprs[(y: Int, m: Int, d: Int)]((CurrentTime.year, CurrentTime.month, lit(java.time.LocalDateTime.now()).day))
+  // println(q.toQueryIR.toSQLQuery()._1)
+  // println(db.run(q))
+
+  val q2 = Exprs[(a: List[Long])](Tuple1(ListExpr(List(1L, 2L, 3L))))
+  println(q2.toQueryIR.toSQLQuery()._1)
+  pprintln(db.run(q2))
 }

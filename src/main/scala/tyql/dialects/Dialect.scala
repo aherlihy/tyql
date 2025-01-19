@@ -4,8 +4,6 @@ import scala.annotation.elidable
 import tyql.DialectFeature
 import tyql.DialectFeature.*
 
-// TODO which of these should be sealed? Do we support custom dialectes?
-
 private def unsupportedFeature(feature: String) =
   throw new UnsupportedOperationException(s"$feature feature not supported in this dialect!")
 
@@ -56,6 +54,9 @@ trait Dialect:
 
   def canExtractDateTimeComponentsNatively: Boolean = true
 
+  def arrayLengthFunctionName: String = "ARRAY_LENGTH"
+  def arrayPrependFunctionName: String = "ARRAY_PREPEND"
+
 object Dialect:
   val literal_percent = '\uE000'
   val literal_underscore = '\uE001'
@@ -97,11 +98,13 @@ object Dialect:
         )
       override def stringPositionFindingVia: String = "POSITION"
       override val `prefers $n over ? for parametrization` = true
+      override def arrayLengthFunctionName: String = "CARDINALITY"
 
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given INCanHandleRows = new INCanHandleRows {}
     given ReversibleStrings = new ReversibleStrings {}
+    given HomogenousArraysOf1D = new HomogenousArraysOf1D {}
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
     given [T1: Numeric, T2: Numeric]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
 
@@ -211,12 +214,14 @@ object Dialect:
           Precedence.Unary,
           snippet"(with randomIntParameters as (select $a as a, $b as b) select floor(rand() * (b - a + 1) + a) from randomIntParameters)"
         )
+      override def arrayPrependFunctionName: String = "ARRAY_APPEND"
 
     given INCanHandleRows = new INCanHandleRows {}
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
     given [T1: Numeric, T2: Numeric]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}
+    given HomogenousArraysOf1D = new HomogenousArraysOf1D {}
     given AcceptsLimitInDeletes = new AcceptsLimitInDeletes {}
     given AcceptsLimitAndOrderByInUpdates = new AcceptsLimitAndOrderByInUpdates {}
 
@@ -248,5 +253,6 @@ object Dialect:
     given RandomUUID = new RandomUUID {}
     given RandomIntegerInInclusiveRange = new RandomIntegerInInclusiveRange {}
     given ReversibleStrings = new ReversibleStrings {}
+    given HomogenousArraysOf1D = new HomogenousArraysOf1D {}
     given [T: ResultTag]: CanBeEqualed[T, T] = new CanBeEqualed[T, T] {}
     given [T1: Numeric, T2: Numeric]: CanBeEqualed[T1, T2] = new CanBeEqualed[T1, T2] {}

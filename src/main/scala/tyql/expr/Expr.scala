@@ -236,7 +236,10 @@ object Expr:
                 by another expression in some larger expression.
       Because we do not want to use macros and the Option.map is expected to have little code, we pick the lambda.
      */
-    def map[U](f: Expr[T, NonScalarExpr] => Expr[U, NonScalarExpr])(using ResultTag[U]): Expr[Option[U], S1] =
+    def map[U: SimpleTypeResultTag]
+      (f: Expr[T, NonScalarExpr] => Expr[U, NonScalarExpr])
+      (using ResultTag[U])
+      : Expr[Option[U], S1] =
       OptionMap(x, f)
 
     // TODO somehow use options in aggregations
@@ -324,6 +327,7 @@ object Expr:
     // XXX Because the list one is less used, this one is called `containsElement` instead.
     def containsElement(elem: Expr[A, NonScalarExpr]): Expr[Boolean, NonScalarExpr] = ListContains(x, elem)
     def length: Expr[Int, NonScalarExpr] = ListLength(x)
+    def ++(other: Expr[List[A], NonScalarExpr]): Expr[List[A], NonScalarExpr] = ListConcat(x, other)
 
   // Aggregations
   def sum[T : ResultTag : Numeric](x: Expr[T, ?]): AggregationExpr[T] = AggregationExpr.Sum(x)
@@ -500,11 +504,18 @@ object Expr:
   case class TimestampMinutes[S <: ExprShape]($x: Expr[java.time.LocalDateTime, S]) extends Expr[Int, S]
   case class TimestampSeconds[S <: ExprShape]($x: Expr[java.time.LocalDateTime, S]) extends Expr[Int, S]
 
-  case class ListExpr[A]($elements: List[Expr[A, NonScalarExpr]])(using ResultTag[List[A]])
-      extends Expr[List[A], NonScalarExpr]
+  case class ListExpr[A]
+    ($elements: List[Expr[A, NonScalarExpr]])
+    (using
+        t: ResultTag[List[A]],
+        @implicitNotFound(
+          "Lists/Arrays in SQL can only be of simple types. This is not a simple type: ${A}"
+        ) st: SimpleTypeResultTag[A]
+    ) extends Expr[List[A], NonScalarExpr]
   extension [A, E <: Expr[A, NonScalarExpr]](x: List[E])
-    def toExpr(using ResultTag[List[A]]): ListExpr[A] = ListExpr(x)
-  //  given Conversion[List[A], ListExpr[A]] = ListExpr(_)
+    def toExpr(using ResultTag[List[A]], SimpleTypeResultTag[A]): ListExpr[A] = ListExpr(x)
+  given [A : SimpleTypeResultTag : ResultTag]: Conversion[List[A], Expr[List[A], NonScalarExpr]] =
+    lst => ListExpr(lst.map(x => dynamicLit(x)))
 
   case class ListPrepend[A]($x: Expr[A, NonScalarExpr], $list: Expr[List[A], NonScalarExpr])(using ResultTag[List[A]])
       extends Expr[List[A], NonScalarExpr]
@@ -513,6 +524,10 @@ object Expr:
   case class ListContains[A]($list: Expr[List[A], NonScalarExpr], $x: Expr[A, NonScalarExpr])(using ResultTag[Boolean])
       extends Expr[Boolean, NonScalarExpr]
   case class ListLength[A]($list: Expr[List[A], NonScalarExpr])(using ResultTag[Int]) extends Expr[Int, NonScalarExpr]
+  case class ListConcat[A]
+    ($xs: Expr[List[A], NonScalarExpr], $ys: Expr[List[A], NonScalarExpr])
+    (using ResultTag[List[A]])
+      extends Expr[List[A], NonScalarExpr]
 
   // So far Select is weakly typed, so `selectDynamic` is easy to implement.
   // TODO: Make it strongly typed like the other cases
@@ -579,7 +594,7 @@ object Expr:
 
   case class OptionMap[A, B, S <: ExprShape]
     ($x: Expr[Option[A], S], $f: Expr[A, NonScalarExpr] => Expr[B, NonScalarExpr])
-    (using ResultTag[A], ResultTag[B]) extends Expr[Option[B], S]
+    (using ResultTag[A], ResultTag[B], SimpleTypeResultTag[A], SimpleTypeResultTag[B]) extends Expr[Option[B], S]
 
   case class Cast[A, B, S <: ExprShape]($x: Expr[A, S], resultType: CastTarget)(using ResultTag[B]) extends Expr[B, S]
 
@@ -606,10 +621,9 @@ object Expr:
 
   /** Scala values can be lifted into literals by conversions */
   given Conversion[Int, IntLit] = IntLit(_)
-  // XXX maybe only from literals with FromDigits?
+  given Conversion[Long, LongLit] = LongLit(_)
 
-  case class StringLit($value: String) extends Expr[String, NonScalarExpr]
-      with LiteralExpression // TODO XXX why is this nonscalar?
+  case class StringLit($value: String) extends Expr[String, NonScalarExpr] with LiteralExpression
   given Conversion[String, StringLit] = StringLit(_)
 
   case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr] with LiteralExpression
@@ -619,8 +633,7 @@ object Expr:
   given Conversion[Float, FloatLit] = FloatLit(_)
 
   case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr] with LiteralExpression
-  //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
-  // TODO why does this break things?
+  // given Conversion[Boolean, BooleanLit] = BooleanLit(_) // XXX this one breaks everything by inlining complex expressions as FALSE everywhere
 
   def randomFloat(): Expr[Double, NonScalarExpr] = RandomFloat()
   def randomUUID(using r: DialectFeature.RandomUUID)(): Expr[String, NonScalarExpr] = RandomUUID()
@@ -702,6 +715,26 @@ inline def lit(x: java.time.LocalDateTime): Expr[java.time.LocalDateTime, NonSca
 inline def True = Expr.BooleanLit(true)
 inline def False = Expr.BooleanLit(false)
 inline def Null = Expr.NullLit[scala.Null]()
+inline def lit[A]
+  (x: List[A])
+  (using ResultTag[A], ResultTag[List[A]], SimpleTypeResultTag[A])
+  : Expr[List[A], NonScalarExpr] =
+  Expr.ListExpr(x.map(dynamicLit(_)))
+
+private def dynamicLit[A](x: A)(using SimpleTypeResultTag[A], ResultTag[A]): Expr[A, NonScalarExpr] =
+  (x match
+    case x if x == null                               => Null
+    case x if x.isInstanceOf[Int]                     => lit(x.asInstanceOf[Int])
+    case x if x.isInstanceOf[Long]                    => lit(x.asInstanceOf[Long])
+    case x if x.isInstanceOf[Double]                  => lit(x.asInstanceOf[Double])
+    case x if x.isInstanceOf[Float]                   => lit(x.asInstanceOf[Float])
+    case x if x.isInstanceOf[String]                  => lit(x.asInstanceOf[String])
+    case x if x.isInstanceOf[Boolean]                 => lit(x.asInstanceOf[Boolean])
+    case x if x.isInstanceOf[java.time.LocalDate]     => lit(x.asInstanceOf[java.time.LocalDate])
+    case x if x.isInstanceOf[java.time.LocalDateTime] => lit(x.asInstanceOf[java.time.LocalDateTime])
+    case _ => assert(false, "This was supposed to be handled for every SimpleTypeResultTag!")
+  ).asInstanceOf[Expr[A, NonScalarExpr]]
+
 def Null[T](using ResultTag[T]) = Expr.NullLit[T]()
 private case class ElseToken()
 val Else = new ElseToken()
