@@ -4,7 +4,7 @@ package tyql
   * @tparam Result
   */
 trait DatabaseAST[Result](using val qTag: ResultTag[Result]):
-  def toSQLString(using d: Dialect)(using cnf: Config): String = toQueryIR.toSQLString()
+  def toSQLString()(using d: Dialect)(using cnf: Config): String = toQueryIR.toSQLString()
 
   private var cached: java.util.concurrent.ConcurrentHashMap[Dialect, QueryIRNode] = null
 

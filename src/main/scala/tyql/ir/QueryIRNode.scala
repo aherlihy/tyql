@@ -14,7 +14,7 @@ trait QueryIRNode:
   private var cached: java.util.concurrent.ConcurrentHashMap[(Dialect, Config), SQLRenderingContext] =
     null // do not allocate memory if unused
 
-  final def toSQLString(using d: Dialect)(using cnf: Config)(): String =
+  final def toSQLString()(using d: Dialect)(using cnf: Config): String =
     val (sql, _) = toSQLQuery()
     sql
 
