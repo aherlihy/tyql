@@ -23,7 +23,7 @@ type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape =
     case (NonScalarExpr, NonScalarExpr) => NonScalarExpr
 
 @implicitNotFound(
-  "Equality semenaitcs differs between dialects. E.g. in Postgres you can only compare similar types. To express equality or inequality, please import a dialect like this: `import tyql.Dialect.mysql.given`. If you have imported a dialect, then the selected dialect does not support equalit between ${T1} and ${T2}."
+  "Equality semantics differ between dialects. E.g. in Postgres you can only compare similar types. To express equality or inequality, please import a dialect like this: `import tyql.Dialect.mysql.given`. If you have imported a dialect, then the selected dialect does not support equality between ${T1} and ${T2}."
 )
 trait CanBeEqualed[T1, T2]
 
