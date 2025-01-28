@@ -45,6 +45,7 @@ for dir in */"$datadir"; do
             file_size=$(du -sk "$file" | awk '{printf "%d B", $1 * 1024}')
         fi
         echo -e "\t$parent_dir/$file_name: ${file_size}"
+        echo -e "\t\t with $(wc -l < "$file") lines"
       fi
     done
   fi

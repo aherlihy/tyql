@@ -42,11 +42,11 @@
      if [[ "$dir" == *"andersen"* ]]; then
          linecount=1000
      elif [[ "$dir" == *"dataflow"* ]]; then
-         linecount=4000
-     elif [[ "$dir" == *"java"* || "$dir" == *"count"* ]]; then
-         linecount=3000
-     elif [[ "$dir" == *"cba"* ]]; then
          linecount=2000
+     elif [[ "$dir" == *"java"* || "$dir" == *"count"* ]]; then
+         linecount=1500
+     elif [[ "$dir" == *"cba"* ]]; then
+         linecount=1000
      else
          echo "Directory not medium sized?"
          exit 1
@@ -88,13 +88,13 @@ echo "copying XL data"
        python3 ../../generate.py --size "$target_size" --units MB --columns "(parent, int) (child, int)" --filename parents.csv   --acyclic
        cd "$datadir"
    elif [[ "$dir" == *"sssp"* ]]; then
-       target_size=50
+       target_size=25
        mkdir -p "$datadir/$dir/data_${target_size}MB"
        cd "$datadir/$dir/data_${target_size}MB"
        python3 ../../generate.py --size "$target_size" --units MB --columns "(src, int) (dst, int) (cost, int)" --filename edge.csv --acyclic
        cd "$datadir"
    elif [[ "$dir" == *"tc" ]]; then
-       target_size=15
+       target_size=5
        mkdir -p "$datadir/$dir/data_${target_size}MB"
        cd "$datadir/$dir/data_${target_size}MB"
        python3 ../../generate.py --size "$target_size" --units MB --columns "(x, int) (y, int)" --filename edge.csv  --base1
