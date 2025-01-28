@@ -1,7 +1,13 @@
 import os
+import argparse
+
+# Parse CLI arguments
+parser = argparse.ArgumentParser(description="Generate a CSV file of incrementing integer up to a specified size.")
+parser.add_argument("target_mbs", type=int, help="Target size of the file in megabytes (MB).")
+args = parser.parse_args()
 
 # Set the target file size in bytes (1MB = 1048576 bytes)
-TARGET_SIZE = 1048576  # Adjust this value as needed
+TARGET_SIZE = args.target_mbs * 1048576
 OUTPUT_FILE = "numbers.csv"
 
 # Start by writing the header

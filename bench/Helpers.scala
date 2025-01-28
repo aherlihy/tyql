@@ -7,7 +7,7 @@ import java.io.{BufferedWriter, FileWriter}
 import java.sql.{ResultSet, ResultSetMetaData}
 
 object Helpers {
-  val currentData = "data"
+  val currentData = sys.env.get("TYQL_DATA_DIR").get // throw if data dir doesn't exist
   val timeoutMins = 10
   val skip = Seq(
 //    "ancestry",
