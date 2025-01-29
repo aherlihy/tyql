@@ -82,7 +82,7 @@ class TOCollectionsBenchmark {
     runWithTimeout("ancestry", blackhole)
   }
 
-  @Benchmark def andersens_pointeranalysis(blackhole: Blackhole): Unit = {
+  @Benchmark def andersens_programanalysis(blackhole: Blackhole): Unit = {
     runWithTimeout("andersens", blackhole)
   }
 
@@ -98,7 +98,7 @@ class TOCollectionsBenchmark {
     runWithTimeout("orbits", blackhole)
   }
 
-  @Benchmark def dataflow_pointeranalysis(blackhole: Blackhole): Unit = {
+  @Benchmark def dataflow_programanalysis(blackhole: Blackhole): Unit = {
     runWithTimeout("dataflow", blackhole)
   }
 
@@ -110,11 +110,11 @@ class TOCollectionsBenchmark {
     runWithTimeout("cc", blackhole)
   }
 
-  @Benchmark def pointstocount_pointeranalysis(blackhole: Blackhole): Unit = {
+  @Benchmark def pointstocount_programanalysis(blackhole: Blackhole): Unit = {
     runWithTimeout("pointstocount", blackhole)
   }
 
-  @Benchmark def javapointsto_pointeranalysis(blackhole: Blackhole): Unit = {
+  @Benchmark def javapointsto_programanalysis(blackhole: Blackhole): Unit = {
     runWithTimeout("javapointsto", blackhole)
   }
 
@@ -130,7 +130,7 @@ class TOCollectionsBenchmark {
     runWithTimeout("cspa", blackhole)
   }
 
-  @Benchmark def cba_pointeranalysis(blackhole: Blackhole): Unit = {
+  @Benchmark def cba_programanalysis(blackhole: Blackhole): Unit = {
     runWithTimeout("cba", blackhole)
   }
 }

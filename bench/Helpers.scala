@@ -67,6 +67,10 @@ object Helpers {
 //      println(s"SKIPPING result set $outputFile")
       {}
     else
+      val f = new File(outputFile)
+      f.getParentFile.mkdirs()
+      f.createNewFile()
+
       val writer = new BufferedWriter(new FileWriter(outputFile))
 
       try {
@@ -95,6 +99,10 @@ object Helpers {
     if (data == null) // skipped test
       {}
     else
+      val f = new File(outputFile)
+      f.getParentFile.mkdirs()
+      f.createNewFile()
+
       val file = new BufferedWriter(new FileWriter(outputFile))
 
       try {
