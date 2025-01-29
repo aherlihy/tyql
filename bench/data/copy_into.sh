@@ -145,6 +145,9 @@ echo "copying XL data"
        mkdir -p "$datadir/$dir/data_${target_size}MB"
        cd "$datadir/$dir/data_${target_size}MB"
        python3 ../../generate.py --size "$target_size" --units MB --columns "(src, int) (dst, int) (cost, int)" --filename edge.csv --acyclic
+       base_csv_path="$datadir/$dir/data_${target_size}MB/base.csv"
+       echo -e "dst,cost\n1,0" > "$base_csv_path"
+       echo "    ---> Generated $base_csv_path"
        cd "$datadir"
    elif [[ "$dir" == *"tc" ]]; then
        target_size=10
