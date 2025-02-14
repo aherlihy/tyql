@@ -62,6 +62,14 @@ echo "copying M and L data"
                  head -n "$linecount" "$file" > "$l_target_dir/$filename"
              fi
          done
+      elif [[ "$dir" == "cc" ]]; then
+          linecount=130000
+          for file in "$l_source_dir"/*; do
+              if [[ -f "$file" ]]; then
+                  filename=$(basename "$file")
+                  head -n "$linecount" "$file" > "$l_target_dir/$filename"
+              fi
+          done
      else
        cp -r "$l_source_dir"/* "$l_target_dir/"
      fi
@@ -82,13 +90,17 @@ echo "copying M and L data"
 
      # Set linecount based on the value of dir
      if [[ "$dir" == *"andersen"* ]]; then
-         linecount=1000
+         linecount_m=500
+         linecount_l=1000
      elif [[ "$dir" == *"dataflow"* ]]; then
-         linecount=2000
+         linecount_m=1000
+         linecount_l=2000
      elif [[ "$dir" == *"java"* || "$dir" == *"count"* ]]; then
-         linecount=1500
+         linecount_m=1500
+         linecount_l=3000
      elif [[ "$dir" == *"cba"* ]]; then
-         linecount=1000
+         linecount_m=1000
+         linecount_l=2000
      else
          echo "Directory not program analysis benchmark?"
          exit 1
@@ -97,8 +109,8 @@ echo "copying M and L data"
      for file in "$source_dir"/*; do
          if [[ -f "$file" ]]; then
              filename=$(basename "$file")
-             head -n "$linecount" "$file" > "$m_target_dir/$filename"
-             head -n "$((linecount*2))" "$file" > "$l_target_dir/$filename"
+             head -n "$linecount_m" "$file" > "$m_target_dir/$filename"
+             head -n "$linecount_l" "$file" > "$l_target_dir/$filename"
          fi
      done
      echo "Copied contents from $source_dir to $m_target_dir with $linecount lines, and to $l_target_dir with $((linecount*2)) lines"
@@ -145,6 +157,9 @@ echo "copying XL data"
        mkdir -p "$datadir/$dir/data_${target_size}MB"
        cd "$datadir/$dir/data_${target_size}MB"
        python3 ../../generate.py --size "$target_size" --units MB --columns "(src, int) (dst, int) (cost, int)" --filename edge.csv --acyclic
+       base_csv_path="$datadir/$dir/data_${target_size}MB/base.csv"
+       echo -e "dst,cost\n1,0" > "$base_csv_path"
+       echo "    ---> Generated $base_csv_path"
        cd "$datadir"
    elif [[ "$dir" == *"tc" ]]; then
        target_size=10
