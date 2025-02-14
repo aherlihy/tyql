@@ -46,14 +46,6 @@ echo "copying M and L data"
                  head -n "$linecount" "$file" > "$l_target_dir/$filename"
              fi
          done
-     elif [[ "$dir" == "cc" ]]; then
-         linecount=400000
-         for file in "$l_source_dir"/*; do
-             if [[ -f "$file" ]]; then
-                 filename=$(basename "$file")
-                 head -n "$linecount" "$file" > "$l_target_dir/$filename"
-             fi
-         done
      elif [[ "$dir" == "cspa" ]]; then
          linecount=400000
          for file in "$l_source_dir"/*; do
