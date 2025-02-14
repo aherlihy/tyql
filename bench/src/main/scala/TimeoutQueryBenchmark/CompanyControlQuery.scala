@@ -133,7 +133,7 @@ class TOCompanyControlQuery extends QueryBenchmark {
       (csharesRecur, controlRecur)
     )
     resultCollections = control.sortBy(_.com1).sortBy(_.com2)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -179,7 +179,7 @@ class TOCompanyControlQuery extends QueryBenchmark {
 
     val result = cc_derived2.select.sortBy(_.com1).sortBy(_.com2)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

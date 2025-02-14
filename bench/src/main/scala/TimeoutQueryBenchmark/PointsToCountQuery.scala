@@ -192,7 +192,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
       (vpt, hpt)
     )
     resultCollections = Seq(pt._1.filter(vpt => vpt.x == "r").size)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -242,7 +242,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
 //    println(s"FINAL RES=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY r.x")}")
     backupResultScalaSql = ddb.runQuery(s"SELECT COUNT(1) FROM ${ScalaSQLTable.name(pointstocount_derived2)} as r WHERE r.x = 'r'")
 
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 //    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY x, y")
 
   // Write results to csv for checking

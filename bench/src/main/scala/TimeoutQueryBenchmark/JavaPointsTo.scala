@@ -195,7 +195,7 @@ class TOJavaPointsTo extends QueryBenchmark {
     )
 //    resultCollections = pt._2.sortBy(_.x).sortBy(_.y)
     resultCollections = pt._1.sortBy(_.x).sortBy(_.y)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -241,7 +241,7 @@ class TOJavaPointsTo extends QueryBenchmark {
 
 //    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived2)} as r ORDER BY r.x, r.y")
     backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived1)} as r ORDER BY r.y, r.x")
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

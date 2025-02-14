@@ -143,7 +143,7 @@ class TOPartyQuery extends QueryBenchmark {
       (recurAttend, recurCntFriends)
     )
     resultCollections = finalAttend.distinct.sortBy(_.person)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -186,7 +186,7 @@ class TOPartyQuery extends QueryBenchmark {
 
     val result = party_derived1.select.distinct.sortBy(_.person)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

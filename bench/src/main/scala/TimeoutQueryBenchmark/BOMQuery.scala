@@ -127,7 +127,7 @@ class TOBOMQuery extends QueryBenchmark {
       .values.toSeq
       .sortBy(_.part)
       .sortBy(_.max)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -150,7 +150,7 @@ class TOBOMQuery extends QueryBenchmark {
     //    bom_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(s"SELECT s.part as part, MAX(s.max) as max FROM ${ScalaSQLTable.name(bom_derived)} as s GROUP BY s.part ORDER BY max, part")
 
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

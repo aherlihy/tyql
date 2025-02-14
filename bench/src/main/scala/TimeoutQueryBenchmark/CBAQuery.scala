@@ -304,7 +304,7 @@ class TOCBAQuery extends QueryBenchmark {
       })
 
     resultCollections = Seq(dataTerm.distinct.size)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -408,7 +408,7 @@ class TOCBAQuery extends QueryBenchmark {
     val result = cba_derived1.select.distinct
     resultScalaSQL = Seq(db.run(result).size)
 
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

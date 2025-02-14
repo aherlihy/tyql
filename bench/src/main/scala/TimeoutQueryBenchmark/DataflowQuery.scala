@@ -141,7 +141,7 @@ class TODataflowQuery extends QueryBenchmark {
               if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
               ResultCC(r = r.opN, w = w.opN))))
       .sortBy(_.r).sortBy(_.w)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -176,7 +176,7 @@ class TODataflowQuery extends QueryBenchmark {
     "WHERE writeOp169.opN = recref13.a AND writeOp169.varN = readOp168.varN AND recref13.b = readOp168.opN ORDER BY w ASC, r ASC;"
     backupResultScalaSql = ddb.runQuery(result)
 
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

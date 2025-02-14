@@ -139,7 +139,7 @@ class TOTrustChainQuery extends QueryBenchmark {
       .toSeq
 
     resultCollections = query.sortBy(_.name).sortBy(_.count)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -178,7 +178,7 @@ class TOTrustChainQuery extends QueryBenchmark {
     )(fixFn.asInstanceOf[((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
     backupResultScalaSql = ddb.runQuery(s"SELECT r.person2 as name, COUNT(r.person1) as count FROM ${ScalaSQLTable.name(trustchain_derived2)} as r GROUP BY r.person2 ORDER BY count, r.person2")
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

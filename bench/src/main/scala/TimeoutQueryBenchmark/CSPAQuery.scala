@@ -223,7 +223,7 @@ class TOCSPAQuery extends QueryBenchmark {
       }
     )
     resultCollections = valueFlowFinal.sortBy(_.p2).sortBy(_.p1)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -309,7 +309,7 @@ class TOCSPAQuery extends QueryBenchmark {
 
     val result = cspa_derived1.select.sortBy(_.p2).sortBy(_.p1)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

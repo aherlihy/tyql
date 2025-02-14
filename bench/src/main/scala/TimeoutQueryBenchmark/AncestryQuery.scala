@@ -97,7 +97,7 @@ class TOAncestryQuery extends QueryBenchmark {
               GenCC(name = parent.child, gen = g.gen + 1))
         ).distinct
     ).filter(g => g.gen == 2).map(g => ResultCC(name = g.name)).sortBy(_.name)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -126,7 +126,7 @@ class TOAncestryQuery extends QueryBenchmark {
       .sortBy(_.name)
       .map(r => r.name)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

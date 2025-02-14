@@ -116,7 +116,7 @@ class TOEvenOddQuery extends QueryBenchmark {
       (evenResult, oddResult)
     )
     resultCollections = odd.sortBy(_.value).sortBy(_.typ)
-    println(s"\nIT,$name,collections,$it")
+    //println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -171,7 +171,7 @@ class TOEvenOddQuery extends QueryBenchmark {
 
     val result = evenodd_derived2.select.sortBy(_.value).sortBy(_.typ)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

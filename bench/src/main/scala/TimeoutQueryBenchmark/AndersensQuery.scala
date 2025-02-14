@@ -132,7 +132,7 @@ class TOAndersensQuery extends QueryBenchmark {
                 if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
                 EdgeCC(x = pt1.y, y = pt2.y))))))
       .sortBy(_.y).sortBy(_.x)
-      println(s"\nIT,$name,collections,$it")
+      //println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -170,7 +170,7 @@ class TOAndersensQuery extends QueryBenchmark {
 
     val result = andersens_derived.select.sortBy(_.y).sortBy(_.x)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    //println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =
