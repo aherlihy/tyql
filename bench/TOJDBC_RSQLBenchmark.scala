@@ -69,7 +69,7 @@ class TOJDBC_RSQLBenchmark {
   @TearDown(Level.Trial)
   def close(): Unit = {
     benchmarks.values.foreach(bm =>
-      bm.writeJDBC_RSQLResult()
+      bm.writeBenchResult(Helpers.QueryMode.JDBC_RSQL)
     )
     duckDB.close()
   }
