@@ -80,11 +80,17 @@ class TODataflowQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[ResultSS[?]] = null
   var resultCollections: Seq[ResultCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT * FROM dataflow_jumpOp as dataflow_jumpOp1) UNION ((SELECT ref0.a as a, ref1.b as b FROM recursive1 as ref0, recursive1 as ref1 WHERE ref0.b = ref1.a)))\n SELECT dataflow_readOp8.opN as r, dataflow_writeOp9.opN as w FROM recursive1 as recref0, dataflow_readOp as dataflow_readOp8, dataflow_writeOp as dataflow_writeOp9 WHERE dataflow_writeOp9.opN = recref0.a AND dataflow_writeOp9.varN = dataflow_readOp8.varN AND recref0.b = dataflow_readOp8.opN ORDER BY w ASC, r ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val query =
       if (set)
@@ -179,6 +185,10 @@ class TODataflowQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

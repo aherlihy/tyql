@@ -68,11 +68,17 @@ class TOTrustChainQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[ResultSS[?]] = null
   var resultCollections: Seq[ResultCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT * FROM trustchain_friends as trustchain_friends2) UNION ((SELECT ref1.person1 as person1, ref0.person2 as person2 FROM recursive2 as ref0, recursive1 as ref1 WHERE ref1.person2 = ref0.person1))),\nrecursive2 AS ((SELECT * FROM trustchain_friends as trustchain_friends7) UNION ((SELECT ref3.person1 as person1, ref3.person2 as person2 FROM recursive1 as ref3)))\n SELECT recref0.person2 as name, COUNT(recref0.person1) as count FROM recursive1 as recref0 GROUP BY recref0.person2 ORDER BY count ASC, name ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val baseFriends = tyqlDB.friends
 
@@ -181,6 +187,10 @@ class TOTrustChainQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

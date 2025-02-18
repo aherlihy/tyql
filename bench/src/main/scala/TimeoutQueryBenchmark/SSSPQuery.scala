@@ -72,11 +72,17 @@ class TOSSSPQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[WResultEdgeSS[?]] = null
   var resultCollections: Seq[ResultEdgeCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT * FROM sssp_base as sssp_base1) UNION ((SELECT sssp_edge3.dst as dst, ref1.cost + sssp_edge3.cost as cost FROM sssp_edge as sssp_edge3, recursive1 as ref1 WHERE ref1.dst = sssp_edge3.src)))\n SELECT recref0.dst as dst, MIN(recref0.cost) as cost FROM recursive1 as recref0 GROUP BY recref0.dst ORDER BY dst ASC, cost ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.base
     val query = base.fix(sp =>
@@ -144,6 +150,10 @@ class TOSSSPQuery extends QueryBenchmark {
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)
+
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
 
   def writeCollectionsResult(): Unit =
     val outfile = s"$outdir/collections.csv"

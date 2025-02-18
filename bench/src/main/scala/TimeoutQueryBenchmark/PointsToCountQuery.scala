@@ -100,6 +100,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[Expr[Int]] = null
   var resultCollections: Seq[Int] = null
 //  var resultScalaSQL: Seq[PointsToSS[?]] = null
@@ -107,6 +108,11 @@ class TOPointsToCountQuery extends QueryBenchmark {
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT pointstocount_new2.x as x, pointstocount_new2.y as y FROM pointstocount_new as pointstocount_new2) UNION ((SELECT pointstocount_assign4.x as x, ref2.y as y FROM pointstocount_assign as pointstocount_assign4, recursive1 as ref2 WHERE pointstocount_assign4.y = ref2.x) UNION (SELECT pointstocount_loadT7.x as x, ref5.h as y FROM pointstocount_loadT as pointstocount_loadT7, recursive2 as ref5, recursive1 as ref6 WHERE pointstocount_loadT7.y = ref6.x AND pointstocount_loadT7.h = ref5.y AND ref6.y = ref5.x))),\nrecursive2 AS ((SELECT * FROM pointstocount_hpt as pointstocount_hpt13) UNION ((SELECT ref9.y as x, pointstocount_store15.y as y, ref10.y as h FROM pointstocount_store as pointstocount_store15, recursive1 as ref9, recursive1 as ref10 WHERE pointstocount_store15.x = ref9.x AND pointstocount_store15.h = ref10.x)))\n SELECT COUNT(1) FROM recursive1 as recref0 WHERE recref0.x = 'r'"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val baseVPT = tyqlDB.newT.map(a => (x = a.x, y = a.y).toRow)
     val baseHPT = tyqlDB.baseHPT
@@ -246,6 +252,10 @@ class TOPointsToCountQuery extends QueryBenchmark {
 //    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY x, y")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

@@ -69,11 +69,17 @@ class TOAndersensQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[EdgeSS[?]] = null
   var resultCollections: Seq[EdgeCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT andersens_addressOf1.x as x, andersens_addressOf1.y as y FROM andersens_addressOf as andersens_addressOf1) UNION ((SELECT andersens_assign3.x as x, ref2.y as y FROM andersens_assign as andersens_assign3, recursive1 as ref2 WHERE andersens_assign3.y = ref2.x) UNION (SELECT andersens_loadT6.x as x, ref6.y as y FROM andersens_loadT as andersens_loadT6, recursive1 as ref5, recursive1 as ref6 WHERE andersens_loadT6.y = ref5.x AND ref5.y = ref6.x) UNION (SELECT ref9.y as x, ref10.y as y FROM andersens_store as andersens_store11, recursive1 as ref9, recursive1 as ref10 WHERE andersens_store11.x = ref9.x AND andersens_store11.y = ref10.x)))\nSELECT * FROM recursive1 as recref0 ORDER BY x ASC, y ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.addressOf.map(a => (x = a.x, y = a.y).toRow)
     val query = base.unrestrictedFix(pointsTo =>
@@ -173,6 +179,10 @@ class TOAndersensQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

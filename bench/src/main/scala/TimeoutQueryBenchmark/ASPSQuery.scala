@@ -67,11 +67,17 @@ class TOASPSQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[WEdgeSS[?]] = null
   var resultCollections: Seq[WEdgeCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT asps_edge1.src as src, asps_edge1.dst as dst, MIN(asps_edge1.cost) as cost FROM asps_edge as asps_edge1 GROUP BY asps_edge1.src, asps_edge1.dst) UNION ((SELECT ref2.src as src, ref3.dst as dst, MIN(ref2.cost + ref3.cost) as cost FROM recursive1 as ref2, recursive1 as ref3 WHERE ref2.dst = ref3.src GROUP BY ref2.src, ref3.dst)))\nSELECT recref0.src as src, recref0.dst as dst, MIN(recref0.cost) as cost FROM recursive1 as recref0 GROUP BY recref0.src, recref0.dst ORDER BY cost ASC, src ASC, dst ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.edge
       .aggregate(e =>
@@ -163,6 +169,10 @@ class TOASPSQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)
