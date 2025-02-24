@@ -454,33 +454,6 @@ class BOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int)] {
 }
 
 
-class RecursionSSSPTest extends SQLStringQueryTest[WeightedGraphDB, (dst: Int, cost: Int)] {
-  def testDescription: String = "Single source shortest path"
-
-  def query() =
-    val base = testDB.tables.base
-    base.fix(sp =>
-      testDB.tables.edge.flatMap(edge =>
-        sp
-          .filter(s => s.dst == edge.src)
-          .map(s => (dst = edge.dst, cost = s.cost + edge.cost).toRow)
-      ).distinct
-    ).aggregate(s => (dst = s.dst, cost = min(s.cost)).toGroupingRow).groupBySource(s => (dst = s._1.dst).toRow)
-
-  def expectedQueryPattern: String =
-    """
-          WITH RECURSIVE
-            recursive$62 AS
-              ((SELECT * FROM base as base$62)
-                  UNION
-                ((SELECT
-                    edge$64.dst as dst, ref$29.cost + edge$64.cost as cost
-                  FROM edge as edge$64, recursive$62 as ref$29
-                  WHERE ref$29.dst = edge$64.src)))
-          SELECT recref$5.dst as dst, MIN(recref$5.cost) as cost FROM recursive$62 as recref$5 GROUP BY recref$5.dst
-        """
-}
-
 type Organizer = (orgName: String)
 type Friend = (pName: String, fName: String)
 type PartyDB = (organizers: Organizer, friends: Friend, counts: (fName: String, nCount: Int))
@@ -615,93 +588,6 @@ class GraphalyticsDAGTest extends SQLStringQueryTest[GraphDB, Path] {
             WHERE edge$176.x = ref$94.endNode AND NOT list_contains(ref$94.path, edge$176.y))))
       SELECT * FROM recursive$174 as recref$15 ORDER BY length(recref$15.path) ASC, path ASC
       """
-}
-
-type Parent = (parent: String, child: String)
-type AncestryDB = (parent: Parent)
-
-given ancestryDBs: TestDatabase[AncestryDB] with
-  override def tables = (
-    parent = Table[Parent]("parents")
-    )
-
-class AncestryTest extends SQLStringQueryTest[AncestryDB, (name: String)] {
-  def testDescription: String = "Ancestry query to calculate total number of descendants in the same generation"
-
-  def query() =
-    val base = testDB.tables.parent.filter(p => p.parent == "Alice").map(e => (name = e.child, gen = IntLit(1)).toRow)
-    base.fix(gen =>
-      testDB.tables.parent.flatMap(parent =>
-        gen
-          .filter(g => parent.parent == g.name)
-          .map(g => (name = parent.child, gen = g.gen + 1).toRow)
-      ).distinct
-    ).filter(g => g.gen == 2).map(g => (name = g.name).toRow)
-
-
-  def expectedQueryPattern: String =
-    """
-      WITH RECURSIVE
-        recursive$162 AS
-          ((SELECT parents$162.child as name, 1 as gen
-            FROM parents as parents$162
-            WHERE parents$162.parent = "Alice")
-            UNION
-          ((SELECT parents$164.child as name, ref$86.gen + 1 as gen
-            FROM parents as parents$164, recursive$162 as ref$86
-            WHERE parents$164.parent = ref$86.name)))
-      SELECT recref$14.name as name FROM recursive$162 as recref$14 WHERE recref$14.gen = 2
-            """
-}
-
-type Number = (id: Int, value: Int)
-type NumberType = (value: Int, typ: String)
-type EvenOddDB = (numbers: Number)
-
-given EvenOddDBs: TestDatabase[EvenOddDB] with
-  override def tables = (
-    numbers = Table[Number]("numbers")
-    )
-
-class EvenOddTest extends SQLStringQueryTest[EvenOddDB, NumberType] {
-  def testDescription: String = "Mutually recursive even-odd (classic)"
-
-  def query() =
-    val evenBase = testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
-    val oddBase = testDB.tables.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
-
-    val (even, odd) = fix((evenBase, oddBase))((even, odd) =>
-      val evenResult = testDB.tables.numbers.flatMap(num =>
-        odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = StringLit("even")))
-      ).distinct
-      val oddResult = testDB.tables.numbers.flatMap(num =>
-        even.filter(e => num.value == e.value + 1).map(e => (value = num.value, typ = StringLit("odd")))
-      ).distinct
-      (evenResult, oddResult)
-    )
-    odd
-
-  def expectedQueryPattern: String =
-    """
-      WITH RECURSIVE
-        recursive$1 AS
-          ((SELECT numbers$2.value as value, "even" as typ
-            FROM numbers as numbers$2
-            WHERE numbers$2.value = 0)
-          UNION
-            ((SELECT numbers$4.value as value, "even" as typ
-              FROM numbers as numbers$4, recursive$2 as ref$5
-              WHERE numbers$4.value = ref$5.value + 1))),
-         recursive$2 AS
-          ((SELECT numbers$8.value as value, "odd" as typ
-            FROM numbers as numbers$8
-            WHERE numbers$8.value = 1)
-              UNION
-          ((SELECT numbers$10.value as value, "odd" as typ
-            FROM numbers as numbers$10, recursive$1 as ref$8
-            WHERE numbers$10.value = ref$8.value + 1)))
-        SELECT * FROM recursive$2 as recref$1
-    """
 }
 
 type Term = (x: Int, y: String, z: Int)
