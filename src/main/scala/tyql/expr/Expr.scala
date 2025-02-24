@@ -16,12 +16,12 @@ type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
   case NonScalarExpr => S1
 
 trait ConstructorFreedom
-class Restricted extends ConstructorFreedom
-class NonRestricted extends ConstructorFreedom
+class RestrictedConstructors extends ConstructorFreedom
+class NonRestrictedConstructors extends ConstructorFreedom
 
 type CalculatedCF[S1 <: ConstructorFreedom, S2 <: ConstructorFreedom] <: ConstructorFreedom = S2 match
-  case Restricted => S2
-  case NonRestricted => S1
+  case RestrictedConstructors => S2
+  case NonRestrictedConstructors => S1
 /** The type of expressions in the query language */
 trait Expr[Result, Shape <: ExprShape, CF <: ConstructorFreedom](using val tag: ResultTag[Result]) extends Selectable:
   /** This type is used to support selection with any of the field names
@@ -37,34 +37,34 @@ trait Expr[Result, Shape <: ExprShape, CF <: ConstructorFreedom](using val tag: 
 
   /** Member methods to implement universal equality on Expr level. */
   @targetName("eqNonScalarRestricted")
-  def ==(other: Expr[?, NonScalarExpr, Restricted]): Expr[Boolean, Shape, Restricted] = Expr.Eq[Shape, NonScalarExpr, CF, Restricted](this, other)
+  def ==(other: Expr[?, NonScalarExpr, RestrictedConstructors]): Expr[Boolean, Shape, RestrictedConstructors] = Expr.Eq[Shape, NonScalarExpr, CF, RestrictedConstructors](this, other)
   @targetName("eqNonScalarNonRestricted")
-  def ==(other: Expr[?, NonScalarExpr, NonRestricted]): Expr[Boolean, Shape, CF] = Expr.Eq[Shape, NonScalarExpr, CF, NonRestricted](this, other)
+  def ==(other: Expr[?, NonScalarExpr, NonRestrictedConstructors]): Expr[Boolean, Shape, CF] = Expr.Eq[Shape, NonScalarExpr, CF, NonRestrictedConstructors](this, other)
   @targetName("eqScalarRestricted")
-  def ==(other: Expr[?, ScalarExpr, Restricted]): Expr[Boolean, ScalarExpr, Restricted] = Expr.Eq[Shape, ScalarExpr, CF, Restricted](this, other)
+  def ==(other: Expr[?, ScalarExpr, RestrictedConstructors]): Expr[Boolean, ScalarExpr, RestrictedConstructors] = Expr.Eq[Shape, ScalarExpr, CF, RestrictedConstructors](this, other)
   @targetName("eqScalarNonRestricted")
-  def ==(other: Expr[?, ScalarExpr, NonRestricted]): Expr[Boolean, ScalarExpr, CF] = Expr.Eq[Shape, ScalarExpr, CF, NonRestricted](this, other)
+  def ==(other: Expr[?, ScalarExpr, NonRestrictedConstructors]): Expr[Boolean, ScalarExpr, CF] = Expr.Eq[Shape, ScalarExpr, CF, NonRestrictedConstructors](this, other)
 //  def == [S <: ScalarExpr](other: Expr[?, S]): Expr[Boolean, CalculatedShape[Shape, S]] = Expr.Eq(this, other)
   def ==(other: String): Expr[Boolean, Shape, CF] = Expr.Eq(this, Expr.StringLit(other))
   def ==(other: Int): Expr[Boolean, Shape, CF] = Expr.Eq(this, Expr.IntLit(other))
   def ==(other: Boolean): Expr[Boolean, Shape, CF] = Expr.Eq(this, Expr.BooleanLit(other))
 
   @targetName("neqNonScalarRestricted")
-  def != (other: Expr[?, NonScalarExpr, Restricted]): Expr[Boolean, Shape, Restricted] = Expr.Ne[Shape, NonScalarExpr, CF, Restricted](this, other)
+  def != (other: Expr[?, NonScalarExpr, RestrictedConstructors]): Expr[Boolean, Shape, RestrictedConstructors] = Expr.Ne[Shape, NonScalarExpr, CF, RestrictedConstructors](this, other)
   @targetName("neqNonScalarNonRestricted")
-  def != (other: Expr[?, NonScalarExpr, NonRestricted]): Expr[Boolean, Shape, CF] = Expr.Ne[Shape, NonScalarExpr, CF, NonRestricted](this, other)
+  def != (other: Expr[?, NonScalarExpr, NonRestrictedConstructors]): Expr[Boolean, Shape, CF] = Expr.Ne[Shape, NonScalarExpr, CF, NonRestrictedConstructors](this, other)
   @targetName("neqScalarRestricted")
-  def != (other: Expr[?, ScalarExpr, Restricted]): Expr[Boolean, ScalarExpr, Restricted] = Expr.Ne[Shape, ScalarExpr, CF, Restricted](this, other)
+  def != (other: Expr[?, ScalarExpr, RestrictedConstructors]): Expr[Boolean, ScalarExpr, RestrictedConstructors] = Expr.Ne[Shape, ScalarExpr, CF, RestrictedConstructors](this, other)
   @targetName("neqScalarNonRestricted")
-  def != (other: Expr[?, ScalarExpr, NonRestricted]): Expr[Boolean, ScalarExpr, CF] = Expr.Ne[Shape, ScalarExpr, CF, NonRestricted](this, other)
+  def != (other: Expr[?, ScalarExpr, NonRestrictedConstructors]): Expr[Boolean, ScalarExpr, CF] = Expr.Ne[Shape, ScalarExpr, CF, NonRestrictedConstructors](this, other)
 
 object Expr:
   /** Sample extension methods for individual types */
   extension [S1 <: ExprShape, CF1 <: ConstructorFreedom](x: Expr[Int, S1, CF1])
     def >[S2 <: ExprShape, CF2 <: ConstructorFreedom] (y: Expr[Int, S2, CF2]): Expr[Boolean, CalculatedShape[S1, S2], CalculatedCF[CF1, CF2]] = Gt(x, y)
-    def >(y: Int): Expr[Boolean, S1, CF1] = Gt[S1, NonScalarExpr, CF1, NonRestricted](x, IntLit(y))
+    def >(y: Int): Expr[Boolean, S1, CF1] = Gt[S1, NonScalarExpr, CF1, NonRestrictedConstructors](x, IntLit(y))
     def <[S2 <: ExprShape, CF2 <: ConstructorFreedom] (y: Expr[Int, S2, CF2]): Expr[Boolean, CalculatedShape[S1, S2], CalculatedCF[CF1, CF2]] = Lt(x, y)
-    def <(y: Int): Expr[Boolean, S1, CF1] = Lt[S1, NonScalarExpr, CF1, NonRestricted](x, IntLit(y))
+    def <(y: Int): Expr[Boolean, S1, CF1] = Lt[S1, NonScalarExpr, CF1, NonRestrictedConstructors](x, IntLit(y))
     def <=[S2 <: ExprShape, CF2 <: ConstructorFreedom] (y: Expr[Int, S2, CF2]): Expr[Boolean, CalculatedShape[S1, S2], CalculatedCF[CF1, CF2]] = Lte(x, y)
 
     // (NonRestricted|Restricted) op NonRestricted
@@ -77,10 +77,10 @@ object Expr:
     def >[S2 <: ExprShape, CF2 <: ConstructorFreedom](y: Expr[Double, S2, CF2]): Expr[Boolean, CalculatedShape[S1, S2], CalculatedCF[CF1, CF2]] = // allowed for all cf
       GtDouble(x, y)
     @targetName("gtDoubleLit")
-    def >(y: Double): Expr[Boolean, S1, CF1] = GtDouble[S1, NonScalarExpr, CF1, NonRestricted](x, DoubleLit(y))
-    def <(y: Double): Expr[Boolean, S1, CF1] = LtDouble[S1, NonScalarExpr, CF1, NonRestricted](x, DoubleLit(y))
+    def >(y: Double): Expr[Boolean, S1, CF1] = GtDouble[S1, NonScalarExpr, CF1, NonRestrictedConstructors](x, DoubleLit(y))
+    def <(y: Double): Expr[Boolean, S1, CF1] = LtDouble[S1, NonScalarExpr, CF1, NonRestrictedConstructors](x, DoubleLit(y))
 
-    def *(y: Double): Expr[Double, S1, CF1] = Times[S1, NonScalarExpr, CF1, NonRestricted, Double](x, DoubleLit(y))
+    def *(y: Double): Expr[Double, S1, CF1] = Times[S1, NonScalarExpr, CF1, NonRestrictedConstructors, Double](x, DoubleLit(y))
 
     // (NonRestricted|Restricted) op NonRestricted
 //    @targetName("addDoubleToNonRestricted")
@@ -98,43 +98,43 @@ object Expr:
     def toUpperCase: Expr[String, S1, CF1] = Expr.Upper(x)
 
   // NonRestricted op NonRestricted
-  extension [S1 <: ExprShape](x: Expr[Double, S1, NonRestricted])
+  extension [S1 <: ExprShape](x: Expr[Double, S1, NonRestrictedConstructors])
     @targetName("addDoubleToNonRestricted")
-    def +[S2 <: ExprShape](y: Expr[Double, S2, NonRestricted]): Expr[Double, CalculatedShape[S1, S2], NonRestricted] = Plus(x, y)
+    def +[S2 <: ExprShape](y: Expr[Double, S2, NonRestrictedConstructors]): Expr[Double, CalculatedShape[S1, S2], NonRestrictedConstructors] = Plus(x, y)
     @targetName("multipleDoubleToNonRestricted")
-    def *[S2 <: ExprShape](y: Expr[Double, S2, NonRestricted]): Expr[Double, CalculatedShape[S1, S2], NonRestricted] = Times(x, y)
-  extension [S1 <: ExprShape](x: Expr[Int, S1, NonRestricted])
+    def *[S2 <: ExprShape](y: Expr[Double, S2, NonRestrictedConstructors]): Expr[Double, CalculatedShape[S1, S2], NonRestrictedConstructors] = Times(x, y)
+  extension [S1 <: ExprShape](x: Expr[Int, S1, NonRestrictedConstructors])
     @targetName("addDoubleToNonRestrictedInt")
-    def +[S2 <: ExprShape](y: Expr[Int, S2, NonRestricted]): Expr[Int, CalculatedShape[S1, S2], NonRestricted] = Plus(x, y)
+    def +[S2 <: ExprShape](y: Expr[Int, S2, NonRestrictedConstructors]): Expr[Int, CalculatedShape[S1, S2], NonRestrictedConstructors] = Plus(x, y)
     @targetName("multipleDoubleToNonRestrictedInt")
-    def *[S2 <: ExprShape](y: Expr[Int, S2, NonRestricted]): Expr[Int, CalculatedShape[S1, S2], NonRestricted] = Times(x, y)
+    def *[S2 <: ExprShape](y: Expr[Int, S2, NonRestrictedConstructors]): Expr[Int, CalculatedShape[S1, S2], NonRestrictedConstructors] = Times(x, y)
 
-  extension [A](x: Expr[List[A], NonScalarExpr, NonRestricted])(using ResultTag[List[A]])
-    def prepend(elem: Expr[A, NonScalarExpr, NonRestricted]): Expr[List[A], NonScalarExpr, NonRestricted] = ListPrepend(elem, x)
-    def append(elem: Expr[A, NonScalarExpr, NonRestricted]): Expr[List[A], NonScalarExpr, NonRestricted] = ListAppend(x, elem)
+  extension [A](x: Expr[List[A], NonScalarExpr, NonRestrictedConstructors])(using ResultTag[List[A]])
+    def prepend(elem: Expr[A, NonScalarExpr, NonRestrictedConstructors]): Expr[List[A], NonScalarExpr, NonRestrictedConstructors] = ListPrepend(elem, x)
+    def append(elem: Expr[A, NonScalarExpr, NonRestrictedConstructors]): Expr[List[A], NonScalarExpr, NonRestrictedConstructors] = ListAppend(x, elem)
 
   extension [A, CF <: ConstructorFreedom](x: Expr[List[A], NonScalarExpr, CF] ) (using ResultTag[List[A]] )
     def contains(elem: Expr[A, NonScalarExpr, ?]): Expr[Boolean, NonScalarExpr, CF] = ListContains(x, elem)
     def length: Expr[Int, NonScalarExpr, CF] = ListLength(x)
 
   // Aggregations
-  def sum(x: Expr[Int, ?, NonRestricted]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
+  def sum(x: Expr[Int, ?, NonRestrictedConstructors]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
 
   @targetName("doubleSum")
-  def sum(x: Expr[Double, ?, NonRestricted]): AggregationExpr[Double] = AggregationExpr.Sum(x) // TODO: require summable type?
+  def sum(x: Expr[Double, ?, NonRestrictedConstructors]): AggregationExpr[Double] = AggregationExpr.Sum(x) // TODO: require summable type?
 
-  def avg[T: ResultTag](x: Expr[T, ?, NonRestricted]): AggregationExpr[T] = AggregationExpr.Avg(x)
+  def avg[T: ResultTag](x: Expr[T, ?, NonRestrictedConstructors]): AggregationExpr[T] = AggregationExpr.Avg(x)
 
   @targetName("doubleAvg")
-  def avg(x: Expr[Double, ?, NonRestricted]): AggregationExpr[Double] = AggregationExpr.Avg(x)
+  def avg(x: Expr[Double, ?, NonRestrictedConstructors]): AggregationExpr[Double] = AggregationExpr.Avg(x)
 
-  def max[T: ResultTag](x: Expr[T, ?, NonRestricted]): AggregationExpr[T] = AggregationExpr.Max(x)
+  def max[T: ResultTag](x: Expr[T, ?, NonRestrictedConstructors]): AggregationExpr[T] = AggregationExpr.Max(x)
 
-  def min[T: ResultTag](x: Expr[T, ?, NonRestricted]): AggregationExpr[T] = AggregationExpr.Min(x)
+  def min[T: ResultTag](x: Expr[T, ?, NonRestrictedConstructors]): AggregationExpr[T] = AggregationExpr.Min(x)
 
-  def count(x: Expr[Int, ?, NonRestricted]): AggregationExpr[Int] = AggregationExpr.Count(x)
+  def count(x: Expr[Int, ?, NonRestrictedConstructors]): AggregationExpr[Int] = AggregationExpr.Count(x)
   @targetName("stringCnt")
-  def count(x: Expr[String, ?, NonRestricted]): AggregationExpr[Int] = AggregationExpr.Count(x)
+  def count(x: Expr[String, ?, NonRestrictedConstructors]): AggregationExpr[Int] = AggregationExpr.Count(x)
 
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
@@ -156,13 +156,13 @@ object Expr:
   case class Upper[S <: ExprShape, CF1 <: ConstructorFreedom]($x: Expr[String, S, CF1]) extends Expr[String, S, CF1]
   case class Lower[S <: ExprShape, CF1 <: ConstructorFreedom]($x: Expr[String, S, CF1]) extends Expr[String, S, CF1]
 
-  case class ListExpr[A]($elements: List[Expr[A, NonScalarExpr, NonRestricted]])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr, NonRestricted]
-  extension [A, E <: Expr[A, NonScalarExpr, NonRestricted]](x: List[E])
+  case class ListExpr[A]($elements: List[Expr[A, NonScalarExpr, NonRestrictedConstructors]])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr, NonRestrictedConstructors]
+  extension [A, E <: Expr[A, NonScalarExpr, NonRestrictedConstructors]](x: List[E])
     def toExpr(using ResultTag[List[A]]): ListExpr[A] = ListExpr(x)
   //  given Conversion[List[A], ListExpr[A]] = ListExpr(_)
 
-  case class ListPrepend[A]($x: Expr[A, NonScalarExpr, NonRestricted], $list: Expr[List[A], NonScalarExpr, NonRestricted])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr, NonRestricted]
-  case class ListAppend[A]($list: Expr[List[A], NonScalarExpr, NonRestricted], $x: Expr[A, NonScalarExpr, NonRestricted])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr, NonRestricted]
+  case class ListPrepend[A]($x: Expr[A, NonScalarExpr, NonRestrictedConstructors], $list: Expr[List[A], NonScalarExpr, NonRestrictedConstructors])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr, NonRestrictedConstructors]
+  case class ListAppend[A]($list: Expr[List[A], NonScalarExpr, NonRestrictedConstructors], $x: Expr[A, NonScalarExpr, NonRestrictedConstructors])(using ResultTag[List[A]]) extends Expr[List[A], NonScalarExpr, NonRestrictedConstructors]
   case class ListContains[A, CF1 <: ConstructorFreedom]($list: Expr[List[A], NonScalarExpr, CF1], $x: Expr[A, NonScalarExpr, ?])(using ResultTag[Boolean]) extends Expr[Boolean, NonScalarExpr, CF1]
   case class ListLength[A, CF1 <: ConstructorFreedom]($list: Expr[List[A], NonScalarExpr, CF1])(using ResultTag[Int]) extends Expr[Int, NonScalarExpr, CF1]
 
@@ -208,17 +208,17 @@ object Expr:
   case class Fun[A, B, S <: ExprShape, CF <: ConstructorFreedom]($param: Ref[A, S, CF], $body: B)
 
   /** Literals are type-specific, tailored to the types that the DB supports */
-  case class IntLit($value: Int) extends Expr[Int, NonScalarExpr, NonRestricted]
+  case class IntLit($value: Int) extends Expr[Int, NonScalarExpr, NonRestrictedConstructors]
   /** Scala values can be lifted into literals by conversions */
   given Conversion[Int, IntLit] = IntLit(_)
 
-  case class StringLit($value: String) extends Expr[String, NonScalarExpr, NonRestricted]
+  case class StringLit($value: String) extends Expr[String, NonScalarExpr, NonRestrictedConstructors]
   given Conversion[String, StringLit] = StringLit(_)
 
-  case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr, NonRestricted]
+  case class DoubleLit($value: Double) extends Expr[Double, NonScalarExpr, NonRestrictedConstructors]
   given Conversion[Double, DoubleLit] = DoubleLit(_)
 
-  case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr, NonRestricted]
+  case class BooleanLit($value: Boolean) extends Expr[Boolean, NonScalarExpr, NonRestrictedConstructors]
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
 
   /** Should be able to rely on the implicit conversions, but not always.
@@ -251,8 +251,8 @@ object Expr:
                               actualP: Expr[A, S, CF]): Expr[B, S, CF] = ???
   type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, NonScalarExpr, ?]
 
-  type IsTupleOfNonRestricted[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?, NonRestricted]
-  type IsTupleOfRestricted[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?, Restricted]
+  type IsTupleOfNonRestricted[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?, NonRestrictedConstructors]
+  type IsTupleOfRestricted[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?, RestrictedConstructors]
 
   /** Explicit conversion from
    *      (name_1: Expr[T_1], ..., name_n: Expr[T_n])

@@ -28,31 +28,31 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
 
   // flatMap given a function that returns regular Query does not add any dependencies
   @targetName("restrictedQueryFlatMap")
-  def flatMap[B: ResultTag](f: Expr.Ref[A, NonScalarExpr, Restricted] => Query[B, ?]): RestrictedQuery[B, BagResult, D] =
-    val ref = Expr.Ref[A, NonScalarExpr, Restricted]()
+  def flatMap[B: ResultTag](f: Expr.Ref[A, NonScalarExpr, RestrictedConstructors] => Query[B, ?]): RestrictedQuery[B, BagResult, D] =
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictedConstructors]()
     RestrictedQuery(Query.FlatMap(wrapped, Expr.Fun(ref, f(ref))))
 
   @targetName("restrictedQueryFlatMapRestricted")
-  def flatMap[B: ResultTag, D2 <: Tuple](f: Expr.Ref[A, NonScalarExpr, Restricted] => RestrictedQuery[B, ?, D2]): RestrictedQuery[B, BagResult, Tuple.Concat[D, D2]] =
+  def flatMap[B: ResultTag, D2 <: Tuple](f: Expr.Ref[A, NonScalarExpr, RestrictedConstructors] => RestrictedQuery[B, ?, D2]): RestrictedQuery[B, BagResult, Tuple.Concat[D, D2]] =
 //  (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true)
-    val toR: Expr.Ref[A, NonScalarExpr, Restricted] => Query[B, ?] = arg => f(arg).toQuery
-    val ref = Expr.Ref[A, NonScalarExpr, Restricted]()
+    val toR: Expr.Ref[A, NonScalarExpr, RestrictedConstructors] => Query[B, ?] = arg => f(arg).toQuery
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictedConstructors]()
     RestrictedQuery(Query.FlatMap(wrapped, Expr.Fun(ref, toR(ref))))
 
-  def map[B: ResultTag, CF <: ConstructorFreedom](f: Expr.Ref[A, NonScalarExpr, Restricted] => Expr[B, NonScalarExpr, CF]): RestrictedQuery[B, BagResult, D] =
-    val ref = Expr.Ref[A, NonScalarExpr, Restricted]()
+  def map[B: ResultTag, CF <: ConstructorFreedom](f: Expr.Ref[A, NonScalarExpr, RestrictedConstructors] => Expr[B, NonScalarExpr, CF]): RestrictedQuery[B, BagResult, D] =
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictedConstructors]()
     RestrictedQuery(Query.Map(wrapped, Expr.Fun(ref, f(ref))))
 
-  def map[B <: AnyNamedTuple: Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NonScalarExpr, Restricted] => B): RestrictedQuery[NamedTuple.Map[B, Expr.StripExpr], BagResult, D] =
+  def map[B <: AnyNamedTuple: Expr.IsTupleOfExpr](using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])(f: Expr.Ref[A, NonScalarExpr, RestrictedConstructors] => B): RestrictedQuery[NamedTuple.Map[B, Expr.StripExpr], BagResult, D] =
     import Expr.toRow
-    val ref = Expr.Ref[A, NonScalarExpr, Restricted]()
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictedConstructors]()
     RestrictedQuery(Query.Map(wrapped, Expr.Fun(ref, f(ref).toRow)))
 
-  def withFilter[CF <: ConstructorFreedom](p: Expr.Ref[A, NonScalarExpr, Restricted] => Expr[Boolean, NonScalarExpr, CF]): RestrictedQuery[A, C, D] =
-    val ref = Expr.Ref[A, NonScalarExpr, Restricted]()
+  def withFilter[CF <: ConstructorFreedom](p: Expr.Ref[A, NonScalarExpr, RestrictedConstructors] => Expr[Boolean, NonScalarExpr, CF]): RestrictedQuery[A, C, D] =
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictedConstructors]()
     RestrictedQuery(Query.Filter[A, C](wrapped, Expr.Fun(ref, p(ref))))
-  def filter[CF <: ConstructorFreedom](p: Expr.Ref[A, NonScalarExpr, Restricted] => Expr[Boolean, NonScalarExpr, CF]): RestrictedQuery[A, C, D] =
-    val ref = Expr.Ref[A, NonScalarExpr, Restricted]()
+  def filter[CF <: ConstructorFreedom](p: Expr.Ref[A, NonScalarExpr, RestrictedConstructors] => Expr[Boolean, NonScalarExpr, CF]): RestrictedQuery[A, C, D] =
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictedConstructors]()
     RestrictedQuery(Query.Filter[A, C](wrapped, Expr.Fun(ref, p(ref))))
 
   def distinct: RestrictedQuery[A, SetResult, D] = RestrictedQuery(wrapped.distinct)
@@ -75,10 +75,10 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
     RestrictedQuery(Query.UnionAll(wrapped, that))
 
   // TODO: Does nonEmpty count as non-monotone? (yes)
-  def nonEmpty: Expr[Boolean, NonScalarExpr, Restricted] =
+  def nonEmpty: Expr[Boolean, NonScalarExpr, RestrictedConstructors] =
     Expr.NonEmpty(wrapped)
 
-  def isEmpty: Expr[Boolean, NonScalarExpr, Restricted] =
+  def isEmpty: Expr[Boolean, NonScalarExpr, RestrictedConstructors] =
     Expr.IsEmpty(wrapped)
 
 object RestrictedQuery {

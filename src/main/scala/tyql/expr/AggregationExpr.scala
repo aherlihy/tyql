@@ -9,7 +9,7 @@ import Expr.{Fun, StripExpr}
 /**
  * A scalar operation, e.g. an expression that returns a single result, instead of a collection.
  */
-trait AggregationExpr[Result](using ResultTag[Result]) extends Expr[Result, ScalarExpr, NonRestricted]
+trait AggregationExpr[Result](using ResultTag[Result]) extends Expr[Result, ScalarExpr, NonRestrictedConstructors]
 object AggregationExpr {
 
   case class Sum[A: ResultTag]($a: Expr[A, ?, ?]) extends AggregationExpr[A]

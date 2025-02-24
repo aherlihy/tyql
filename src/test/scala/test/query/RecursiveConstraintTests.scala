@@ -991,7 +991,7 @@ class RecursionFibFailTest extends munit.FunSuite {
   def testDescription: String = "Fibonacci example fails due to unsupported arithmetic on tyql.Expr"
 
   def expectedError: String =
-    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.Restricted]"
+    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.RestrictedConstructors]"
 
   test(testDescription) {
     val error: String =
@@ -1020,7 +1020,7 @@ class RecursionShortestPathFailTest extends munit.FunSuite {
   def testDescription: String = "Shortest path query fails due to unsupported append operation on tyql.Expr"
 
   def expectedError: String =
-    "value append is not a member of tyql.Expr[List[Int], tyql.NonScalarExpr, tyql.Restricted]"
+    "value append is not a member of tyql.Expr[List[Int], tyql.NonScalarExpr, tyql.RestrictedConstructors]"
 
   test(testDescription) {
     val error: String =
@@ -1055,7 +1055,7 @@ class RecursionTreeFailTest extends munit.FunSuite {
   def testDescription: String = "Tag tree example fails due to unsupported prepend operation on tyql.Expr"
 
   def expectedError: String =
-    "value prepend is not a member of tyql.Expr[List[String], tyql.NonScalarExpr, tyql.Restricted]"
+    "value prepend is not a member of tyql.Expr[List[String], tyql.NonScalarExpr, tyql.RestrictedConstructors]"
 
   test(testDescription) {
     val error: String =
@@ -1090,7 +1090,7 @@ class AncestryFailTest extends munit.FunSuite {
   def testDescription: String = "Ancestry query fails due to unsupported arithmetic on tyql.Expr"
 
   def expectedError: String =
-    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.Restricted]"
+    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.RestrictedConstructors]"
 
   test(testDescription) {
     val error: String =
@@ -1122,7 +1122,7 @@ class EvenOddFailTest extends munit.FunSuite {
   def testDescription: String = "Even-odd recursion fails due to unsupported arithmetic on tyql.Expr"
 
   def expectedError: String =
-    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.Restricted]"
+    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.RestrictedConstructors]"
 
   test(testDescription) {
     val error: String =
@@ -1157,7 +1157,7 @@ class RecursionSSSPFailTest extends munit.FunSuite {
   def testDescription: String = "Single source shortest path fails due to unsupported arithmetic on tyql.Expr"
 
   def expectedError: String =
-    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.Restricted]"
+    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.RestrictedConstructors]"
 
   test(testDescription) {
     val error: String =
