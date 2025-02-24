@@ -53,7 +53,7 @@ class RecursionConstraintRangeRestrictionTest extends SQLStringQueryTest[TCDB, E
 }
 class RecursionConstraintRangeRestrictionFailTest extends munit.FunSuite {
   def testDescription: String = "Range restricted incorrectly"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(y : Int), tyql.SetResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(y : Int), tyql.SetResult, Tuple1[(0 : Int)],\n  tyql.RestrictedConstructors]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]"
 
   test(testDescription) {
     val error: String =
@@ -110,7 +110,7 @@ class RecursionConstraintCategoryResultTest extends SQLStringQueryTest[TCDB, Edg
 }
 class RecursionConstraintCategoryUnionAllFailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)],\n  tyql.RestrictedConstructors]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]"
 
   test(testDescription) {
     val error: String =
@@ -144,7 +144,7 @@ class RecursionConstraintCategoryUnionAllFailTest extends munit.FunSuite {
 }
 class RecursionConstraintCategoryFlatmapFailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, missing distinct"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)],\n  tyql.RestrictedConstructors]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)],\n  tyql.RestrictedConstructors]"
 
   test(testDescription) {
     val error: String =
@@ -316,7 +316,7 @@ class RecursiveConstraintLinearFailInline0Test extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 0 usages of path, inline fix"
 
   // Special because inline fix
-  def expectedError: String = "Found:    tyql.Query[(x : Int, y : Int), tyql.SetResult]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String = "Found:    tyql.Query[(x : Int, y : Int), tyql.SetResult]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)"
 
   test(testDescription) {
     val error: String =
@@ -353,7 +353,7 @@ class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: 2 usages of path, inline fix"
 
 //  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.SetResult, ((0 : Int), (0 : Int))]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.SetResult,\n  ((0 : Int), (0 : Int)), tyql.RestrictedConstructors]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)"
   test(testDescription) {
     val error: String =
       compileErrors(
@@ -956,7 +956,7 @@ class RecursiveConstraintAggregationMutualRecursionFailTest extends munit.FunSui
 
 class RecursionConstraintCategoryUnionAll2FailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll, will not terminate!"
-  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)]]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)]]"
+  def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)],\n  tyql.RestrictedConstructors]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)"
 
   test(testDescription) {
     val error: String =
