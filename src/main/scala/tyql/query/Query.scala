@@ -34,7 +34,7 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
    * @tparam B  the result type of the query.
    * @return    RestrictedQuery[B]
    */
-  def flatMap[B: ResultTag, D <: Tuple](f: Ref[A, NonScalarExpr, NonRestrictedConstructors] => RestrictedQuery[B, ?, D]): RestrictedQuery[B, BagResult, D] =
+  def flatMap[B: ResultTag, D <: Tuple, RCF <: ConstructorFreedom](f: Ref[A, NonScalarExpr, NonRestrictedConstructors] => RestrictedQuery[B, ?, D, RCF]): RestrictedQuery[B, BagResult, D, RCF] =
     val ref = Ref[A, NonScalarExpr, NonRestrictedConstructors]()
     RestrictedQuery(Query.FlatMap(this, Fun(ref, f(ref).toQuery)))
   /**
@@ -209,12 +209,19 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val ref = Ref[A, NonScalarExpr, NonRestrictedConstructors]()
     Query.Map(this, Fun(ref, f(ref).toRow))
 
-  def fix(p: RestrictedQueryRef[A, ?, 0] => RestrictedQuery[A, SetResult, Tuple1[0]]): Query[A, SetResult] =
+  def fix(p: RestrictedQueryRef[A, ?, 0, RestrictedConstructors] => RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors]): Query[A, SetResult] =
     type QT = Tuple1[Query[A, ?]]
     type DT = Tuple1[Tuple1[0]]
-    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0]]]
-    val fn: Tuple1[RestrictedQueryRef[A, ?, 0]] => RQT = r => Tuple1(p(r._1))
+    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors]]
+    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, RestrictedConstructors]] => RQT = r => Tuple1(p(r._1))
     Query.fix[QT, DT, RQT](Tuple1(this))(fn)._1
+
+  def fixConstructors(p: RestrictedQueryRef[A, ?, 0, NonRestrictedConstructors] => RestrictedQuery[A, SetResult, Tuple1[0], NonRestrictedConstructors]): Query[A, SetResult] =
+    type QT = Tuple1[Query[A, ?]]
+    type DT = Tuple1[Tuple1[0]]
+    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], NonRestrictedConstructors]]
+    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, NonRestrictedConstructors]] => RQT = r => Tuple1(p(r._1))
+    Query.fixConstructors[QT, DT, RQT](Tuple1(this))(fn)._1
 
   def unrestrictedFix(p: Query.QueryRef[A, ?] => Query[A, ?]): Query[A, BagResult] =
     type QT = Tuple1[Query[A, ?]]
@@ -256,6 +263,18 @@ object Query:
   def unrestrictedBagFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToUnrestrictedQueryRef[QT] => ToUnrestrictedQuery[QT]): ToQuery[QT] =
     unrestrictedFixImpl(false)(bases)(fns)
 
+  def fixConstructors[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
+  (bases: QT)
+  (fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors] => RQT)
+  (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
+  (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
+  (using @implicitNotFound("Cannot constrain DT") ev2: DT <:< InverseMapDeps[RQT])
+  (using @implicitNotFound("Recursive definitions must be linear: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, NonRestrictedConstructors])
+  (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
+  : ToQuery[QT] =
+    fixImpl(bases)(fns)
+
+
   /**
    * Fixed point computation.
    *
@@ -274,11 +293,11 @@ object Query:
    */
   def fix[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
                                     (bases: QT)
-                                    (fns: ToRestrictedQueryRef[QT] => RQT)
+                                    (fns: ToRestrictedQueryRef[QT, RestrictedConstructors] => RQT)
                                     (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
                                     (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
                                     (using @implicitNotFound("Cannot constrain DT") ev2: DT <:< InverseMapDeps[RQT])
-                                    (using @implicitNotFound("Recursive definitions must be linear: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT])
+                                    (using @implicitNotFound("Recursive definitions must be linear: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RestrictedConstructors])
                                     (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
 //                                    (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition: ${RQT}") ev2: Tuple.Union[Tuple.Map[DT, CheckDuplicate]] =:= false)
       : ToQuery[QT] =
@@ -313,9 +332,9 @@ object Query:
           case (query: Query[t, c], ddef) =>
             UnionAll(ddef.asInstanceOf[Query[t, c]], query.asInstanceOf[Query[t, c]])(using query.tag)
 
-    val rt = refsTuple.asInstanceOf[Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?]]]
+    val rt = refsTuple.asInstanceOf[Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?, NonRestrictedConstructors]]]
     rt.naturalMap([t] => finalRef =>
-      val fr = finalRef.asInstanceOf[RestrictedQueryRef[t, ?, ?]]
+      val fr = finalRef.asInstanceOf[RestrictedQueryRef[t, ?, ?, NonRestrictedConstructors]]
 
       given ResultTag[t] = fr.tag
 
@@ -326,7 +345,7 @@ object Query:
       )
     )
 
-  def fixImpl[QT <: Tuple, P <: Tuple, R <: Tuple](bases: QT)(fns: P => R): ToQuery[QT] =
+  def fixImpl[QT <: Tuple, P <: Tuple, R <: Tuple, RCF <: ConstructorFreedom](bases: QT)(fns: P => R): ToQuery[QT] =
     // If base cases are themselves recursive definitions.
     val baseRefsAndDefs = bases.toArray.map {
       case MultiRecursive(params, querys, resultQ) => ???// TODO: decide on semantics for multiple fix definitions. (param, query)
@@ -337,7 +356,7 @@ object Query:
     val recurQueries = fns(refsTuple)
 
     val baseCaseDefsList = baseRefsAndDefs.map(_._2.asInstanceOf[Query[?, ?]])
-    val recursiveDefsList: List[Query[?, ?]] = recurQueries.toList.map(_.asInstanceOf[RestrictedQuery[?, ?, ?]].toQuery).lazyZip(baseCaseDefsList).map:
+    val recursiveDefsList: List[Query[?, ?]] = recurQueries.toList.map(_.asInstanceOf[RestrictedQuery[?, ?, ?, RCF]].toQuery).lazyZip(baseCaseDefsList).map:
       case (query: Query[t, c], ddef) =>
         // Optimization: remove any extra .distinct calls that are getting fed into a union anyway
         val lhs = ddef match
@@ -348,9 +367,9 @@ object Query:
           case t => t
         Union(lhs.asInstanceOf[Query[t, c]], rhs.asInstanceOf[Query[t, c]])(using query.tag)
 
-    val rt = refsTuple.asInstanceOf[Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?]]]
+    val rt = refsTuple.asInstanceOf[Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?, RCF]]]
     rt.naturalMap([t] => finalRef =>
-      val fr = finalRef.asInstanceOf[RestrictedQueryRef[t, ?, ?]]
+      val fr = finalRef.asInstanceOf[RestrictedQueryRef[t, ?, ?, RCF]]
       given ResultTag[t] = fr.tag
       MultiRecursive(
         refsList,
@@ -360,7 +379,7 @@ object Query:
     )
 
   // TODO: in the case we want to allow bag semantics within recursive queries, set $bag
-  case class MultiRecursive[R]($param: List[RestrictedQueryRef[?, ?, ?]],
+  case class MultiRecursive[R]($param: List[RestrictedQueryRef[?, ?, ?, ?]],
                                $subquery: List[Query[?, ?]],
                                $resultQuery: Query[R, ?])(using ResultTag[R]) extends Query[R, SetResult]
 
