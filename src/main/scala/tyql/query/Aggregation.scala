@@ -2,12 +2,12 @@ package tyql
 
 import tyql.Expr.{Fun, Ref}
 
-type ToNonScalarRef[TT <: Tuple] = Tuple.Map[TT, [T] =>> Ref[T, NonScalarExpr, NonRestricted]]
+type ToNonScalarRef[TT <: Tuple] = Tuple.Map[TT, [T] =>> Ref[T, NonScalarExpr, NonRestrictedConstructors]]
 
 trait Aggregation[
   AllSourceTypes <: Tuple,
   Result
-](using ResultTag[Result]) extends DatabaseAST[Result] with Expr[Result, NonScalarExpr, NonRestricted]:
+](using ResultTag[Result]) extends DatabaseAST[Result] with Expr[Result, NonScalarExpr, NonRestrictedConstructors]:
   def groupBySource[GroupResult, GroupShape <: ExprShape]
     (groupingFn: ToNonScalarRef[AllSourceTypes] => Expr[GroupResult, GroupShape, ?])
   : Query.NewGroupBy[AllSourceTypes, Result, GroupResult, GroupShape]
@@ -57,7 +57,7 @@ object Aggregation:
 
       Query.NewGroupBy(this, groupResult, argRefs, sourceTags, None)
 
-  case class AggFilter[A: ResultTag]($from: Query[A, ?], $pred: Expr.Fun[A, Expr[Boolean, ScalarExpr, NonRestricted], ScalarExpr, ?]) extends Aggregation[A *: EmptyTuple, A]:
+  case class AggFilter[A: ResultTag]($from: Query[A, ?], $pred: Expr.Fun[A, Expr[Boolean, ScalarExpr, NonRestrictedConstructors], ScalarExpr, ?]) extends Aggregation[A *: EmptyTuple, A]:
     def groupBySource[GroupResult, GroupShape <: ExprShape]
       (groupingFn: ToNonScalarRef[A *: EmptyTuple] => Expr[GroupResult, GroupShape, ?])
     : Query.NewGroupBy[A *: EmptyTuple, A, GroupResult, GroupShape] =
