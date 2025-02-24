@@ -1,7 +1,7 @@
 package test.query.recursive
 import test.{SQLStringAggregationTest, SQLStringQueryTest, TestDatabase}
 import tyql.*
-import Query.{fix, unrestrictedFix, unrestrictedFixImpl}
+import Query.{fix, unrestrictedFix}
 import Expr.{IntLit, count, max, min, sum}
 
 import language.experimental.namedTuples
