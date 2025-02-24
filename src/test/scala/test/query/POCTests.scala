@@ -21,7 +21,7 @@ class AbstractOverValuesHostTest extends SQLStringQueryTest[AllCommerceDBs, Prod
 class AbstractOverPredicatesHostTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "Support for abstracting over predicates in the host language"
   def query() =
-    val satisfies: Expr[Double, NonScalarExpr, NonRestricted] => Expr[Boolean, NonScalarExpr, NonRestricted] = (p => p > 10.0)
+    val satisfies: Expr[Double, NonScalarExpr, NonRestrictedConstructors] => Expr[Boolean, NonScalarExpr, NonRestrictedConstructors] = (p => p > 10.0)
     testDB.tables.products.filter(p => satisfies(p.price))
   def expectedQueryPattern: String = "SELECT * FROM product as product$A WHERE product$A.price > 10.0"
 }
@@ -29,7 +29,7 @@ class AbstractOverPredicatesHostTest extends SQLStringQueryTest[AllCommerceDBs, 
 class AbstractOverValuesAndPredicatesHostTest extends SQLStringQueryTest[AllCommerceDBs, Product] {
   def testDescription: String = "Support for abstracting over predicates and values in the host language"
   def query() =
-    val satisfies: (Expr[Double, NonScalarExpr, NonRestricted], Double) => Expr[Boolean, NonScalarExpr, NonRestricted] = (p, q) => p > q
+    val satisfies: (Expr[Double, NonScalarExpr, NonRestrictedConstructors], Double) => Expr[Boolean, NonScalarExpr, NonRestrictedConstructors] = (p, q) => p > q
 
     val range = (a: Double, b: Double) => testDB.tables.products
       .filter(p => satisfies(p.price, a) && p.price < b)
