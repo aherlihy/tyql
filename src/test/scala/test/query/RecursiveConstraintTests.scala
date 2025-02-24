@@ -987,6 +987,205 @@ class RecursionConstraintCategoryUnionAll2FailTest extends munit.FunSuite {
   }
 }
 
+class RecursionFibFailTest extends munit.FunSuite {
+  def testDescription: String = "Fibonacci example fails due to unsupported arithmetic on tyql.Expr"
+
+  def expectedError: String =
+    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.Restricted]"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr, Query}
+           import Query.fix
+
+           type FibNum = (recursionDepth: Int, fibonacciNumber: Int, nextNumber: Int)
+           val base = Table[FibNum]("base")
+
+           base.fix(fib =>
+             fib
+               .filter(f => (f.recursionDepth + 1) < 10)
+               .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
+               .distinct
+           )
+        """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursionShortestPathFailTest extends munit.FunSuite {
+  def testDescription: String = "Shortest path query fails due to unsupported append operation on tyql.Expr"
+
+  def expectedError: String =
+    "value append is not a member of tyql.Expr[List[Int], tyql.NonScalarExpr, tyql.Restricted]"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr, Query}
+           import Query.fix
+
+           type Edge = (x: Int, y: Int)
+           type Path = (startNode: Int, endNode: Int, path: List[Int])
+           val edge = Table[Edge]("edge")
+
+           val pathBase = edge
+             .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
+             .filter(p => p.startNode == 1)
+
+           pathBase.fix(path =>
+             path.flatMap(p =>
+               edge
+                 .filter(e => e.x == p.endNode)
+                 .map(e => (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow)
+             ).distinct
+           )
+        """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursionTreeFailTest extends munit.FunSuite {
+  def testDescription: String = "Tag tree example fails due to unsupported prepend operation on tyql.Expr"
+
+  def expectedError: String =
+    "value prepend is not a member of tyql.Expr[List[String], tyql.NonScalarExpr, tyql.Restricted]"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr, Query}
+           import Query.fix
+
+           type Tag = (id: Int, name: String, subclassof: Int)
+           type TagHierarchy = (id: Int, source: String, path: List[String])
+           val tag = Table[Tag]("tag")
+
+           val tagHierarchy0 = tag
+             .filter(t => t.subclassof == -1)
+             .map(t => (id = t.id, source = t.name, path = List(t.name).toExpr).toRow)
+
+           tagHierarchy0.fix(tagHierarchy1 =>
+             tagHierarchy1.flatMap(hier =>
+               tag
+                 .filter(t => t.subclassof == hier.id)
+                 .map(t => (id = t.id, source = t.name, path = hier.path.prepend(t.name)).toRow)
+             ).distinct
+           )
+        """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class AncestryFailTest extends munit.FunSuite {
+  def testDescription: String = "Ancestry query fails due to unsupported arithmetic on tyql.Expr"
+
+  def expectedError: String =
+    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.Restricted]"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr, Query}
+           import Query.fix
+
+           type Parent = (parent: String, child: String)
+           val parent = Table[Parent]("parents")
+
+           val base = parent.filter(p => p.parent == "Alice").map(e => (name = e.child, gen = Expr.IntLit(1)).toRow)
+
+           base.fix(gen =>
+             parent.flatMap(parent =>
+               gen
+                 .filter(g => parent.parent == g.name)
+                 .map(g => (name = parent.child, gen = g.gen + 1).toRow)
+             ).distinct
+           )
+        """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class EvenOddFailTest extends munit.FunSuite {
+  def testDescription: String = "Even-odd recursion fails due to unsupported arithmetic on tyql.Expr"
+
+  def expectedError: String =
+    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.Restricted]"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr, Query}
+           import Query.fix
+
+           type Number = (id: Int, value: Int)
+           val numbers = Table[Number]("numbers")
+
+           val evenBase = numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = Expr.StringLit("even")).toRow)
+           val oddBase = numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = Expr.StringLit("odd")).toRow)
+
+           val (even, odd) = fix((evenBase, oddBase))((even, odd) =>
+             val evenResult = numbers.flatMap(num =>
+               odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = Expr.StringLit("even")))
+             ).distinct
+             val oddResult = numbers.flatMap(num =>
+               even.filter(e => num.value == e.value + 1).map(e => (value = num.value, typ = Expr.StringLit("odd")))
+             ).distinct
+             (evenResult, oddResult)
+           )
+        """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+class RecursionSSSPFailTest extends munit.FunSuite {
+  def testDescription: String = "Single source shortest path fails due to unsupported arithmetic on tyql.Expr"
+
+  def expectedError: String =
+    "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.Restricted]"
+
+  test(testDescription) {
+    val error: String =
+      compileErrors(
+        """
+           // BOILERPLATE
+           import language.experimental.namedTuples
+           import tyql.{Table, Expr, Query}
+           import Query.fix
+
+           type WeightedEdge = (src: Int, dst: Int, cost: Int)
+           val edge = Table[WeightedEdge]("edge")
+
+           val base = Table[(dst: Int, cost: Int)]("base")
+
+           base.fix(sp =>
+             edge.flatMap(edge =>
+               sp
+                 .filter(s => s.dst == edge.src)
+                 .map(s => (dst = edge.dst, cost = s.cost + edge.cost).toRow)
+             ).distinct
+           )
+        """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+
 
 //class TESTTEST extends SQLStringQueryTest[TCDB, Edge] {
 //  def testDescription: String = "Live tests"
