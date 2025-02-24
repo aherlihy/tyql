@@ -22,9 +22,9 @@ object TreePrettyPrinter {
       s"${indent(level)}$key=${values.mkString("[\n", ",\n", s"\n${indent(level)}]")}"
 
 
-  extension (fun: Fun[?, ?, ?]) {
+  extension (fun: Fun[?, ?, ?, ?]) {
     def prettyPrint(depth: Int): String = fun match
-      case Fun(param, body: Expr[?, ?]) =>
+      case Fun(param, body: Expr[?, ?, ?]) =>
         s"${indent(depth)}FunE(${param.stringRef()} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Fun(param, body: DatabaseAST[?]) =>
         s"${indent(depth)}FunQ(${param.stringRef()} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
@@ -37,10 +37,10 @@ object TreePrettyPrinter {
         s"${indent(depth)}FunR(${param.prettyPrint(0)} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
   }
 
-  extension (expr: Expr[?, ?]) {
+  extension (expr: Expr[?, ?, ?]) {
     def prettyPrint(depth: Int): String = expr match {
       case Select(x, name) => s"${indent(depth)}Select(${x.prettyPrint(0)}.$name)"
-      case Ref(_) => s"${indent(depth)}${expr.asInstanceOf[Ref[?, ?]].stringRef()}"
+      case Ref(_) => s"${indent(depth)}${expr.asInstanceOf[Ref[?, ?, ?]].stringRef()}"
       case Eq(x, y) => s"${indent(depth)}Eq(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Ne(x, y) => s"${indent(depth)}Ne(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Gt(x, y) => s"${indent(depth)}Gt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
@@ -82,7 +82,7 @@ object TreePrettyPrinter {
           case _ => Seq()
         val children = a.toList.zipWithIndex
           .map((expr, idx) =>
-            val e = expr.asInstanceOf[Expr[?, ?]]
+            val e = expr.asInstanceOf[Expr[?, ?, ?]]
             val namedStr = namedTupleNames(idx).fold("")(n => s"$n")
             indentWithKey(depth + 1, namedStr, e.prettyPrint(depth + 1))
           )
@@ -114,7 +114,7 @@ object TreePrettyPrinter {
           case _ => Seq()
         val children = a.toList.zipWithIndex
           .map((expr, idx) =>
-            val e = expr.asInstanceOf[Expr[?, ?]]
+            val e = expr.asInstanceOf[Expr[?, ?, ?]]
             val namedStr = namedTupleNames(idx).fold("")(n => s"$n=")
             s"${indent(depth+1)}$namedStr${e.prettyPrint(0)}"
           )

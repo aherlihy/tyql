@@ -2,14 +2,14 @@ package tyql
 
 import tyql.Expr.{Fun, Ref}
 
-type ToNonScalarRef[TT <: Tuple] = Tuple.Map[TT, [T] =>> Ref[T, NonScalarExpr]]
+type ToNonScalarRef[TT <: Tuple] = Tuple.Map[TT, [T] =>> Ref[T, NonScalarExpr, NonRestricted]]
 
 trait Aggregation[
   AllSourceTypes <: Tuple,
   Result
-](using ResultTag[Result]) extends DatabaseAST[Result] with Expr[Result, NonScalarExpr]:
+](using ResultTag[Result]) extends DatabaseAST[Result] with Expr[Result, NonScalarExpr, NonRestricted]:
   def groupBySource[GroupResult, GroupShape <: ExprShape]
-    (groupingFn: ToNonScalarRef[AllSourceTypes] => Expr[GroupResult, GroupShape])
+    (groupingFn: ToNonScalarRef[AllSourceTypes] => Expr[GroupResult, GroupShape, ?])
   : Query.NewGroupBy[AllSourceTypes, Result, GroupResult, GroupShape]
 
 object Aggregation:
@@ -28,7 +28,7 @@ object Aggregation:
       case _ =>
         throw new Exception(s"GroupBy on result of ${q} not yet implemented")
 
-  def getNestedSourceTables(q: Fun[?, ?, ?], sources: Seq[(String, ResultTag[?])]): Seq[(String, ResultTag[?])] =
+  def getNestedSourceTables(q: Fun[?, ?, ?, ?], sources: Seq[(String, ResultTag[?])]): Seq[(String, ResultTag[?])] =
     q.$body match
       case AggFlatMap(src, q) =>
         val srcOuter = getSourceTables(src, sources)
@@ -41,10 +41,10 @@ object Aggregation:
     AllSourceTypes <: Tuple,
     B: ResultTag
   ]($from: Query[Tuple.Head[AllSourceTypes], ?],
-    $query: Expr.Fun[Tuple.Head[AllSourceTypes], Expr[B, ?], ?]) extends Aggregation[AllSourceTypes, B]:
+    $query: Expr.Fun[Tuple.Head[AllSourceTypes], Expr[B, ?, ?], ?, ?]) extends Aggregation[AllSourceTypes, B]:
 
     def groupBySource[GroupResult, GroupShape <: ExprShape]
-      (groupingFn: ToNonScalarRef[AllSourceTypes] => Expr[GroupResult, GroupShape])
+      (groupingFn: ToNonScalarRef[AllSourceTypes] => Expr[GroupResult, GroupShape, ?])
     : Query.NewGroupBy[AllSourceTypes, B, GroupResult, GroupShape] =
 
       val sourceTagsOuter = getSourceTables($from, Seq.empty)
@@ -57,8 +57,8 @@ object Aggregation:
 
       Query.NewGroupBy(this, groupResult, argRefs, sourceTags, None)
 
-  case class AggFilter[A: ResultTag]($from: Query[A, ?], $pred: Expr.Pred[A, ScalarExpr]) extends Aggregation[A *: EmptyTuple, A]:
+  case class AggFilter[A: ResultTag]($from: Query[A, ?], $pred: Expr.Fun[A, Expr[Boolean, ScalarExpr, NonRestricted], ScalarExpr, ?]) extends Aggregation[A *: EmptyTuple, A]:
     def groupBySource[GroupResult, GroupShape <: ExprShape]
-      (groupingFn: ToNonScalarRef[A *: EmptyTuple] => Expr[GroupResult, GroupShape])
+      (groupingFn: ToNonScalarRef[A *: EmptyTuple] => Expr[GroupResult, GroupShape, ?])
     : Query.NewGroupBy[A *: EmptyTuple, A, GroupResult, GroupShape] =
       ???
