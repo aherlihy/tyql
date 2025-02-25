@@ -15,7 +15,7 @@ import NamedTupleDecomposition.*
 object QueryIRTree:
 
   def generateFullQuery(ast: DatabaseAST[?], symbols: SymbolTable): RelationOp =
-    generateQuery(ast, symbols).appendFlag(SelectFlags.Final) // ignore top-level parens
+    generateQuery(ast, symbols).appendFlag(SelectFlags.Top) // ignore top-level parens
 
   var idCount = 0
   /**
@@ -165,7 +165,13 @@ object QueryIRTree:
         /** TODO: this is where could create more complex join nodes,
          * for now just r1.filter(f1).flatMap(a1 => r2.filter(f2).map(a2 => body(a1, a2))) => SELECT body FROM a1, a2 WHERE f1 AND f2
          */
-        unnest(fromNodes, projectIR, flatMap)
+
+        // NOTE: For now, don't collapse if there are queries with recursive subqueries unless subsequent calls to a single, top-level fix.
+        if (fromNodes.drop(1).exists { case _: MultiRecursiveRelationOp => true; case _ => false })
+          SelectQuery(projectIR, fromNodes, Seq(), None, flatMap)
+        else
+          unnest(fromNodes, projectIR, flatMap)
+
       case aggFlatMap: Aggregation.AggFlatMap[?, ?] => // Separate bc AggFlatMap can contain Expr
         val actualParam = generateActualParam(aggFlatMap.$from, aggFlatMap.$query.$param, symbols)
         val (unevaluated, boundST) = partiallyGenerateFun(aggFlatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))

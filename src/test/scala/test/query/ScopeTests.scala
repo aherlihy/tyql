@@ -169,3 +169,80 @@ class ScopeSubquery4Test extends SQLStringQueryTest[AllCommerceDBs, (purchId: In
       """
 }
 
+class ScopeSubquery5Test extends SQLStringQueryTest[AllCommerceDBs, (t: Int, p: Int, b: Int)] {
+  def testDescription = "Subquery: Cross references"
+  def query() =
+    testDB.tables.purchases.flatMap(pur =>
+      testDB.tables.buyers.flatMap(buy =>
+        testDB.tables.products
+          .filter(prod => prod.id == pur.productId && prod.id == buy.id)
+          .map(prod => (t = pur.id, p = prod.id, b = buy.id).toRow)
+      )
+    )
+  def expectedQueryPattern = """
+	    SELECT purchase$8.id as t, product$10.id as p, buyers$9.id as b
+	    FROM purchase as purchase$8, buyers as buyers$9, product as product$10
+	    WHERE product$10.id = purchase$8.productId AND product$10.id = buyers$9.id
+      """
+}
+
+class ScopeSubquery6Test extends SQLStringQueryTest[AllCommerceDBs, (t: Int, p: Int, b: Int)] {
+  def testDescription = "Subquery: Cross references with breaker"
+  def query() =
+    testDB.tables.purchases.flatMap(pur =>
+      testDB.tables.buyers.flatMap(buy =>
+        testDB.tables.products
+          .filter(prod => prod.id == pur.productId && prod.id == buy.id)
+          .map(prod => (t = pur.id, p = prod.id, b = buy.id).toRow)
+      ).limit(10)
+    )
+  def expectedQueryPattern = """
+      SELECT subquery$43
+      FROM
+        purchase as purchase$38,
+        (SELECT purchase$38.id as t, product$40.id as p, buyers$39.id as b FROM buyers as buyers$39, product as product$40 WHERE product$40.id = purchase$38.productId AND product$40.id = buyers$39.id LIMIT 10) as subquery$43
+      """
+}
+
+class ScopeSubquery7Test extends SQLStringQueryTest[AllCommerceDBs, (p: Int, b: Int)] {
+  def testDescription = "Subquery: Cross references with breaker"
+
+  def query() =
+    testDB.tables.buyers.flatMap(buy =>
+      testDB.tables.products.map(p => (p = p.id, b = buy.id)).unrestrictedFix(f =>
+        f
+          .filter(prod => prod.p == buy.id)
+          .map(prod => (p = prod.p, b = buy.id).toRow)
+      )
+    )
+
+  def expectedQueryPattern =
+    """
+      SELECT recref$0
+        FROM buyers as buyers$4,
+        (WITH RECURSIVE recursive$6 AS
+          ((SELECT product$6.id as p, buyers$4.id as b FROM product as product$6)
+            UNION
+            ((SELECT ref$5.p as p, buyers$4.id as b FROM recursive$6 as ref$5 WHERE ref$5.p = buyers$4.id))) SELECT * FROM recursive$6 as recref$0) as recref$0
+
+      """
+}
+class ScopeSubquery8Test extends SQLStringQueryTest[AllCommerceDBs, (t: Int, p: Int, b: Int)] {
+  def testDescription = "Subquery: Cross references with breaker"
+  def query() =
+    testDB.tables.purchases.flatMap(pur =>
+      testDB.tables.buyers.flatMap(buy =>
+        testDB.tables.products.map(p => (t = pur.id, p = p.id, b = buy.id)).unrestrictedFix(f =>
+          f
+            .filter(prod => prod.t == pur.productId && prod.t == buy.id)
+            .map(prod => (t = pur.id, p = prod.p, b = buy.id).toRow)
+        )
+      )
+    )
+  def expectedQueryPattern = """
+       SELECT recref$0 FROM
+        purchase as purchase$0,
+        buyers as buyers$1,
+        (WITH RECURSIVE recursive$3 AS ((SELECT purchase$0.id as t, product$3.id as p, buyers$1.id as b FROM product as product$3) UNION ((SELECT purchase$0.id as t, ref$3.p as p, buyers$1.id as b FROM recursive$3 as ref$3 WHERE ref$3.t = purchase$0.productId AND ref$3.t = buyers$1.id))) SELECT * FROM recursive$3 as recref$0) as recref$0
+  """
+}

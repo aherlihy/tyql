@@ -34,55 +34,60 @@ given commerceDBs: TestDatabase[AllCommerceDBs] with
 
   override def init(): String =
     """
-CREATE TABLE Product (
-    id SERIAL PRIMARY KEY,
+CREATE DATABASE IF NOT EXISTS AllCommerceDB;
+use AllCommerceDB;
+DROP TABLE IF EXISTS product;
+DROP TABLE IF EXISTS purchase;
+DROP TABLE IF EXISTS buyers;
+DROP TABLE IF EXISTS shippingInfo;
+
+
+CREATE TABLE product (
+    id INT,
     name VARCHAR(255),
     price NUMERIC
 );
 
-CREATE TABLE Buyer (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE buyers (
+    id INT,
     name VARCHAR(255),
-    date_of_birth DATE
+    dateOfBirth DATE
 );
 
-CREATE TABLE ShippingInfo (
-    id SERIAL PRIMARY KEY,
-    buyer_id INT,
-    shipping_date DATE,
-    FOREIGN KEY (buyer_id) REFERENCES Buyer(id)
+CREATE TABLE shippingInfo (
+    id INT,
+    shippingDate DATE,
+    buyerId INT
 );
 
-CREATE TABLE Purchase (
-    id SERIAL PRIMARY KEY,
-    shipping_info_id INT,
-    product_id INT,
+CREATE TABLE purchase (
+    id INT,
+    shippingInfoId INT,
+    productId INT,
     count INT,
-    total NUMERIC,
-    FOREIGN KEY (shipping_info_id) REFERENCES ShippingInfo(id),
-    FOREIGN KEY (product_id) REFERENCES Product(id)
+    total NUMERIC
 );
 
 
-INSERT INTO Product (id, name, price)
+INSERT INTO product (id, name, price)
 VALUES
 (1, 'Laptop', 1200.00),
 (2, 'Smartphone', 800.00),
 (3, 'Tablet', 500.00);
 
-INSERT INTO Buyer (id, name, date_of_birth)
+INSERT INTO buyers (id, name, dateOfBirth)
 VALUES
 (1, 'John Doe', '1985-03-15'),
 (2, 'Jane Smith', '1990-06-25'),
 (3, 'Alice Johnson', '1978-12-30');
 
-INSERT INTO ShippingInfo (id, buyer_id, shipping_date)
+INSERT INTO shippingInfo (id, buyerId, shippingDate)
 VALUES
 (1, 1, '2024-01-05'),
 (2, 2, '2024-01-08'),
 (3, 3, '2024-01-10');
 
-INSERT INTO Purchase (id, shipping_info_id, product_id, count, total)
+INSERT INTO purchase (id, shippingInfoId, productId, count, total)
 VALUES
 (1, 1, 1, 1, 1200.00),
 (2, 2, 2, 2, 1600.00),

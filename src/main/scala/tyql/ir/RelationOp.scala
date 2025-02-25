@@ -7,8 +7,9 @@ import tyql.SelectFlags.Final
  */
 enum SelectFlags:
   case Distinct   // used by select queries
-  case Final      // top-level final result, e.g. avoid extra parens or aliasing
-  case ExprLevel  // expression-level relation operation
+  case Final      // complete result, e.g. no parens or aliasing
+  case ExprLevel  // expression-level relation operation, e.g. no aliasing
+  case Top        // top-level result, no parents or aliasing
 
 enum PositionFlag:
   case Project, Where, Subquery
@@ -60,8 +61,8 @@ trait RelationOp extends QueryIRNode:
     f.foldLeft(this)((r: RelationOp, f) => r.appendFlag(f))
 
   def wrapString(inner: String): String =
-    val (open, close) = if flags.contains(SelectFlags.Final) then ("", "") else ("(", ")")
-    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) then "" else s" as $alias"
+    val (open, close) = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.Top) then ("", "") else ("(", ")")
+    val aliasStr = if flags.contains(SelectFlags.Final) || flags.contains(SelectFlags.ExprLevel) || flags.contains(SelectFlags.Top) then "" else s" as $alias"
     s"$open$inner$close$aliasStr"
 
 /**
@@ -399,9 +400,12 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
     this
 
   override def toSQLString(): String =
-    // NOTE: no parens or alias needed, since already defined
     val ctes = aliases.zip(query).map((a, q) => s"$a AS (${q.toSQLString()})").mkString(",\n")
-    s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
+    val inner = s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
+    if (flags.contains(SelectFlags.Top))
+      inner
+    else
+      wrapString(inner)
 
 /**
  * A recursive variable that points to a table or subquery.
@@ -410,7 +414,6 @@ case class RecursiveIRVar(pointsToAlias: String, alias: String, ast: DatabaseAST
   override def toSQLString() = s"$pointsToAlias as $alias"
   override def toString: String = s"RVAR($alias->$pointsToAlias)"
 
-  // TODO: for now reuse TableOp's methods
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     r match
       case t: (TableLeaf  | RecursiveIRVar) =>
