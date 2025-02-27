@@ -59,12 +59,33 @@ lazy val root = (project in file("."))
         .map(ty =>
           baseDirectory.value / s"bench/data/$bm/out/$ty.csv"))
 )
+
 lazy val bench = (project in file("bench"))
   .dependsOn(root)
   .enablePlugins(JmhPlugin)
   .settings(
-    Jmh/compile := (Jmh/compile).dependsOn(Test/compile).value,
-    Jmh/run := (Jmh/run).dependsOn(Jmh/compile).evaluated,
+    // Environment variable check, runs before Jmh/compile and Jmh/run
+    Jmh/compile := {
+      val requiredEnvVar = "TYQL_DATA_DIR"
+      sys.env.get(requiredEnvVar) match {
+        case Some(value) =>
+          println(s"✅ $requiredEnvVar is set correctly: $value")
+        case None =>
+          sys.error(s"❌ $requiredEnvVar is not set. Exiting...")
+      }
+      (Jmh/compile).dependsOn(Test/compile).value
+    },
+
+    Jmh/run := {
+      val requiredEnvVar = "TYQL_DATA_DIR"
+      sys.env.get(requiredEnvVar) match {
+        case Some(value) =>
+          println(s"✅ $requiredEnvVar is set correctly: $value")
+        case None =>
+          sys.error(s"❌ $requiredEnvVar is not set. Exiting...")
+      }
+      (Jmh/run).dependsOn(Jmh/compile).evaluated
+    },
 
     // sbt-jmh generates a ton of Java files, but they're never referenced by Scala files.
     // By enforcing this using `compileOrder`, we avoid having to run these generated files

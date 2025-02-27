@@ -13,15 +13,14 @@ import Helpers.*
 @Measurement(iterations = 1, time = 1, timeUnit = TimeUnit.MILLISECONDS, batchSize= 1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
-class TOScalaSQLBenchmark {
+class TOJDBC_SNEBenchmark {
   private def runWithTimeout(benchmarkName: String, blackhole: Blackhole): Unit = {
     val executor = Executors.newSingleThreadExecutor()
     val future: Future[Unit] = executor.submit(() => {
-      blackhole.consume(benchmarks(benchmarkName).executeScalaSQL(duckDB))
+      blackhole.consume(benchmarks(benchmarkName).executeJDBC_SNE(duckDB))
     })
 
     try {
-      // Await completion or timeout
       future.get(timeoutMins, TimeUnit.MINUTES)
     } catch {
       case e: InterruptedException => // New: Catch the interrupt signal
@@ -29,7 +28,7 @@ class TOScalaSQLBenchmark {
         Thread.currentThread().interrupt()
       case e: Exception =>
         throw e
-      //        println(s"Benchmark '$benchmarkName' encountered an exception: ${e.getMessage}")
+              println(s"Benchmark '$benchmarkName' encountered an exception: ${e.getMessage}")
     } finally {
       duckDB.cancelStmt()
       executor.shutdownNow() // Ensure cleanup
@@ -37,6 +36,7 @@ class TOScalaSQLBenchmark {
   }
 
   var duckDB = DuckDBBackend(timeout = timeoutMins)
+
   val benchmarks = Map(
     "tc" -> TOTCQuery(),
     "sssp" -> TOSSSPQuery(),
@@ -56,8 +56,7 @@ class TOScalaSQLBenchmark {
     "cba" -> TOCBAQuery(),
   )
 
-
-  def run(bm: String) = benchmarks(bm).executeScalaSQL(duckDB)
+  def run(bm: String) = benchmarks(bm).executeJDBC_SNE(duckDB)
 
   @Setup(Level.Trial)
   def loadDB(): Unit = {
@@ -70,73 +69,73 @@ class TOScalaSQLBenchmark {
   @TearDown(Level.Trial)
   def close(): Unit = {
     benchmarks.values.foreach(bm =>
-      bm.writeBenchResult(Helpers.QueryMode.ScalaSQL)
+      bm.writeBenchResult(Helpers.QueryMode.JDBC_SNE)
     )
     duckDB.close()
   }
 
   /*******************Boilerplate*****************/
-  @Benchmark def tc_graph(blackhole: Blackhole): Unit = {
-    runWithTimeout("tc", blackhole)
-  }
-
-  @Benchmark def sssp_graph(blackhole: Blackhole): Unit = {
-    runWithTimeout("sssp", blackhole)
-  }
-
-  @Benchmark def ancestry_graph(blackhole: Blackhole): Unit = {
-    runWithTimeout("ancestry", blackhole)
-  }
-
-  @Benchmark def andersens_programanalysis(blackhole: Blackhole): Unit = {
-    runWithTimeout("andersens", blackhole)
-  }
-
-  @Benchmark def asps_misc(blackhole: Blackhole): Unit = {
-    runWithTimeout("asps", blackhole)
-  }
-
-  @Benchmark def bom_misc(blackhole: Blackhole): Unit = {
-    runWithTimeout("bom", blackhole)
-  }
-
+//  @Benchmark def tc_graph(blackhole: Blackhole): Unit = {
+//    runWithTimeout("tc", blackhole)
+//  }
+//
+//  @Benchmark def sssp_graph(blackhole: Blackhole): Unit = {
+//    runWithTimeout("sssp", blackhole)
+//  }
+//
+//  @Benchmark def ancestry_graph(blackhole: Blackhole): Unit = {
+//    runWithTimeout("ancestry", blackhole)
+//  }
+//
+//  @Benchmark def andersens_programanalysis(blackhole: Blackhole): Unit = {
+//    runWithTimeout("andersens", blackhole)
+//  }
+//
+//  @Benchmark def asps_misc(blackhole: Blackhole): Unit = {
+//    runWithTimeout("asps", blackhole)
+//  }
+//
+//  @Benchmark def bom_misc(blackhole: Blackhole): Unit = {
+//    runWithTimeout("bom", blackhole)
+//  }
+//
   @Benchmark def orbits_misc(blackhole: Blackhole): Unit = {
     runWithTimeout("orbits", blackhole)
   }
 
-  @Benchmark def dataflow_programanalysis(blackhole: Blackhole): Unit = {
-    runWithTimeout("dataflow", blackhole)
-  }
-
-  @Benchmark def evenodd_misc(blackhole: Blackhole): Unit = {
-    runWithTimeout("evenodd", blackhole)
-  }
-
-  @Benchmark def cc_misc(blackhole: Blackhole): Unit = {
-    runWithTimeout("cc", blackhole)
-  }
-
-  @Benchmark def pointstocount_programanalysis(blackhole: Blackhole): Unit = {
-    runWithTimeout("pointstocount", blackhole)
-  }
-
-  @Benchmark def javapointsto_programanalysis(blackhole: Blackhole): Unit = {
-    runWithTimeout("javapointsto", blackhole)
-  }
-
-  @Benchmark def trustchain_misc(blackhole: Blackhole): Unit = {
-    runWithTimeout("trustchain", blackhole)
-  }
-
-  @Benchmark def party_misc(blackhole: Blackhole): Unit = {
-    runWithTimeout("party", blackhole)
-  }
-
-  @Benchmark def cspa_misc(blackhole: Blackhole): Unit = {
-    runWithTimeout("cspa", blackhole)
-  }
-
-  @Benchmark def cba_programanalysis(blackhole: Blackhole): Unit = {
-    runWithTimeout("cba", blackhole)
-  }
+//  @Benchmark def dataflow_programanalysis(blackhole: Blackhole): Unit = {
+//    runWithTimeout("dataflow", blackhole)
+//  }
+//
+//  @Benchmark def evenodd_misc(blackhole: Blackhole): Unit = {
+//    runWithTimeout("evenodd", blackhole)
+//  }
+//
+//  @Benchmark def cc_misc(blackhole: Blackhole): Unit = {
+//    runWithTimeout("cc", blackhole)
+//  }
+//
+//  @Benchmark def pointstocount_programanalysis(blackhole: Blackhole): Unit = {
+//    runWithTimeout("pointstocount", blackhole)
+//  }
+//
+//  @Benchmark def javapointsto_programanalysis(blackhole: Blackhole): Unit = {
+//    runWithTimeout("javapointsto", blackhole)
+//  }
+//
+//  @Benchmark def trustchain_misc(blackhole: Blackhole): Unit = {
+//    runWithTimeout("trustchain", blackhole)
+//  }
+//
+//  @Benchmark def party_misc(blackhole: Blackhole): Unit = {
+//    runWithTimeout("party", blackhole)
+//  }
+//
+//  @Benchmark def cspa_misc(blackhole: Blackhole): Unit = {
+//    runWithTimeout("cspa", blackhole)
+//  }
+//
+//  @Benchmark def cba_programanalysis(blackhole: Blackhole): Unit = {
+//    runWithTimeout("cba", blackhole)
+//  }
 }

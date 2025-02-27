@@ -65,7 +65,7 @@ class TOCollectionsBenchmark {
   @TearDown(Level.Trial)
   def writeDB(): Unit = {
     benchmarks.values.foreach(bm =>
-      bm.writeCollectionsResult()
+      bm.writeBenchResult(Helpers.QueryMode.Collections)
     )
   }
 

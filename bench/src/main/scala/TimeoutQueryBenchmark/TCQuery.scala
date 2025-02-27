@@ -16,6 +16,7 @@ import scalasql.core.SqlStr.SqlStringSyntax
 @experimental
 class TOTCQuery extends QueryBenchmark {
   override def name = "tc"
+  private val outputHeader = Seq("startNode", "endNode", "path")
   override def set = false
 
   // TYQL data model
@@ -28,7 +29,7 @@ class TOTCQuery extends QueryBenchmark {
   // ScalaSQL data model
   case class EdgeSS[T[_]](x: T[Int], y: T[Int])
   case class ResultEdgeSS[T[_]](startNode: T[Int], endNode: T[Int], path: T[String])
-  def fromSSRow(r: ResultEdgeSS[?]): Seq[String] = Seq(
+  def fromSSRes(r: ResultEdgeSS[?]): Seq[String] = Seq(
     r.startNode.toString,
     r.endNode.toString,
     r.path.toString
@@ -40,10 +41,10 @@ class TOTCQuery extends QueryBenchmark {
 
   // Collections data model + initialization
   case class EdgeCC(x: Int, y: Int)
-  def toCollRow(row: Seq[String]): EdgeCC = EdgeCC(row(0).toInt, row(1).toInt)
+  def toCollRes(row: Seq[String]): EdgeCC = EdgeCC(row(0).toInt, row(1).toInt)
   case class CollectionsDB(edge: Seq[EdgeCC])
   case class ResultEdgeCC(startNode: Int, endNode: Int, path: Seq[Int])
-  def fromCollRow(r: ResultEdgeCC): Seq[String] = Seq(
+  def fromCollRes(r: ResultEdgeCC): Seq[String] = Seq(
     r.startNode.toString,
     r.endNode.toString,
     r.path.mkString("[", ", ", "]")
@@ -55,7 +56,7 @@ class TOTCQuery extends QueryBenchmark {
     val tables = allCSV.map(s => (s.getFileName.toString.replace(".csv", ""), s)).sortBy(_._1).map((name, csv) =>
       name match
         case "edge" =>
-          loadCSV(csv, toCollRow)
+          loadCSV(csv, toCollRes)
         case _ => ???
     )
     collectionsDB = CollectionsDB(tables(0))
@@ -63,6 +64,7 @@ class TOTCQuery extends QueryBenchmark {
   // Result types for later printing
   var resultTyql: ResultSet = null
   var resultJDBC_RSQL: ResultSet = null
+  var resultJDBC_SNE: ResultSet = null
   var resultScalaSQL: Seq[ResultEdgeSS[?]] = null
   var resultCollections: Seq[ResultEdgeCC] = null
 
@@ -155,21 +157,23 @@ class TOTCQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
-  def writeJDBC_RSQLResult(): Unit =
-    val outfile = s"$outdir/jdbc-rsql.csv"
-    resultSetToCSV(resultJDBC_RSQL, outfile)
-
-  def writeTyQLResult(): Unit =
-    val outfile = s"$outdir/tyql.csv"
-    resultSetToCSV(resultTyql, outfile)
-
-  def writeCollectionsResult(): Unit =
-    val outfile = s"$outdir/collections.csv"
-    collectionToCSV(resultCollections, outfile, Seq("startNode", "endNode", "path"), fromCollRow)
-
-  def writeScalaSQLResult(): Unit =
-    val outfile = s"$outdir/scalasql.csv"
-    collectionToCSV(resultScalaSQL, outfile, Seq("startNode", "endNode", "path"), fromSSRow)
+  def writeBenchResult(mode: QueryMode): Unit =
+    mode match
+      case QueryMode.TyQL =>
+        val outfile = s"$outdir/tyql.csv"
+        resultSetToCSV(resultTyql, outfile)
+      case QueryMode.ScalaSQL =>
+        val outfile = s"$outdir/scalasql.csv"
+          collectionToCSV(resultScalaSQL, outfile, outputHeader, fromSSRes)
+      case QueryMode.Collections =>
+        val outfile = s"$outdir/collections.csv"
+        collectionToCSV(resultCollections, outfile, outputHeader, fromCollRes)
+      case QueryMode.JDBC_SNE =>
+        val outfile = s"$outdir/jdbc_sne.csv"
+        resultSetToCSV(resultJDBC_SNE, outfile)
+      case QueryMode.JDBC_RSQL =>
+        val outfile = s"$outdir/jdbc_sne.csv"
+        resultSetToCSV(resultJDBC_RSQL, outfile)
 
   // Extract all results to avoid lazy-loading
   //  def printResultJDBC(resultSet: ResultSet): Unit =

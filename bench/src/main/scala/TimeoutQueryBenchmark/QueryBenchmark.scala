@@ -16,8 +16,6 @@ trait QueryBenchmark {
     def executeJDBC_RSQL(ddb: DuckDBBackend): Unit
     def executeScalaSQL(ddb: DuckDBBackend): Unit
     def executeCollections(): Unit
-    def writeTyQLResult(): Unit
-    def writeCollectionsResult(): Unit
-    def writeScalaSQLResult(): Unit
-    def writeJDBC_RSQLResult(): Unit
+    def executeJDBC_SNE(ddb: DuckDBBackend): Unit = ???
+    def writeBenchResult(mode: Helpers.QueryMode): Unit
 }

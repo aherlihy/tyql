@@ -69,7 +69,7 @@ class TOTyQLBenchmark {
   @TearDown(Level.Trial)
   def close(): Unit = {
     benchmarks.values.foreach(bm =>
-      bm.writeTyQLResult()
+      bm.writeBenchResult(Helpers.QueryMode.TyQL)
     )
     duckDB.close()
   }
