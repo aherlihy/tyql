@@ -73,11 +73,17 @@ class TOCompanyControlQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[ResultSS[?]] = null
   var resultCollections: Seq[ResultCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      " WITH RECURSIVE recursive1 AS ((SELECT * FROM cc_shares as cc_shares2) UNION ((SELECT ref0.com1 as byC, ref1.of as of, SUM(ref1.percent) as percent FROM recursive2 as ref0, recursive1 as ref1 WHERE ref1.byC = ref0.com2 GROUP BY ref0.com1, ref1.of))),\nrecursive2 AS ((SELECT * FROM cc_control as cc_control8) UNION ((SELECT ref5.byC as com1, ref5.of as com2 FROM recursive1 as ref5 WHERE ref5.percent > 50)))\n SELECT * FROM recursive2 as recref1 ORDER BY com2 ASC, com1 ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val (cshares, control) = unrestrictedFix(tyqlDB.shares, tyqlDB.control)((cshares, control) =>
       val csharesRecur = control.aggregate(con =>
@@ -183,6 +189,10 @@ class TOCompanyControlQuery extends QueryBenchmark {
 
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

@@ -70,11 +70,17 @@ class TOEvenOddQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[ResultSS[?]] = null
   var resultCollections: Seq[ResultCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT evenodd_numbers2.value as value, 'even' as typ FROM evenodd_numbers as evenodd_numbers2 WHERE evenodd_numbers2.value = 0) UNION ((SELECT evenodd_numbers4.value as value, 'even' as typ FROM evenodd_numbers as evenodd_numbers4, recursive2 as ref5 WHERE evenodd_numbers4.value = ref5.value + 1))),\nrecursive2 AS ((SELECT evenodd_numbers8.value as value, 'odd' as typ FROM evenodd_numbers as evenodd_numbers8 WHERE evenodd_numbers8.value = 1) UNION ((SELECT evenodd_numbers10.value as value, 'odd' as typ FROM evenodd_numbers as evenodd_numbers10, recursive1 as ref8 WHERE evenodd_numbers10.value = ref8.value + 1)))\n SELECT * FROM recursive2 as recref1 ORDER BY typ ASC, value ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val evenBase = tyqlDB.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
     val oddBase = tyqlDB.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
@@ -175,6 +181,10 @@ class TOEvenOddQuery extends QueryBenchmark {
 
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

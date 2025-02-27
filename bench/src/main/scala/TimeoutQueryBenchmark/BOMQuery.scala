@@ -74,11 +74,17 @@ class TOBOMQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[ResultSS[?]] = null
   var resultCollections: Seq[ResultCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT * FROM bom_basic as bom_basic1) UNION ALL ((SELECT bom_assbl3.part as part, ref1.days as days FROM bom_assbl as bom_assbl3, recursive1 as ref1 WHERE bom_assbl3.spart = ref1.part)))\nSELECT recref0.part as part, MAX(recref0.days) as max FROM recursive1 as recref0 GROUP BY recref0.part ORDER BY max ASC, part ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val waitFor = tyqlDB.basic
     val query =
@@ -153,6 +159,10 @@ class TOBOMQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

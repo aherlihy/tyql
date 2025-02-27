@@ -125,11 +125,17 @@ class TOCBAQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[Int] = null
   var resultCollections: Seq[Int] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT cba_term4.x as x, cba_lits5.y as y FROM cba_term as cba_term4, cba_lits as cba_lits5 WHERE cba_lits5.x = cba_term4.z AND cba_term4.y = 'Lit') UNION ALL ((SELECT cba_term8.x as x, ref6.y as y FROM cba_term as cba_term8, recursive2 as ref6 WHERE cba_term8.y = 'Var' AND cba_term8.z = ref6.x) UNION ALL (SELECT cba_term11.x as x, ref9.y as y FROM cba_term as cba_term11, recursive1 as ref9, recursive3 as ref10, cba_abs as cba_abs12, cba_app as cba_app13 WHERE cba_term11.y = 'App' AND cba_term11.z = cba_app13.x AND ref9.x = cba_abs12.z AND ref10.x = cba_app13.y AND ref10.y = cba_abs12.x))),\nrecursive2 AS ((SELECT * FROM cba_baseData as cba_baseData21) UNION ALL ((SELECT cba_abs23.y as x, ref15.y as y FROM recursive3 as ref14, recursive1 as ref15, cba_abs as cba_abs23, cba_app as cba_app24 WHERE ref14.x = cba_app24.y AND ref14.y = cba_abs23.x AND ref15.x = cba_app24.z))),\nrecursive3 AS ((SELECT cba_term30.x as x, cba_term30.z as y FROM cba_term as cba_term30 WHERE cba_term30.y = 'Abs') UNION ALL ((SELECT cba_term32.x as x, ref20.y as y FROM cba_term as cba_term32, recursive4 as ref20 WHERE cba_term32.y = 'Var' AND cba_term32.z = ref20.x) UNION ALL (SELECT cba_term35.x as x, ref23.y as y FROM cba_term as cba_term35, recursive3 as ref23, recursive3 as ref24, cba_abs as cba_abs36, cba_app as cba_app37 WHERE cba_term35.y = 'App' AND cba_term35.z = cba_app37.x AND ref23.x = cba_abs36.z AND ref24.x = cba_app37.y AND ref24.y = cba_abs36.x))),\nrecursive4 AS ((SELECT * FROM cba_baseCtrl as cba_baseCtrl45) UNION ALL ((SELECT cba_abs47.y as x, ref29.y as y FROM recursive3 as ref28, recursive3 as ref29, cba_abs as cba_abs47, cba_app as cba_app48 WHERE ref28.x = cba_app48.y AND ref28.y = cba_abs47.x AND ref29.x = cba_app48.z)))\nSELECT DISTINCT COUNT(1) FROM recursive1 as recref0"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val dataTermBase = tyqlDB.term.flatMap(t =>
       tyqlDB.lits
@@ -411,6 +417,10 @@ class TOCBAQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

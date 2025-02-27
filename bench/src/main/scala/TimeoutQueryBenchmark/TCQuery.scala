@@ -62,10 +62,16 @@ class TOTCQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[ResultEdgeSS[?]] = null
   var resultCollections: Seq[ResultEdgeCC] = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT tc_edge1.x as startNode, tc_edge1.y as endNode, [tc_edge1.x, tc_edge1.y] as path FROM tc_edge as tc_edge1 WHERE tc_edge1.x = 1) UNION ALL ((SELECT ref2.startNode as startNode, tc_edge3.y as endNode, list_append(ref2.path, tc_edge3.y) as path FROM recursive1 as ref2, tc_edge as tc_edge3 WHERE tc_edge3.x = ref2.endNode AND NOT list_contains(ref2.path, tc_edge3.y))))\n SELECT * FROM recursive1 as recref0 ORDER BY endNode ASC, startNode ASC, length(recref0.path) ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val pathBase = tyqlDB.edge
       .filter(p => p.x == 1)
@@ -149,6 +155,10 @@ class TOTCQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

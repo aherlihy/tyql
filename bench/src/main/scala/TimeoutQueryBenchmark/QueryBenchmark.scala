@@ -13,9 +13,11 @@ trait QueryBenchmark {
 
     def initializeCollections(): Unit
     def executeTyQL(ddb: DuckDBBackend): Unit
+    def executeJDBC_RSQL(ddb: DuckDBBackend): Unit
     def executeScalaSQL(ddb: DuckDBBackend): Unit
     def executeCollections(): Unit
     def writeTyQLResult(): Unit
     def writeCollectionsResult(): Unit
     def writeScalaSQLResult(): Unit
+    def writeJDBC_RSQLResult(): Unit
 }

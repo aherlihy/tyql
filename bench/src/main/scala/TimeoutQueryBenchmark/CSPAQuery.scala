@@ -76,11 +76,17 @@ class TOCSPAQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[PairSS[?]] = null
   var resultCollections: Seq[PairCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT * FROM cspa_assign as cspa_assign3) UNION ((SELECT cspa_assign5.p1 as p1, cspa_assign5.p1 as p2 FROM cspa_assign as cspa_assign5) UNION (SELECT cspa_assign8.p2 as p1, cspa_assign8.p2 as p2 FROM cspa_assign as cspa_assign8) UNION (SELECT cspa_assign11.p1 as p1, ref5.p2 as p2 FROM cspa_assign as cspa_assign11, recursive3 as ref5 WHERE cspa_assign11.p2 = ref5.p1) UNION (SELECT ref7.p1 as p1, ref8.p2 as p2 FROM recursive1 as ref7, recursive1 as ref8 WHERE ref7.p2 = ref8.p1))), recursive2 AS ((SELECT * FROM cspa_empty as cspa_empty18) UNION ((SELECT cspa_dereference20.p2 as p1, cspa_dereference21.p2 as p2 FROM cspa_dereference as cspa_dereference20, recursive2 as ref11, cspa_dereference as cspa_dereference21 WHERE cspa_dereference20.p1 = ref11.p1 AND ref11.p2 = cspa_dereference21.p1))), recursive3 AS ((SELECT cspa_assign26.p2 as p1, cspa_assign26.p2 as p2 FROM cspa_assign as cspa_assign26) UNION ((SELECT cspa_assign28.p1 as p1, cspa_assign28.p1 as p2 FROM cspa_assign as cspa_assign28) UNION (SELECT ref14.p2 as p1, ref15.p2 as p2 FROM recursive1 as ref14, recursive1 as ref15 WHERE ref14.p1 = ref15.p1) UNION (SELECT ref17.p2 as p1, ref19.p2 as p2 FROM recursive1 as ref17, recursive3 as ref18, recursive1 as ref19 WHERE ref17.p1 = ref18.p1 AND ref19.p1 = ref18.p2)))\nSELECT * FROM recursive1 as recref0 ORDER BY p1 ASC, p2 ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val assign = tyqlDB.assign
     val dereference = tyqlDB.dereference
@@ -313,6 +319,10 @@ class TOCSPAQuery extends QueryBenchmark {
 
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

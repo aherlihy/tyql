@@ -63,11 +63,17 @@ class TOOrbitsQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[OrbitsSS[?]] = null
   var resultCollections: Seq[OrbitsCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT * FROM orbits_base as orbits_base1) UNION ALL ((SELECT ref0.x as x, ref1.y as y FROM recursive1 as ref0, recursive1 as ref1 WHERE ref0.y = ref1.x)))\n SELECT * FROM recursive1 as recref0 WHERE EXISTS (SELECT * FROM (SELECT ref4.x as x, ref5.y as y FROM recursive1 as ref4, recursive1 as ref5 WHERE ref4.y = ref5.x) as subquery9 WHERE recref0.x = subquery9.x AND recref0.y = subquery9.y) ORDER BY y ASC, x ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.base
     val orbits =
@@ -166,6 +172,10 @@ class TOOrbitsQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

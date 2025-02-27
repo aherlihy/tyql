@@ -61,11 +61,17 @@ class TOAncestryQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[String] = null
   var resultCollections: Seq[ResultCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT ancestry_parents1.child as name, 1 as gen FROM ancestry_parents as ancestry_parents1 WHERE ancestry_parents1.parent = '1') UNION ((SELECT ancestry_parents3.child as name, ref3.gen + 1 as gen FROM ancestry_parents as ancestry_parents3, recursive1 as ref3 WHERE ancestry_parents3.parent = ref3.name)))\n SELECT recref0.name as name FROM recursive1 as recref0 WHERE recref0.gen = 2 ORDER BY name ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.parents.filter(p => p.parent == parentName).map(e => (name = e.child, gen = IntLit(1)).toRow)
     val query = base.fix(gen =>
@@ -129,6 +135,10 @@ class TOAncestryQuery extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

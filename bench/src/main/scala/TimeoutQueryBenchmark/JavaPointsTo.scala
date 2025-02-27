@@ -98,6 +98,7 @@ class TOJavaPointsTo extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
 //  var resultScalaSQL: Seq[ProgramHeapSS[?]] = null
 //  var resultCollections: Seq[ProgramHeapCC] = null
   var resultScalaSQL: Seq[PointsToSS[?]] = null
@@ -105,6 +106,11 @@ class TOJavaPointsTo extends QueryBenchmark {
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT javapointsto_new2.x as x, javapointsto_new2.y as y FROM javapointsto_new as javapointsto_new2) UNION ((SELECT javapointsto_assign4.x as x, ref2.y as y FROM javapointsto_assign as javapointsto_assign4, recursive1 as ref2 WHERE javapointsto_assign4.y = ref2.x) UNION (SELECT javapointsto_loadT7.x as x, ref5.h as y FROM javapointsto_loadT as javapointsto_loadT7, recursive2 as ref5, recursive1 as ref6 WHERE javapointsto_loadT7.y = ref6.x AND javapointsto_loadT7.h = ref5.y AND ref6.y = ref5.x))),\nrecursive2 AS ((SELECT * FROM javapointsto_hpt as javapointsto_hpt13) UNION ((SELECT ref9.y as x, javapointsto_store15.y as y, ref10.y as h FROM javapointsto_store as javapointsto_store15, recursive1 as ref9, recursive1 as ref10 WHERE javapointsto_store15.x = ref9.x AND javapointsto_store15.h = ref10.x)))\n SELECT * FROM recursive1 as recref0 ORDER BY y ASC, x ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val baseVPT = tyqlDB.newT.map(a => (x = a.x, y = a.y).toRow)
     val baseHPT = tyqlDB.baseHPT
@@ -244,6 +250,10 @@ class TOJavaPointsTo extends QueryBenchmark {
     println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)

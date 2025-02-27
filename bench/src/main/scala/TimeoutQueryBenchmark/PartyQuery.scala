@@ -78,11 +78,17 @@ class TOPartyQuery extends QueryBenchmark {
 
   // Result types for later printing
   var resultTyql: ResultSet = null
+  var resultJDBC_RSQL: ResultSet = null
   var resultScalaSQL: Seq[ResultSS[?]] = null
   var resultCollections: Seq[ResultCC] = null
   var backupResultScalaSql: ResultSet = null
 
   // Execute queries
+  def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
+    val queryStr =
+      "WITH RECURSIVE recursive1 AS ((SELECT party_organizers2.orgName as person FROM party_organizers as party_organizers2) UNION ((SELECT ref1.fName as person FROM recursive2 as ref1 WHERE ref1.nCount > 2))),\nrecursive2 AS ((SELECT * FROM party_counts as party_counts6) UNION ((SELECT party_friends8.pName as fName, COUNT(party_friends8.fName) as nCount FROM party_friends as party_friends8, recursive1 as ref4 WHERE ref4.person = party_friends8.fName GROUP BY party_friends8.pName)))\n SELECT DISTINCT * FROM recursive1 as recref0 ORDER BY person ASC"
+    resultJDBC_RSQL = ddb.runQuery(queryStr)
+
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val baseAttend = tyqlDB.organizers.map(o => (person = o.orgName).toRow)
     val baseCntFriends = tyqlDB.counts
@@ -190,6 +196,10 @@ class TOPartyQuery extends QueryBenchmark {
 
 
   // Write results to csv for checking
+  def writeJDBC_RSQLResult(): Unit =
+    val outfile = s"$outdir/jdbc-rsql.csv"
+    resultSetToCSV(resultJDBC_RSQL, outfile)
+
   def writeTyQLResult(): Unit =
     val outfile = s"$outdir/tyql.csv"
     resultSetToCSV(resultTyql, outfile)
