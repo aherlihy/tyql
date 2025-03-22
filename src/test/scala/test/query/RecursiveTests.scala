@@ -58,7 +58,7 @@ class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(pathRec =>
+    path.fix([t <: Singleton] =>pathRec =>
       pathRec.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -81,7 +81,7 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 
   def query() =
     val path = testDB.tables.edges.union(testDB.tables.edges)
-    path.fix(path =>
+    path.fix([t <: Singleton] =>path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -108,7 +108,7 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 //
 //  def query() =
 //    val path = testDB.tables.edges.union(testDB.tables.edges)
-//    val path2 = path.fix(path =>
+//    val path2 = path.fix([t <: Singleton] =>path =>
 //      path.flatMap(p =>
 //        testDB.tables.edges
 //          .filter(e => p.y == e.x)
@@ -148,7 +148,7 @@ class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.fix([t <: Singleton] =>path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -172,7 +172,7 @@ class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.fix([t <: Singleton] =>path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -197,7 +197,7 @@ class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.fix([t <: Singleton] =>path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -582,7 +582,7 @@ class RecursionCPTest extends SQLStringQueryTest[TCDB, (dst: Int, sum: Int)] {
 
   def query() =
     val base = testDB.tables.edges.map(e => (y = IntLit(1), cnt = IntLit(1)).toRow)
-    base.fix(cp =>
+    base.fix([t <: Singleton] =>cp =>
       testDB.tables.edges.flatMap(edge =>
         cp
           .filter(cpaths => cpaths.y == edge.x)
@@ -623,7 +623,7 @@ class RecursionManagementTest extends SQLStringQueryTest[ManagementDB, (mgr: Int
 
   def query() =
     val base = testDB.tables.reports.map(e => (mgr = e.mgr, cnt = IntLit(1)).toRow)
-    base.fix(empCount =>
+    base.fix([t <: Singleton] =>empCount =>
       testDB.tables.reports.flatMap(report =>
         empCount
           .filter(ec => ec.mgr == report.mgr)
@@ -672,7 +672,7 @@ class RecursionMLMBonusTest extends SQLStringQueryTest[MLMDatabase, (m: Int, b: 
 
   def query() =
     val base = testDB.tables.sales.map(s => (m = s.m, b = s.p * 0.1).toRow)
-    base.fix(bonus =>
+    base.fix([t <: Singleton] =>bonus =>
       testDB.tables.sponsors.flatMap(sponsor =>
         bonus
           .filter(b => b.m == sponsor.m2)
@@ -737,7 +737,7 @@ given IntervalDBs: TestDatabase[IntervalDB] with
 //        .map(int => (s = ls.t, e = int.e))
 //    )
 //
-//    base.fix(coal =>
+//    base.fix([t <: Singleton] =>coal =>
 //      testDB.tables.intervals.flatMap(inter =>
 //        coal
 //          .filter(c => c.s <= inter.s && inter.s <= c.e)
@@ -774,7 +774,7 @@ class MinReachTest extends SQLStringQueryTest[TCDB, (x: Int, min_y: Int)] {
 
   def query() =
     val reach = testDB.tables.edges
-    reach.fix(reach =>
+    reach.fix([t <: Singleton] =>reach =>
       reach
         .flatMap(p =>
           testDB.tables.edges
@@ -805,7 +805,7 @@ class MinReachStratifiedTest extends SQLStringQueryTest[TCDB, (x: Int, min_y: In
   def query() =
     val edges = testDB.tables.edges.groupBy(e => (x = e.x).toRow, e => (x = e.x, y = min(e.y)).toRow)
 
-    edges.fix(minReach =>
+    edges.fix([t <: Singleton] =>minReach =>
       minReach.flatMap(mr =>
         edges
           .filter(e => mr.y == e.x)
@@ -1076,7 +1076,7 @@ class RecursiveNonterminationExampleTest extends SQLStringQueryTest[CyclicGraphD
 
   def query() =
     val base = testDB.tables.edges
-    base.fix(path =>
+    base.fix([t <: Singleton] =>path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)

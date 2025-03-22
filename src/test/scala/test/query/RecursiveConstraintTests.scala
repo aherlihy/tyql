@@ -34,7 +34,7 @@ class RecursionConstraintRangeRestrictionTest extends SQLStringQueryTest[TCDB, E
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.fix([t <: Singleton] => path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -73,7 +73,7 @@ class RecursionConstraintRangeRestrictionFailTest extends munit.FunSuite {
 
           // TEST
           val path = tables.edges
-          path.fix(path =>
+          path.fix([t <: Singleton] =>path =>
             path.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -89,7 +89,7 @@ class RecursionConstraintCategoryResultTest extends SQLStringQueryTest[TCDB, Edg
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.fix([t <: Singleton] =>path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -131,7 +131,7 @@ class RecursionConstraintCategoryUnionAllFailTest extends munit.FunSuite {
 
           // TEST
           val path = tables.edges
-          path.fix(path =>
+          path.fix([t <: Singleton] =>path =>
             path.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -165,7 +165,7 @@ class RecursionConstraintCategoryFlatmapFailTest extends munit.FunSuite {
 
           // TEST
           val path = tables.edges
-          path.fix(path =>
+          path.fix([t <: Singleton] =>path =>
             path.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -276,7 +276,7 @@ class RecursionConstraintMonotonicInlineFailTest extends munit.FunSuite {
 
           // TEST
           val path = tables.edges
-          path.fix(path =>
+          path.fix([t <: Singleton] =>path =>
             path.aggregate(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -293,7 +293,7 @@ class RecursiveConstraintLinearTest extends SQLStringQueryTest[TCDB, Int] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.fix([t <: Singleton] =>path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -336,7 +336,7 @@ class RecursiveConstraintLinearFailInline0Test extends munit.FunSuite {
 
             // TEST
             val path = tables.edges
-            path.fix(path =>
+            path.fix([t <: Singleton] =>path =>
               tables.edges.flatMap(p =>
                 tables.edges2
                   .filter(e => p.y == e.x)
@@ -372,7 +372,7 @@ class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
 
               // TEST
               val path = tables.edges
-               path.fix(path =>
+               path.fix([t <: Singleton] =>path =>
                  path.flatMap(p =>
                   path
                     .filter(e => p.y == e.x)
@@ -798,7 +798,7 @@ class RecursiveConstraintGroupbyInlineFailTest extends munit.FunSuite {
     // TEST
     val edges = tables.edges.groupBy(e => (x = e.x).toRow, e => (x = e.x, y = min(e.y)).toRow)
 
-    edges.fix(minReach =>
+    edges.fix([t <: Singleton] =>minReach =>
       minReach.flatMap(mr =>
         edges
           .filter(e => mr.y == e.x)
@@ -975,7 +975,7 @@ class RecursionConstraintCategoryUnionAll2FailTest extends munit.FunSuite {
 
           // TEST
           val base = tables.edges
-          base.fix(path =>
+          base.fix([t <: Singleton] =>path =>
             path.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -1005,7 +1005,7 @@ class RecursionFibFailTest extends munit.FunSuite {
            type FibNum = (recursionDepth: Int, fibonacciNumber: Int, nextNumber: Int)
            val base = Table[FibNum]("base")
 
-           base.fix(fib =>
+           base.fix([t <: Singleton] =>fib =>
              fib
                .filter(f => (f.recursionDepth + 1) < 10)
                .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
@@ -1039,7 +1039,7 @@ class RecursionShortestPathFailTest extends munit.FunSuite {
              .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
              .filter(p => p.startNode == 1)
 
-           pathBase.fix(path =>
+           pathBase.fix([t <: Singleton] =>path =>
              path.flatMap(p =>
                edge
                  .filter(e => e.x == p.endNode)
@@ -1074,7 +1074,7 @@ class RecursionTreeFailTest extends munit.FunSuite {
              .filter(t => t.subclassof == -1)
              .map(t => (id = t.id, source = t.name, path = List(t.name).toExpr).toRow)
 
-           tagHierarchy0.fix(tagHierarchy1 =>
+           tagHierarchy0.fix([t <: Singleton] =>tagHierarchy1 =>
              tagHierarchy1.flatMap(hier =>
                tag
                  .filter(t => t.subclassof == hier.id)
@@ -1106,7 +1106,7 @@ class AncestryFailTest extends munit.FunSuite {
 
            val base = parent.filter(p => p.parent == "Alice").map(e => (name = e.child, gen = Expr.IntLit(1)).toRow)
 
-           base.fix(gen =>
+           base.fix([t <: Singleton] =>gen =>
              parent.flatMap(parent =>
                gen
                  .filter(g => parent.parent == g.name)
@@ -1173,7 +1173,7 @@ class RecursionSSSPFailTest extends munit.FunSuite {
 
            val base = Table[(dst: Int, cost: Int)]("base")
 
-           base.fix(sp =>
+           base.fix([t <: Singleton] =>sp =>
              edge.flatMap(edge =>
                sp
                  .filter(s => s.dst == edge.src)
@@ -1192,7 +1192,7 @@ class RecursionSSSPFailTest extends munit.FunSuite {
 //
 //  def query() =
 //    val path = testDB.tables.edges
-//    path.fix(path =>
+//    path.fix([t <: Singleton] =>path =>
 //      path.flatMap(p =>
 //        path
 //          .filter(e => p.y == e.x)

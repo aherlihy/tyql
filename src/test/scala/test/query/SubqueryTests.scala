@@ -11,6 +11,102 @@ import NamedTuple.*
 
 import java.time.LocalDate
 
+import test.query.recursive.{TCDB, Edge, TCDBs}
+
+/**
+ * No complaints from DuckDB on inner queries referencing columns from outer queries, even between recursive calls.
+ */
+class RecursionNested1Test extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "TC Nested fix with reference to outer fix"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.fix([t <: Singleton] => pathRec1 =>
+      val inner = path.fix([t2 <: Singleton] => pathRec2 =>
+        pathRec1.flatMap(p => // inner doesn't use fix argument so not linear
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        ).distinct
+      )
+      pathRec1.flatMap(p =>
+        inner.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
+      ).distinct
+    )
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE recursive$1 AS
+          ((SELECT * FROM edges as edges$1)
+          UNION
+              ((SELECT ref$3.x as x, recref$1.y as y FROM recursive$1 as ref$3,
+                (WITH RECURSIVE recursive$4 AS
+                  ((SELECT * FROM edges as edges$4)
+                      UNION
+                          ((SELECT ref$0.x as x, edges$6.y as y
+                          FROM recursive1 as ref$0, edges as edges$6
+                          WHERE ref$0.y = edges$6.x)))
+                  SELECT * FROM recursive$4 as recref$1 WHERE ref$3.y = recref$1.x) as recref$1)))
+          SELECT * FROM recursive$1 as recref$0
+        """
+}
+
+class RecursionNested2Test extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "TC Nested fix with reference to outer subquery"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.flatMap(p =>
+      path.fix([t <: Singleton] =>pathRec2 =>
+        pathRec2.flatMap(p2 => // inner doesn't use fix argument so not linear
+          testDB.tables.edges
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        ).distinct
+      )
+    )
+
+  def expectedQueryPattern: String =
+    """
+      SELECT recref$0
+      FROM
+        edges as edges$0,
+        (WITH RECURSIVE recursive$2 AS
+            ((SELECT * FROM edges as edges$2)
+                UNION
+            ((SELECT edges$0.x as x, edges$4.y as y
+              FROM recursive$2 as ref$1, edges as edges$4
+              WHERE edges$0.y = edges$4.x)))
+         SELECT * FROM recursive$2 as recref$0) as recref$0
+          """
+}
+
+class RecursionNested3Test extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "TC fix with subquery reference to outer recref"
+
+  def query() =
+    val path = testDB.tables.edges
+    path.fix([t <: Singleton] =>pathRec2 =>
+      pathRec2.flatMap(p2 =>
+        testDB.tables.edges.filter(e => e.x == p2.x).limit(10) // force subquery
+            .filter(e => p2.y == e.x)
+            .map(e => (x = p2.x, y = e.y).toRow)
+        ).distinct
+    )
+
+  def expectedQueryPattern: String =
+    """
+  WITH RECURSIVE recursive$1 AS
+    ((SELECT * FROM edges as edges$1)
+        UNION
+    ((SELECT ref$0.x as x, subquery$4.y as y
+      FROM
+        recursive$1 as ref$0,
+        (SELECT * FROM edges as edges$3 WHERE edges$3.x = ref$0.x LIMIT 10) as subquery$4
+      WHERE ref$0.y = subquery$4.x))) SELECT * FROM recursive$1 as recref$0
+            """
+}
+
 class SortTakeJoinSubqueryTest extends SQLStringQueryTest[AllCommerceDBs, Double] {
   def testDescription = "Subquery: sortTakeJoin"
   def query() =
