@@ -387,7 +387,7 @@ class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
 class RecursiveConstraintLinearMultifix2xFailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: multiple uses of path in multifix"
 
-  def expectedError: String = "Recursive definitions must be linear"
+  def expectedError: String = "Failed to generate recursive queries"
 
   test(testDescription) {
     val error: String =
@@ -865,7 +865,7 @@ class RecursiveConstraintGroupbyMultifixFailTest extends munit.FunSuite {
 class RecursiveConstraintNonlinearFailTest extends munit.FunSuite {
   def testDescription: String = "Use all args in one relation, none in the other, but with groupBy in one"
 
-  def expectedError: String = "Recursive definitions must be linear:"
+  def expectedError: String = "Failed to generate recursive queries"
 
   test(testDescription) {
     val error: String =
@@ -911,7 +911,7 @@ class RecursiveConstraintNonlinearFailTest extends munit.FunSuite {
 class RecursiveConstraintAggregationMutualRecursionFailTest extends munit.FunSuite {
   def testDescription: String = "Aggregation in mutual recursion"
 
-  def expectedError: String = "Recursive definitions must be linear:"
+  def expectedError: String = "value groupBy is not a member of tyql.RestrictedQuery"
 
   test(testDescription) {
     val error: String =
