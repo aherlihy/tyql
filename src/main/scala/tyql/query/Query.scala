@@ -277,8 +277,8 @@ object Query:
   (fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, MonotoneRestriction] => RQT)
   (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
   (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
-  (using @implicitNotFound("Cannot constrain DT") ev2: DT <:< InverseMapDeps[RQT])
-  (using @implicitNotFound("Recursive definitions must be linear: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, NonRestrictedConstructors, MonotoneRestriction, SetResult])
+  (using @implicitNotFound("Cannot extract dependencies, is the query affine?") ev2: DT <:< InverseMapDeps[RQT])
+  (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, NonRestrictedConstructors, MonotoneRestriction, SetResult])
   (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
   : ToQuery[QT] =
     fixImpl(true)(bases)(fns)
@@ -304,23 +304,23 @@ object Query:
                                     (fns: ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction] => RQT)
                                     (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
                                     (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
-                                    (using @implicitNotFound("Cannot constrain DT") ev2: DT <:< InverseMapDeps[RQT])
-                                    (using @implicitNotFound("Recursive definitions must be linear: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RestrictedConstructors, MonotoneRestriction, SetResult])
+                                    (using @implicitNotFound("Cannot extract dependencies, is the query affine?") ev2: DT <:< InverseMapDeps[RQT])
+                                    (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RestrictedConstructors, MonotoneRestriction, SetResult])
                                     (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
 //                                    (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition: ${RQT}") ev2: Tuple.Union[Tuple.Map[DT, CheckDuplicate]] =:= false)
       : ToQuery[QT] =
     fixImpl(true)(bases)(fns)
 
   /* Specify which constraints you want to apply with options parameters */
-  def customFix[QT <: Tuple, DT <: Tuple, RQT <: Tuple, RCF <: ConstructorFreedom, RM <: MonotoneRestriction, RC <: ResultCategory, RL <: LinearRestriction]
+  def customFix[QT <: Tuple, DT <: Tuple, RQT <: Tuple, RCF <: ConstructorFreedom, RM <: MonotoneRestriction, RC <: ResultCategory, RL <: Linear | NonLinear]
     (options: (RCF, RM, RC, RL))
     (bases: QT)
     (fns: ToRestrictedQueryRef[QT, RCF, RM] => RQT)
   (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
   (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
-  (using @implicitNotFound("Cannot constrain DT") ev2: DT <:< InverseMapDeps[RQT])
-  (using @implicitNotFound("Recursive definitions must be linear: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RCF, RM, RC])
-  (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
+  (using @implicitNotFound("Cannot extract dependencies, is the query affine?: ${RQT}") ev2: DT <:< ToDependencyTuple[RL, RQT])
+  (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RCF, RM, RC])
+  (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RL}") ev4: CheckRelevantQuery[RL, QT, RQT] <:< true)
   : ToQuery[QT] =
     fixImpl(options._3.isInstanceOf[SetResult])(bases)(fns)
 

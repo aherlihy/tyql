@@ -9,6 +9,11 @@ object Utils:
 
   type ZipWithIndex[T <: Tuple] = Tuple.Zip[T, GenerateIndices[0, Tuple.Size[T]]]
 
+  /**
+   * Check for duplicates in a tuple by recursively checking if the body of the tuple contains the head
+   * @tparam T tuple
+   * returns Nothing if there are duplicates, otherwise the unmodified input T
+   */
   type HasDuplicate[T <: Tuple] <: Tuple = T match
     case EmptyTuple => T
     case h *: t => Tuple.Contains[t, h] match

@@ -1,7 +1,7 @@
 package test.query.customfix
 import test.{SQLStringQueryTest, TestDatabase}
 import tyql.*
-import Query.{customFix, fix}
+import Query.{customFix, fix, unrestrictedFix}
 import test.query.recursive.{Edge, TCDB, TCDBs}
 import Expr.{IntLit, StringLit, count, max, min, sum}
 import test.query.recursivebenchmarks.{WeightedGraphDB, WeightedGraphDBs}
@@ -162,58 +162,68 @@ class CustomFixLinearTest extends SQLStringQueryTest[TCDB, Int] {
         """
 }
 
-//class CustomFixRelevantNeg extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "Linear recursion: relevant (skip pathToA)"
-//
-//  def query() =
-//    val path = testDB.tables.edges
-//    val pathBase = testDB.tables.edges
+class CustomFixRelevantNeg extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "Linear recursion: relevant (skip pathToA)"
+
+  def query() =
+    val path = testDB.tables.edges
+    val pathBase = testDB.tables.edges
+    val (pathResult, pathToResult) = customFix((RestrictedConstructors(), Monotone(), SetResult(), NonLinear()))(pathBase, pathBase)((path, pathToA) =>
+//    val (pathResult, pathToResult) = unrestrictedFix(pathBase, pathBase)((path, pathToA) =>
+//    val (pathResult, pathToResult) = nonLinearFix(pathBase, pathBase)((path, pathToA) =>
+      val P = path.flatMap(p => // deps = (0)
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+      val PtoA = path.filter(e => e.x == 1) // deps = (0)
+      (P.distinct, PtoA.distinct)
+    )
+    pathResult
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+      recursive$1 AS
+        ((SELECT * FROM edges as edges$2)
+          UNION
+        ((SELECT ref$0.x as x, edges$4.y as y FROM recursive$1 as ref$0, edges as edges$4 WHERE ref$0.y = edges$4.x))),
+      recursive$2 AS
+        ((SELECT * FROM edges as edges$8)
+          UNION
+         ((SELECT * FROM recursive$1 as ref$3 WHERE ref$3.x = 1))) SELECT * FROM recursive$1 as recref$0
+        """
+}
+
+class CustomFixAffineNeg extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "Linear recursion: affine (double path)"
+
+  def query() =
+    val path = testDB.tables.edges
+    val pathBase = testDB.tables.edges
+//    val (pathResult, pathToResult) = unrestrictedFix(pathBase, pathBase)((path, pathToA) =>
 //    val (pathResult, pathToResult) = customFix((RestrictedConstructors(), Monotone(), SetResult(), NonLinear()))(pathBase, pathBase)((path, pathToA) =>
-//      val P = path.flatMap(p =>
-//        testDB.tables.edges
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      )
-//      val PtoA = path.filter(e => e.x == 1)
-//      (P.distinct, PtoA.distinct)
-//    )
-//    pathResult
-//
-//  def expectedQueryPattern: String =
-//    """
-//      WITH RECURSIVE recursive$A AS
-//        ((SELECT * FROM edges as edges$B)
-//          UNION
-//        ((SELECT ref$D.x as x, edges$C.y as y
-//        FROM recursive$A as ref$D, edges as edges$C
-//        WHERE ref$D.y = edges$C.x))) SELECT recref$E.x FROM recursive$A as recref$E
-//        """
-//}
-//
-//class CustomFixAffineNeg extends SQLStringQueryTest[TCDB, Edge] {
-//  def testDescription: String = "Linear recursion: affine (double path)"
-//
-//  def query() =
-//    val path = testDB.tables.edges
-//    val pathBase = testDB.tables.edges
-//    val (pathResult, pathToResult) = customFix((RestrictedConstructors(), Monotone(), SetResult(), NonLinear()))(pathBase, pathBase)((path, pathToA) =>
-//      val P = path.flatMap(p =>
-//        path
-//          .filter(e => p.y == e.x)
-//          .map(e => (x = p.x, y = e.y).toRow)
-//      )
-//      val PtoA = path.filter(e => e.x == 1)
-//      (P.distinct, PtoA.distinct)
-//    )
-//    pathResult
-//
-//  def expectedQueryPattern: String =
-//    """
-//      WITH RECURSIVE recursive$A AS
-//        ((SELECT * FROM edges as edges$B)
-//          UNION
-//        ((SELECT ref$D.x as x, edges$C.y as y
-//        FROM recursive$A as ref$D, edges as edges$C
-//        WHERE ref$D.y = edges$C.x))) SELECT recref$E.x FROM recursive$A as recref$E
-//        """
-//}
+    val (pathResult, pathToResult) = customFix((RestrictedConstructors(), Monotone(), SetResult(), NonLinear()))(pathBase, pathBase)((path, pathToA) =>
+      val P = path.flatMap(p =>
+        path
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      )
+      val PtoA = path.filter(e => e.x == 1)
+      (P.distinct, PtoA.distinct)
+    )
+    pathResult
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+      recursive$1 AS
+        ((SELECT * FROM edges as edges$2)
+          UNION
+        ((SELECT ref$0.x as x, ref$4.y as y FROM recursive$1 as ref$0, recursive$1 as ref$4 WHERE ref$0.y = ref$4.x))),
+      recursive$2 AS
+        ((SELECT * FROM edges as edges$8)
+          UNION
+         ((SELECT * FROM recursive$1 as ref$3 WHERE ref$3.x = 1))) SELECT * FROM recursive$1 as recref$0
+        """
+}
