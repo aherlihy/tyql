@@ -104,29 +104,49 @@ object RestrictedQuery {
 
   type ConstructRestrictedQuery[T, CF <: ConstructorFreedom, RM <: MonotoneRestriction, RC <: ResultCategory] = T match
     case (t, d) => RestrictedQuery[t, RC, d, CF, RM]
-  // Adjustable restrictions
+
   type ToRestrictedQuery[QT <: Tuple, DT <: Tuple, RCF <: ConstructorFreedom, RM <: MonotoneRestriction, RC <: ResultCategory] =
     Tuple.Map[Tuple.Zip[Elems[QT], DT], [T] =>> ConstructRestrictedQuery[T, RCF, RM, RC]]
   type ToRestrictedQueryRef[QT <: Tuple, RCF <: ConstructorFreedom, RM <: MonotoneRestriction] = Tuple.Map[ZipWithIndex[Elems[QT]], [T] =>> T match
     case (elem, index) => RestrictedQueryRef[elem, SetResult, index, RCF, RM]]
 
-  type ToAffineQuery[RL <: LinearRestriction, DT <: Tuple, RQT <: Tuple] = RL match
-    case Linear => DT <:< InverseMapDeps[RQT]
-    case NonLinear => true
-
-  type ToRelevantQuery[RL <: LinearRestriction, QT <: Tuple, RQT <: Tuple] = RL match
-    case Linear => ExpectedResult[QT] <:< ActualResult[RQT]
-    case NonLinear => true
-
+  // Adjustable restrictions:
   // only include the monotone restriction, ignore category or linearity
   type ToMonotoneQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, ?, ?, NonRestrictedConstructors, MonotoneRestriction]]
   type ToMonotoneQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?, NonRestrictedConstructors, MonotoneRestriction]]
+
   // ignore all restrictions
   type ToUnrestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, ?]]
   type ToUnrestrictedQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query.QueryRef[T, ?]]
 
+  /**
+   * Check if the query is relevant, e.g. all dependencies are used at least once in all result queries
+   */
+  type CheckRelevantQuery[RL <: LinearRestriction, QT <: Tuple, RQT <: Tuple] = RL match
+    case Linear => ExpectedResult[QT] <:< ActualResult[RQT]
+    case NonLinear => true
+
+  /**
+   * Extract the dependencies from a tuple of restricted queries and optionally check for duplicates.
+   */
+  type ToDependencyTuple[RL <: LinearRestriction, RQT <: Tuple] <: Tuple = RL match
+    case Linear => InverseMapDeps[RQT]
+    case NonLinear => NonlinearInverseMapDeps[RQT]
+
+  /**
+   * Extract the dependencies from a tuple of restricted queries.
+   * Returns a tuple of dependencies for each element in the tuple, or nothing if there are duplicates.
+   */
   type InverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
     case RestrictedQuery[a, c, d, rcf, mf] *: t => HasDuplicate[d] *: InverseMapDeps[t]
+    case EmptyTuple => EmptyTuple
+  }
+
+  /**
+   * Same as InverseMapDeps except it does not check for duplicates.
+   */
+  type NonlinearInverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
+    case RestrictedQuery[a, c, d, rcf, mf] *: t => d *: NonlinearInverseMapDeps[t]
     case EmptyTuple => EmptyTuple
   }
 
@@ -144,6 +164,7 @@ object RestrictedQuery {
 //    type UnionExpected = Tuple.Union[Expected]
 //    val check: UnionExpected <:< UnionActual = summon[UnionExpected <:< UnionActual]
 
+  // Checks to ensure that no dependencies are missing from all results (e.g. relevant)
   type ExtractDependencies[D] <: Tuple = D match
     case RestrictedQuery[a, c, d, rcf, mf] => d
   type ExpectedResult[QT <: Tuple] = Tuple.Union[GenerateIndices[0, Tuple.Size[QT]]]
