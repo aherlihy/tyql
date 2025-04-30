@@ -10,8 +10,8 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table, Query}
-import tyql.Query.fix
+import tyql.{Linear, Monotone, NonRestrictedConstructors, Ord, Query, SetResult, Table}
+import tyql.Query.{customFix, fix}
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
@@ -85,7 +85,9 @@ class TOEvenOddQuery extends QueryBenchmark {
     val evenBase = tyqlDB.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
     val oddBase = tyqlDB.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
 
-    val (even, odd) = fix((evenBase, oddBase))((even, odd) =>
+    val (even, odd) = customFix(
+      (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear())
+    )((evenBase, oddBase))((even, odd) =>
       val evenResult = tyqlDB.numbers.flatMap(num =>
         odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = StringLit("even")))
       ).distinct

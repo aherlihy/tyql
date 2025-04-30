@@ -8,16 +8,16 @@ import scala.compiletime.{erasedValue, summonInline}
 
 // TODO: probably seal
 trait ExprShape
-class ScalarExpr extends ExprShape
-class NonScalarExpr extends ExprShape
+case class ScalarExpr() extends ExprShape
+case class NonScalarExpr() extends ExprShape
 
 type CalculatedShape[S1 <: ExprShape, S2 <: ExprShape] <: ExprShape = S2 match
   case ScalarExpr => S2
   case NonScalarExpr => S1
 
 trait ConstructorFreedom
-class RestrictedConstructors extends ConstructorFreedom
-class NonRestrictedConstructors extends ConstructorFreedom
+case class RestrictedConstructors() extends ConstructorFreedom
+case class NonRestrictedConstructors() extends ConstructorFreedom
 
 type CalculatedCF[S1 <: ConstructorFreedom, S2 <: ConstructorFreedom] <: ConstructorFreedom = S2 match
   case RestrictedConstructors => S2

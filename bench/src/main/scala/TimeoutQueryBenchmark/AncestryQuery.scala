@@ -11,7 +11,7 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.{BagResult, SetResult, Linear, Monotone, NonRestrictedConstructors, Ord, Table}
 import tyql.Expr.{IntLit, min}
 
 @experimental
@@ -74,7 +74,7 @@ class TOAncestryQuery extends QueryBenchmark {
 
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.parents.filter(p => p.parent == parentName).map(e => (name = e.child, gen = IntLit(1)).toRow)
-    val query = base.fix(gen =>
+    val query = base.customFix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear()))(gen =>
       tyqlDB.parents.flatMap(parent =>
         gen
           .filter(g => parent.parent == g.name)

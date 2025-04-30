@@ -7,12 +7,12 @@ import scala.NamedTuple.AnyNamedTuple
 import scala.annotation.{implicitNotFound, targetName}
 
 trait MonotoneRestriction
-class Monotone extends MonotoneRestriction
-class NonMonotone extends MonotoneRestriction
+case class Monotone() extends MonotoneRestriction
+case class NonMonotone() extends MonotoneRestriction
 
 trait LinearRestriction
-class Linear extends LinearRestriction
-class NonLinear extends LinearRestriction
+case class Linear() extends LinearRestriction
+case class NonLinear() extends LinearRestriction
 
 case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int, RestrictionCF <: ConstructorFreedom, RestrictionM <: MonotoneRestriction](w: Option[Query.QueryRef[A, C]] = None) extends RestrictedQuery[A, C, Tuple1[ID], RestrictionCF, RestrictionM] (w.getOrElse(Query.QueryRef[A, C]())):
   type Self = this.type
@@ -124,7 +124,7 @@ object RestrictedQuery {
    */
   type CheckRelevantQuery[RL <: LinearRestriction, QT <: Tuple, RQT <: Tuple] = RL match
     case Linear => ExpectedResult[QT] <:< ActualResult[RQT]
-    case NonLinear => true
+    case NonLinear => true <:< true // strange but necessary to allow skipping checks
 
   /**
    * Extract the dependencies from a tuple of restricted queries and optionally check for duplicates.

@@ -11,7 +11,7 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.{Linear, Monotone, NonRestrictedConstructors, Ord, SetResult, Table}
 import tyql.Expr.min
 
 @experimental
@@ -85,7 +85,7 @@ class TOSSSPQuery extends QueryBenchmark {
 
   def executeTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.base
-    val query = base.fix(sp =>
+    val query = base.customFix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear()))(sp =>
       tyqlDB.edge.flatMap(edge =>
         sp
           .filter(s => s.dst == edge.src)

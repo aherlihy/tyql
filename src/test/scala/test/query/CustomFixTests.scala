@@ -24,7 +24,13 @@ class CustomFixBag extends SQLStringQueryTest[TCDB, Edge] {
 
   def expectedQueryPattern: String =
     """
-    WITH RECURSIVE recursive$436 AS ((SELECT edges$436.y as x, edges$436.y as y FROM recursive$436 as ref$244, edges as edges$436 WHERE ref$244.y = edges$436.x) UNION ALL ((SELECT * FROM edges as edges$439) UNION ALL (SELECT * FROM edges as edges$442))) SELECT * FROM recursive$436 as recref$16
+    WITH RECURSIVE recursive$436 AS
+      ((SELECT * FROM edges as edges$439)
+        UNION ALL
+      ((SELECT edges$436.y as x, edges$436.y as y FROM recursive$436 as ref$244, edges as edges$436 WHERE ref$244.y = edges$436.x)
+       UNION ALL
+      (SELECT * FROM edges as edges$442)))
+    SELECT * FROM recursive$436 as recref$16
     """
 }
 
