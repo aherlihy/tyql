@@ -1,6 +1,6 @@
 package tyql
 
-import tyql.Utils.{GenerateIndices, HasDuplicate, ZipWithIndex}
+import tyql.Utils.{Except, GenerateIndices, HasDuplicate, ZipWithIndex}
 import tyql.{DatabaseAST, Expr, NonScalarExpr, Query, ResultTag}
 
 import scala.NamedTuple.AnyNamedTuple
@@ -169,6 +169,10 @@ object RestrictedQuery {
     case RestrictedQuery[a, c, d, rcf, mf] => d
   type ExpectedResult[QT <: Tuple] = Tuple.Union[GenerateIndices[0, Tuple.Size[QT]]]
   type ActualResult[RT <: Tuple] = Tuple.Union[Tuple.FlatMap[RT, ExtractDependencies]]
+  
+  type MissingDependencies[QT <: Tuple, RQT <: Tuple] = Except[GenerateIndices[0, Tuple.Size[QT]], Tuple.FlatMap[RQT, ExtractDependencies]] match
+    case EmptyTuple => Nothing
+    case _ => true
 
   // Proof of concept that you can selectively disable the monotone constraint
   extension [A, C <: ResultCategory, D <: Tuple, RCF <: ConstructorFreedom](q: RestrictedQuery[A, C, D, RCF, NonMonotone])

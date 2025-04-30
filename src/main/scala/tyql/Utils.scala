@@ -20,6 +20,12 @@ object Utils:
       case true => Nothing
       case false => h *: HasDuplicate[t]
 
+  type NotContains[T <: Tuple, U] <: Boolean = Tuple.Contains[T, U] match
+    case true => false
+    case false => true
+  
+  type Except[T1 <: Tuple, T2 <: Tuple] = Tuple.Filter[T1, [t] =>> NotContains[T2, t]]
+
   extension [Base <: Tuple, F[_], G[_]](tuple: Tuple.Map[Base, F])
     /** Map a tuple `(F[A], F[B], ...)` to a tuple `(G[A], G[B], ...)`. */
     inline def naturalMap(f: [t] => F[t] => G[t]): Tuple.Map[Base, G] =
