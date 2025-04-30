@@ -20,10 +20,23 @@ object Utils:
       case true => Nothing
       case false => h *: HasDuplicate[t]
 
+  type NotHasDuplicate[T <: Tuple] <: Tuple = CheckDuplicate[T] match
+    case true => T
+    case _ => Nothing
+
+  /**
+   * Same has HasDuplicate, but returns a boolean instead of nothing
+   */
+  type CheckDuplicate[T <: Tuple] <: Boolean = T match
+    case EmptyTuple => false
+    case h *: t => Tuple.Contains[t, h] match
+      case true => true
+      case false => CheckDuplicate[t]
+
   type NotContains[T <: Tuple, U] <: Boolean = Tuple.Contains[T, U] match
     case true => false
     case false => true
-  
+
   type Except[T1 <: Tuple, T2 <: Tuple] = Tuple.Filter[T1, [t] =>> NotContains[T2, t]]
 
   extension [Base <: Tuple, F[_], G[_]](tuple: Tuple.Map[Base, F])

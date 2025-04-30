@@ -1055,7 +1055,7 @@ class EvenOddTestCFNonRelevantDispatch extends SQLStringQueryTest[EvenOddDB, Int
     """
 }
 
-/*
+
 class EvenOddTestCFNonAffineDispatch extends SQLStringQueryTest[EvenOddDB, Int] {
   def testDescription: String = "Non-linear (affine) Mutually recursive constructor-free even/odd query, for Dispatch"
 
@@ -1068,7 +1068,7 @@ class EvenOddTestCFNonAffineDispatch extends SQLStringQueryTest[EvenOddDB, Int] 
         val evenResult = odd.flatMap(num =>
           odd.filter(o => num.value == o.value).map(o => (value = num.value, typ = StringLit("even")))
         ).distinct
-        val oddResult = testDB.tables.numbers.flatMap(num =>
+        val oddResult = even.flatMap(num =>
           even.filter(e => num.value == e.value).map(e => (value = num.value, typ = StringLit("odd")))
         ).distinct
         (evenResult, oddResult)
@@ -1086,8 +1086,9 @@ class EvenOddTestCFNonAffineDispatch extends SQLStringQueryTest[EvenOddDB, Int] 
           recursive$2 AS
             ((SELECT numbers$8.value as value, "odd" as typ FROM numbers as numbers$8 WHERE numbers$8.value = 1)
               UNION
-            ((SELECT numbers$10.value as value, "odd" as typ FROM numbers as numbers$10, recursive$1 as ref$8 WHERE numbers$10.value = ref$8.value)))
-          SELECT recref$0.value FROM recursive$1 as recref$0
+            ((SELECT ref$7.value as value, "odd" as typ FROM recursive$1 as ref$7, recursive$1 as ref$8 WHERE ref$7.value = ref$8.value)))
+        SELECT recref$0.value FROM recursive$1 as recref$0
     """
 }
-*/
+
+// TODO: Add test for nonrelevant + nonaffine, mixed affine + nonaffine
