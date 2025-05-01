@@ -1,6 +1,6 @@
 package tyql
 
-import tyql.Utils.{Except, GenerateIndices, HasDuplicate, NotHasDuplicate, ZipWithIndex}
+import tyql.Utils.{CheckDuplicate, Except, GenerateIndices, HasDuplicate, NotHasDuplicate, ZipWithIndex}
 import tyql.{DatabaseAST, Expr, NonScalarExpr, Query, ResultTag}
 
 import scala.NamedTuple.AnyNamedTuple
@@ -134,6 +134,7 @@ object RestrictedQuery {
     case NonLinear => NonlinearInverseMapDeps[RQT]
 
   /**
+   * Fails if duplicates are found in the dependencies.
    * Extract the dependencies from a tuple of restricted queries.
    * Returns a tuple of dependencies for each element in the tuple, or nothing if there are duplicates.
    */
@@ -143,6 +144,7 @@ object RestrictedQuery {
   }
 
   /**
+   * Ignores duplicates in the dependencies.
    * Same as InverseMapDeps except it does not check for duplicates.
    */
   type NonlinearInverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
@@ -150,10 +152,27 @@ object RestrictedQuery {
     case EmptyTuple => EmptyTuple
   }
 
-  type DuplicateInverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
-    case RestrictedQuery[a, c, d, rcf, mf] *: t => NotHasDuplicate[d] *: DuplicateInverseMapDeps[t]
+  type ContainsAnyDuplicate[RQT <: Tuple] <: Boolean = RQT match
+    case RestrictedQuery[a, c, d, rcf, mf] *: t =>
+      CheckDuplicate[d] match
+        case true => true
+        case false => ContainsAnyDuplicate[t]
+    case EmptyTuple => false
+
+  /**
+   * Fails if there are no duplicates in all dependencies.
+   */
+  type AllDuplicateInverseMapDeps[RQT <: Tuple] <: Tuple = RQT match {
+    case RestrictedQuery[a, c, d, rcf, mf] *: t => NotHasDuplicate[d] *: AllDuplicateInverseMapDeps[t]
     case EmptyTuple => EmptyTuple
   }
+
+  /**
+   * Fails if there are no duplicates in ANY dependencies.
+   */
+  type AnyDuplicateInverseMapDeps[RQT <: Tuple] <: Tuple = ContainsAnyDuplicate[RQT] match
+    case true => NonlinearInverseMapDeps[RQT]
+    case false => Nothing
 
     // test affine
 //    type testA = (0, 1)

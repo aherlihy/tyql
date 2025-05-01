@@ -1032,9 +1032,6 @@ class EvenOddTestCFNonRelevantDispatch extends SQLStringQueryTest[EvenOddDB, Int
         val evenResult = testDB.tables.numbers.flatMap(num =>
           odd.filter(o => num.value == o.value).map(o => (value = num.value, typ = StringLit("even")))
         ).distinct
-        val oddResult = testDB.tables.numbers.flatMap(num =>
-          even.filter(e => num.value == e.value).map(e => (value = num.value, typ = StringLit("odd")))
-        ).distinct
         (evenResult, evenResult)
       )
     even.map(_.value)
@@ -1056,8 +1053,8 @@ class EvenOddTestCFNonRelevantDispatch extends SQLStringQueryTest[EvenOddDB, Int
 }
 
 
-class EvenOddTestCFNonAffineDispatch extends SQLStringQueryTest[EvenOddDB, Int] {
-  def testDescription: String = "Non-linear (affine) Mutually recursive constructor-free even/odd query, for Dispatch"
+class EvenOddTestCFAllNonAffineDispatch extends SQLStringQueryTest[EvenOddDB, Int] {
+  def testDescription: String = "All Non-linear (affine) Mutually recursive constructor-free even/odd query, for Dispatch"
 
   def query() = {
     val evenBase = testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
@@ -1083,6 +1080,73 @@ class EvenOddTestCFNonAffineDispatch extends SQLStringQueryTest[EvenOddDB, Int] 
             ((SELECT numbers$2.value as value, "even" as typ FROM numbers as numbers$2 WHERE numbers$2.value = 0)
               UNION
             ((SELECT ref$4.value as value, "even" as typ FROM recursive$2 as ref$4, recursive$2 as ref$5 WHERE ref$4.value = ref$5.value))),
+          recursive$2 AS
+            ((SELECT numbers$8.value as value, "odd" as typ FROM numbers as numbers$8 WHERE numbers$8.value = 1)
+              UNION
+            ((SELECT ref$7.value as value, "odd" as typ FROM recursive$1 as ref$7, recursive$1 as ref$8 WHERE ref$7.value = ref$8.value)))
+        SELECT recref$0.value FROM recursive$1 as recref$0
+    """
+}
+
+class EvenOddTestCFAnyNonAffineDispatch extends SQLStringQueryTest[EvenOddDB, Int] {
+  def testDescription: String = "Any Non-linear (affine) Mutually recursive constructor-free even/odd query, for Dispatch"
+
+  def query() = {
+    val evenBase = testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
+    val oddBase = testDB.tables.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
+
+    val (even, odd) =
+      dispatchedFix((evenBase, oddBase))((even, odd) =>
+        val evenResult = even.flatMap(num =>
+          odd.filter(o => num.value == o.value).map(o => (value = num.value, typ = StringLit("even")))
+        ).distinct
+        val oddResult = even.flatMap(num =>
+          even.filter(e => num.value == e.value).map(e => (value = num.value, typ = StringLit("odd")))
+        ).distinct
+        (evenResult, oddResult)
+      )
+    even.map(_.value)
+  }
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE
+          recursive$1 AS
+            ((SELECT numbers$2.value as value, "even" as typ FROM numbers as numbers$2 WHERE numbers$2.value = 0)
+              UNION
+            ((SELECT ref$4.value as value, "even" as typ FROM recursive$1 as ref$4, recursive$2 as ref$5 WHERE ref$4.value = ref$5.value))),
+          recursive$2 AS
+            ((SELECT numbers$8.value as value, "odd" as typ FROM numbers as numbers$8 WHERE numbers$8.value = 1)
+              UNION
+            ((SELECT ref$7.value as value, "odd" as typ FROM recursive$1 as ref$7, recursive$1 as ref$8 WHERE ref$7.value = ref$8.value)))
+        SELECT recref$0.value FROM recursive$1 as recref$0
+    """
+}
+
+class EvenOddTestCFNonAffineNonRelevantDispatch extends SQLStringQueryTest[EvenOddDB, Int] {
+  def testDescription: String = "Non-linear (affine and relevant) Mutually recursive constructor-free even/odd query, for Dispatch"
+
+  def query() = {
+    val evenBase = testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
+    val oddBase = testDB.tables.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
+
+    val (even, odd) =
+      dispatchedFix((evenBase, oddBase))((even, odd) =>
+        val evenResult = even.flatMap(num =>
+          even.filter(o => num.value == o.value).map(o => (value = num.value, typ = StringLit("even")))
+        ).distinct
+        (evenResult, evenResult)
+      )
+    even.map(_.value)
+  }
+
+  def expectedQueryPattern: String =
+    """
+        WITH RECURSIVE
+          recursive$1 AS
+            ((SELECT numbers$2.value as value, "even" as typ FROM numbers as numbers$2 WHERE numbers$2.value = 0)
+              UNION
+            ((SELECT ref$4.value as value, "even" as typ FROM recursive$1 as ref$4, recursive$2 as ref$5 WHERE ref$4.value = ref$5.value))),
           recursive$2 AS
             ((SELECT numbers$8.value as value, "odd" as typ FROM numbers as numbers$8 WHERE numbers$8.value = 1)
               UNION
