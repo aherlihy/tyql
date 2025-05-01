@@ -96,7 +96,7 @@ class TOOrbitsQuery extends QueryBenchmark {
 
 
     val query = orbits match
-      case Query.MultiRecursive(_, _, orbitsRef) =>
+      case Query.MultiRecursive(_, _, orbitsRef, _) =>
         orbits.filter(o =>
           orbitsRef
             .flatMap(o1 =>

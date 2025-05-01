@@ -132,7 +132,7 @@ class OrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
     )
 
     orbits match
-      case MultiRecursive(_, _, orbitsRef) =>
+      case MultiRecursive(_, _, orbitsRef, _) =>
         orbits.filter(o =>
           orbitsRef
             .flatMap(o1 =>
@@ -1146,11 +1146,11 @@ class EvenOddTestCFNonAffineNonRelevantDispatch extends SQLStringQueryTest[EvenO
           recursive$1 AS
             ((SELECT numbers$2.value as value, "even" as typ FROM numbers as numbers$2 WHERE numbers$2.value = 0)
               UNION
-            ((SELECT ref$4.value as value, "even" as typ FROM recursive$1 as ref$4, recursive$2 as ref$5 WHERE ref$4.value = ref$5.value))),
+            ((SELECT ref$4.value as value, "even" as typ FROM recursive$1 as ref$4, recursive$1 as ref$5 WHERE ref$4.value = ref$5.value))),
           recursive$2 AS
-            ((SELECT numbers$8.value as value, "odd" as typ FROM numbers as numbers$8 WHERE numbers$8.value = 1)
+            ((SELECT numbers$22.value as value, "odd" as typ FROM numbers as numbers$22 WHERE numbers$22.value = 1)
               UNION
-            ((SELECT ref$7.value as value, "odd" as typ FROM recursive$1 as ref$7, recursive$1 as ref$8 WHERE ref$7.value = ref$8.value)))
+            ((SELECT ref$4.value as value, "even" as typ FROM recursive$1 as ref$4, recursive$1 as ref$5 WHERE ref$4.value = ref$5.value)))
         SELECT recref$0.value FROM recursive$1 as recref$0
     """
 }

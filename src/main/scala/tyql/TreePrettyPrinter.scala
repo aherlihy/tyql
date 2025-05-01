@@ -155,12 +155,12 @@ object TreePrettyPrinter {
         s"${indent(depth)}IntersectAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case ExceptAll(thisQuery, other) =>
         s"${indent(depth)}ExceptAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case MultiRecursive(refs, querys, finalQ) =>
+      case MultiRecursive(refs, querys, finalQ, linear) =>
         val refStr = refs.toList.map(r => r.toQuery.prettyPrint(depth+1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?, ?]].prettyPrint(depth + 2))
         val str = refStr.zip(qryStr).map((r, q) => s"\n$r :=\n$q").mkString(",\n")
         val finalQStr = finalQ.prettyPrint(depth + 1)
-        s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth+1, "FINAL->", finalQStr)}\n${indent(depth)})"
+        s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth+1, "FINAL->", finalQStr)}\n${indent(depth) + linear}\n${indent(depth)})"
       case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?, ?]].stringRef()})"
       case a: Aggregation[?, ?] => a.prettyPrint(depth)
       case GroupBy(source, grouping, select, having) =>
