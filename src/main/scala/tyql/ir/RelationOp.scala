@@ -68,9 +68,11 @@ trait RelationOp extends QueryIRNode:
 /**
  * Simple table read.
  */
-case class TableLeaf(tableName: String, ast: Table[?]) extends RelationOp with QueryIRLeaf:
-  val name = s"$tableName${QueryIRTree.idCount}"
-  QueryIRTree.idCount += 1
+case class TableLeaf(tableName: String, overrideAlias: Option[String], ast: Table[?]) extends RelationOp with QueryIRLeaf:
+  val name = overrideAlias.getOrElse({
+    QueryIRTree.idCount += 1
+    s"$tableName${QueryIRTree.idCount - 1}"
+  })
   override def alias = name
   override def toSQLString(): String =
     if (flags.contains(SelectFlags.Final))
@@ -309,10 +311,13 @@ case class OrderedQuery(query: RelationOp, sortFn: Seq[(QueryIRNode, Ord)], ast:
 /**
  * N-ary relation-level operation
  */
-case class NaryRelationOp(children: Seq[QueryIRNode], op: String, ast: DatabaseAST[?]) extends RelationOp:
-  val latestVar = s"subquery${QueryIRTree.idCount}"
-  QueryIRTree.idCount += 1
-  override def alias = latestVar
+case class NaryRelationOp(children: Seq[QueryIRNode], op: String, overrideAlias: Option[String], ast: DatabaseAST[?]) extends RelationOp:
+  val name = overrideAlias.getOrElse({
+    val latestVar = s"subquery${QueryIRTree.idCount}"
+    QueryIRTree.idCount += 1
+    latestVar
+  })
+  override def alias = name
 
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     SelectAllQuery(

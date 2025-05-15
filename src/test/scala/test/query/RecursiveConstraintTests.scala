@@ -6,6 +6,7 @@ import tyql.Expr.sum
 import tyql.Query.fix
 
 import scala.compiletime.summonInline
+import scala.language.implicitConversions
 import scala.reflect.Typeable
 import language.experimental.namedTuples
 

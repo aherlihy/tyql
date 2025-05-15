@@ -90,17 +90,17 @@ object QueryIRTree:
   private def collapseNaryOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: DatabaseAST[?]): NaryRelationOp =
     val flattened = (
       lhs match
-        case NaryRelationOp(lhsChildren, lhsOp, lhsAst) if op == lhsOp =>
+        case NaryRelationOp(lhsChildren, lhsOp, _, lhsAst) if op == lhsOp =>
           lhsChildren
         case _ => Seq(lhs)
       ) ++ (
       rhs match
-        case NaryRelationOp(rhsChildren, rhsOp, rhsAST) if op == rhsOp =>
+        case NaryRelationOp(rhsChildren, rhsOp, _, rhsAST) if op == rhsOp =>
           rhsChildren
         case _ => Seq(rhs)
       )
 
-    NaryRelationOp(flattened, op, ast)
+    NaryRelationOp(flattened, op, None, ast)
 
   private def collapseMap(lhs: QueryIRNode, rhs: QueryIRNode): RelationOp =
     ???
@@ -123,7 +123,7 @@ object QueryIRTree:
 //    println(s"genQuery: ast=$ast")
     ast match
       case table: Table[?] =>
-        TableLeaf(table.$name, table)
+        TableLeaf(table.$name, None, table)
       case map: Query.Map[?, ?] =>
         val actualParam = generateActualParam(map.$from, map.$query.$param, symbols)
         val attrNode = generateFun(map.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
@@ -226,8 +226,8 @@ object QueryIRTree:
           case union: NaryRelationOp =>
             val base = union.children.head
             val recur = union.children.tail
-            val recurIR = NaryRelationOp(recur, union.op, union.ast).appendFlag(SelectFlags.ExprLevel)
-            NaryRelationOp(Seq(base, recurIR), union.op, union.ast).appendFlags(union.flags)
+            val recurIR = NaryRelationOp(recur, union.op, None, union.ast).appendFlag(SelectFlags.ExprLevel)
+            NaryRelationOp(Seq(base, recurIR), union.op, None, union.ast).appendFlags(union.flags)
           case _ => throw new Exception("Unexpected non-union subtree of recursive query")
         }
 
