@@ -112,8 +112,8 @@ object RestrictedQuery {
 
   // Adjustable restrictions:
   // only include the monotone restriction, ignore category or linearity
-  type ToMonotoneQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, ?, ?, NonRestrictedConstructors, MonotoneRestriction]]
-  type ToMonotoneQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?, NonRestrictedConstructors, MonotoneRestriction]]
+  type ToMonotoneQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQuery[T, ?, ?, NonRestrictedConstructors, Monotone]]
+  type ToMonotoneQueryRef[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?, NonRestrictedConstructors, Monotone]]
 
   // ignore all restrictions
   type ToUnrestrictedQuery[QT <: Tuple] = Tuple.Map[Elems[QT], [T] =>> Query[T, ?]]

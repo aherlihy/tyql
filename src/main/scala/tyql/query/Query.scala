@@ -240,19 +240,19 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
         Query.customFix[QT, Tuple1[DT1], RQT, RCF, RM, RC, NonLinear](nextOptions)(Tuple1(this))(fn)._1
     result.asInstanceOf[Query[A, RC]]
 
-  def fix(p: RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction] => RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]): Query[A, SetResult] =
+  def fix(p: RestrictedQueryRef[A, ?, 0, RestrictedConstructors, Monotone] => RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, Monotone]): Query[A, SetResult] =
     type QT = Tuple1[Query[A, ?]]
     type DT = Tuple1[Tuple1[0]]
-    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]]
-    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction]] => RQT = r => Tuple1(p(r._1))
+    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, Monotone]]
+    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, RestrictedConstructors, Monotone]] => RQT = r => Tuple1(p(r._1))
     Query.fix[QT, DT, RQT](Tuple1(this))(fn)._1
 
-  def fixConstructorFree(p: RestrictedQueryRef[A, ?, 0, NonRestrictedConstructors, MonotoneRestriction] => RestrictedQuery[A, SetResult, Tuple1[0], NonRestrictedConstructors, MonotoneRestriction]): Query[A, SetResult] =
+  def fixNonRestrictedConstructors(p: RestrictedQueryRef[A, ?, 0, NonRestrictedConstructors, Monotone] => RestrictedQuery[A, SetResult, Tuple1[0], NonRestrictedConstructors, Monotone]): Query[A, SetResult] =
     type QT = Tuple1[Query[A, ?]]
     type DT = Tuple1[Tuple1[0]]
-    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], NonRestrictedConstructors, MonotoneRestriction]]
-    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, NonRestrictedConstructors, MonotoneRestriction]] => RQT = r => Tuple1(p(r._1))
-    Query.fixConstructorFree[QT, DT, RQT](Tuple1(this))(fn)._1
+    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], NonRestrictedConstructors, Monotone]]
+    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, NonRestrictedConstructors, Monotone]] => RQT = r => Tuple1(p(r._1))
+    Query.fixNonRestrictedConstructors[QT, DT, RQT](Tuple1(this))(fn)._1
 
   def unrestrictedFix(p: Query.QueryRef[A, ?] => Query[A, ?]): Query[A, BagResult] =
     type QT = Tuple1[Query[A, ?]]
@@ -294,13 +294,13 @@ object Query:
   def unrestrictedBagFix[QT <: Tuple](bases: QT)(using Tuple.Union[QT] <:< Query[?, ?])(fns: ToUnrestrictedQueryRef[QT] => ToUnrestrictedQuery[QT]): ToQuery[QT] =
     fixImpl(setBased = false, restricted = false, linear = None)(bases)(fns)
 
-  def fixConstructorFree[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
+  def fixNonRestrictedConstructors[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
     (bases: QT)
-    (fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, MonotoneRestriction] => RQT)
+    (fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, Monotone] => RQT)
     (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
     (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
     (using @implicitNotFound("Cannot extract dependencies, is the query affine?") ev2: DT <:< InverseMapDeps[RQT])
-    (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, NonRestrictedConstructors, MonotoneRestriction, SetResult])
+    (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, NonRestrictedConstructors, Monotone, SetResult])
     (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
   : ToQuery[QT] =
     fixImpl(setBased = true, restricted = true, linear = Some(true))(bases)(fns)
@@ -321,11 +321,11 @@ object Query:
    */
   def fix[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
     (bases: QT)
-    (fns: ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction] => RQT)
+    (fns: ToRestrictedQueryRef[QT, RestrictedConstructors, Monotone] => RQT)
     (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
     (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
     (using @implicitNotFound("Cannot extract dependencies, is the query affine?") ev2: DT <:< InverseMapDeps[RQT])
-    (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RestrictedConstructors, MonotoneRestriction, SetResult])
+    (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RestrictedConstructors, Monotone, SetResult])
     (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
   : ToQuery[QT] =
     fixImpl(setBased = true, restricted = true, linear = Some(true))(bases)(fns)
@@ -553,7 +553,7 @@ object Query:
   trait FixDispatcher[QT <: Tuple, DT <: Tuple, RQT <: Tuple]:
     def apply
       (bases: QT)
-      (fns: ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction] => RQT): ToQuery[QT]
+      (fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, NonMonotone] => RQT): ToQuery[QT]
 
   /**
    * Instead of failing when linearity restriction is not met, modify the AST.
@@ -564,36 +564,36 @@ object Query:
       (using @implicitNotFound("nonaffine: Size of base cases tuple does not match recursive tuple") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
       (using @implicitNotFound("nonaffine: Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
       (using @implicitNotFound("nonaffine: To match query must not be affine") ev2: DT <:< AnyDuplicateInverseMapDeps[RQT])
-      (using @implicitNotFound("nonaffine: Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RestrictedConstructors, MonotoneRestriction, SetResult])
+      (using @implicitNotFound("nonaffine: Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, NonRestrictedConstructors, NonMonotone, SetResult])
 //      (using @implicitNotFound("nonaffine: Expected must be missing from actual: ${RQT}") ev4: MissingDependencies[QT, RQT] =:= true)
     : FixDispatcher[QT, DT, RQT] with
-      def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction] => RQT): ToQuery[QT] =
+      def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, NonMonotone] => RQT): ToQuery[QT] =
         println(s"NON-AFFINE")
         fixImpl(setBased = true, restricted = true, linear = Some(false))(bases)(fns)
     given nonRelevant[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
       (using @implicitNotFound("nonrelevant: Size of base cases tuple does not match recursive tuple") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
       (using @implicitNotFound("nonrelevant: Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
       (using @implicitNotFound("nonrelevant: Cannot extract dependencies, is the query affine?") ev2: DT <:< InverseMapDeps[RQT])
-      (using @implicitNotFound("nonrelevant: Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RestrictedConstructors, MonotoneRestriction, SetResult])
+      (using @implicitNotFound("nonrelevant: Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, NonRestrictedConstructors, NonMonotone, SetResult])
       (using @implicitNotFound("nonrelevant: To match query must not be relevant: ${RQT}") ev4: MissingDependencies[QT, RQT] =:= true)
     : FixDispatcher[QT, DT, RQT] with
-      def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction] => RQT): ToQuery[QT] =
+      def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, NonMonotone] => RQT): ToQuery[QT] =
         println(s"NON-RELEVANT")
         fixImpl(setBased = true, restricted = true, linear = Some(false))(bases)(fns)
     given restricted[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
       (using @implicitNotFound("restricted: Size of base cases tuple does not match recursive tuple") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
       (using @implicitNotFound("restricted: Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
       (using @implicitNotFound("restricted: Cannot extract dependencies, is the query affine?") ev2: DT <:< InverseMapDeps[RQT])
-      (using @implicitNotFound("restricted: Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RestrictedConstructors, MonotoneRestriction, SetResult])
+      (using @implicitNotFound("restricted: Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, NonRestrictedConstructors, NonMonotone, SetResult])
       (using @implicitNotFound("restricted: Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
       : FixDispatcher[QT, DT, RQT] with
-      def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction] => RQT): ToQuery[QT] =
+      def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, NonMonotone] => RQT): ToQuery[QT] =
         println(s"LINEAR")
         fixImpl(setBased = true, restricted = true, linear = Some(true))(bases)(fns)
 
   def dispatchedFix[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
     (bases: QT)
-    (fns: ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction] => RQT)
+    (fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, NonMonotone] => RQT)
     (using ev: FixDispatcher[QT, DT, RQT])
   : ToQuery[QT] =
     ev(bases)(fns)
