@@ -175,41 +175,41 @@ object TreePrettyPrinter {
     def prettyPrintIR(depth: Int, printAST: Boolean): String = relationOp match {
       case tableLeaf: TableLeaf =>
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", tableLeaf.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}TableLeaf{${relationOp.alias}{${relationOp.flags.mkString(",")}}(${tableLeaf.tableName}$astPrint)"
+        s"${indent(depth)}TableLeaf[${tableLeaf.schema}]{${relationOp.alias}{${relationOp.flags.mkString(",")}}(${tableLeaf.tableName}$astPrint)"
       case selectQuery: SelectQuery =>
         val projectPrint =  indentWithKey(depth + 1, "project", selectQuery.project.prettyPrintIR(depth + 1, printAST))
         val fromPrint =     indentListWithKey(depth + 1, "from", selectQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
         val wherePrint =    indentListWithKey(depth + 1, "where", selectQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", selectQuery.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}SelectQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$projectPrint,\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
+        s"${indent(depth)}SelectQuery[${selectQuery.schema}]{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$projectPrint,\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
       case selectAllQuery: SelectAllQuery =>
         val fromPrint =     indentListWithKey(depth + 1, "from", selectAllQuery.from.map(_.prettyPrintIR(depth + 2, printAST)))
         val wherePrint =    indentListWithKey(depth + 1, "where", selectAllQuery.where.map(_.prettyPrintIR(depth + 2, printAST)))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", selectAllQuery.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}SelectAllQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
+        s"${indent(depth)}SelectAllQuery[${selectAllQuery.schema}]{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$fromPrint,\n$wherePrint$astPrint\n${indent(depth)})"
       case orderedQuery: OrderedQuery =>
         val queryPrint = orderedQuery.query.prettyPrintIR(depth + 1, printAST)
         val sortFnPrint = indentListWithKey(depth+1, "sort", orderedQuery.sortFn.map { case (node, ord) =>
           s"${indent(depth + 2)}${ord.toString}::${node.prettyPrintIR(depth + 2, printAST).stripLeading()}"
         })
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", orderedQuery.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}OrderedQuery{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$queryPrint,\n$sortFnPrint$astPrint\n${indent(depth)})"
+        s"${indent(depth)}OrderedQuery[${orderedQuery.schema}]{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n$queryPrint,\n$sortFnPrint$astPrint\n${indent(depth)})"
       case naryRelationOp: NaryRelationOp =>
         val childrenPrint = naryRelationOp.children.map(_.prettyPrintIR(depth + 1, printAST))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", naryRelationOp.ast.prettyPrint(depth + 1))}" else ""
-        s"${indent(depth)}N-aryRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
-      case MultiRecursiveRelationOp(alias, query, finalQ, carriedSymbols, ast) =>
+        s"${indent(depth)}N-aryRelationOp[${naryRelationOp.schema}]{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
+      case MultiRecursiveRelationOp(alias, query, finalQ, carriedSymbols, schema, ast) =>
         val qryStr = query.map(q => q.prettyPrintIR(depth + 1, false))
         val finalQStr = finalQ.prettyPrintIR(depth + 1, false)
         val str = alias.zip(qryStr).map((r, q) => s"\n$r => \n$q").mkString(",\n")
-        s"${indent(depth)}MultiRecursive{$alias}{${relationOp.flags.mkString(",")}}($str\n${indent(depth)})${indent(depth)}(finalQ =>\n$finalQStr\n${indent(depth)})"
+        s"${indent(depth)}MultiRecursive[$schema]{$alias}{${relationOp.flags.mkString(",")}}($str\n${indent(depth)})${indent(depth)}(finalQ =>\n$finalQStr\n${indent(depth)})"
       case recursiveIRVar: RecursiveIRVar =>
-        s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}{${relationOp.flags.mkString(",")}}->${recursiveIRVar.pointsToAlias}"
-      case GroupByQuery(source, groupBy, having, overrideAlias, ast) =>
+        s"${indent(depth)}RecursiveVar[${recursiveIRVar.schema}]{${recursiveIRVar.alias}}{${relationOp.flags.mkString(",")}}->${recursiveIRVar.pointsToAlias}"
+      case GroupByQuery(source, groupBy, having, overrideAlias, schema, ast) =>
         val srcStr = source.prettyPrintIR(depth + 1, false)
         val groupByStr = groupBy.prettyPrintIR(depth + 1, false)
         val havingStr = having.map(_.prettyPrintIR(depth + 1, false)).getOrElse("[]")
-        s"${indent(depth)}GroupBy(\n$srcStr,\n$groupByStr,\n$havingStr\n${indent(depth)})"
+        s"${indent(depth)}GroupBy[$schema](\n$srcStr,\n$groupByStr,\n$havingStr\n${indent(depth)})"
 
       case _ => throw new Exception(s"Unimplemented pretty print RelationOp $relationOp")
     }

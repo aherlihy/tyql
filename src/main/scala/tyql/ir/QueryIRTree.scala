@@ -1,7 +1,6 @@
 package tyql
 
 import tyql.Query.{Intersect, QueryRef}
-import tyql.ResultTag.NamedTupleTag
 
 import language.experimental.namedTuples
 import NamedTuple.NamedTuple
@@ -32,8 +31,8 @@ object QueryIRTree:
 
   private def lookupRecursiveRef(actualParam: RelationOp, newRef: String): RelationOp =
     actualParam match
-      case RecursiveIRVar(pointsToAlias, alias, ast) =>
-        RecursiveIRVar(pointsToAlias, newRef, ast)
+      case RecursiveIRVar(pointsToAlias, alias, schema, ast) =>
+        RecursiveIRVar(pointsToAlias, newRef, schema, ast)
       case p => p
 
   /**
@@ -71,7 +70,7 @@ object QueryIRTree:
       // Found an operation that cannot be collapsed
       case otherOp: DatabaseAST[?] =>
         val fromNode = generateQuery(otherOp, symbols)
-        (sources :+ fromNode, ProjectClause(Seq(QueryIRVar(fromNode, fromNode.alias, null)), null))
+        (sources :+ fromNode, ProjectClause(Seq(QueryIRVar(fromNode, fromNode.alias, null)), fromNode.schema, null))
       case _ => // Expr
         throw Exception(s"""
             Unimplemented: collapsing flatMap on type $body.
@@ -90,17 +89,17 @@ object QueryIRTree:
   private def collapseNaryOp(lhs: QueryIRNode, rhs: QueryIRNode, op: String, ast: DatabaseAST[?]): NaryRelationOp =
     val flattened = (
       lhs match
-        case NaryRelationOp(lhsChildren, lhsOp, _, lhsAst) if op == lhsOp =>
+        case NaryRelationOp(lhsChildren, lhsOp, _, _, lhsAst) if op == lhsOp =>
           lhsChildren
         case _ => Seq(lhs)
       ) ++ (
       rhs match
-        case NaryRelationOp(rhsChildren, rhsOp, _, rhsAST) if op == rhsOp =>
+        case NaryRelationOp(rhsChildren, rhsOp, _, _, rhsAST) if op == rhsOp =>
           rhsChildren
         case _ => Seq(rhs)
       )
 
-    NaryRelationOp(flattened, op, None, ast)
+    NaryRelationOp(flattened, op, None, ast.qTag, ast)
 
   private def collapseMap(lhs: QueryIRNode, rhs: QueryIRNode): RelationOp =
     ???
@@ -123,7 +122,7 @@ object QueryIRTree:
 //    println(s"genQuery: ast=$ast")
     ast match
       case table: Table[?] =>
-        TableLeaf(table.$name, None, table)
+        TableLeaf(table.$name, None, table.tag, table)
       case map: Query.Map[?, ?] =>
         val actualParam = generateActualParam(map.$from, map.$query.$param, symbols)
         val attrNode = generateFun(map.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
@@ -152,7 +151,7 @@ object QueryIRTree:
           val res = generateFun(ord._1, actualParam, symbols)
           (res, ord._2)
         )
-        OrderedQuery(actualParam.appendFlag(SelectFlags.Final), orderByExprs, sort)
+        OrderedQuery(actualParam.appendFlag(SelectFlags.Final), orderByExprs, sort.tag, sort)
       case flatMap: Query.FlatMap[?, ?] =>
         val actualParam = generateActualParam(flatMap.$from, flatMap.$query.$param, symbols)
         val (unevaluated, boundST) = partiallyGenerateFun(flatMap.$query, actualParam, symbols.bind(actualParam.carriedSymbols))
@@ -168,7 +167,7 @@ object QueryIRTree:
 
         // NOTE: For now, don't collapse if there are queries with recursive subqueries unless subsequent calls to a single, top-level fix.
         if (fromNodes.drop(1).exists { case _: MultiRecursiveRelationOp => true; case _ => false })
-          SelectQuery(projectIR, fromNodes, Seq(), None, flatMap)
+          SelectQuery(projectIR, fromNodes, Seq(), None, ast.qTag, flatMap)
         else
           unnest(fromNodes, projectIR, flatMap)
 
@@ -199,10 +198,10 @@ object QueryIRTree:
         collapseNaryOp(lhs, rhs, s"$op$category", relOp)
       case limit: Query.Limit[?, ?] =>
         val from = generateQuery(limit.$from, symbols)
-        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, Expr.IntLit(limit.$limit)), "LIMIT", limit)
+        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(limit.$limit.toString, ResultTag.IntTag, Expr.IntLit(limit.$limit)), "LIMIT", limit)
       case offset: Query.Offset[?, ?] =>
         val from = generateQuery(offset.$from, symbols)
-        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, Expr.IntLit(offset.$offset)), "OFFSET", offset)
+        collapseNaryOp(from.appendFlag(SelectFlags.Final), Literal(offset.$offset.toString, ResultTag.IntTag, Expr.IntLit(offset.$offset)), "OFFSET", offset)
       case distinct: Query.Distinct[?] =>
         generateQuery(distinct.$from, symbols).appendFlag(SelectFlags.Distinct)
       case queryRef: Query.QueryRef[?, ?] =>
@@ -215,7 +214,7 @@ object QueryIRTree:
 
           // assign variable ID to alias in symbol table
           val varId = p.stringRef()
-          val variable = RecursiveIRVar(newAlias, varId, p)
+          val variable = RecursiveIRVar(newAlias, varId, rP.tag, p)
           (varId, variable)
         )
         val allSymbols = symbols.bind(vars)
@@ -226,67 +225,67 @@ object QueryIRTree:
           case union: NaryRelationOp =>
             val base = union.children.head
             val recur = union.children.tail
-            val recurIR = NaryRelationOp(recur, union.op, None, union.ast).appendFlag(SelectFlags.ExprLevel)
-            NaryRelationOp(Seq(base, recurIR), union.op, None, union.ast).appendFlags(union.flags)
+            val recurIR = NaryRelationOp(recur, union.op, None, union.schema, union.ast).appendFlag(SelectFlags.ExprLevel)
+            NaryRelationOp(Seq(base, recurIR), union.op, None, union.schema, union.ast).appendFlags(union.flags)
           case _ => throw new Exception("Unexpected non-union subtree of recursive query")
         }
 
         val finalQ = multiRecursive.$resultQuery match
           case ref: QueryRef[?, ?] =>
             val v = vars.find((id, _) => id == ref.stringRef()).get._2
-            SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery)
+            SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery.tag, multiRecursive.$resultQuery)
           case q => ??? //generateQuery(q, allSymbols, multiRecursive.$resultQuery)
 
-        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive)
+        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive.$resultQuery.tag, multiRecursive)
 
       case Query.NewGroupBy(source, grouping, sourceRefs, tags, having) =>
         val sourceIR = generateQuery(source, symbols)
         val sourceTables = sourceIR match
-          case SelectQuery(_, from, _, _, _) =>
+          case SelectQuery(_, from, _, _, _, _) =>
             if from.length != tags.length then throw new Exception("Unimplemented: groupBy on complex query")
             from
-          case SelectAllQuery(from, _, _, _) =>
+          case SelectAllQuery(from, _, _, _, _) =>
             if from.length != tags.length then throw new Exception("Unimplemented: groupBy on complex query")
             from
-          case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _) =>
+          case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _, _) =>
             carriedSymbols.map(_._2)
           case _ => throw new Exception("Unimplemented: groupBy on complex query")
 
         val newSymbols = symbols.bind(sourceRefs.zipWithIndex.map((r, i) => (r.stringRef(), sourceTables(i))))
         grouping.tag match
-          case t: NamedTupleTag[?, ?] => t.names = List()
+          case t: ResultTag.NamedTupleTag[?, ?] => t.names = List()
           case _ =>
         val groupingIR = generateExpr(grouping, newSymbols)
         val havingIR = having.map(h => generateExpr(h, newSymbols))
 
-        GroupByQuery(sourceIR.appendFlag(SelectFlags.Final), groupingIR, havingIR, overrideAlias = None, ast)
+        GroupByQuery(sourceIR.appendFlag(SelectFlags.Final), groupingIR, havingIR, overrideAlias = None, ast.qTag, ast)
 
       case groupBy: Query.GroupBy[?, ?, ?, ?, ?] =>
         val fromIR = generateQuery(groupBy.$source, symbols)
 
         def getSource(f: RelationOp): RelationOp = f match
-          case SelectQuery(project, from, where, overrideAlias, ast) =>
+          case SelectQuery(project, from, where, overrideAlias, schema, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
-            SelectQuery(collapseMap(select, project), from, where, None, groupBy)
-          case SelectAllQuery(from, where, overrideAlias, ast) =>
+            SelectQuery(collapseMap(select, project), from, where, None, schema, groupBy)
+          case SelectAllQuery(from, where, overrideAlias, schema, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
-            SelectQuery(select, from, where, None, groupBy)
-          case MultiRecursiveRelationOp(aliases, query, finalQ, carriedSymbols, ast) =>
+            SelectQuery(select, from, where, None, schema, groupBy)
+          case MultiRecursiveRelationOp(aliases, query, finalQ, carriedSymbols, schema, ast) =>
             val newSource = getSource(finalQ).appendFlags(finalQ.flags)
-            MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, ast)
+            MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, schema, ast)
           case _ =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
-            SelectQuery(select, Seq(fromIR), Seq(), None, groupBy) // force subquery
+            SelectQuery(select, Seq(fromIR), Seq(), None, select.schema, groupBy) // force subquery
 
         val source = getSource(fromIR)
 
         // Turn off the attribute names for the grouping clause since no aliases needed
         groupBy.$groupingFn.$body.tag match
-          case t: NamedTupleTag[?, ?] => t.names = List()
+          case t: ResultTag.NamedTupleTag[?, ?] => t.names = List()
           case _ =>
         val groupByIR = generateFun(groupBy.$groupingFn, fromIR, symbols)
         val havingIR = groupBy.$havingFn.map(f => generateFun(f, fromIR, symbols))
-        GroupByQuery(source.appendFlag(SelectFlags.Final), groupByIR, havingIR, overrideAlias = None, ast = groupBy)
+        GroupByQuery(source.appendFlag(SelectFlags.Final), groupByIR, havingIR, overrideAlias = None, schema = groupByIR.schema, ast = groupBy)
 
       case _ => throw new Exception(s"Unimplemented Relation-Op AST: $ast")
 
@@ -329,12 +328,15 @@ object QueryIRTree:
     val namedTupleNames = p.tag match
       case ResultTag.NamedTupleTag(names, types) => names.lift
       case _ => Seq()
+    val namedTupleTypes = p.tag match
+      case ResultTag.NamedTupleTag(names, types) => types
+      case _ => Seq(p.tag)
     val children = tupleOfProject.toList.zipWithIndex
       .map((expr, idx) =>
         val e = expr.asInstanceOf[Expr[?, ?, ?]]
-        AttrExpr(generateExpr(e, symbols), namedTupleNames(idx), e)
+        AttrExpr(generateExpr(e, symbols), namedTupleNames(idx), namedTupleTypes(idx), e)
       )
-    ProjectClause(children, p)
+    ProjectClause(children, p.tag, p)
 
   private def generateExpr(ast: Expr[?, ?, ?], symbols: SymbolTable): QueryIRNode =
     ast match
@@ -342,57 +344,58 @@ object QueryIRTree:
         val name = ref.stringRef()
         val sub = symbols(name)
         QueryIRVar(sub, name, ref) // TODO: singleton?
-      case s: Expr.Select[?, ?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s)
+      case s: Expr.Select[?, ?] => SelectExpr(s.$name, generateExpr(s.$x, symbols), s.tag, s)
       case p: Expr.Project[?, ?] => generateProjection(p, symbols)
-      case g: Expr.Gt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
-      case g: Expr.Lt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
-      case g: Expr.Lte[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", g)
-      case g: Expr.GtDouble[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", g)
-      case g: Expr.LtDouble[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", g)
-      case a: Expr.And[?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", a)
-      case n: Expr.Not[?, ?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", n)
-      case a: Expr.Plus[?, ?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", a)
-      case a: Expr.Times[?, ?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", a)
-      case a: Expr.Eq[?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", a)
-      case a: Expr.Ne[?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", a)
+      case g: Expr.Gt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", ResultTag.BoolTag, g)
+      case g: Expr.Lt[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", ResultTag.BoolTag, g)
+      case g: Expr.Lte[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l <= $r", ResultTag.BoolTag, g)
+      case g: Expr.GtDouble[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l > $r", ResultTag.BoolTag, g)
+      case g: Expr.LtDouble[?, ?, ?, ?] => BinExprOp(generateExpr(g.$x, symbols), generateExpr(g.$y, symbols), (l, r) => s"$l < $r", ResultTag.BoolTag, g)
+      case a: Expr.And[?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l AND $r", ResultTag.BoolTag, a)
+      case n: Expr.Not[?, ?] => UnaryExprOp(generateExpr(n.$x, symbols), o => s"NOT $o", ResultTag.BoolTag, n)
+      case a: Expr.Plus[?, ?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l + $r", a.tag, a)
+      case a: Expr.Times[?, ?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l * $r", a.tag, a)
+      case a: Expr.Eq[?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l = $r", a.tag, a)
+      case a: Expr.Ne[?, ?, ?, ?] => BinExprOp(generateExpr(a.$x, symbols), generateExpr(a.$y, symbols), (l, r) => s"$l <> $r", a.tag, a)
       case a: Expr.Concat[?, ?, ?, ?, ?, ?] =>
         val lhsIR = generateExpr(a.$x, symbols) match
           case p: ProjectClause => p
-          case v: QueryIRVar => SelectExpr("*", v, a.$x)
+          case v: QueryIRVar => SelectExpr("*", v, a.$x.tag, a.$x)
           case _ => throw new Exception("Unimplemented: concatting something that is not a literal nor a variable")
         val rhsIR = generateExpr(a.$y, symbols) match
           case p: ProjectClause => p
-          case v: QueryIRVar => SelectExpr("*", v, a.$y)
+          case v: QueryIRVar => SelectExpr("*", v, a.$y.tag, a.$y)
           case _ => throw new Exception("Unimplemented: concatting something that is not a literal nor a variable")
 
         BinExprOp(
           lhsIR,
           rhsIR,
           (l, r) => s"$l, $r",
+          a.tag,
           a
         )
-      case l: Expr.DoubleLit => Literal(s"${l.$value}", l)
-      case l: Expr.IntLit => Literal(s"${l.$value}", l)
-      case l: Expr.StringLit => Literal(s"\"${l.$value}\"", l)
-      case l: Expr.BooleanLit => Literal(s"\"${l.$value}\"", l)
-      case l: Expr.Lower[?, ?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", l)
+      case l: Expr.DoubleLit => Literal(s"${l.$value}", ResultTag.DoubleTag, l)
+      case l: Expr.IntLit => Literal(s"${l.$value}", ResultTag.IntTag, l)
+      case l: Expr.StringLit => Literal(s"\"${l.$value}\"", ResultTag.StringTag, l)
+      case l: Expr.BooleanLit => Literal(s"\"${l.$value}\"", ResultTag.BoolTag, l)
+      case l: Expr.Lower[?, ?] => UnaryExprOp(generateExpr(l.$x, symbols), o => s"LOWER($o)", ResultTag.StringTag, l)
       case a: AggregationExpr[?] => generateAggregation(a, symbols)
       case a: Aggregation[?, ?] => generateQuery(a, symbols).appendFlag(SelectFlags.ExprLevel)
       case list: Expr.ListExpr[?] => ListTypeExpr(list.$elements.map(generateExpr(_, symbols)), list)
-      case p: Expr.ListPrepend[?] => BinExprOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), (l, r) => s"list_prepend($l, $r)", p)
-      case p: Expr.ListAppend[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_append($l, $r)", p)
-      case p: Expr.ListContains[?, ?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_contains($l, $r)", p)
-      case p: Expr.ListLength[?, ?] => UnaryExprOp(generateExpr(p.$list, symbols), s => s"length($s)", p)
-      case p: Expr.NonEmpty[?, ?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"EXISTS ($s)", p)
-      case p: Expr.IsEmpty[?, ?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"NOT EXISTS ($s)", p)
+      case p: Expr.ListPrepend[?] => BinExprOp(generateExpr(p.$x, symbols), generateExpr(p.$list, symbols), (l, r) => s"list_prepend($l, $r)", p.tag, p)
+      case p: Expr.ListAppend[?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_append($l, $r)", p.tag, p)
+      case p: Expr.ListContains[?, ?] => BinExprOp(generateExpr(p.$list, symbols), generateExpr(p.$x, symbols),(l, r) => s"list_contains($l, $r)", p.tag, p)
+      case p: Expr.ListLength[?, ?] => UnaryExprOp(generateExpr(p.$list, symbols), s => s"length($s)", p.tag, p)
+      case p: Expr.NonEmpty[?, ?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"EXISTS ($s)", ResultTag.BoolTag, p)
+      case p: Expr.IsEmpty[?, ?] => UnaryExprOp(generateQuery(p.$this, symbols).appendFlag(SelectFlags.Final), s => s"NOT EXISTS ($s)", ResultTag.BoolTag, p)
       case _ => throw new Exception(s"Unimplemented Expr AST: $ast")
 
   private def generateAggregation(ast: AggregationExpr[?], symbols: SymbolTable): QueryIRNode =
     ast match
-      case s: AggregationExpr.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", s)
-      case s: AggregationExpr.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", s)
-      case s: AggregationExpr.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", s)
-      case s: AggregationExpr.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", s)
-      case c: AggregationExpr.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT($o)", c)
+      case s: AggregationExpr.Sum[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"SUM($o)", ast.tag, s)
+      case s: AggregationExpr.Avg[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"AVG($o)", ast.tag, s)
+      case s: AggregationExpr.Min[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MIN($o)", ast.tag, s)
+      case s: AggregationExpr.Max[?] => UnaryExprOp(generateExpr(s.$a, symbols), o => s"MAX($o)", ast.tag, s)
+      case c: AggregationExpr.Count[?] => UnaryExprOp(generateExpr(c.$a, symbols), o => s"COUNT($o)", ResultTag.IntTag, c)
       case p: AggregationExpr.AggProject[?] => generateProjection(p, symbols)
       case _ => throw new Exception(s"Unimplemented aggregation op: $ast")

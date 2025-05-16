@@ -19,6 +19,21 @@ enum ResultTag[T]:
   case AnyTag extends ResultTag[Any]
 // TODO: Add more types, specialize for DB backend
 object ResultTag:
+  def extractProduct(t: ResultTag[?]): ResultTag[?] = t match
+    case ProductTag(_, fields) => fields
+    case _ => t
+
+  def merge(aTag: ResultTag[?], bTag: ResultTag[?]): ResultTag[?] =
+    (extractProduct(aTag), extractProduct(bTag)) match
+      case (NamedTupleTag(namesA, typesA), NamedTupleTag(namesB, typesB)) =>
+        NamedTupleTag(namesA ++ namesB, typesA ++ typesB)
+      case (NamedTupleTag(names, types), t) =>
+        NamedTupleTag(names :+ "_", types :+ t)
+      case (t, NamedTupleTag(names, types)) =>
+        NamedTupleTag("_" +: names , t +: types)
+      case (t1, t2) =>
+        NamedTupleTag(List("_", "_"), List(t1, t2))
+
   given ResultTag[Int] = ResultTag.IntTag
   given ResultTag[String] = ResultTag.StringTag
   given ResultTag[Boolean] = ResultTag.BoolTag
