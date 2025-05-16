@@ -236,7 +236,7 @@ object QueryIRTree:
             SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery.tag, multiRecursive.$resultQuery)
           case q => ??? //generateQuery(q, allSymbols, multiRecursive.$resultQuery)
 
-        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive.$resultQuery.tag, multiRecursive)
+        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive.$linear, multiRecursive.$resultQuery.tag, multiRecursive)
 
       case Query.NewGroupBy(source, grouping, sourceRefs, tags, having) =>
         val sourceIR = generateQuery(source, symbols)
@@ -247,7 +247,7 @@ object QueryIRTree:
           case SelectAllQuery(from, _, _, _, _) =>
             if from.length != tags.length then throw new Exception("Unimplemented: groupBy on complex query")
             from
-          case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _, _) =>
+          case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _, _, _) =>
             carriedSymbols.map(_._2)
           case _ => throw new Exception("Unimplemented: groupBy on complex query")
 
@@ -270,9 +270,9 @@ object QueryIRTree:
           case SelectAllQuery(from, where, overrideAlias, schema, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, from, where, None, schema, groupBy)
-          case MultiRecursiveRelationOp(aliases, query, finalQ, carriedSymbols, schema, ast) =>
+          case MultiRecursiveRelationOp(aliases, query, finalQ, carriedSymbols, linear, schema, ast) =>
             val newSource = getSource(finalQ).appendFlags(finalQ.flags)
-            MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, schema, ast)
+            MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, linear, schema, ast)
           case _ =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, Seq(fromIR), Seq(), None, select.schema, groupBy) // force subquery

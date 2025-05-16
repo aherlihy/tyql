@@ -198,11 +198,11 @@ object TreePrettyPrinter {
         val childrenPrint = naryRelationOp.children.map(_.prettyPrintIR(depth + 1, printAST))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", naryRelationOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}N-aryRelationOp[${naryRelationOp.schema}]{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
-      case MultiRecursiveRelationOp(alias, query, finalQ, carriedSymbols, schema, ast) =>
+      case MultiRecursiveRelationOp(alias, query, finalQ, carriedSymbols, linear, schema, ast) =>
         val qryStr = query.map(q => q.prettyPrintIR(depth + 1, false))
         val finalQStr = finalQ.prettyPrintIR(depth + 1, false)
         val str = alias.zip(qryStr).map((r, q) => s"\n$r => \n$q").mkString(",\n")
-        s"${indent(depth)}MultiRecursive[$schema]{$alias}{${relationOp.flags.mkString(",")}}($str\n${indent(depth)})${indent(depth)}(finalQ =>\n$finalQStr\n${indent(depth)})"
+        s"${indent(depth)}MultiRecursive[$schema]{$alias}{${relationOp.flags.mkString(",")}}[linear=$linear]($str\n${indent(depth)})${indent(depth)}(finalQ =>\n$finalQStr\n${indent(depth)})"
       case recursiveIRVar: RecursiveIRVar =>
         s"${indent(depth)}RecursiveVar[${recursiveIRVar.schema}]{${recursiveIRVar.alias}}{${relationOp.flags.mkString(",")}}->${recursiveIRVar.pointsToAlias}"
       case GroupByQuery(source, groupBy, having, overrideAlias, schema, ast) =>

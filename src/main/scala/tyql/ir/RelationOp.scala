@@ -396,23 +396,24 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
                                     query: Seq[RelationOp],
                                     finalQ: RelationOp,
                                     override val carriedSymbols: List[(String, RecursiveIRVar)],
+                                    linear: Option[Boolean],
                                     schema: ResultTag[?],
                                     ast: DatabaseAST[?]) extends RelationOp:
   val alias = finalQ.alias
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendWhere(w, astOther), carriedSymbols, schema, ast
+      aliases, query, finalQ.appendWhere(w, astOther), carriedSymbols, linear, schema, ast
     ).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendProject(p, astOther), carriedSymbols, p.schema, ast
+      aliases, query, finalQ.appendProject(p, astOther), carriedSymbols, linear, p.schema, ast
     ).appendFlags(flags)
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     val f = finalQ.mergeWith(r, astOther)
     MultiRecursiveRelationOp(
-      aliases, query, f.appendFlag(Final), carriedSymbols, f.schema, ast
+      aliases, query, f.appendFlag(Final), carriedSymbols, linear, f.schema, ast
     ).appendFlags(flags)
 
   override def appendFlag(f: SelectFlags): RelationOp =
