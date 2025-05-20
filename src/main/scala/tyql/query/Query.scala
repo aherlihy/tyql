@@ -588,7 +588,7 @@ object Query:
       (using @implicitNotFound("restricted: Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RQT}") ev4: ExpectedResult[QT] <:< ActualResult[RQT])
       : FixDispatcher[QT, DT, RQT] with
       def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, NonMonotone] => RQT): ToQuery[QT] =
-        println(s"LINEAR")
+//        println(s"LINEAR")
         fixImpl(setBased = true, restricted = true, linear = Some(true))(bases)(fns)
 
   def dispatchedFix[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
