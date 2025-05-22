@@ -1154,5 +1154,3 @@ class EvenOddTestCFNonAffineNonRelevantDispatch extends SQLStringQueryTest[EvenO
         SELECT recref$0.value FROM recursive$1 as recref$0
     """
 }
-
-// TODO: Add test for nonrelevant + nonaffine, mixed affine + nonaffine

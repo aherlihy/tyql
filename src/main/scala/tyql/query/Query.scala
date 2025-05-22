@@ -568,7 +568,7 @@ object Query:
 //      (using @implicitNotFound("nonaffine: Expected must be missing from actual: ${RQT}") ev4: MissingDependencies[QT, RQT] =:= true)
     : FixDispatcher[QT, DT, RQT] with
       def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, NonMonotone] => RQT): ToQuery[QT] =
-        println(s"NON-AFFINE")
+//        println(s"NON-AFFINE")
         fixImpl(setBased = true, restricted = true, linear = Some(false))(bases)(fns)
     given nonRelevant[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
       (using @implicitNotFound("nonrelevant: Size of base cases tuple does not match recursive tuple") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
@@ -578,7 +578,7 @@ object Query:
       (using @implicitNotFound("nonrelevant: To match query must not be relevant: ${RQT}") ev4: MissingDependencies[QT, RQT] =:= true)
     : FixDispatcher[QT, DT, RQT] with
       def apply(bases: QT)(fns: ToRestrictedQueryRef[QT, NonRestrictedConstructors, NonMonotone] => RQT): ToQuery[QT] =
-        println(s"NON-RELEVANT")
+//        println(s"NON-RELEVANT")
         fixImpl(setBased = true, restricted = true, linear = Some(false))(bases)(fns)
     given restricted[QT <: Tuple, DT <: Tuple, RQT <: Tuple]
       (using @implicitNotFound("restricted: Size of base cases tuple does not match recursive tuple") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
