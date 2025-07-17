@@ -367,7 +367,7 @@ object Query:
   (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
   (using @implicitNotFound("Cannot extract dependencies, is the query affine?: ${RQT}") ev2: DT <:< ToDependencyTuple[RL, RQT])
   (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RCF, RM, RC])
-  (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: ${RL}") ev4: CheckRelevantQuery[RL, QT, RQT] <:< true)
+  (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: DT=${DT}, RQT=${RQT}") ev4: CheckRelevantQuery[RL, QT, RQT] <:< true)
   : ToQuery[QT] =
     fixImpl(options.category.isInstanceOf[SetResult])(bases)(fns)
 
@@ -439,7 +439,7 @@ object Query:
       else
         recurQueries.toList.map(_.asInstanceOf[RestrictedQuery[?, ?, ?, RCF, RM]].toQuery).lazyZip(baseCaseDefsList).map:
           case (query: Query[t, c], ddef) =>
-            UnionAll(query, ddef.asInstanceOf[Query[t, c]])(using query.tag)
+            UnionAll(ddef.asInstanceOf[Query[t, c]], query)(using query.tag)
 
 
     val rt = refsTuple.asInstanceOf[Tuple.Map[Elems[QT], [T] =>> RestrictedQueryRef[T, ?, ?, RCF, RM]]]
