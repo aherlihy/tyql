@@ -46,7 +46,7 @@ cat benchmark_out_<size>.csv | sed -e 's/tyql.bench.TO//' -e 's/Benchmark\./\",\
 ## Generating aggregate data 
 The excel file used to generate results is "repro-tyql.xlsx", import the data and the charts should auto-generate.
 Steps:
-1) Open `oopsla-tyql-repro.xlsx` with Excel Version 16.76 (23081101)
+1) Open `tyql-repro.xlsx` with Excel Version 16.76 (23081101)
 2) Add an empty sheet to import the data into.
 3) In that new sheet, navigate to "Data > Get Data (Power Query) > From Text (Legacy) > select the small datasize <benchmark_out>_clean.csv 
 file produced by the section above > "Get Data"
