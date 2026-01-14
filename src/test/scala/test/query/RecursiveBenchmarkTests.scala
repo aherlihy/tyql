@@ -453,6 +453,34 @@ class BOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int)] {
       """
 }
 
+class BOMNotStratTest extends SQLStringQueryTest[BOMDB, (part: String, days: Int)] {
+  def testDescription: String = "BOM 'days til delivery' NON stratified"
+
+  def query() =
+    val waitFor = testDB.tables.basic
+    waitFor.unrestrictedFix(waitFor =>
+        testDB.tables.assbl.aggregate(subParts =>
+          waitFor
+            .filter(wf => subParts.spart == wf.part)
+            .aggregate(wf => (part = subParts.part, days = max(wf.days)).toGroupingRow)
+        ).groupBySource(
+          (assbl, wf) => (part = wf.part).toRow
+        )
+    )
+
+  def expectedQueryPattern: String =
+    """
+WITH RECURSIVE recursive$1 AS
+  ((SELECT *
+  FROM basic as basic$2)
+  UNION
+  ((SELECT assbl$5.part as part, MAX(ref$6.days) as days
+  FROM assbl as assbl$5, recursive$1 as ref$6
+  WHERE assbl$5.spart = ref$6.part
+  GROUP BY ref$6.part)))
+SELECT * FROM recursive$1 as recref$0
+      """
+}
 
 type Organizer = (orgName: String)
 type Friend = (pName: String, fName: String)
