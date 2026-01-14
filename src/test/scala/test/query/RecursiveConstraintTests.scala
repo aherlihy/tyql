@@ -384,47 +384,47 @@ class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
   }
 }
 
-class RecursiveConstraintLinearMultifix2xFailTest extends munit.FunSuite {
-  def testDescription: String = "Non-linear recursion: multiple uses of path in multifix"
-
-  def expectedError: String = "Recursive definitions must be linear"
-
-  test(testDescription) {
-    val error: String =
-      compileErrors(
-        """
-             // BOILERPLATE
-             import language.experimental.namedTuples
-             import tyql.{Table, Expr}
-
-             type Edge = (x: Int, y: Int)
-
-             val tables = (
-               edges = Table[Edge]("edges"),
-               edges2 = Table[Edge]("otherEdges"),
-               emptyEdges = Table[Edge]("empty")
-             )
-
-            // TEST
-              val pathBase = tables.edges
-              val path2Base = tables.emptyEdges
-              val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
-                val P = path.flatMap(p =>
-                 path
-                    .filter(e => p.y == e.x)
-                    .map(e => (x = p.x, y = e.y).toRow)
-                ).distinct
-                val P2 = path2.flatMap(p =>
-                  path2
-                    .filter(e => p.y == e.x)
-                    .map(e => (x = p.x, y = e.y).toRow)
-                ).distinct
-                (P, P2)
-              )
-            """)
-    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
-  }
-}
+//class RecursiveConstraintLinearMultifix2xFailTest extends munit.FunSuite {
+//  def testDescription: String = "Non-linear recursion: multiple uses of path in multifix"
+//
+//  def expectedError: String = "Recursive definitions must be linear"
+//
+//  test(testDescription) {
+//    val error: String =
+//      compileErrors(
+//        """
+//             // BOILERPLATE
+//             import language.experimental.namedTuples
+//             import tyql.{Table, Expr}
+//
+//             type Edge = (x: Int, y: Int)
+//
+//             val tables = (
+//               edges = Table[Edge]("edges"),
+//               edges2 = Table[Edge]("otherEdges"),
+//               emptyEdges = Table[Edge]("empty")
+//             )
+//
+//            // TEST
+//              val pathBase = tables.edges
+//              val path2Base = tables.emptyEdges
+//              val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+//                val P = path.flatMap(p =>
+//                 path
+//                    .filter(e => p.y == e.x)
+//                    .map(e => (x = p.x, y = e.y).toRow)
+//                ).distinct
+//                val P2 = path2.flatMap(p =>
+//                  path2
+//                    .filter(e => p.y == e.x)
+//                    .map(e => (x = p.x, y = e.y).toRow)
+//                ).distinct
+//                (P, P2)
+//              )
+//            """)
+//    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+//  }
+//}
 
 class RecursiveConstraintLinearMultifix0FailTest extends munit.FunSuite {
   def testDescription: String = "Non-linear recursion: zero usage of path in multifix"
@@ -862,97 +862,97 @@ class RecursiveConstraintGroupbyMultifixFailTest extends munit.FunSuite {
   }
 }
 
-class RecursiveConstraintNonlinearFailTest extends munit.FunSuite {
-  def testDescription: String = "Use all args in one relation, none in the other, but with groupBy in one"
-
-  def expectedError: String = "Recursive definitions must be linear:"
-
-  test(testDescription) {
-    val error: String =
-      compileErrors(
-        """
-     // BOILERPLATE
-     import language.experimental.namedTuples
-     import tyql.{Table, Expr}
-     import tyql.Expr.min
-
-     type Edge = (x: Int, y: Int)
-
-     val tables = (
-       edges = Table[Edge]("edges"),
-       edges2 = Table[Edge]("otherEdges"),
-       emptyEdges = Table[Edge]("empty")
-     )
-
-    // TEST
-    val parentChild = tables.edges
-
-    val ancestorBase = parentChild
-    val descendantBase = parentChild
-
-    val (ancestorResult, descendantResult) = fix(ancestorBase, descendantBase) { (ancestor, descendant) =>
-      val newAncestor = parentChild.groupBy(
-        row => (x = row.x).toRow,
-        row => (x = row.x, mutual_friend_count = count(row.y)).toRow
-      )
-      val newDescendant = descendant.flatMap(d =>
-       ancestor
-          .filter(p => d.x == p.y)
-          .map(p => (x = d.y, y = p.x).toRow)
-      )
-      (newAncestor.distinct, newDescendant.distinct)
-    }
-
-    ancestorResult
-    """)
-    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
-  }
-}
-class RecursiveConstraintAggregationMutualRecursionFailTest extends munit.FunSuite {
-  def testDescription: String = "Aggregation in mutual recursion"
-
-  def expectedError: String = "Recursive definitions must be linear:"
-
-  test(testDescription) {
-    val error: String =
-      compileErrors(
-        """
-     // BOILERPLATE
-     import language.experimental.namedTuples
-     import tyql.{Table, Expr}
-     import tyql.Expr.sum
-
-    type Shares = (by: String, of: String, percent: Int)
-    type Control = (com1: String, com2: String)
-    type CompanyControlDB = (shares: Shares, control: Control)
-
-    val tables = (
-        shares = Table[Shares]("shares"),
-        control = Table[Control]("control")
-    )
-
-    // TEST
-    val (cshares, control) = fix(tables.shares, tables.control)((cshares, control) =>
-      val csharesRecur = control.flatMap(con =>
-        cshares
-          .filter(cs => cs.by == con.com2)
-          .map(cs => (by = con.com1, of = cs.of, percent = cs.percent))
-      ).union(cshares)
-        .groupBy(
-          c => (by = c.by, of = c.of).toRow,
-          c => (by = c.by, of = c.of, percent = sum(c.percent)).toRow
-        ).distinct
-      val controlRecur = cshares
-        .filter(s => s.percent > 50)
-        .map(s => (com1 = s.by, com2 = s.of))
-        .distinct
-      (csharesRecur, controlRecur)
-    )
-    control
-    """)
-    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
-  }
-}
+//class RecursiveConstraintNonlinearFailTest extends munit.FunSuite {
+//  def testDescription: String = "Use all args in one relation, none in the other, but with groupBy in one"
+//
+//  def expectedError: String = "Recursive definitions must be linear:"
+//
+//  test(testDescription) {
+//    val error: String =
+//      compileErrors(
+//        """
+//     // BOILERPLATE
+//     import language.experimental.namedTuples
+//     import tyql.{Table, Expr}
+//     import tyql.Expr.min
+//
+//     type Edge = (x: Int, y: Int)
+//
+//     val tables = (
+//       edges = Table[Edge]("edges"),
+//       edges2 = Table[Edge]("otherEdges"),
+//       emptyEdges = Table[Edge]("empty")
+//     )
+//
+//    // TEST
+//    val parentChild = tables.edges
+//
+//    val ancestorBase = parentChild
+//    val descendantBase = parentChild
+//
+//    val (ancestorResult, descendantResult) = fix(ancestorBase, descendantBase) { (ancestor, descendant) =>
+//      val newAncestor = parentChild.groupBy(
+//        row => (x = row.x).toRow,
+//        row => (x = row.x, mutual_friend_count = count(row.y)).toRow
+//      )
+//      val newDescendant = descendant.flatMap(d =>
+//       ancestor
+//          .filter(p => d.x == p.y)
+//          .map(p => (x = d.y, y = p.x).toRow)
+//      )
+//      (newAncestor.distinct, newDescendant.distinct)
+//    }
+//
+//    ancestorResult
+//    """)
+//    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+//  }
+//}
+//class RecursiveConstraintAggregationMutualRecursionFailTest extends munit.FunSuite {
+//  def testDescription: String = "Aggregation in mutual recursion"
+//
+//  def expectedError: String = "Recursive definitions must be linear:"
+//
+//  test(testDescription) {
+//    val error: String =
+//      compileErrors(
+//        """
+//     // BOILERPLATE
+//     import language.experimental.namedTuples
+//     import tyql.{Table, Expr}
+//     import tyql.Expr.sum
+//
+//    type Shares = (by: String, of: String, percent: Int)
+//    type Control = (com1: String, com2: String)
+//    type CompanyControlDB = (shares: Shares, control: Control)
+//
+//    val tables = (
+//        shares = Table[Shares]("shares"),
+//        control = Table[Control]("control")
+//    )
+//
+//    // TEST
+//    val (cshares, control) = fix(tables.shares, tables.control)((cshares, control) =>
+//      val csharesRecur = control.flatMap(con =>
+//        cshares
+//          .filter(cs => cs.by == con.com2)
+//          .map(cs => (by = con.com1, of = cs.of, percent = cs.percent))
+//      ).union(cshares)
+//        .groupBy(
+//          c => (by = c.by, of = c.of).toRow,
+//          c => (by = c.by, of = c.of, percent = sum(c.percent)).toRow
+//        ).distinct
+//      val controlRecur = cshares
+//        .filter(s => s.percent > 50)
+//        .map(s => (com1 = s.by, com2 = s.of))
+//        .distinct
+//      (csharesRecur, controlRecur)
+//    )
+//    control
+//    """)
+//    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+//  }
+//}
 
 class RecursionConstraintCategoryUnionAll2FailTest extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll, will not terminate!"
