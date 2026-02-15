@@ -1,0 +1,33 @@
+// Orbits of cosmological objects
+// Rafael Caballero-Rold\'an, 2007
+// Adopted from DES
+
+.type D
+
+.decl orbits  (x:D,y:D)
+.decl intermediate (x:D,y:D)
+.decl satellite (x:D,y:D)
+
+orbits("Earth", "Sun").
+orbits("Moon", "Earth").
+orbits("ISS", "Earth").
+orbits("Mars", "Sun").
+orbits("Phobos", "Mars").
+orbits("Deimos", "Mars").
+orbits("MoonMoon", "Moon").
+
+
+orbits(X,Y) :-  
+  orbits(X,Z),  
+  orbits(Z,Y).
+
+satellite(X,Y) :-       
+  orbits(X,Y),          
+  intermediate(X,Y).
+
+intermediate(X,Y) :- 
+  orbits(X,Z),       
+  orbits(Z,Y).
+
+.output satellite()
+.output orbits()

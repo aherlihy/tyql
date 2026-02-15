@@ -7,6 +7,9 @@ import java.io.{BufferedWriter, FileWriter}
 import java.sql.{ResultSet, ResultSetMetaData}
 
 object Helpers {
+  enum QueryMode:
+    case TyQL, ScalaSQL, Collections, JDBC_SNE, JDBC_RSQL
+
   val currentData = sys.env.get("TYQL_DATA_DIR").get // throw if data dir doesn't exist
   val timeoutMins = 10
   val skip = Seq(
@@ -61,6 +64,21 @@ object Helpers {
     } finally {
       source.close()
     }
+
+  def printResultSet(resultSet: ResultSet, meta: String = ""): Unit =
+    val metaData = resultSet.getMetaData
+    val columnCount = metaData.getColumnCount
+
+    val header = (1 to columnCount).map(metaData.getColumnName).mkString("|")
+    var rows = Seq[String]()
+
+    while (resultSet.next()) {
+      var row = (1 to columnCount).map(resultSet.getString(_)).mkString("(", ", ", ")")
+      rows = rows :+ row
+    }
+    println(s"ResultSet $meta [$header]: ${rows.mkString("{", ",", "}")}")
+
+    resultSet.close()
 
   def resultSetToCSV(resultSet: ResultSet, outputFile: String): Unit =
     if (resultSet == null) // skipped test

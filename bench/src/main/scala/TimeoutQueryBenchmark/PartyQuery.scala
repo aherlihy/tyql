@@ -18,6 +18,7 @@ import Helpers.*
 @experimental
 class TOPartyQuery extends QueryBenchmark {
   override def name = "party"
+  private val outputHeader = Seq("person")
   override def set = true
 
   // TYQL data model
@@ -79,6 +80,7 @@ class TOPartyQuery extends QueryBenchmark {
   // Result types for later printing
   var resultTyql: ResultSet = null
   var resultJDBC_RSQL: ResultSet = null
+  var resultJDBC_SNE: ResultSet = null
   var resultScalaSQL: Seq[ResultSS[?]] = null
   var resultCollections: Seq[ResultCC] = null
   var backupResultScalaSql: ResultSet = null
@@ -196,24 +198,26 @@ class TOPartyQuery extends QueryBenchmark {
 
 
   // Write results to csv for checking
-  def writeJDBC_RSQLResult(): Unit =
-    val outfile = s"$outdir/jdbc-rsql.csv"
-    resultSetToCSV(resultJDBC_RSQL, outfile)
-
-  def writeTyQLResult(): Unit =
-    val outfile = s"$outdir/tyql.csv"
-    resultSetToCSV(resultTyql, outfile)
-
-  def writeCollectionsResult(): Unit =
-    val outfile = s"$outdir/collections.csv"
-    collectionToCSV(resultCollections, outfile, Seq("person"), fromCollRes)
-
-  def writeScalaSQLResult(): Unit =
-    val outfile = s"$outdir/scalasql.csv"
-    if (backupResultScalaSql != null)
-      resultSetToCSV(backupResultScalaSql, outfile)
-    else
-      collectionToCSV(resultScalaSQL, outfile, Seq("person"), fromSSRes)
+  def writeBenchResult(mode: QueryMode): Unit =
+    mode match
+      case QueryMode.TyQL =>
+        val outfile = s"$outdir/tyql.csv"
+        resultSetToCSV(resultTyql, outfile)
+      case QueryMode.ScalaSQL =>
+        val outfile = s"$outdir/scalasql.csv"
+        if (backupResultScalaSql != null)
+          resultSetToCSV(backupResultScalaSql, outfile)
+        else
+          collectionToCSV(resultScalaSQL, outfile, outputHeader, fromSSRes)
+      case QueryMode.Collections =>
+        val outfile = s"$outdir/collections.csv"
+        collectionToCSV(resultCollections, outfile, outputHeader, fromCollRes)
+      case QueryMode.JDBC_SNE =>
+        val outfile = s"$outdir/jdbc_sne.csv"
+        resultSetToCSV(resultJDBC_SNE, outfile)
+      case QueryMode.JDBC_RSQL =>
+        val outfile = s"$outdir/jdbc_sne.csv"
+        resultSetToCSV(resultJDBC_RSQL, outfile)
 
   // Extract all results to avoid lazy-loading
   //  def printResultJDBC(resultSet: ResultSet): Unit =

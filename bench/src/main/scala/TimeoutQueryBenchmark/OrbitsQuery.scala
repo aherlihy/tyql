@@ -11,12 +11,14 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
+import scala.collection.mutable.ArrayBuffer
 import tyql.{Ord, Table, Query}
 import tyql.Expr.max
 
 @experimental
 class TOOrbitsQuery extends QueryBenchmark {
   override def name = "orbits"
+  private val outputHeader = Seq("x", "y")
   override def set = true
 
   // TYQL data model
@@ -64,6 +66,7 @@ class TOOrbitsQuery extends QueryBenchmark {
   // Result types for later printing
   var resultTyql: ResultSet = null
   var resultJDBC_RSQL: ResultSet = null
+  var resultJDBC_SNE: ResultSet = null
   var resultScalaSQL: Seq[OrbitsSS[?]] = null
   var resultCollections: Seq[OrbitsCC] = null
   var backupResultScalaSql: ResultSet = null
@@ -157,7 +160,8 @@ class TOOrbitsQuery extends QueryBenchmark {
       ddb, orbits_delta, orbits_tmp, orbits_derived
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[OrbitsSS] => query.Select[Any, Any]])
 
-    //    orbits_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
+    printResultSet(ddb.runQuery("SELECT * FROM orbits_derived"), "FINAL ScalaSQL")
+    //    orbits_derived.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(
       "SELECT *" +
       s"FROM ${ScalaSQLTable.name(orbits_derived)} as recref0" +
@@ -171,33 +175,67 @@ class TOOrbitsQuery extends QueryBenchmark {
     )
     println(s"\nIT,$name,scalasql,$it")
 
+  override def executeJDBC_SNE(ddb: DuckDBBackend): Unit =
+    var it = 0
+
+    val initBase = () => s"SELECT orbits_base0.x, orbits_base0.y FROM ${ScalaSQLTable.name(orbits_base)} orbits_base0"
+
+    val linearFixFn = (orbits: String, _: String) =>
+      it += 1
+      s"SELECT orbits_delta0.x AS x, orbits_delta1.y AS y FROM $orbits orbits_delta0 JOIN $orbits orbits_delta1 ON (orbits_delta0.y = orbits_delta1.x)"
+
+    val nonlinearFixFn = (delta: String, derived: String) =>
+      it += 1
+      val sq1 = s"SELECT orbits0.x AS x, orbits1.y AS y FROM $delta orbits0 JOIN $derived orbits1 ON (orbits0.y = orbits1.x)"
+      val sq2 = s"SELECT orbits0.x AS x, orbits1.y AS y FROM $derived orbits0 JOIN $delta orbits1 ON (orbits0.y = orbits1.x)"
+      s"$sq1 UNION $sq2"
+
+    JDBC_SNEFixedPointQuery.jdbcSemiNaiveIteration(set)(
+      ddb, ScalaSQLTable.name(orbits_delta), ScalaSQLTable.name(orbits_tmp), ScalaSQLTable.name(orbits_derived)
+    )(initBase)(nonlinearFixFn)
+
+    resultJDBC_SNE = ddb.runQuery(
+      "SELECT *" +
+        s"FROM ${ScalaSQLTable.name(orbits_derived)} as recref0" +
+        " WHERE EXISTS" +
+        "     (SELECT * FROM" +
+        "     (SELECT ref4.x as x, ref5.y as y" +
+        s"        FROM ${ScalaSQLTable.name(orbits_derived)} as ref4, ${ScalaSQLTable.name(orbits_derived)} as ref5" +
+        "       WHERE ref4.y = ref5.x) as subquery9" +
+        "     WHERE recref0.x = subquery9.x AND recref0.y = subquery9.y)" +
+        " ORDER BY recref0.y, recref0.x"
+    )
+    printResultSet(ddb.runQuery("SELECT * FROM orbits_derived"), "FINAL JDBC_SNE")
+    println(s"\nIT,$name,jdbc,$it")
+
   // Write results to csv for checking
-  def writeJDBC_RSQLResult(): Unit =
-    val outfile = s"$outdir/jdbc-rsql.csv"
-    resultSetToCSV(resultJDBC_RSQL, outfile)
+  def writeBenchResult(mode: QueryMode): Unit =
+    mode match
+      case QueryMode.TyQL =>
+        val outfile = s"$outdir/tyql.csv"
+        resultSetToCSV(resultTyql, outfile)
+      case QueryMode.ScalaSQL =>
+        val outfile = s"$outdir/scalasql.csv"
+        if (backupResultScalaSql != null)
+          resultSetToCSV(backupResultScalaSql, outfile)
+        else
+          collectionToCSV(resultScalaSQL, outfile, outputHeader, fromSSRes)
+      case QueryMode.Collections =>
+        val outfile = s"$outdir/collections.csv"
+        collectionToCSV(resultCollections, outfile, outputHeader, fromCollRes)
+      case QueryMode.JDBC_SNE =>
+        val outfile = s"$outdir/jdbc_sne.csv"
+        resultSetToCSV(resultJDBC_SNE, outfile)
+      case QueryMode.JDBC_RSQL =>
+        val outfile = s"$outdir/jdbc_sne.csv"
+        resultSetToCSV(resultJDBC_RSQL, outfile)
 
-  def writeTyQLResult(): Unit =
-    val outfile = s"$outdir/tyql.csv"
-    resultSetToCSV(resultTyql, outfile)
-
-  def writeCollectionsResult(): Unit =
-    val outfile = s"$outdir/collections.csv"
-    collectionToCSV(resultCollections, outfile, Seq("x", "y"), fromCollRes)
-
-  def writeScalaSQLResult(): Unit =
-    val outfile = s"$outdir/scalasql.csv"
-    if (backupResultScalaSql != null)
-      resultSetToCSV(backupResultScalaSql, outfile)
-    else
-      collectionToCSV(resultScalaSQL, outfile, Seq("x", "y"), fromSSRes)
-
-  // Extract all results to avoid lazy-loading
-  //  def printResultJDBC(resultSet: ResultSet): Unit =
-  //    println("Query Results:")
-  //    while (resultSet.next()) {
-  //      val x = resultSet.getInt("startNode")
-  //      val y = resultSet.getInt("endNode")
-  //      val z = resultSet.getArray("path")
-  //      println(s"x: $x, y: $y, path=$z")
-  //    }
+  def JDBCToNT(resultSet: ResultSet): Seq[Orbits] =
+    val buffer = ArrayBuffer.empty[Orbits]
+    while (resultSet.next()) {
+      val xV = resultSet.getString("x")
+      val yV = resultSet.getString("y")
+      buffer.append((x = xV, y = yV))
+    }
+    buffer.toSeq
 }
