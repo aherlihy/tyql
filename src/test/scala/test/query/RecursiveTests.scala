@@ -1,7 +1,7 @@
 package test.query.recursive
 import test.{SQLStringAggregationTest, SQLStringQueryTest, TestDatabase}
 import tyql.*
-import Query.{fix, unrestrictedFix}
+import Query.{fix, fixPaperSyntax, unrestrictedFix}
 import Expr.{IntLit, count, max, min, sum}
 
 import language.experimental.namedTuples
@@ -249,7 +249,7 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
     val pathBase = testDB.tables.edges
     val pathToABase = testDB.tables.emptyEdges
 
-    val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
+    val (pathResult, pathToAResult) = fixPaperSyntax(pathBase, pathToABase)((path, pathToA) =>
       val P = path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)

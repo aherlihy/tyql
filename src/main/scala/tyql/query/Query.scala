@@ -272,12 +272,12 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val fn: Tuple1[RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction]] => RQT = r => Tuple1(p(r._1))
     Query.fix[QT, DT, RQT](Tuple1(this))(fn)._1
 
-  def fixPaperSyntax(p: RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction] => RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]): Query[A, SetResult] =
-    type QT = Tuple1[Query[A, ?]]
-    //    type DT = Tuple1[Tuple1[0]]
-    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]]
-    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction]] => RQT = r => Tuple1(p(r._1))
-    Query.fixPaperSyntax[QT, RQT](Tuple1(this))(fn)._1
+//  def fixPaperSyntax(p: RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction] => RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]): Query[A, SetResult] =
+//    type QT = Tuple1[Query[A, ?]]
+//    //    type DT = Tuple1[Tuple1[0]]
+//    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]]
+//    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction]] => RQT = r => Tuple1(p(r._1))
+//    Query.fixPaperSyntax[QT, RQT](Tuple1(this))(fn)._1
 
   def fixConstructorFree(p: RestrictedQueryRef[A, ?, 0, NonRestrictedConstructors, MonotoneRestriction] => RestrictedQuery[A, SetResult, Tuple1[0], NonRestrictedConstructors, MonotoneRestriction]): Query[A, SetResult] =
     type QT = Tuple1[Query[A, ?]]
@@ -391,27 +391,40 @@ object Query:
     case Nothing => false
     case _ => true
   }
+  type NoDuplicateReferences[RQT <: Tuple] = NoDuplicates[RQT] =:= true
 
   // Extract the row type from Query union type
   type ExtractRowType[Q] = Q match {
     case Query[row, ?] => row
   }
 
-  def fixPaperSyntax[QT <: Tuple, RQT <: Tuple]
+  // Extract all row types from a tuple of queries
+  type ExtractAllRowTypes[QT <: Tuple] <: Tuple = QT match {
+    case EmptyTuple => EmptyTuple
+    case Query[row, ?] *: tail => row *: ExtractAllRowTypes[tail]
+  }
+
+  // Check that a union of types is a subtype of AnyNamedTuple (which includes named tuples)
+  // This constraint will verify all row types are Tuples (including named tuples)
+  type AllRowTypesAreNamedTuples[QT <: Tuple] = Tuple.Union[ExtractAllRowTypes[QT]] <:< AnyNamedTuple
+  type IsTupleOfQueries[QT <: Tuple] = Tuple.Union[QT] <:< Query[?, ?]
+  type NoReferencesMissing[QT <: Tuple, RQT <: Tuple] = IndexSequence[QT] =:= UnionDT[RQT]
+
+  def fixPaperSyntax[QT <: Tuple, RQTRefx <: Tuple, RQT <: Tuple]
   (bases: QT)
   (f: RQTRef[QT] => RQT)
   (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1:
-  Union[QT] <:< Query[?, ?])
+  IsTupleOfQueries[QT])
   (using @implicitNotFound("Row types must be Tuples: ${QT}") evRowTypes:
-  ExtractRowType[Union[QT]] <:< Tuple)
+  AllRowTypesAreNamedTuples[QT])
   (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0:
   Tuple.Size[QT] =:= Tuple.Size[RQT])
   (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3:
   RQT <:< ToRestrictedQuery[QT, ExtractQueryDependencies[RQT], RestrictedConstructors, MonotoneRestriction, SetResult])
   (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: (1_κ, ..., i_κ) ≡ ∪ DT_i") ev4:
-  IndexSequence[QT] =:= UnionDT[RQT])
+  NoReferencesMissing[QT, RQT])
   (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition: ∀ DT_i |DT_i| ≡ |∪ DT_i|") ev5:
-  NoDuplicates[RQT] =:= true)
+  NoDuplicateReferences[RQT])
   : ToQuery[QT] =
     fixImpl(true)(bases)(f)
 
@@ -420,8 +433,8 @@ object Query:
   (options: (constructorFreedom: RCF, monotonicity: RM, category: RC, linearity: RL))
   (bases: QT)
   (fns: ToRestrictedQueryRef[QT, RCF, RM] => RQT)
-  (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: Union[QT] <:< Query[?, ?])
-  (using @implicitNotFound("Row types must be Tuples: ${QT}") evRowTypes: ExtractRowType[Union[QT]] <:< Tuple)
+  (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1: IsTupleOfQueries[QT])
+  (using @implicitNotFound("Row types must be Tuples: ${QT}") evRowTypes: AllRowTypesAreNamedTuples[QT])
   (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0: Tuple.Size[QT] =:= Tuple.Size[RQT])
   (using @implicitNotFound("Cannot extract dependencies, is the query affine?: ${RQT}") ev2: DT <:< ToDependencyTuple[RL, RQT])
   (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3: RQT <:< ToRestrictedQuery[QT, DT, RCF, RM, RC])
