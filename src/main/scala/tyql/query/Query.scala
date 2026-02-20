@@ -379,7 +379,7 @@ object Query:
     fixImpl(options.category.isInstanceOf[SetResult])(bases)(fns)
 
   type ExtractQueryDependencies[T <: Tuple] = InverseMapDeps[T]
-  type RQTRef[QT <: Tuple] = ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction]
+  type QRef[QT <: Tuple] = ToRestrictedQueryRef[QT, RestrictedConstructors, MonotoneRestriction]
   // Formal rule: (1_κ, ..., i_κ) ≡ ∪ DT_i
   type IndexSequence[QT <: Tuple] = Tuple.Union[GenerateIndices[0, Tuple.Size[QT]]]
   type UnionDT[RQT <: Tuple] = Tuple.Union[Tuple.FlatMap[RQT, ExtractDependencies]]
@@ -410,23 +410,23 @@ object Query:
   type IsTupleOfQueries[QT <: Tuple] = Tuple.Union[QT] <:< Query[?, ?]
   type NoReferencesMissing[QT <: Tuple, RQT <: Tuple] = IndexSequence[QT] =:= UnionDT[RQT]
 
-  def fixPaperSyntax[QT <: Tuple, RQTRefx <: Tuple, RQT <: Tuple]
-  (bases: QT)
-  (f: RQTRef[QT] => RQT)
+  def fixPaperSyntax[Qbase <: Tuple, Qret <: Tuple]
+  (q: Qbase)
+  (f: QRef[Qbase] => Qret)
   (using @implicitNotFound("Base cases must be of type Query: ${QT}") ev1:
-  IsTupleOfQueries[QT])
+  IsTupleOfQueries[Qbase])
   (using @implicitNotFound("Row types must be Tuples: ${QT}") evRowTypes:
-  AllRowTypesAreNamedTuples[QT])
-  (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0:
-  Tuple.Size[QT] =:= Tuple.Size[RQT])
+  AllRowTypesAreNamedTuples[Qbase])
   (using @implicitNotFound("Failed to generate recursive queries: ${RQT}") ev3:
-  RQT <:< ToRestrictedQuery[QT, ExtractQueryDependencies[RQT], RestrictedConstructors, MonotoneRestriction, SetResult])
+  Qret <:< ToRestrictedQuery[Qbase, ExtractQueryDependencies[Qret], RestrictedConstructors, MonotoneRestriction, SetResult])
   (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions: (1_κ, ..., i_κ) ≡ ∪ DT_i") ev4:
-  NoReferencesMissing[QT, RQT])
+  NoReferencesMissing[Qbase, Qret])
   (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition: ∀ DT_i |DT_i| ≡ |∪ DT_i|") ev5:
-  NoDuplicateReferences[RQT])
-  : ToQuery[QT] =
-    fixImpl(true)(bases)(f)
+  NoDuplicateReferences[Qret])
+  (using @implicitNotFound("Number of base cases must match the number of recursive definitions returned by fns") ev0:
+  Tuple.Size[Qbase] =:= Tuple.Size[Qret])// & Tuple.Size[QT] =:= 1)
+  : ToQuery[Qbase] =
+    fixImpl(true)(q)(f)
 
   /* Specify which constraints you want to apply with options parameters */
   def customFixPaperSyntax[QT <: Tuple, DT <: Tuple, RQT <: Tuple, RCF <: ConstructorFreedom, RM <: MonotoneRestriction, RC <: ResultCategory, RL <: LinearRestriction]
