@@ -57,7 +57,6 @@ object FixedPointQuery {
 
     val isEmpty = cmp(next, acc)
     if (isEmpty)
-      acc
       copyTo(bases, acc, next)._1
     else
       val (newNext, newBase) = copyTo(bases, acc, next)

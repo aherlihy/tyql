@@ -12,7 +12,9 @@ trait QueryBenchmark {
     def set: Boolean
 
     def initializeCollections(): Unit
-    def executeTyQL(ddb: DuckDBBackend): Unit
+    def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit
+    def executeCustomTyQL(ddb: DuckDBBackend): Unit
+    def executeTyQL(ddb: DuckDBBackend): Unit = executeCustomTyQL(ddb)
     def executeJDBC_RSQL(ddb: DuckDBBackend): Unit
     def executeScalaSQL(ddb: DuckDBBackend): Unit
     def executeCollections(): Unit

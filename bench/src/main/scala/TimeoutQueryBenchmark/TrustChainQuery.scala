@@ -11,7 +11,8 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Table, Query}
-import tyql.Query.{unrestrictedBagFix, unrestrictedFix}
+import tyql.*
+import tyql.Query.{unrestrictedBagFix, unrestrictedFix, fix}
 import tyql.Expr.{IntLit, StringLit, count}
 import Helpers.*
 
@@ -79,11 +80,10 @@ class TOTrustChainQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT * FROM trustchain_friends as trustchain_friends2) UNION ((SELECT ref1.person1 as person1, ref0.person2 as person2 FROM recursive2 as ref0, recursive1 as ref1 WHERE ref1.person2 = ref0.person1))),\nrecursive2 AS ((SELECT * FROM trustchain_friends as trustchain_friends7) UNION ((SELECT ref3.person1 as person1, ref3.person2 as person2 FROM recursive1 as ref3)))\n SELECT recref0.person2 as name, COUNT(recref0.person1) as count FROM recursive1 as recref0 GROUP BY recref0.person2 ORDER BY count ASC, name ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val baseFriends = tyqlDB.friends
 
-    val tyqlFix = if set then unrestrictedFix((baseFriends, baseFriends)) else unrestrictedBagFix((baseFriends, baseFriends))
-    val (trust, friends) = tyqlFix((trust, friends) => {
+    val (trust, friends) = unrestrictedFix(baseFriends, baseFriends)((trust, friends) => {
       val mutualTrustResult = friends.flatMap(f =>
         trust
           .filter(mt => mt.person2 == f.person1)
@@ -93,6 +93,33 @@ class TOTrustChainQuery extends QueryBenchmark {
       val friendsResult = trust.map(mt =>
         (person1 = mt.person1, person2 = mt.person2).toRow
       )
+
+      (mutualTrustResult, friendsResult)
+    })
+
+    val query = trust
+      .aggregate(mt => (name = mt.person2, count = count(mt.person1)).toGroupingRow)
+      .groupBySource(mt => (person = mt._1.person2).toRow)
+      .sort(mt => mt.name, Ord.ASC)
+      .sort(mt => mt.count, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val baseFriends = tyqlDB.friends
+
+    val cotOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (trust, friends) = fix(cotOptions)(baseFriends, baseFriends)((trust, friends) => {
+      val mutualTrustResult = friends.flatMap(f =>
+        trust
+          .filter(mt => mt.person2 == f.person1)
+          .map(mt => (person1 = mt.person1, person2 = f.person2).toRow)
+      ).distinct
+
+      val friendsResult = trust.map(mt =>
+        (person1 = mt.person1, person2 = mt.person2).toRow
+      ).distinct
 
       (mutualTrustResult, friendsResult)
     })
@@ -145,7 +172,7 @@ class TOTrustChainQuery extends QueryBenchmark {
       .toSeq
 
     resultCollections = query.sortBy(_.name).sortBy(_.count)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -184,7 +211,7 @@ class TOTrustChainQuery extends QueryBenchmark {
     )(fixFn.asInstanceOf[((ScalaSQLTable[FriendsSS], ScalaSQLTable[FriendsSS])) => (query.Select[Any, Any], query.Select[Any, Any])])
 
     backupResultScalaSql = ddb.runQuery(s"SELECT r.person2 as name, COUNT(r.person1) as count FROM ${ScalaSQLTable.name(trustchain_derived2)} as r GROUP BY r.person2 ORDER BY count, r.person2")
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

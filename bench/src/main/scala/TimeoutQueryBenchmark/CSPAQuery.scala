@@ -11,7 +11,8 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Table, Query}
-import tyql.Query.unrestrictedFix
+import tyql.*
+import tyql.Query.{unrestrictedFix, unrestrictedBagFix, fix}
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
@@ -87,7 +88,7 @@ class TOCSPAQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT * FROM cspa_assign as cspa_assign3) UNION ((SELECT cspa_assign5.p1 as p1, cspa_assign5.p1 as p2 FROM cspa_assign as cspa_assign5) UNION (SELECT cspa_assign8.p2 as p1, cspa_assign8.p2 as p2 FROM cspa_assign as cspa_assign8) UNION (SELECT cspa_assign11.p1 as p1, ref5.p2 as p2 FROM cspa_assign as cspa_assign11, recursive3 as ref5 WHERE cspa_assign11.p2 = ref5.p1) UNION (SELECT ref7.p1 as p1, ref8.p2 as p2 FROM recursive1 as ref7, recursive1 as ref8 WHERE ref7.p2 = ref8.p1))), recursive2 AS ((SELECT * FROM cspa_empty as cspa_empty18) UNION ((SELECT cspa_dereference20.p2 as p1, cspa_dereference21.p2 as p2 FROM cspa_dereference as cspa_dereference20, recursive2 as ref11, cspa_dereference as cspa_dereference21 WHERE cspa_dereference20.p1 = ref11.p1 AND ref11.p2 = cspa_dereference21.p1))), recursive3 AS ((SELECT cspa_assign26.p2 as p1, cspa_assign26.p2 as p2 FROM cspa_assign as cspa_assign26) UNION ((SELECT cspa_assign28.p1 as p1, cspa_assign28.p1 as p2 FROM cspa_assign as cspa_assign28) UNION (SELECT ref14.p2 as p1, ref15.p2 as p2 FROM recursive1 as ref14, recursive1 as ref15 WHERE ref14.p1 = ref15.p1) UNION (SELECT ref17.p2 as p1, ref19.p2 as p2 FROM recursive1 as ref17, recursive3 as ref18, recursive1 as ref19 WHERE ref17.p1 = ref18.p1 AND ref19.p1 = ref18.p2)))\nSELECT * FROM recursive1 as recref0 ORDER BY p1 ASC, p2 ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val assign = tyqlDB.assign
     val dereference = tyqlDB.dereference
 
@@ -150,22 +151,86 @@ class TOCSPAQuery extends QueryBenchmark {
     val queryStr = valueFlowFinal.sort(_.p2, Ord.ASC).sort(_.p1, Ord.ASC).toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
 
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val assign = tyqlDB.assign
+    val dereference = tyqlDB.dereference
+
+    val memoryAliasBase =
+      assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+        .union(
+          assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
+        )
+
+    val valueFlowBase =
+      assign
+        .union(
+          assign.map(a => (p1 = a.p1, p2 = a.p1).toRow)
+        ).union(
+          assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
+        )
+
+    val cspaOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual())
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(cspaOptions)(valueFlowBase, tyqlDB.empty, memoryAliasBase)(
+      (valueFlow, valueAlias, memoryAlias) =>
+        val vfDef1 =
+          for
+            a <- assign
+            m <- memoryAlias
+            if a.p2 == m.p1
+          yield (p1 = a.p1, p2 = m.p2).toRow
+        val vfDef2 =
+          for
+            vf1 <- valueFlow
+            vf2 <- valueFlow
+            if vf1.p2 == vf2.p1
+          yield (p1 = vf1.p1, p2 = vf2.p2).toRow
+        val VF = vfDef1.union(vfDef2)
+
+        val MA =
+          for
+            d1 <- dereference
+            va <- valueAlias
+            d2 <- dereference
+            if d1.p1 == va.p1 && va.p2 == d2.p1
+          yield (p1 = d1.p2, p2 = d2.p2).toRow
+
+        val vaDef1 =
+          for
+            vf1 <- valueFlow
+            vf2 <- valueFlow
+            if vf1.p1 == vf2.p1
+          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
+        val vaDef2 =
+          for
+            vf1 <- valueFlow
+            m <- memoryAlias
+            vf2 <- valueFlow
+            if vf1.p1 == m.p1 && vf2.p1 == m.p2
+          yield (p1 = vf1.p2, p2 = vf2.p2).toRow
+        val VA = vaDef1.union(vaDef2)
+
+        (VF, MA.distinct, VA)
+    )
+
+    val queryStr = valueFlowFinal.sort(_.p2, Ord.ASC).sort(_.p1, Ord.ASC).toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
   def executeCollections(): Unit =
     var it = 0
 
     val memoryAliasBase =
       collectionsDB.assign.map(a => PairCC(p1 = a.p2, p2 = a.p2))
-        .union(
+        .concat(
           collectionsDB.assign.map(a => PairCC(p1 = a.p1, p2 = a.p1))
-        )
+        ).distinct
 
     val valueFlowBase =
       collectionsDB.assign
-        .union(
+        .concat(
           collectionsDB.assign.map(a => PairCC(p1 = a.p1, p2 = a.p1))
-        ).union(
+        ).concat(
           collectionsDB.assign.map(a => PairCC(p1 = a.p2, p2 = a.p2))
-        )
+        ).distinct
 
     val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = FixedPointQuery.multiFix(true)((valueFlowBase, Seq[PairCC](), memoryAliasBase), (Seq(), Seq(), Seq()))(
       (recur, acc) => {
@@ -191,7 +256,7 @@ class TOCSPAQuery extends QueryBenchmark {
             _ = if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
             if vf1.p2 == vf2.p1
           yield PairCC(p1 = vf1.p1, p2 = vf2.p2)
-        val VF = valueFlowDef1.union(valueFlowDef2)
+        val VF = valueFlowDef1.concat(valueFlowDef2).distinct
 
         val memoryAliasDef =
           for
@@ -223,13 +288,13 @@ class TOCSPAQuery extends QueryBenchmark {
             _ = if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
             if vf1.p1 == m.p1 && vf2.p1 == m.p2
           yield PairCC(p1 = vf1.p2, p2 = vf2.p2)
-        val VA = valueAliasDef1.union(valueAliasDef2)
+        val VA = valueAliasDef1.concat(valueAliasDef2).distinct
 
         (VF, MA, VA)
       }
     )
     resultCollections = valueFlowFinal.sortBy(_.p2).sortBy(_.p1)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -315,7 +380,7 @@ class TOCSPAQuery extends QueryBenchmark {
 
     val result = cspa_derived1.select.sortBy(_.p2).sortBy(_.p1)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

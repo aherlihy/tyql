@@ -11,14 +11,15 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Table, Query}
-import tyql.Query.{unrestrictedBagFix, unrestrictedFix}
+import tyql.*
+import tyql.Query.{unrestrictedBagFix, unrestrictedFix, fix}
 import tyql.Expr.{IntLit, StringLit, count}
 import Helpers.*
 
 @experimental
 class TOPartyQuery extends QueryBenchmark {
   override def name = "party"
-  override def set = true
+  override def set = false
 
   // TYQL data model
   type Organizer = (orgName: String)
@@ -86,15 +87,14 @@ class TOPartyQuery extends QueryBenchmark {
   // Execute queries
   def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
     val queryStr =
-      "WITH RECURSIVE recursive1 AS ((SELECT party_organizers2.orgName as person FROM party_organizers as party_organizers2) UNION ((SELECT ref1.fName as person FROM recursive2 as ref1 WHERE ref1.nCount > 2))),\nrecursive2 AS ((SELECT * FROM party_counts as party_counts6) UNION ((SELECT party_friends8.pName as fName, COUNT(party_friends8.fName) as nCount FROM party_friends as party_friends8, recursive1 as ref4 WHERE ref4.person = party_friends8.fName GROUP BY party_friends8.pName)))\n SELECT DISTINCT * FROM recursive1 as recref0 ORDER BY person ASC"
+      "WITH RECURSIVE recursive1 AS ((SELECT party_organizers2.orgName as person FROM party_organizers as party_organizers2) UNION ALL ((SELECT ref1.fName as person FROM recursive2 as ref1 WHERE ref1.nCount > 2))),\nrecursive2 AS ((SELECT * FROM party_counts as party_counts6) UNION ALL ((SELECT party_friends8.pName as fName, COUNT(party_friends8.fName) as nCount FROM party_friends as party_friends8, recursive1 as ref4 WHERE ref4.person = party_friends8.fName GROUP BY party_friends8.pName)))\n SELECT * FROM recursive1 as recref0 ORDER BY person ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val baseAttend = tyqlDB.organizers.map(o => (person = o.orgName).toRow)
     val baseCntFriends = tyqlDB.counts
 
-    val tyqlFix = if set then unrestrictedFix(baseAttend, baseCntFriends) else unrestrictedBagFix(baseAttend, baseCntFriends)
-    val (finalAttend, finalCntFriends) = tyqlFix((attend, cntfriends) =>
+    val (finalAttend, finalCntFriends) = unrestrictedBagFix(baseAttend, baseCntFriends)((attend, cntfriends) =>
       val recurAttend = cntfriends
         .filter(cf => cf.nCount > 2)
         .map(cf => (person = cf.fName).toRow)
@@ -107,7 +107,31 @@ class TOPartyQuery extends QueryBenchmark {
         ).groupBySource(f => (name = f._1.pName).toRow)
       (recurAttend, recurCntFriends)
     )
-    val query = finalAttend.distinct
+    val query = finalAttend
+
+    val queryStr = query.sort(_.person, Ord.ASC).toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    import RestrictedQuery.*
+    val baseAttend = tyqlDB.organizers.map(o => (person = o.orgName).toRow)
+    val baseCntFriends = tyqlDB.counts
+
+    val partyOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = BagResult(), linearity = Linear(), mutual = AllowMutual())
+    val (finalAttend, finalCntFriends) = fix(partyOptions)(baseAttend, baseCntFriends)((attend, cntfriends) =>
+      val recurAttend = cntfriends
+        .filter(cf => cf.nCount > 2)
+        .map(cf => (person = cf.fName).toRow)
+
+      val recurCntFriends = tyqlDB.friends
+        .aggregate(friends =>
+          attend
+            .filter(att => att.person == friends.fName)
+            .aggregate(att => (fName = friends.pName, nCount = count(friends.fName)).toGroupingRow)
+        ).groupBySource(f => (name = f._1.pName).toRow)
+      (recurAttend, recurCntFriends)
+    )
+    val query = finalAttend
 
     val queryStr = query.sort(_.person, Ord.ASC).toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -122,10 +146,6 @@ class TOPartyQuery extends QueryBenchmark {
       val (attendAcc, cntfriendsAcc) = if it == 0 then (baseAttend, baseCntFriends) else acc
       it+=1
 
-//      println(s"***iteration $it")
-//      println(s"\nRES input:\n\tattend  : ${attend.map(f => f.person).mkString("(", ",", ")")}\n\tfriendC: ${cntfriends.map(f => f.fName + "-" + f.nCount).mkString("(", ",", ")")}")
-//      println(s"\nDER input:\n\tattend  : ${attendAcc.map(f => f.person).mkString("(", ",", ")")}\n\tfriendC: ${cntfriendsAcc.map(f => f.fName + "-" + f.nCount).mkString("(", ",", ")")}")
-//      if (it > 2) then System.exit(0)
       val recurAttend = cntfriendsAcc
         .filter(cf => cf.nCount > 2)
         .map(cf => ResultCC(person = cf.fName))
@@ -145,11 +165,10 @@ class TOPartyQuery extends QueryBenchmark {
         .map((pName, pairs) => CountsCC(fName = pName, nCount = pairs.size))
         .toSeq
 
-//      println(s"output:\n\tRattend: ${recurAttend.map(f => f.person).mkString("(", ",", ")")}\n\tRfriends: ${recurCntFriends.map(f => f.fName + "=" + f.nCount).mkString("(", ",", ")")}")
       (recurAttend, recurCntFriends)
     )
-    resultCollections = finalAttend.distinct.sortBy(_.person)
-    println(s"\nIT,$name,collections,$it")
+    resultCollections = finalAttend.sortBy(_.person)
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -169,15 +188,9 @@ class TOPartyQuery extends QueryBenchmark {
         val (attendAcc, cntFriendsAcc) = if it == 0 then (party_delta1, party_delta2) else (party_derived1, party_derived2)
         it+=1
 
-//        println(s"***iteration $it")
-//        println(s"RES input:\n\tattend : ${db.runRaw[(String)](s"SELECT * FROM ${ScalaSQLTable.name(attend)}").map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.runRaw[(String, Int)](s"SELECT * FROM ${ScalaSQLTable.name(cntFriends)}").map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
-//        println(s"DER input:\n\tattend : ${db.runRaw[(String)](s"SELECT * FROM ${ScalaSQLTable.name(attendAcc)}").map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.runRaw[(String, Int)](s"SELECT * FROM ${ScalaSQLTable.name(cntFriendsAcc)}").map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
-
         val recurAttend = s"SELECT f.fName as person FROM ${ScalaSQLTable.name(cntFriendsAcc)} as f WHERE f.nCount > 2"
 
         val recurFriends = s"SELECT f.pName as fName, COUNT(f.fName) as count FROM ${ScalaSQLTable.name(party_friends)} as f, ${ScalaSQLTable.name(attendAcc)} as a WHERE a.person = f.fName GROUP BY f.pName"
-
-//        println(s"output:\n\tattend: ${db.run(recurAttend).map(f => f).mkString("(", ",", ")")}\n\tfriendC: ${db.run(recurFriends).map(f => f._1 + "=" + f._2).mkString("(", ",", ")")}")
 
         (recurAttend, recurFriends)
     }
@@ -190,9 +203,9 @@ class TOPartyQuery extends QueryBenchmark {
       initBase.asInstanceOf[() => (query.Select[Any, Any], query.Select[Any, Any])]
     )(fixFn)
 
-    val result = party_derived1.select.distinct.sortBy(_.person)
+    val result = party_derived1.select.sortBy(_.person)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking
@@ -214,14 +227,4 @@ class TOPartyQuery extends QueryBenchmark {
       resultSetToCSV(backupResultScalaSql, outfile)
     else
       collectionToCSV(resultScalaSQL, outfile, Seq("person"), fromSSRes)
-
-  // Extract all results to avoid lazy-loading
-  //  def printResultJDBC(resultSet: ResultSet): Unit =
-  //    println("Query Results:")
-  //    while (resultSet.next()) {
-  //      val x = resultSet.getInt("startNode")
-  //      val y = resultSet.getInt("endNode")
-  //      val z = resultSet.getArray("path")
-  //      println(s"x: $x, y: $y, path=$z")
-  //    }
 }

@@ -11,7 +11,8 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.*
+import tyql.Query.fix
 import tyql.Expr.min
 
 @experimental
@@ -78,7 +79,7 @@ class TOASPSQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT asps_edge1.src as src, asps_edge1.dst as dst, MIN(asps_edge1.cost) as cost FROM asps_edge as asps_edge1 GROUP BY asps_edge1.src, asps_edge1.dst) UNION ((SELECT ref2.src as src, ref3.dst as dst, MIN(ref2.cost + ref3.cost) as cost FROM recursive1 as ref2, recursive1 as ref3 WHERE ref2.dst = ref3.src GROUP BY ref2.src, ref3.dst)))\nSELECT recref0.src as src, recref0.dst as dst, MIN(recref0.cost) as cost FROM recursive1 as recref0 GROUP BY recref0.src, recref0.dst ORDER BY cost ASC, src ASC, dst ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.edge
       .aggregate(e =>
         (src = e.src, dst = e.dst, cost = min(e.cost)).toGroupingRow)
@@ -107,10 +108,41 @@ class TOASPSQuery extends QueryBenchmark {
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
 
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    import RestrictedQuery.*
+    val base = tyqlDB.edge
+      .aggregate(e =>
+        (src = e.src, dst = e.dst, cost = min(e.cost)).toGroupingRow)
+      .groupBySource(e =>
+        (src = e._1.src, dst = e._1.dst).toRow)
+
+    val aspsOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
+    val asps = base.fix(aspsOptions)(path =>
+      path.aggregate(p =>
+          path
+            .filter(e =>
+              p.dst == e.src)
+            .aggregate(e =>
+              (src = p.src, dst = e.dst, cost = min(p.cost + e.cost)).toGroupingRow))
+        .groupBySource(p =>
+          (g1 = p._1.src, g2 = p._2.dst).toRow).distinct
+    )
+    val query = asps
+      .aggregate(a =>
+        (src = a.src, dst = a.dst, cost = min(a.cost)).toGroupingRow)
+      .groupBySource(p =>
+        (g1 = p._1.src, g2 = p._1.dst).toRow)
+      .sort(_.dst, Ord.ASC)
+      .sort(_.src, Ord.ASC)
+      .sort(_.cost, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
 
   def executeCollections(): Unit =
     var it = 0
-    val base = collectionsDB.edge.groupBy(s => (s.src, s.dst)).mapValues(_.minBy(_.cost)).values.toSeq
+    val base = collectionsDB.edge.groupBy(s => (s.src, s.dst)).view.mapValues(_.minBy(_.cost)).toMap.values.toSeq
     resultCollections = FixedPointQuery.fix(set)(base, Seq())(path =>
       it += 1
       path.flatMap(p =>
@@ -125,16 +157,16 @@ class TOASPSQuery extends QueryBenchmark {
           .groupBy(w =>
             if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
             (w.src, w.dst))
-          .mapValues(_.minBy(_.cost))
-          .values.toSeq
+          .view.mapValues(_.minBy(_.cost))
+          .toMap.values.toSeq
       )
     )
       .groupBy(w => (w.src, w.dst))
-      .mapValues(_.minBy(_.cost)).values.toSeq
+      .view.mapValues(_.minBy(_.cost)).toMap.values.toSeq
       .sortBy(_.dst)
       .sortBy(_.src)
       .sortBy(_.cost)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -166,7 +198,7 @@ class TOASPSQuery extends QueryBenchmark {
       s"GROUP BY s.src, s.dst " +
       s"ORDER BY cost, src, dst;")
 
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

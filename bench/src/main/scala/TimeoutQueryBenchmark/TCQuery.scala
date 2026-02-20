@@ -4,7 +4,8 @@ import java.sql.{Connection, ResultSet}
 import scala.annotation.experimental
 import language.experimental.namedTuples
 import NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.*
+import tyql.Query.fix
 import buildinfo.BuildInfo
 import Helpers.*
 
@@ -72,12 +73,31 @@ class TOTCQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT tc_edge1.x as startNode, tc_edge1.y as endNode, [tc_edge1.x, tc_edge1.y] as path FROM tc_edge as tc_edge1 WHERE tc_edge1.x = 1) UNION ALL ((SELECT ref2.startNode as startNode, tc_edge3.y as endNode, list_append(ref2.path, tc_edge3.y) as path FROM recursive1 as ref2, tc_edge as tc_edge3 WHERE tc_edge3.x = ref2.endNode AND NOT list_contains(ref2.path, tc_edge3.y))))\n SELECT * FROM recursive1 as recref0 ORDER BY endNode ASC, startNode ASC, length(recref0.path) ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val pathBase = tyqlDB.edge
       .filter(p => p.x == 1)
       .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
 
     val query = pathBase.unrestrictedBagFix(path =>
+        path.flatMap(p =>
+          tyqlDB.edge
+            .filter(e => e.x == p.endNode && !p.path.contains(e.y))
+            .map(e =>
+              (startNode = p.startNode, endNode = e.y, path = p.path.append(e.y)).toRow)))
+      .sort(p => p.path.length, Ord.ASC)
+      .sort(p => p.startNode, Ord.ASC)
+      .sort(_.endNode, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val pathBase = tyqlDB.edge
+      .filter(p => p.x == 1)
+      .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
+
+    val tcOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual())
+    val query = pathBase.fix(tcOptions)(path =>
         path.flatMap(p =>
           tyqlDB.edge
             .filter(e => e.x == p.endNode && !p.path.contains(e.y))
@@ -114,7 +134,7 @@ class TOTCQuery extends QueryBenchmark {
     ).sortBy(r => r.path.length)
       .sortBy(_.startNode)
       .sortBy(_.endNode)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -150,9 +170,9 @@ class TOTCQuery extends QueryBenchmark {
     )(toTuple)(initBase.asInstanceOf[() => query.Select[Any, Any]])(fixFn.asInstanceOf[ScalaSQLTable[ResultEdgeSS] => query.Select[Any, Any]])
 
 
-    val result = tc_derived.select.sortBy(_.path).sortBy(_.endNode).sortBy(_.startNode)
+    val result = tc_derived.select.sortBy(_.path).sortBy(_.startNode).sortBy(_.endNode)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

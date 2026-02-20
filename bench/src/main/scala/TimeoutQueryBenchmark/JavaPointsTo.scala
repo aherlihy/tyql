@@ -11,7 +11,8 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Query, Table}
-import tyql.Query.{fix, unrestrictedFix, unrestrictedBagFix}
+import tyql.*
+import tyql.Query.{unrestrictedFix, unrestrictedBagFix, fix}
 import tyql.Expr.{IntLit, StringLit, min, sum}
 import Helpers.*
 
@@ -111,12 +112,11 @@ class TOJavaPointsTo extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT javapointsto_new2.x as x, javapointsto_new2.y as y FROM javapointsto_new as javapointsto_new2) UNION ((SELECT javapointsto_assign4.x as x, ref2.y as y FROM javapointsto_assign as javapointsto_assign4, recursive1 as ref2 WHERE javapointsto_assign4.y = ref2.x) UNION (SELECT javapointsto_loadT7.x as x, ref5.h as y FROM javapointsto_loadT as javapointsto_loadT7, recursive2 as ref5, recursive1 as ref6 WHERE javapointsto_loadT7.y = ref6.x AND javapointsto_loadT7.h = ref5.y AND ref6.y = ref5.x))),\nrecursive2 AS ((SELECT * FROM javapointsto_hpt as javapointsto_hpt13) UNION ((SELECT ref9.y as x, javapointsto_store15.y as y, ref10.y as h FROM javapointsto_store as javapointsto_store15, recursive1 as ref9, recursive1 as ref10 WHERE javapointsto_store15.x = ref9.x AND javapointsto_store15.h = ref10.x)))\n SELECT * FROM recursive1 as recref0 ORDER BY y ASC, x ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val baseVPT = tyqlDB.newT.map(a => (x = a.x, y = a.y).toRow)
     val baseHPT = tyqlDB.baseHPT
 
-    val tyqlFix = if set then unrestrictedFix((baseVPT, baseHPT)) else unrestrictedBagFix((baseVPT, baseHPT))
-    val pt = tyqlFix((varPointsTo, heapPointsTo) => {
+    val pt = unrestrictedFix(baseVPT, baseHPT)((varPointsTo, heapPointsTo) => {
       val vpt1 = tyqlDB.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           (x = a.x, y = p.y).toRow
@@ -132,7 +132,7 @@ class TOJavaPointsTo extends QueryBenchmark {
               )
           )
         )
-      val vpt = if set then vpt1.union(vpt2) else vpt1.unionAll(vpt2)
+      val vpt = vpt1.union(vpt2)
       val hpt = tyqlDB.store.flatMap(s =>
         varPointsTo.flatMap(vpt1 =>
           varPointsTo
@@ -142,6 +142,46 @@ class TOJavaPointsTo extends QueryBenchmark {
             )
           )
         )
+
+      (vpt, hpt)
+    })
+//    val query = pt._2.sort(_.x, Ord.ASC).sort(_.y, Ord.ASC)
+    val query = pt._1.sort(_.x, Ord.ASC).sort(_.y, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val baseVPT = tyqlDB.newT.map(a => (x = a.x, y = a.y).toRow)
+    val baseHPT = tyqlDB.baseHPT
+
+    val jptOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual())
+    val pt = fix(jptOptions)(baseVPT, baseHPT)((varPointsTo, heapPointsTo) => {
+      val vpt1 = tyqlDB.assign.flatMap(a =>
+        varPointsTo.filter(p => a.y == p.x).map(p =>
+          (x = a.x, y = p.y).toRow
+        )
+      )
+      val vpt2 =
+        tyqlDB.loadT.flatMap(l =>
+          heapPointsTo.flatMap(hpt =>
+            varPointsTo
+              .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
+              .map(pt2 =>
+                (x = l.x, y = hpt.h).toRow
+              )
+          )
+        )
+      val vpt = vpt1.union(vpt2)
+      val hpt = tyqlDB.store.flatMap(s =>
+        varPointsTo.flatMap(vpt1 =>
+          varPointsTo
+            .filter(vpt2 => s.x == vpt1.x && s.h == vpt2.x)
+            .map(vpt2 =>
+              (x = vpt1.y, y = s.y, h = vpt2.y).toRow
+            )
+          )
+        ).distinct
 
       (vpt, hpt)
     })
@@ -182,7 +222,7 @@ class TOJavaPointsTo extends QueryBenchmark {
               )
           )
         )
-      val vpt = if set then vpt1.union(vpt2) else vpt1 ++ vpt2
+      val vpt = if set then vpt1.concat(vpt2).distinct else vpt1 ++ vpt2
       val hpt = collectionsDB.store.flatMap(s =>
         if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
         varPointsToAcc.flatMap(vpt1 =>
@@ -201,7 +241,7 @@ class TOJavaPointsTo extends QueryBenchmark {
     )
 //    resultCollections = pt._2.sortBy(_.x).sortBy(_.y)
     resultCollections = pt._1.sortBy(_.x).sortBy(_.y)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -247,7 +287,7 @@ class TOJavaPointsTo extends QueryBenchmark {
 
 //    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived2)} as r ORDER BY r.x, r.y")
     backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(javapointsto_derived1)} as r ORDER BY r.y, r.x")
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

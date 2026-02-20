@@ -1,7 +1,7 @@
 package test.query.recursive
 import test.{SQLStringAggregationTest, SQLStringQueryTest, TestDatabase}
 import tyql.*
-import Query.{fix, fixPaperSyntax, unrestrictedFix}
+import Query.{restrictedFix, fix, unrestrictedFix}
 import Expr.{IntLit, count, max, min, sum}
 
 import language.experimental.namedTuples
@@ -58,7 +58,7 @@ class Recursion1Test extends SQLStringQueryTest[TCDB, Edge] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(pathRec =>
+    path.restrictedFix(pathRec =>
       pathRec.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -81,7 +81,7 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 
   def query() =
     val path = testDB.tables.edges.union(testDB.tables.edges)
-    path.fix(path =>
+    path.restrictedFix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -108,7 +108,7 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 //
 //  def query() =
 //    val path = testDB.tables.edges.union(testDB.tables.edges)
-//    val path2 = path.fix(path =>
+//    val path2 = path.restrictedFix(path =>
 //      path.flatMap(p =>
 //        testDB.tables.edges
 //          .filter(e => p.y == e.x)
@@ -116,7 +116,7 @@ class Recursion2Test extends SQLStringQueryTest[TCDB, Edge] {
 //      )
 //    )
 //
-//    path2.fix(path =>
+//    path2.restrictedFix(path =>
 //      path.flatMap(p =>
 //        testDB.tables.edges
 //          .filter(e => p.y == e.x)
@@ -148,7 +148,7 @@ class Recursion4Test extends SQLStringQueryTest[TCDB, Int] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.restrictedFix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -172,7 +172,7 @@ class Recursion5Test extends SQLStringQueryTest[TCDB, Edge] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.restrictedFix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -197,7 +197,7 @@ class Recursion6Test extends SQLStringQueryTest[TCDB, Int] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.restrictedFix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -249,7 +249,8 @@ class RecursiveTwoMultiTest extends SQLStringQueryTest[TCDB, Edge] {
     val pathBase = testDB.tables.edges
     val pathToABase = testDB.tables.emptyEdges
 
-    val (pathResult, pathToAResult) = fixPaperSyntax(pathBase, pathToABase)((path, pathToA) =>
+    val mutualOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (pathResult, pathToAResult) = fix(mutualOptions)(pathBase, pathToABase)((path, pathToA) =>
       val P = path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -582,7 +583,7 @@ class RecursionCPTest extends SQLStringQueryTest[TCDB, (dst: Int, sum: Int)] {
 
   def query() =
     val base = testDB.tables.edges.map(e => (y = IntLit(1), cnt = IntLit(1)).toRow)
-    base.fix(cp =>
+    base.restrictedFix(cp =>
       testDB.tables.edges.flatMap(edge =>
         cp
           .filter(cpaths => cpaths.y == edge.x)
@@ -623,7 +624,7 @@ class RecursionManagementTest extends SQLStringQueryTest[ManagementDB, (mgr: Int
 
   def query() =
     val base = testDB.tables.reports.map(e => (mgr = e.mgr, cnt = IntLit(1)).toRow)
-    base.fix(empCount =>
+    base.restrictedFix(empCount =>
       testDB.tables.reports.flatMap(report =>
         empCount
           .filter(ec => ec.mgr == report.mgr)
@@ -672,7 +673,7 @@ class RecursionMLMBonusTest extends SQLStringQueryTest[MLMDatabase, (m: Int, b: 
 
   def query() =
     val base = testDB.tables.sales.map(s => (m = s.m, b = s.p * 0.1).toRow)
-    base.fix(bonus =>
+    base.restrictedFix(bonus =>
       testDB.tables.sponsors.flatMap(sponsor =>
         bonus
           .filter(b => b.m == sponsor.m2)
@@ -737,7 +738,7 @@ given IntervalDBs: TestDatabase[IntervalDB] with
 //        .map(int => (s = ls.t, e = int.e))
 //    )
 //
-//    base.fix(coal =>
+//    base.restrictedFix(coal =>
 //      testDB.tables.intervals.flatMap(inter =>
 //        coal
 //          .filter(c => c.s <= inter.s && inter.s <= c.e)
@@ -774,7 +775,7 @@ class MinReachTest extends SQLStringQueryTest[TCDB, (x: Int, min_y: Int)] {
 
   def query() =
     val reach = testDB.tables.edges
-    reach.fix(reach =>
+    reach.restrictedFix(reach =>
       reach
         .flatMap(p =>
           testDB.tables.edges
@@ -805,7 +806,7 @@ class MinReachStratifiedTest extends SQLStringQueryTest[TCDB, (x: Int, min_y: In
   def query() =
     val edges = testDB.tables.edges.groupBy(e => (x = e.x).toRow, e => (x = e.x, y = min(e.y)).toRow)
 
-    edges.fix(minReach =>
+    edges.restrictedFix(minReach =>
       minReach.flatMap(mr =>
         edges
           .filter(e => mr.y == e.x)
@@ -865,7 +866,8 @@ class AncestorRecursiveTest extends SQLStringQueryTest[ParentChildDB, (x: Int, y
     val ancestorBase = parentChild
     val descendantBase = parentChild
 
-    val (ancestorResult, descendantResult) = fix(ancestorBase, descendantBase) { (ancestor, descendant) =>
+    val mutualOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (ancestorResult, descendantResult) = fix(mutualOptions)(ancestorBase, descendantBase) { (ancestor, descendant) =>
       val newAncestor = ancestor.flatMap(a =>
         parentChild
           .filter(p => a.y == p.x)
@@ -935,7 +937,8 @@ class MutualFriendsStratifiedTest extends SQLStringQueryTest[FriendshipDB, (x: I
     )
 
     // Define the mutually recursive fixpoint
-    val (totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, baseFriendships) { (totalFriendsCount, friendships) =>
+    val mutualOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (totalFriendsResult, mutualFriendsResult) = fix(mutualOptions)(directFriendsCount, baseFriendships) { (totalFriendsCount, friendships) =>
       val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
         friendships
           .filter(f => tf1.x == f.x)
@@ -999,7 +1002,8 @@ class MutualFriendsStratifiedFutureFailTest extends SQLStringQueryTest[Friendshi
     )
 
     // Define the mutually recursive fixpoint
-    val (dfC, totalFriendsResult, mutualFriendsResult) = fix(directFriendsCount, directFriendsCount, baseFriendships) { (dfC2, totalFriendsCount, friendships) =>
+    val mutualOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (dfC, totalFriendsResult, mutualFriendsResult) = fix(mutualOptions)(directFriendsCount, directFriendsCount, baseFriendships) { (dfC2, totalFriendsCount, friendships) =>
       val recurTotalFriendsCount = totalFriendsCount.flatMap(tf1 =>
         friendships
           .filter(f => tf1.x == f.x)
@@ -1076,7 +1080,7 @@ class RecursiveNonterminationExampleTest extends SQLStringQueryTest[CyclicGraphD
 
   def query() =
     val base = testDB.tables.edges
-    base.fix(path =>
+    base.restrictedFix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -1168,8 +1172,30 @@ class RecursiveOrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
 
 }
 
+// Test: materialized = true generates AS MATERIALIZED in SQL
+class MaterializedCTETest extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "materialized: generates AS MATERIALIZED"
 
+  def query() =
+    val path = testDB.tables.edges
+    val options = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
+    path.fix(options, materialized = true)(pathRec =>
+      pathRec.flatMap(p =>
+        testDB.tables.edges
+          .filter(e => p.y == e.x)
+          .map(e => (x = p.x, y = e.y).toRow)
+      ).distinct
+    )
 
-
+  def expectedQueryPattern: String =
+    """
+    WITH RECURSIVE recursive$A AS MATERIALIZED
+      ((SELECT * FROM edges as edges$B)
+        UNION
+      ((SELECT ref$D.x as x, edges$C.y as y
+      FROM recursive$A as ref$D, edges as edges$C
+      WHERE ref$D.y = edges$C.x))) SELECT * FROM recursive$A as recref$E
+      """
+}
 
 

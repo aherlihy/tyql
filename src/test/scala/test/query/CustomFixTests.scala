@@ -1,7 +1,7 @@
-package test.query.customfix
+package test.query.fix
 import test.{SQLStringQueryTest, TestDatabase}
 import tyql.*
-import Query.{customFix, fix, unrestrictedFix}
+import Query.{fix, restrictedFix, unrestrictedFix}
 import test.query.recursive.{Edge, TCDB, TCDBs}
 import Expr.{IntLit, StringLit, count, max, min, sum}
 import test.query.recursivebenchmarks.{WeightedGraphDB, WeightedGraphDBs}
@@ -9,12 +9,12 @@ import test.query.recursivebenchmarks.{WeightedGraphDB, WeightedGraphDBs}
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
-class CustomFixBag extends SQLStringQueryTest[TCDB, Edge] {
-  def testDescription: String = "Recursive query defined over bag, using unionAll using customFix"
+class fixBag extends SQLStringQueryTest[TCDB, Edge] {
+  def testDescription: String = "Recursive query defined over bag, using unionAll using fix"
 
   def query() =
     val path = testDB.tables.edges
-    path.customFix((RestrictedConstructors(), Monotone(), BagResult(), Linear()))(pathRec =>
+    path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
       pathRec.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -27,12 +27,12 @@ class CustomFixBag extends SQLStringQueryTest[TCDB, Edge] {
 WITH RECURSIVE recursive$553 AS ((SELECT * FROM edges as edges$553) UNION ALL ((SELECT edges$555.y as x, edges$555.y as y FROM recursive$553 as ref$309, edges as edges$555 WHERE ref$309.y = edges$555.x) UNION ALL (SELECT * FROM edges as edges$558))) SELECT * FROM recursive$553 as recref$28    """
 }
 
-class CustomFixBagNeg extends munit.FunSuite {
+class fixBagNeg extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll"
   def expectedError: String = """tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)],
                                 |  tyql.RestrictedConstructors, tyql.Monotone]
-                                |Required: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)],
-                                |  tyql.RestrictedConstructors, tyql.Monotone]
+                                |Required: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple, tyql.RestrictedConstructors,
+                                |  tyql.Monotone]
                                 |            ).unionAll(tables.edges2)""".stripMargin
 
   test(testDescription) {
@@ -52,7 +52,7 @@ class CustomFixBagNeg extends munit.FunSuite {
              emptyEdges = Table[Edge]("empty")
            )
           val path = tables.edges
-          path.customFix((RestrictedConstructors(), Monotone(), SetResult(), Linear()))(pathRec =>
+          path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
             pathRec.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -64,8 +64,8 @@ class CustomFixBagNeg extends munit.FunSuite {
   }
 }
 
-class CustomFixConstructorNeg extends munit.FunSuite {
-  def testDescription: String = "Single source shortest path fails due to restricted constructor preventing arithmetic in customFix"
+class fixConstructorNeg extends munit.FunSuite {
+  def testDescription: String = "Single source shortest path fails due to restricted constructor preventing arithmetic in fix"
 
   def expectedError: String =
     "value + is not a member of tyql.Expr[Int, tyql.NonScalarExpr, tyql.RestrictedConstructors]"
@@ -76,7 +76,7 @@ class CustomFixConstructorNeg extends munit.FunSuite {
         """
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
-           import Query.customFix
+           import Query.fix
 
            type WeightedEdge = (src: Int, dst: Int, cost: Int)
            type WeightedGraphDB = (edge: WeightedEdge, base: (dst: Int, cost: Int))
@@ -84,7 +84,7 @@ class CustomFixConstructorNeg extends munit.FunSuite {
            val edge = Table[WeightedEdge]("edge")
            val base = Table[(dst: Int, cost: Int)]("base")
 
-           base.customFix((RestrictedConstructors(), Monotone(), SetResult(), Linear()))(sp =>
+           base.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(sp =>
              edge.flatMap(edge =>
                sp
                  .filter(s => s.dst == edge.src)
@@ -97,9 +97,9 @@ class CustomFixConstructorNeg extends munit.FunSuite {
   }
 }
 
-class CustomFixMonotonicNeg extends munit.FunSuite {
+class fixMonotonicNeg extends munit.FunSuite {
   def testDescription: String = "Aggregation within recursive definition."
-  def expectedError: String = "value aggregate is not a member of tyql.RestrictedQueryRef"
+  def expectedError: String = "Cannot prove that tyql.Monotone =:= tyql.NonMonotone"
 
   test(testDescription) {
     val error: String =
@@ -109,40 +109,39 @@ class CustomFixMonotonicNeg extends munit.FunSuite {
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
            import Expr.{sum}
-           import Query.customFix
+           import Query.fix
 
            type Edge = (x: Int, y: Int)
            val table = Table[Edge]("edges")
 
           // TEST
           val path = table
-          path.customFix((RestrictedConstructors(), Monotone(), SetResult(), Linear()))(pathRec =>
-            pathRec.aggregate(p => (x = sum(p.x), y = sum(p.y)).toRow).distinct
+          path.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+            pathRec.aggregate(p => (x = sum(p.x), y = sum(p.y)).toGroupingRow).distinct
           )
           """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
 
-class CustomFixMonotonicTestPos extends munit.FunSuite {
-  test("Aggregation within recursive definition under monotonic constraints using customFix"){
+class fixMonotonicTestPos extends munit.FunSuite {
+  test("Aggregation within recursive definition under monotonic constraints using fix"){
     type Edge = (x: Int, y: Int)
     val path = Table[Edge]("edges")
+    import RestrictedQuery.*
 
-    intercept[NotImplementedError] {
-      path.customFix((RestrictedConstructors(), NonMonotone(), SetResult(), Linear()))(pathRec =>
-        pathRec.aggregate(p => (x = sum(p.x), y = sum(p.y)).toRow).distinct
-      )
-    }
+    path.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+      pathRec.aggregate(p => (x = sum(p.x), y = sum(p.y)).toGroupingRow).groupBySource(p => (x = p._1.x).toRow).distinct
+    )
   }
 }
 
-class CustomFixLinearTest extends SQLStringQueryTest[TCDB, Int] {
+class fixLinearTest extends SQLStringQueryTest[TCDB, Int] {
   def testDescription: String = "Linear recursion"
 
   def query() =
     val path = testDB.tables.edges
-    path.customFix((RestrictedConstructors(), Monotone(), SetResult(), Linear()))(path =>
+    path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -161,13 +160,13 @@ class CustomFixLinearTest extends SQLStringQueryTest[TCDB, Int] {
         """
 }
 
-class CustomFixRelevantNeg extends SQLStringQueryTest[TCDB, Edge] {
+class fixRelevantNeg extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "Linear recursion: relevant (skip pathToA)"
 
   def query() =
     val path = testDB.tables.edges
     val pathBase = testDB.tables.edges
-    val (pathResult, pathToResult) = customFix((RestrictedConstructors(), Monotone(), SetResult(), NonLinear()))(pathBase, pathBase)((path, pathToA) =>
+    val (pathResult, pathToResult) = fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual()))(pathBase, pathBase)((path, pathToA) =>
 //    val (pathResult, pathToResult) = unrestrictedFix(pathBase, pathBase)((path, pathToA) =>
 //    val (pathResult, pathToResult) = nonLinearFix(pathBase, pathBase)((path, pathToA) =>
       val P = path.flatMap(p => // deps = (0)
@@ -194,15 +193,15 @@ class CustomFixRelevantNeg extends SQLStringQueryTest[TCDB, Edge] {
         """
 }
 
-class CustomFixAffineNeg extends SQLStringQueryTest[TCDB, Edge] {
+class fixAffineNeg extends SQLStringQueryTest[TCDB, Edge] {
   def testDescription: String = "Linear recursion: affine (double path)"
 
   def query() =
     val path = testDB.tables.edges
     val pathBase = testDB.tables.edges
 //    val (pathResult, pathToResult) = unrestrictedFix(pathBase, pathBase)((path, pathToA) =>
-//    val (pathResult, pathToResult) = customFix((RestrictedConstructors(), Monotone(), SetResult(), NonLinear()))(pathBase, pathBase)((path, pathToA) =>
-    val (pathResult, pathToResult) = customFix((RestrictedConstructors(), Monotone(), SetResult(), NonLinear()))(pathBase, pathBase)((path, pathToA) =>
+//    val (pathResult, pathToResult) = fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual()))(pathBase, pathBase)((path, pathToA) =>
+    val (pathResult, pathToResult) = fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual()))(pathBase, pathBase)((path, pathToA) =>
       val P = path.flatMap(p =>
         path
           .filter(e => p.y == e.x)

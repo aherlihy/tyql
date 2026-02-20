@@ -118,19 +118,21 @@ object Expr:
     def length: Expr[Int, NonScalarExpr, CF] = ListLength(x)
 
   // Aggregations
-  def sum(x: Expr[Int, ?, NonRestrictedConstructors]): AggregationExpr[Int] = AggregationExpr.Sum(x) // TODO: require summable type?
+  // sum, avg, count can introduce new domain values, so they require NonRestrictedConstructors
+  def sum(x: Expr[Int, ?, NonRestrictedConstructors]): AggregationExpr[Int] = AggregationExpr.Sum(x)
 
   @targetName("doubleSum")
-  def sum(x: Expr[Double, ?, NonRestrictedConstructors]): AggregationExpr[Double] = AggregationExpr.Sum(x) // TODO: require summable type?
+  def sum(x: Expr[Double, ?, NonRestrictedConstructors]): AggregationExpr[Double] = AggregationExpr.Sum(x)
 
   def avg[T: ResultTag](x: Expr[T, ?, NonRestrictedConstructors]): AggregationExpr[T] = AggregationExpr.Avg(x)
 
   @targetName("doubleAvg")
   def avg(x: Expr[Double, ?, NonRestrictedConstructors]): AggregationExpr[Double] = AggregationExpr.Avg(x)
 
-  def max[T: ResultTag](x: Expr[T, ?, NonRestrictedConstructors]): AggregationExpr[T] = AggregationExpr.Max(x)
+  // max, min only select existing values from the domain, so they accept any ConstructorFreedom
+  def max[T: ResultTag](x: Expr[T, ?, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
 
-  def min[T: ResultTag](x: Expr[T, ?, NonRestrictedConstructors]): AggregationExpr[T] = AggregationExpr.Min(x)
+  def min[T: ResultTag](x: Expr[T, ?, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
 
   def count(x: Expr[Int, ?, NonRestrictedConstructors]): AggregationExpr[Int] = AggregationExpr.Count(x)
   @targetName("stringCnt")
@@ -179,6 +181,7 @@ object Expr:
   type StripExpr[E] = E match
     case Expr[b, s, cf] => b
     case AggregationExpr[b] => b
+    case _ => E
 
   // Also weakly typed in the arguments since these two classes model universal equality */
   case class Eq[S1 <: ExprShape, S2 <: ExprShape, CF1 <: ConstructorFreedom, CF2 <: ConstructorFreedom]($x: Expr[?, S1, CF1], $y: Expr[?, S2, CF2]) extends Expr[Boolean, CalculatedShape[S1, S2], CalculatedCF[CF1, CF2]]
@@ -249,8 +252,10 @@ object Expr:
     private def substitute[C](expr: Expr[B, S, CF],
                               formalP: RefExpr[A, S, CF],
                               actualP: Expr[A, S, CF]): Expr[B, S, CF] = ???
-  type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, NonScalarExpr, ?]
+  type ExprOrLiteral = Expr[?, NonScalarExpr, ?] | Int | String | Double
+  type IsTupleOfExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< ExprOrLiteral
 
+  type IsTupleOfMixedExpr[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?, ?]
   type IsTupleOfNonRestricted[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?, NonRestrictedConstructors]
   type IsTupleOfRestricted[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ?, RestrictedConstructors]
 

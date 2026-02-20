@@ -11,14 +11,15 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Query, Table}
-import tyql.Query.{unrestrictedBagFix, unrestrictedFix}
+import tyql.*
+import tyql.Query.{unrestrictedBagFix, unrestrictedFix, fix}
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
 @experimental
 class TOCBAQuery extends QueryBenchmark {
   override def name = "cba"
-  override def set = false
+  override def set = true
 
   // TYQL data model
   type Term = (x: Int, y: String, z: Int)
@@ -133,10 +134,10 @@ class TOCBAQuery extends QueryBenchmark {
   // Execute queries
   def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
     val queryStr =
-      "WITH RECURSIVE recursive1 AS ((SELECT cba_term4.x as x, cba_lits5.y as y FROM cba_term as cba_term4, cba_lits as cba_lits5 WHERE cba_lits5.x = cba_term4.z AND cba_term4.y = 'Lit') UNION ALL ((SELECT cba_term8.x as x, ref6.y as y FROM cba_term as cba_term8, recursive2 as ref6 WHERE cba_term8.y = 'Var' AND cba_term8.z = ref6.x) UNION ALL (SELECT cba_term11.x as x, ref9.y as y FROM cba_term as cba_term11, recursive1 as ref9, recursive3 as ref10, cba_abs as cba_abs12, cba_app as cba_app13 WHERE cba_term11.y = 'App' AND cba_term11.z = cba_app13.x AND ref9.x = cba_abs12.z AND ref10.x = cba_app13.y AND ref10.y = cba_abs12.x))),\nrecursive2 AS ((SELECT * FROM cba_baseData as cba_baseData21) UNION ALL ((SELECT cba_abs23.y as x, ref15.y as y FROM recursive3 as ref14, recursive1 as ref15, cba_abs as cba_abs23, cba_app as cba_app24 WHERE ref14.x = cba_app24.y AND ref14.y = cba_abs23.x AND ref15.x = cba_app24.z))),\nrecursive3 AS ((SELECT cba_term30.x as x, cba_term30.z as y FROM cba_term as cba_term30 WHERE cba_term30.y = 'Abs') UNION ALL ((SELECT cba_term32.x as x, ref20.y as y FROM cba_term as cba_term32, recursive4 as ref20 WHERE cba_term32.y = 'Var' AND cba_term32.z = ref20.x) UNION ALL (SELECT cba_term35.x as x, ref23.y as y FROM cba_term as cba_term35, recursive3 as ref23, recursive3 as ref24, cba_abs as cba_abs36, cba_app as cba_app37 WHERE cba_term35.y = 'App' AND cba_term35.z = cba_app37.x AND ref23.x = cba_abs36.z AND ref24.x = cba_app37.y AND ref24.y = cba_abs36.x))),\nrecursive4 AS ((SELECT * FROM cba_baseCtrl as cba_baseCtrl45) UNION ALL ((SELECT cba_abs47.y as x, ref29.y as y FROM recursive3 as ref28, recursive3 as ref29, cba_abs as cba_abs47, cba_app as cba_app48 WHERE ref28.x = cba_app48.y AND ref28.y = cba_abs47.x AND ref29.x = cba_app48.z)))\nSELECT DISTINCT COUNT(1) FROM recursive1 as recref0"
+      "WITH RECURSIVE recursive1 AS ((SELECT cba_term4.x as x, cba_lits5.y as y FROM cba_term as cba_term4, cba_lits as cba_lits5 WHERE cba_lits5.x = cba_term4.z AND cba_term4.y = 'Lit') UNION ((SELECT cba_term8.x as x, ref6.y as y FROM cba_term as cba_term8, recursive2 as ref6 WHERE cba_term8.y = 'Var' AND cba_term8.z = ref6.x) UNION (SELECT cba_term11.x as x, ref9.y as y FROM cba_term as cba_term11, recursive1 as ref9, recursive3 as ref10, cba_abs as cba_abs12, cba_app as cba_app13 WHERE cba_term11.y = 'App' AND cba_term11.z = cba_app13.x AND ref9.x = cba_abs12.z AND ref10.x = cba_app13.y AND ref10.y = cba_abs12.x))),\nrecursive2 AS ((SELECT * FROM cba_baseData as cba_baseData21) UNION ((SELECT cba_abs23.y as x, ref15.y as y FROM recursive3 as ref14, recursive1 as ref15, cba_abs as cba_abs23, cba_app as cba_app24 WHERE ref14.x = cba_app24.y AND ref14.y = cba_abs23.x AND ref15.x = cba_app24.z))),\nrecursive3 AS ((SELECT cba_term30.x as x, cba_term30.z as y FROM cba_term as cba_term30 WHERE cba_term30.y = 'Abs') UNION ((SELECT cba_term32.x as x, ref20.y as y FROM cba_term as cba_term32, recursive4 as ref20 WHERE cba_term32.y = 'Var' AND cba_term32.z = ref20.x) UNION (SELECT cba_term35.x as x, ref23.y as y FROM cba_term as cba_term35, recursive3 as ref23, recursive3 as ref24, cba_abs as cba_abs36, cba_app as cba_app37 WHERE cba_term35.y = 'App' AND cba_term35.z = cba_app37.x AND ref23.x = cba_abs36.z AND ref24.x = cba_app37.y AND ref24.y = cba_abs36.x))),\nrecursive4 AS ((SELECT * FROM cba_baseCtrl as cba_baseCtrl45) UNION ((SELECT cba_abs47.y as x, ref29.y as y FROM recursive3 as ref28, recursive3 as ref29, cba_abs as cba_abs47, cba_app as cba_app48 WHERE ref28.x = cba_app48.y AND ref28.y = cba_abs47.x AND ref29.x = cba_app48.z)))\nSELECT DISTINCT COUNT(1) FROM recursive1 as recref0"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val dataTermBase = tyqlDB.term.flatMap(t =>
       tyqlDB.lits
         .filter(l => l.x == t.z && t.y == StringLit("Lit"))
@@ -148,9 +149,7 @@ class TOCBAQuery extends QueryBenchmark {
 
     val ctrlVarBase = tyqlDB.baseCtrl
 
-    val tyqlFix = if set then unrestrictedFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)) else unrestrictedBagFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))
-
-    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = tyqlFix(
+    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = unrestrictedFix(dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)(
       (dataTerm, dataVar, ctrlTerm, ctrlVar) => {
         val dt1 =
           for
@@ -203,10 +202,86 @@ class TOCBAQuery extends QueryBenchmark {
             if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
           yield (x = abs.y, y = ct2.y).toRow
 
-        val dt = if set then dt1.union(dt2) else dt1.unionAll(dt2)
-        val ct = if set then ct1.union(ct2) else ct1.unionAll(ct2)
+        val dt = dt1.union(dt2)
+        val ct = ct1.union(ct2)
 
         (dt, dv, ct, cv)
+      })
+
+    val query = dataTerm.distinct.size
+    val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val dataTermBase = tyqlDB.term.flatMap(t =>
+      tyqlDB.lits
+        .filter(l => l.x == t.z && t.y == StringLit("Lit"))
+        .map(l => (x = t.x, y = l.y).toRow))
+
+    val dataVarBase = tyqlDB.baseData
+
+    val ctrlTermBase = tyqlDB.term.filter(t => t.y == StringLit("Abs")).map(t => (x = t.x, y = t.z).toRow)
+
+    val ctrlVarBase = tyqlDB.baseCtrl
+
+    val cbaOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual())
+    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = fix(cbaOptions)(dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase)(
+      (dataTerm, dataVar, ctrlTerm, ctrlVar) => {
+        val dt1 =
+          for
+            t <- tyqlDB.term
+            dv <- dataVar
+            if t.y == "Var" && t.z == dv.x
+          yield (x = t.x, y = dv.y).toRow
+
+        val dt2 =
+          for
+            t <- tyqlDB.term
+            dt <- dataTerm
+            ct <- ctrlTerm
+            abs <- tyqlDB.abs
+            app <- tyqlDB.app
+            if t.y == "App" && t.z == app.x && dt.x == abs.z && ct.x == app.y && ct.y == abs.x
+          yield (x = t.x, y = dt.y).toRow
+
+        val dv =
+          for
+            ct <- ctrlTerm
+            dt <- dataTerm
+            abs <- tyqlDB.abs
+            app <- tyqlDB.app
+            if ct.x == app.y && ct.y == abs.x && dt.x == app.z
+          yield (x = abs.y, y = dt.y).toRow
+
+        val ct1 =
+          for
+            t <- tyqlDB.term
+            cv <- ctrlVar
+            if t.y == "Var" && t.z == cv.x
+          yield (x = t.x, y = cv.y).toRow
+        val ct2 =
+          for
+            t <- tyqlDB.term
+            ct1 <- ctrlTerm
+            ct2 <- ctrlTerm
+            abs <- tyqlDB.abs
+            app <- tyqlDB.app
+            if t.y == "App" && t.z == app.x && ct1.x == abs.z && ct2.x == app.y && ct2.y == abs.x
+          yield (x = t.x, y = ct1.y).toRow
+
+        val cv =
+          for
+            ct1 <- ctrlTerm
+            ct2 <- ctrlTerm
+            abs <- tyqlDB.abs
+            app <- tyqlDB.app
+            if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
+          yield (x = abs.y, y = ct2.y).toRow
+
+        val dt = dt1.union(dt2)
+        val ct = ct1.union(ct2)
+
+        (dt, dv.distinct, ct, cv.distinct)
       })
 
     val query = dataTerm.distinct.size
@@ -304,13 +379,13 @@ class TOCBAQuery extends QueryBenchmark {
             if ct1.x == app.y && ct1.y == abs.x && ct2.x == app.z
           yield CtrlCC(x = abs.y, y = ct2.y)
 
-        val dt = if set then dt1.union(dt2) else dt1 ++ dt2
-        val ct = if set then ct1.union(ct2) else ct1 ++ ct2
+        val dt = if set then dt1.concat(dt2).distinct else dt1 ++ dt2
+        val ct = if set then ct1.concat(ct2).distinct else ct1 ++ ct2
         (dt, dv, ct, cv)
       })
 
     resultCollections = Seq(dataTerm.distinct.size)
-    println(s"\nIT,$name,collections,$it")
+//    println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -343,9 +418,6 @@ class TOCBAQuery extends QueryBenchmark {
         val (dataTermAcc, dataVarAcc, ctrlTermAcc, ctrlVarAcc) = if it == 0 then (cba_delta1, cba_delta2, cba_delta3, cba_delta4) else (cba_derived1, cba_derived2, cba_derived3, cba_derived4)
         it += 1
 
-        //        println(s"***iteration $it")
-        //        println(s"BASES:\n\teven : ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(even)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\todd: ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(odd)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
-        //        println(s"DERIV:\n\teven : ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(derived_even)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\todd: ${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(derived_odd)}").map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         val dataTerm1 =
           for
             t <- cba_term.select
@@ -397,7 +469,6 @@ class TOCBAQuery extends QueryBenchmark {
             if ct1.x === app.y && ct1.y === abs.x && ct2.x === app.z
           yield (abs.y, ct2.y)
 
-        //        println(s"output:\n\teven: ${db.run(evenResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\toddResult: ${db.run(oddResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
         val dataTermResult = if set then dataTerm1.union(dataTerm2) else dataTerm1.unionAll(dataTerm2)
         val controlTermResult = if set then controlTerm1.union(controlTerm2) else controlTerm1.unionAll(controlTerm2)
         (dataTermResult, dataVarResult, controlTermResult, controlVarResult)
@@ -414,7 +485,7 @@ class TOCBAQuery extends QueryBenchmark {
     val result = cba_derived1.select.distinct
     resultScalaSQL = Seq(db.run(result).size)
 
-    println(s"\nIT,$name,scalasql,$it")
+//    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =
@@ -435,14 +506,4 @@ class TOCBAQuery extends QueryBenchmark {
       resultSetToCSV(backupResultScalaSql, outfile)
     else
       collectionToCSV(resultScalaSQL, outfile, Seq("count(1)"), x => Seq(x.toString))
-
-  // Extract all results to avoid lazy-loading
-  //  def printResultJDBC(resultSet: ResultSet): Unit =
-  //    println("Query Results:")
-  //    while (resultSet.next()) {
-  //      val x = resultSet.getInt("startNode")
-  //      val y = resultSet.getInt("endNode")
-  //      val z = resultSet.getArray("path")
-  //      println(s"x: $x, y: $y, path=$z")
-  //    }
 }

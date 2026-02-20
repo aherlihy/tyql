@@ -11,7 +11,8 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Query, Table}
-import tyql.Query.{fix, unrestrictedFix}
+import tyql.*
+import tyql.Query.{unrestrictedFix, unrestrictedBagFix, fix}
 import tyql.Expr.{IntLit, StringLit, min, sum}
 import Helpers.*
 
@@ -113,10 +114,10 @@ class TOPointsToCountQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT pointstocount_new2.x as x, pointstocount_new2.y as y FROM pointstocount_new as pointstocount_new2) UNION ((SELECT pointstocount_assign4.x as x, ref2.y as y FROM pointstocount_assign as pointstocount_assign4, recursive1 as ref2 WHERE pointstocount_assign4.y = ref2.x) UNION (SELECT pointstocount_loadT7.x as x, ref5.h as y FROM pointstocount_loadT as pointstocount_loadT7, recursive2 as ref5, recursive1 as ref6 WHERE pointstocount_loadT7.y = ref6.x AND pointstocount_loadT7.h = ref5.y AND ref6.y = ref5.x))),\nrecursive2 AS ((SELECT * FROM pointstocount_hpt as pointstocount_hpt13) UNION ((SELECT ref9.y as x, pointstocount_store15.y as y, ref10.y as h FROM pointstocount_store as pointstocount_store15, recursive1 as ref9, recursive1 as ref10 WHERE pointstocount_store15.x = ref9.x AND pointstocount_store15.h = ref10.x)))\n SELECT COUNT(1) FROM recursive1 as recref0 WHERE recref0.x = 'r'"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val baseVPT = tyqlDB.newT.map(a => (x = a.x, y = a.y).toRow)
     val baseHPT = tyqlDB.baseHPT
-    val pt = unrestrictedFix((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
+    val pt = unrestrictedFix(baseVPT, baseHPT)((varPointsTo, heapPointsTo) =>
       val vpt = tyqlDB.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           (x = a.x, y = p.y).toRow
@@ -140,7 +141,44 @@ class TOPointsToCountQuery extends QueryBenchmark {
               (x = vpt1.y, y = s.y, h = vpt2.y).toRow
             )
         )
+      ).distinct
+
+      (vpt, hpt)
+    )
+    val query = pt._1.filter(vpt => vpt.x == "r").size
+
+    val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val baseVPT = tyqlDB.newT.map(a => (x = a.x, y = a.y).toRow)
+    val baseHPT = tyqlDB.baseHPT
+    val ptcOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual())
+    val pt = fix(ptcOptions)(baseVPT, baseHPT)((varPointsTo, heapPointsTo) =>
+      val vpt = tyqlDB.assign.flatMap(a =>
+        varPointsTo.filter(p => a.y == p.x).map(p =>
+          (x = a.x, y = p.y).toRow
+        )
+      ).union(
+        tyqlDB.loadT.flatMap(l =>
+          heapPointsTo.flatMap(hpt =>
+            varPointsTo
+              .filter(vpt => l.y == vpt.x && l.h == hpt.y && vpt.y == hpt.x)
+              .map(pt2 =>
+                (x = l.x, y = hpt.h).toRow
+              )
+          )
+        )
       )
+      val hpt = tyqlDB.store.flatMap(s =>
+        varPointsTo.flatMap(vpt1 =>
+          varPointsTo
+            .filter(vpt2 => s.x == vpt1.x && s.h == vpt2.x)
+            .map(vpt2 =>
+              (x = vpt1.y, y = s.y, h = vpt2.y).toRow
+            )
+        )
+      ).distinct
 
       (vpt, hpt)
     )
@@ -164,7 +202,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
           a.y == p.x).map(p =>
           PointsToCC(x = a.x, y = p.y)
         )
-      ).union(
+      ).concat(
         collectionsDB.loadT.flatMap(l =>
           if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
           heapPointsToAcc.flatMap(hpt =>
@@ -179,7 +217,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
               )
           )
         )
-      )
+      ).distinct
       val hpt = collectionsDB.store.flatMap(s =>
         if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
         varPointsToAcc.flatMap(vpt1 =>
@@ -198,7 +236,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
       (vpt, hpt)
     )
     resultCollections = Seq(pt._1.filter(vpt => vpt.x == "r").size)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -246,9 +284,9 @@ class TOPointsToCountQuery extends QueryBenchmark {
 
 //    val result = pointstocount_derived2.select.filter(_.x === "r").size // this does not work!!!!!
 //    println(s"FINAL RES=${db.runRaw[(String, String)](s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY r.x")}")
-    backupResultScalaSql = ddb.runQuery(s"SELECT COUNT(1) FROM ${ScalaSQLTable.name(pointstocount_derived2)} as r WHERE r.x = 'r'")
+    backupResultScalaSql = ddb.runQuery(s"SELECT COUNT(1) FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r WHERE r.x = 'r'")
 
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 //    backupResultScalaSql = ddb.runQuery(s"SELECT * FROM ${ScalaSQLTable.name(pointstocount_derived1)} as r ORDER BY x, y")
 
   // Write results to csv for checking

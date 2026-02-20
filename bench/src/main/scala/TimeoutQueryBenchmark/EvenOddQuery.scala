@@ -4,14 +4,15 @@ import buildinfo.BuildInfo
 import scalasql.PostgresDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
 import scalasql.{Expr, query, Table as ScalaSQLTable}
+import scala.language.implicitConversions
 
 import java.sql.{Connection, ResultSet}
 import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table, Query}
-import tyql.Query.fix
+import tyql.*
+import tyql.Query.{unrestrictedFix, unrestrictedBagFix, fix}
 import tyql.Expr.{IntLit, StringLit, min}
 import Helpers.*
 
@@ -81,11 +82,29 @@ class TOEvenOddQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT evenodd_numbers2.value as value, 'even' as typ FROM evenodd_numbers as evenodd_numbers2 WHERE evenodd_numbers2.value = 0) UNION ((SELECT evenodd_numbers4.value as value, 'even' as typ FROM evenodd_numbers as evenodd_numbers4, recursive2 as ref5 WHERE evenodd_numbers4.value = ref5.value + 1))),\nrecursive2 AS ((SELECT evenodd_numbers8.value as value, 'odd' as typ FROM evenodd_numbers as evenodd_numbers8 WHERE evenodd_numbers8.value = 1) UNION ((SELECT evenodd_numbers10.value as value, 'odd' as typ FROM evenodd_numbers as evenodd_numbers10, recursive1 as ref8 WHERE evenodd_numbers10.value = ref8.value + 1)))\n SELECT * FROM recursive2 as recref1 ORDER BY typ ASC, value ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val evenBase = tyqlDB.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
     val oddBase = tyqlDB.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
 
-    val (even, odd) = fix((evenBase, oddBase))((even, odd) =>
+    val (even, odd) = unrestrictedFix(evenBase, oddBase)((even, odd) =>
+      val evenResult = tyqlDB.numbers.flatMap(num =>
+        odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = StringLit("even")))
+      ).distinct
+      val oddResult = tyqlDB.numbers.flatMap(num =>
+        even.filter(e => num.value == e.value + 1).map(e => (value = num.value, typ = StringLit("odd")))
+      ).distinct
+      (evenResult, oddResult)
+    )
+
+    val queryStr = odd.sort(_.value, Ord.ASC).sort(_.typ, Ord.ASC).toQueryIR.toSQLString().replace("\"", "'")
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val evenBase = tyqlDB.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
+    val oddBase = tyqlDB.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
+
+    val eoOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (even, odd) = fix(eoOptions)(evenBase, oddBase)((even, odd) =>
       val evenResult = tyqlDB.numbers.flatMap(num =>
         odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = StringLit("even")))
       ).distinct
@@ -122,7 +141,7 @@ class TOEvenOddQuery extends QueryBenchmark {
       (evenResult, oddResult)
     )
     resultCollections = odd.sortBy(_.value).sortBy(_.typ)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -177,7 +196,7 @@ class TOEvenOddQuery extends QueryBenchmark {
 
     val result = evenodd_derived2.select.sortBy(_.value).sortBy(_.typ)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

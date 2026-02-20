@@ -1,7 +1,7 @@
 package test.query.appendixTests
 import test.{SQLStringQueryTest, TestDatabase, SQLStringAggregationTest}
 import tyql.*
-import Query.{customFix, fix, unrestrictedBagFix, unrestrictedFix}
+import Query.{fix, restrictedFix, unrestrictedBagFix, unrestrictedFix}
 import Expr.{IntLit, StringLit, count, max, min, sum}
 
 import language.experimental.namedTuples
@@ -43,7 +43,8 @@ SELECT * FROM oddR as recref$1
       constructorFreedom = NonRestrictedConstructors(),
       monotonicity = Monotone(),
       category = SetResult(),
-      linearity = NonLinear() // TODO
+      linearity = NonLinear(), // TODO
+      mutual = AllowMutual()
     )
     val numbers = Table[(id: Int, value: Int)]("Numbers")
     val evenBase = numbers
@@ -53,7 +54,7 @@ SELECT * FROM oddR as recref$1
       .filter(n => n.value == IntLit(1))
       .map(n => (value = n.value, typ = StringLit("odd")).toRow)
     val result =
-      customFix(options)((evenBase, oddBase))((even, odd) =>
+      fix(options)((evenBase, oddBase))((even, odd) =>
         val evenResult = numbers.flatMap(num =>
           odd
             .filter(o => num.value == o.value + IntLit(1))
@@ -105,13 +106,14 @@ SELECT * FROM controlR as recref$4
       constructorFreedom = NonRestrictedConstructors(),
       monotonicity = NonMonotone(),
       category = SetResult(),
-      linearity = Linear()
+      linearity = Linear(),
+      mutual = NoMutual()
     )
     val shares = Table[(byC: String, of: String, percent: Int)]("Shares")
     val control = Table[(com1: String, com2: String)]("Control")
     val result =
       unrestrictedFix(shares, control)((csharesR, controlR) => // TODO
-//      customFix(options)(shares, control)((csharesR, controlR) =>
+//      fix(options)(shares, control)((csharesR, controlR) =>
         val csharesRecur = controlR
           .aggregate(con =>
             csharesR
@@ -162,12 +164,13 @@ GROUP BY recref$19.person2
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = BagResult(),
-      linearity = NonLinear() // TODO
+      linearity = NonLinear(), // TODO
+      mutual = AllowMutual()
     )
     val friends = Table[(person1: String, person2: String)]("Friends")
 
     val result =
-        customFix(options)(friends, friends)((trustR, friendsR) => {
+        fix(options)(friends, friends)((trustR, friendsR) => {
           val mutualTrustResult = friendsR.flatMap(f =>
           trustR
             .filter(mt => mt.person2 == f.person1)
@@ -202,7 +205,8 @@ class CSPAAppendixTest extends SQLStringQueryTest[EmptyDB, (p1: Int, p2: Int)] {
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = SetResult(),
-      linearity = NonLinear()
+      linearity = NonLinear(),
+      mutual = AllowMutual()
     )
     val assign = Table[(p1: Int, p2: Int)]("Assign")
     val dereference = Table[(p1: Int, p2: Int)]("Dereference")
@@ -222,7 +226,7 @@ class CSPAAppendixTest extends SQLStringQueryTest[EmptyDB, (p1: Int, p2: Int)] {
         )
 
     val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) =
-      customFix(options)(valueFlowBase, Table[(p1: Int, p2: Int)]("empty"), memoryAliasBase)(
+      fix(options)(valueFlowBase, Table[(p1: Int, p2: Int)]("empty"), memoryAliasBase)(
         (valueFlowR, valueAliasR, memoryAliasR) =>
           val vfDef1 =
             for
@@ -327,7 +331,8 @@ class PTCAppendixTest extends SQLStringAggregationTest[EmptyDB, Int] {
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = SetResult(),
-      linearity = NonLinear()
+      linearity = NonLinear(),
+      mutual = AllowMutual()
     )
     val newT = Table[(x: String, y: String)]("New")
     val assign = Table[(x: String, y: String)]("Assign")
@@ -338,7 +343,7 @@ class PTCAppendixTest extends SQLStringAggregationTest[EmptyDB, Int] {
     val baseHPT = Table[(x: String, y: String, h: String)]("BaseHPT")
 
     val pt =
-      customFix(options)((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
+      fix(options)((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
         val vpt = assign.flatMap(a =>
           varPointsTo.filter(p => a.y == p.x).map(p =>
             (x = a.x, y = p.y).toRow
@@ -407,7 +412,8 @@ class JPTAppendixTest extends SQLStringQueryTest[EmptyDB, (x: String, y: String)
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = BagResult(),
-      linearity = NonLinear()
+      linearity = NonLinear(),
+      mutual = AllowMutual()
     )
     val newT = Table[(x: String, y: String)]("New")
     val assign = Table[(x: String, y: String)]("Assign")
@@ -418,7 +424,7 @@ class JPTAppendixTest extends SQLStringQueryTest[EmptyDB, (x: String, y: String)
     val baseHPT = Table[(x: String, y: String, h: String)]("BaseHPT")
 
     val pt =
-      customFix(options)((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
+      fix(options)((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
         val vpt = assign.flatMap(a =>
           varPointsTo.filter(p => a.y == p.x).map(p =>
             (x = a.x, y = p.y).toRow
@@ -485,7 +491,8 @@ class PartyAppendixTest extends SQLStringQueryTest[EmptyDB, (person: String)] {
       constructorFreedom = NonRestrictedConstructors(),
       monotonicity = NonMonotone(),
       category = BagResult(),
-      linearity = Linear()
+      linearity = Linear(),
+      mutual = NoMutual()
     )
     val organizers = Table[(orgName: String)]("Organizers")
     val friend = Table[(pName: String, fName: String)]("Friends")
@@ -495,7 +502,7 @@ class PartyAppendixTest extends SQLStringQueryTest[EmptyDB, (person: String)] {
 
     val result =
       unrestrictedBagFix((baseAttend, counts))((attendR, cntFriendsR) =>
-//      customFix(options)(baseAttend, counts)((attendR, cntFriendsR) =>
+//      fix(options)(baseAttend, counts)((attendR, cntFriendsR) =>
         val recurAttend = cntFriendsR
           .filter(cf => cf.nCount > 2)
           .map(cf => (person = cf.fName).toRow)
@@ -548,7 +555,8 @@ class CBAAppendixTest extends SQLStringAggregationTest[EmptyDB, Int] {
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = BagResult(),
-      linearity = NonLinear()
+      linearity = NonLinear(),
+      mutual = AllowMutual()
     )
     val term = Table[(x: Int, y: String, z: Int)]("Term")
     val lits = Table[(x: Int, y: String)]("Lits")
@@ -562,7 +570,7 @@ class CBAAppendixTest extends SQLStringAggregationTest[EmptyDB, Int] {
     val ctrlTermBase = term.filter(t => t.y == StringLit("Abs")).map(t => (x = t.x, y = t.z).toRow)
     val ctrlVarBase = baseCtrl
     val result =
-      customFix(options)((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))(
+      fix(options)((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))(
         (dataTermR, dataVarR, ctrlTermR, ctrlVarR) =>
           val dt1 =
             for
@@ -679,11 +687,12 @@ class SSSPAppendixTest extends SQLStringQueryTest[EmptyDB, (dst: String, cost: I
       constructorFreedom = NonRestrictedConstructors(),
       monotonicity = Monotone(),
       category = SetResult(),
-      linearity = Linear()
+      linearity = Linear(),
+      mutual = NoMutual()
     )
     val base = Table[(dst: String, cost: Int)]("Base")
     val edge = Table[(src: String, dst: String, cost: Int)]("Edge")
-    base.customFix(options)(pathR =>
+    base.fix(options)(pathR =>
         edge.flatMap(edge =>
           pathR
             .filter(s => s.dst == edge.src)
@@ -724,18 +733,19 @@ class AncestryAppendixTest extends SQLStringQueryTest[EmptyDB, (name: String)] {
       constructorFreedom = NonRestrictedConstructors(),
       monotonicity = Monotone(),
       category = SetResult(),
-      linearity = Linear()
+      linearity = Linear(),
+      mutual = NoMutual()
     )
     val parents = Table[(parent: String, child: String)]("Parents")
     val base = parents
       .filter(p => p.parent == "A")
       .map(e => (name = e.child, gen = IntLit(1)).toRow)
 
-    base.customFix(options)(genR =>
+    base.fix(options)(genR =>
         parents.flatMap(parent =>
           genR
             .filter(g => parent.parent == g.name)
-            .map(g => (name = parent.child, gen = g.gen + 1).toRow)
+            .map(g => (name = parent.child, gen = g.gen + IntLit(1)).toRow)
         ).distinct)
       .filter(g => g.gen == 2)
       .map(g => (name = g.name).toRow)
@@ -771,7 +781,8 @@ class APTAppendixTest extends SQLStringQueryTest[EmptyDB, (x: String, y: String)
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = SetResult(),
-      linearity = NonLinear()
+      linearity = NonLinear(),
+      mutual = AllowMutual()
     )
     val addressOf = Table[(x: String, y: String)]("AddressOf")
     val assign = Table[(x: String, y: String)]("Assign")
@@ -779,7 +790,7 @@ class APTAppendixTest extends SQLStringQueryTest[EmptyDB, (x: String, y: String)
     val store = Table[(x: String, y: String)]("Store")
     val base = addressOf.map(a => (x = a.x, y = a.y).toRow)
 
-    base.customFix(options)(pointsToR =>
+    base.fix(options)(pointsToR =>
       assign.flatMap(a =>
           pointsToR.filter(p => a.y == p.x).map(p =>
             (x = a.x, y = p.y).toRow))
@@ -836,7 +847,8 @@ class APSPAppendixTest extends SQLStringQueryTest[EmptyDB, (src: Int, dst: Int, 
       constructorFreedom = NonRestrictedConstructors(),
       monotonicity = NonMonotone(),
       category = SetResult(),
-      linearity = NonLinear()
+      linearity = NonLinear(),
+      mutual = AllowMutual()
     )
     val edge = Table[(src: Int, dst: Int, cost: Int)]("Edge")
     val baseEdges = edge
@@ -846,7 +858,7 @@ class APSPAppendixTest extends SQLStringQueryTest[EmptyDB, (src: Int, dst: Int, 
         (src = e._1.src, dst = e._1.dst).toRow)
 
     val asps =
-//      base.customFix(options)(pathR =>
+//      base.fix(options)(pathR =>
       baseEdges.unrestrictedFix(pathR =>
         pathR.aggregate(p =>
             pathR
@@ -895,7 +907,8 @@ class TCAppendixTest extends SQLStringQueryTest[EmptyDB, (startNode: Int, endNod
       constructorFreedom = NonRestrictedConstructors(),
       monotonicity = Monotone(),
       category = BagResult(),
-      linearity = Linear()
+      linearity = Linear(),
+      mutual = NoMutual()
     )
     val edge = Table[(x: Int, y: Int)]("Edge")
     val pathBase = edge
@@ -903,7 +916,7 @@ class TCAppendixTest extends SQLStringQueryTest[EmptyDB, (startNode: Int, endNod
       .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
 
     pathBase
-      .customFix(options)(pathR =>
+      .fix(options)(pathR =>
         pathR.flatMap(p =>
           edge
             .filter(e => e.x == p.endNode && !p.path.contains(e.y))
@@ -940,12 +953,13 @@ class BOMAppendixTest extends SQLStringQueryTest[EmptyDB, (part: String, max: In
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = BagResult(),
-      linearity = Linear()
+      linearity = Linear(),
+      mutual = NoMutual()
     )
     val assbl = Table[(part: String, spart: String)]("Assbl")
     val basic = Table[(part: String, days: Int)]("Basic")
     val result = basic
-      .customFix(options)(waitForR =>
+      .fix(options)(waitForR =>
         assbl.flatMap(assbl =>
           waitForR
             .filter(wf => assbl.spart == wf.part)
@@ -986,11 +1000,12 @@ class OrbitsAppendixTest extends SQLStringQueryTest[EmptyDB, (x: String, y: Stri
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = BagResult(),
-      linearity = NonLinear()
+      linearity = NonLinear(),
+      mutual = AllowMutual()
     )
     val base = Table[(x: String, y: String)]("Base")
     val orbits =
-      base.customFix(options)(orbitsR =>
+      base.fix(options)(orbitsR =>
         orbitsR.flatMap(p =>
           orbitsR
             .filter(e => p.y == e.x)
@@ -998,7 +1013,7 @@ class OrbitsAppendixTest extends SQLStringQueryTest[EmptyDB, (x: String, y: Stri
         )
       )
     orbits match
-      case Query.MultiRecursive(_, _, orbitsRef) =>
+      case Query.MultiRecursive(_, _, orbitsRef, _) =>
         orbits.filter(o =>
           orbitsRef
             .flatMap(o1 =>
@@ -1046,13 +1061,14 @@ class DataflowAppendixTest extends SQLStringQueryTest[EmptyDB, (r: String, w: St
       constructorFreedom = RestrictedConstructors(),
       monotonicity = Monotone(),
       category = BagResult(),
-      linearity = NonLinear()
+      linearity = NonLinear(),
+      mutual = AllowMutual()
     )
     val readOp = Table[(opN: String, varN: String)]("ReadOp")
     val writeOp = Table[(opN: String, varN: String)]("WriteOp")
     val jumpOp = Table[(a: String, b: String)]("JumpOp")
     jumpOp
-      .customFix(options)(flowR =>
+      .fix(options)(flowR =>
         flowR.flatMap(f1 =>
           flowR.filter(f2 => f1.b == f2.a).map(f2 =>
             (a = f1.a, b = f2.b).toRow)))

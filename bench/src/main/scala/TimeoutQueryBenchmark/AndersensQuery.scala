@@ -11,7 +11,8 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.*
+import tyql.Query.fix
 import tyql.Expr.{IntLit, min}
 
 @experimental
@@ -80,9 +81,33 @@ class TOAndersensQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT andersens_addressOf1.x as x, andersens_addressOf1.y as y FROM andersens_addressOf as andersens_addressOf1) UNION ((SELECT andersens_assign3.x as x, ref2.y as y FROM andersens_assign as andersens_assign3, recursive1 as ref2 WHERE andersens_assign3.y = ref2.x) UNION (SELECT andersens_loadT6.x as x, ref6.y as y FROM andersens_loadT as andersens_loadT6, recursive1 as ref5, recursive1 as ref6 WHERE andersens_loadT6.y = ref5.x AND ref5.y = ref6.x) UNION (SELECT ref9.y as x, ref10.y as y FROM andersens_store as andersens_store11, recursive1 as ref9, recursive1 as ref10 WHERE andersens_store11.x = ref9.x AND andersens_store11.y = ref10.x)))\nSELECT * FROM recursive1 as recref0 ORDER BY x ASC, y ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.addressOf.map(a => (x = a.x, y = a.y).toRow)
     val query = base.unrestrictedFix(pointsTo =>
+      tyqlDB.assign.flatMap(a =>
+          pointsTo.filter(p => a.y == p.x).map(p =>
+            (x = a.x, y = p.y).toRow))
+        .union(tyqlDB.loadT.flatMap(l =>
+          pointsTo.flatMap(pt1 =>
+            pointsTo
+              .filter(pt2 => l.y == pt1.x && pt1.y == pt2.x)
+              .map(pt2 =>
+                (x = l.x, y = pt2.y).toRow))))
+        .union(tyqlDB.store.flatMap(s =>
+          pointsTo.flatMap(pt1 =>
+            pointsTo
+              .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
+              .map(pt2 =>
+                (x = pt1.y, y = pt2.y).toRow)))))
+      .sort(_.y, Ord.ASC).sort(_.x, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val base = tyqlDB.addressOf.map(a => (x = a.x, y = a.y).toRow)
+    val aptOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
+    val query = base.fix(aptOptions)(pointsTo =>
       tyqlDB.assign.flatMap(a =>
           pointsTo.filter(p => a.y == p.x).map(p =>
             (x = a.x, y = p.y).toRow))
@@ -115,7 +140,7 @@ class TOAndersensQuery extends QueryBenchmark {
             a.y == p.x).map(p =>
             if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
             EdgeCC(x = a.x, y = p.y)))
-        .union(collectionsDB.loadT.flatMap(l =>
+        .concat(collectionsDB.loadT.flatMap(l =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
           pointsTo.flatMap(pt1 =>
             if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
@@ -126,7 +151,7 @@ class TOAndersensQuery extends QueryBenchmark {
               .map(pt2 =>
                 if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
                 EdgeCC(x = l.x, y = pt2.y)))))
-        .union(collectionsDB.store.flatMap(s =>
+        .concat(collectionsDB.store.flatMap(s =>
           if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
           pointsTo.flatMap(pt1 =>
             if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
@@ -136,9 +161,10 @@ class TOAndersensQuery extends QueryBenchmark {
                 s.x == pt1.x && s.y == pt2.x)
               .map(pt2 =>
                 if (Thread.currentThread().isInterrupted) throw new Exception(s"$name timed out")
-                EdgeCC(x = pt1.y, y = pt2.y))))))
+                EdgeCC(x = pt1.y, y = pt2.y)))))
+      .distinct)
       .sortBy(_.y).sortBy(_.x)
-      println(s"\nIT,$name,collections,$it")
+      // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -176,7 +202,7 @@ class TOAndersensQuery extends QueryBenchmark {
 
     val result = andersens_derived.select.sortBy(_.y).sortBy(_.x)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

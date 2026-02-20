@@ -11,7 +11,8 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table, Query}
+import tyql.*
+import tyql.Query.fix
 import tyql.Expr.max
 
 @experimental
@@ -71,32 +72,51 @@ class TOOrbitsQuery extends QueryBenchmark {
   // Execute queries
   def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
     val queryStr =
-      "WITH RECURSIVE recursive1 AS ((SELECT * FROM orbits_base as orbits_base1) UNION ALL ((SELECT ref0.x as x, ref1.y as y FROM recursive1 as ref0, recursive1 as ref1 WHERE ref0.y = ref1.x)))\n SELECT * FROM recursive1 as recref0 WHERE EXISTS (SELECT * FROM (SELECT ref4.x as x, ref5.y as y FROM recursive1 as ref4, recursive1 as ref5 WHERE ref4.y = ref5.x) as subquery9 WHERE recref0.x = subquery9.x AND recref0.y = subquery9.y) ORDER BY y ASC, x ASC"
+      "WITH RECURSIVE recursive1 AS MATERIALIZED ((SELECT * FROM orbits_base as orbits_base1) UNION ((SELECT ref0.x as x, ref1.y as y FROM recursive1 as ref0, recursive1 as ref1 WHERE ref0.y = ref1.x)))\n SELECT * FROM recursive1 as recref0 WHERE EXISTS (SELECT * FROM (SELECT ref4.x as x, ref5.y as y FROM recursive1 as ref4, recursive1 as ref5 WHERE ref4.y = ref5.x) as subquery9 WHERE recref0.x = subquery9.x AND recref0.y = subquery9.y) ORDER BY y ASC, x ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.base
     val orbits =
-      if (set)
-        base.unrestrictedBagFix(orbits =>
-          orbits.flatMap(p =>
-            orbits
-              .filter(e => p.y == e.x)
-              .map(e => (x = p.x, y = e.y).toRow)
-          )
+      base.unrestrictedFix(orbits =>
+        orbits.flatMap(p =>
+          orbits
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
         )
-      else
-        base.unrestrictedFix(orbits =>
-          orbits.flatMap(p =>
-            orbits
-              .filter(e => p.y == e.x)
-              .map(e => (x = p.x, y = e.y).toRow)
-          )
-        )
+      )
 
 
     val query = orbits match
-      case Query.MultiRecursive(_, _, orbitsRef) =>
+      case Query.MultiRecursive(_, _, orbitsRef, _) =>
+        orbits.filter(o =>
+          orbitsRef
+            .flatMap(o1 =>
+              orbitsRef
+                .filter(o2 => o1.y == o2.x)
+                .map(o2 => (x = o1.x, y = o2.y).toRow))
+            .filter(io => o.x == io.x && o.y == io.y)
+            .nonEmpty
+        ).sort(_.x, Ord.ASC).sort(_.y, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val base = tyqlDB.base
+    val orbitsOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
+    val orbits =
+      base.fix(orbitsOptions, materialized = true)(orbits =>
+        orbits.flatMap(p =>
+          orbits
+            .filter(e => p.y == e.x)
+            .map(e => (x = p.x, y = e.y).toRow)
+        ).distinct
+      )
+
+
+    val query = orbits match
+      case Query.MultiRecursive(_, _, orbitsRef, _) =>
         orbits.filter(o =>
           orbitsRef
             .flatMap(o1 =>
@@ -136,7 +156,7 @@ class TOOrbitsQuery extends QueryBenchmark {
         )
       )
     ).sortBy(_.x).sortBy(_.y)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -169,7 +189,7 @@ class TOOrbitsQuery extends QueryBenchmark {
       "     WHERE recref0.x = subquery9.x AND recref0.y = subquery9.y)" +
       " ORDER BY recref0.y, recref0.x"
     )
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

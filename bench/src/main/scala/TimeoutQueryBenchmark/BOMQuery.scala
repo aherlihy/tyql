@@ -11,7 +11,8 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.*
+import tyql.Query.fix
 import tyql.Expr.max
 
 @experimental
@@ -82,32 +83,38 @@ class TOBOMQuery extends QueryBenchmark {
   // Execute queries
   def executeJDBC_RSQL(ddb: DuckDBBackend): Unit =
     val queryStr =
-      "WITH RECURSIVE recursive1 AS ((SELECT * FROM bom_basic as bom_basic1) UNION ALL ((SELECT bom_assbl3.part as part, ref1.days as days FROM bom_assbl as bom_assbl3, recursive1 as ref1 WHERE bom_assbl3.spart = ref1.part)))\nSELECT recref0.part as part, MAX(recref0.days) as max FROM recursive1 as recref0 GROUP BY recref0.part ORDER BY max ASC, part ASC"
+      "WITH RECURSIVE recursive1 AS ((SELECT * FROM bom_basic as bom_basic1) UNION ((SELECT bom_assbl3.part as part, ref1.days as days FROM bom_assbl as bom_assbl3, recursive1 as ref1 WHERE bom_assbl3.spart = ref1.part)))\nSELECT recref0.part as part, MAX(recref0.days) as max FROM recursive1 as recref0 GROUP BY recref0.part ORDER BY max ASC, part ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val waitFor = tyqlDB.basic
     val query =
-      if (set)
-        waitFor.unrestrictedBagFix(waitFor =>
-          tyqlDB.assbl.flatMap(assbl =>
-            waitFor
-              .filter(wf => assbl.spart == wf.part)
-              .map(wf => (part = assbl.part, days = wf.days).toRow)))
-        .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
-        .groupBySource(wf => (part = wf._1.part).toRow)
-        .sort(_.part, Ord.ASC)
-        .sort(_.max, Ord.ASC)
-      else
-        waitFor.unrestrictedFix(waitFor =>
-          tyqlDB.assbl.flatMap(assbl =>
-            waitFor
-              .filter(wf => assbl.spart == wf.part)
-              .map(wf => (part = assbl.part, days = wf.days).toRow)))
-        .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
-        .groupBySource(wf => (part = wf._1.part).toRow)
-        .sort(_.part, Ord.ASC)
-        .sort(_.max, Ord.ASC)
+      waitFor.unrestrictedFix(waitFor =>
+        tyqlDB.assbl.flatMap(assbl =>
+          waitFor
+            .filter(wf => assbl.spart == wf.part)
+            .map(wf => (part = assbl.part, days = wf.days).toRow)))
+      .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
+      .groupBySource(wf => (part = wf._1.part).toRow)
+      .sort(_.part, Ord.ASC)
+      .sort(_.max, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val waitFor = tyqlDB.basic
+    val bomOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
+    val query =
+      waitFor.fix(bomOptions)(waitFor =>
+        tyqlDB.assbl.flatMap(assbl =>
+          waitFor
+            .filter(wf => assbl.spart == wf.part)
+            .map(wf => (part = assbl.part, days = wf.days).toRow)).distinct)
+      .aggregate(wf => (part = wf.part, max = max(wf.days)).toGroupingRow)
+      .groupBySource(wf => (part = wf._1.part).toRow)
+      .sort(_.part, Ord.ASC)
+      .sort(_.max, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
@@ -129,11 +136,11 @@ class TOBOMQuery extends QueryBenchmark {
         )
       )
       .groupBy(_.part)
-      .mapValues(_.maxBy(_.max))
-      .values.toSeq
+      .view.mapValues(_.maxBy(_.max))
+      .toMap.values.toSeq
       .sortBy(_.part)
       .sortBy(_.max)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -156,7 +163,7 @@ class TOBOMQuery extends QueryBenchmark {
     //    bom_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(s"SELECT s.part as part, MAX(s.max) as max FROM ${ScalaSQLTable.name(bom_derived)} as s GROUP BY s.part ORDER BY max, part")
 
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

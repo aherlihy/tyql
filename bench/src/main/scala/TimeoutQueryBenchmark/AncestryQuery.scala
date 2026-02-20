@@ -5,13 +5,15 @@ import scalasql.PostgresDialect.*
 import scalasql.core.SqlStr.SqlStringSyntax
 import scalasql.{Expr, query, Table as ScalaSQLTable}
 import Helpers.*
+import scala.language.implicitConversions
 
 import java.sql.{Connection, ResultSet}
 import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.*
+import tyql.Query.fix
 import tyql.Expr.{IntLit, min}
 
 @experimental
@@ -72,13 +74,29 @@ class TOAncestryQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT ancestry_parents1.child as name, 1 as gen FROM ancestry_parents as ancestry_parents1 WHERE ancestry_parents1.parent = '1') UNION ((SELECT ancestry_parents3.child as name, ref3.gen + 1 as gen FROM ancestry_parents as ancestry_parents3, recursive1 as ref3 WHERE ancestry_parents3.parent = ref3.name)))\n SELECT recref0.name as name FROM recursive1 as recref0 WHERE recref0.gen = 2 ORDER BY name ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.parents.filter(p => p.parent == parentName).map(e => (name = e.child, gen = IntLit(1)).toRow)
-    val query = base.fix(gen =>
+    val query = base.unrestrictedFix(gen =>
       tyqlDB.parents.flatMap(parent =>
         gen
           .filter(g => parent.parent == g.name)
-          .map(g => (name = parent.child, gen = g.gen + 1).toRow)
+          .map(g => (name = parent.child, gen = g.gen + IntLit(1)).toRow)
+      ).distinct
+    ).filter(g => g.gen == 2)
+      .map(g => (name = g.name).toRow)
+      .sort(_.name, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val base = tyqlDB.parents.filter(p => p.parent == parentName).map(e => (name = e.child, gen = IntLit(1)).toRow)
+    val sgOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
+    val query = base.fix(sgOptions)(gen =>
+      tyqlDB.parents.flatMap(parent =>
+        gen
+          .filter(g => parent.parent == g.name)
+          .map(g => (name = parent.child, gen = g.gen + IntLit(1)).toRow)
       ).distinct
     ).filter(g => g.gen == 2)
       .map(g => (name = g.name).toRow)
@@ -103,7 +121,7 @@ class TOAncestryQuery extends QueryBenchmark {
               GenCC(name = parent.child, gen = g.gen + 1))
         ).distinct
     ).filter(g => g.gen == 2).map(g => ResultCC(name = g.name)).sortBy(_.name)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
     var it = 0
@@ -132,7 +150,7 @@ class TOAncestryQuery extends QueryBenchmark {
       .sortBy(_.name)
       .map(r => r.name)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

@@ -11,7 +11,8 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.*
+import tyql.Query.fix
 import tyql.Expr.min
 
 @experimental
@@ -83,9 +84,27 @@ class TOSSSPQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT * FROM sssp_base as sssp_base1) UNION ((SELECT sssp_edge3.dst as dst, ref1.cost + sssp_edge3.cost as cost FROM sssp_edge as sssp_edge3, recursive1 as ref1 WHERE ref1.dst = sssp_edge3.src)))\n SELECT recref0.dst as dst, MIN(recref0.cost) as cost FROM recursive1 as recref0 GROUP BY recref0.dst ORDER BY dst ASC, cost ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val base = tyqlDB.base
-    val query = base.fix(sp =>
+    val query = base.unrestrictedFix(sp =>
+      tyqlDB.edge.flatMap(edge =>
+        sp
+          .filter(s => s.dst == edge.src)
+          .map(s => (dst = edge.dst, cost = s.cost + edge.cost).toRow)
+      ).distinct
+    )
+      .aggregate(s => (dst = s.dst, cost = min(s.cost)).toGroupingRow)
+      .groupBySource(s => (dst = s._1.dst).toRow)
+      .sort(_.cost, Ord.ASC)
+      .sort(_.dst, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val base = tyqlDB.base
+    val ssspOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
+    val query = base.fix(ssspOptions)(sp =>
       tyqlDB.edge.flatMap(edge =>
         sp
           .filter(s => s.dst == edge.src)
@@ -117,11 +136,11 @@ class TOSSSPQuery extends QueryBenchmark {
         ).distinct
       )
       .groupBy(_.dst)
-      .mapValues(_.minBy(_.cost))
-      .values.toSeq
+      .view.mapValues(_.minBy(_.cost))
+      .toMap.values.toSeq
       .sortBy(_.cost)
       .sortBy(_.dst)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -144,7 +163,7 @@ class TOSSSPQuery extends QueryBenchmark {
 
     //    sssp_base.select.groupBy(_.dst)(_.dst) groupBy does not work with ScalaSQL + postgres
     backupResultScalaSql = ddb.runQuery(s"SELECT s.dst as dst, MIN(s.cost) as cost FROM ${ScalaSQLTable.name(sssp_derived)} as s GROUP BY s.dst ORDER BY dst, cost")
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeTyQLResult(): Unit =

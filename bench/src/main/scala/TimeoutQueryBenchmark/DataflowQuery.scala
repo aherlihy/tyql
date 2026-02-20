@@ -11,7 +11,8 @@ import scala.annotation.experimental
 import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
-import tyql.{Ord, Table}
+import tyql.*
+import tyql.Query.fix
 import tyql.Expr.{IntLit, min}
 
 @experimental
@@ -91,31 +92,36 @@ class TODataflowQuery extends QueryBenchmark {
       "WITH RECURSIVE recursive1 AS ((SELECT * FROM dataflow_jumpOp as dataflow_jumpOp1) UNION ((SELECT ref0.a as a, ref1.b as b FROM recursive1 as ref0, recursive1 as ref1 WHERE ref0.b = ref1.a)))\n SELECT dataflow_readOp8.opN as r, dataflow_writeOp9.opN as w FROM recursive1 as recref0, dataflow_readOp as dataflow_readOp8, dataflow_writeOp as dataflow_writeOp9 WHERE dataflow_writeOp9.opN = recref0.a AND dataflow_writeOp9.varN = dataflow_readOp8.varN AND recref0.b = dataflow_readOp8.opN ORDER BY w ASC, r ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val query =
-      if (set)
-        tyqlDB.jumpOp
-          .unrestrictedFix(flow =>
-            flow.flatMap(f1 =>
-              flow.filter(f2 => f1.b == f2.a).map(f2 =>
-                (a = f1.a, b = f2.b).toRow)))
-          .flatMap(f =>
-            tyqlDB.readOp.flatMap(r =>
-              tyqlDB.writeOp
-                .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
-                .map(w => (r = r.opN, w = w.opN).toRow)))
+      tyqlDB.jumpOp
+        .unrestrictedFix(flow =>
+          flow.flatMap(f1 =>
+            flow.filter(f2 => f1.b == f2.a).map(f2 =>
+              (a = f1.a, b = f2.b).toRow)))
+        .flatMap(f =>
+          tyqlDB.readOp.flatMap(r =>
+            tyqlDB.writeOp
+              .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
+              .map(w => (r = r.opN, w = w.opN).toRow)))
           .sort(_.r, Ord.ASC).sort(_.w, Ord.ASC)
-      else
-        tyqlDB.jumpOp
-          .unrestrictedBagFix(flow =>
-            flow.flatMap(f1 =>
-              flow.filter(f2 => f1.b == f2.a).map(f2 =>
-                (a = f1.a, b = f2.b).toRow)))
-          .flatMap(f =>
-            tyqlDB.readOp.flatMap(r =>
-              tyqlDB.writeOp
-                .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
-                .map(w => (r = r.opN, w = w.opN).toRow)))
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    val dataflowOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
+    val query =
+      tyqlDB.jumpOp
+        .fix(dataflowOptions)(flow =>
+          flow.flatMap(f1 =>
+            flow.filter(f2 => f1.b == f2.a).map(f2 =>
+              (a = f1.a, b = f2.b).toRow)).distinct)
+        .flatMap(f =>
+          tyqlDB.readOp.flatMap(r =>
+            tyqlDB.writeOp
+              .filter(w => w.opN == f.a && w.varN == r.varN && f.b == r.opN)
+              .map(w => (r = r.opN, w = w.opN).toRow)))
           .sort(_.r, Ord.ASC).sort(_.w, Ord.ASC)
 
     val queryStr = query.toQueryIR.toSQLString()
@@ -147,7 +153,7 @@ class TODataflowQuery extends QueryBenchmark {
               if Thread.currentThread().isInterrupted then throw new Exception(s"$name timed out")
               ResultCC(r = r.opN, w = w.opN))))
       .sortBy(_.r).sortBy(_.w)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -182,7 +188,7 @@ class TODataflowQuery extends QueryBenchmark {
     "WHERE writeOp169.opN = recref13.a AND writeOp169.varN = readOp168.varN AND recref13.b = readOp168.opN ORDER BY w ASC, r ASC;"
     backupResultScalaSql = ddb.runQuery(result)
 
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

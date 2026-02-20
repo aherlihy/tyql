@@ -33,8 +33,10 @@ object TreePrettyPrinter {
 
   extension (fun: QueryFun[?, ?]) {
     def prettyPrint(depth: Int): String = fun match
-      case QueryFun(param, body: DatabaseAST[?]) =>
+      case QueryFun(param: QueryRef[?, ?], body: DatabaseAST[?]) =>
         s"${indent(depth)}FunR(${param.prettyPrint(0)} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case QueryFun(param, body) =>
+        s"${indent(depth)}FunR(${param.toString} =>\n${body.toString}\n${indent(depth)})"
   }
 
   extension (expr: Expr[?, ?, ?]) {
@@ -155,7 +157,7 @@ object TreePrettyPrinter {
         s"${indent(depth)}IntersectAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case ExceptAll(thisQuery, other) =>
         s"${indent(depth)}ExceptAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case MultiRecursive(refs, querys, finalQ) =>
+      case MultiRecursive(refs, querys, finalQ, _) =>
         val refStr = refs.toList.map(r => r.toQuery.prettyPrint(depth+1))
         val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?, ?]].prettyPrint(depth + 2))
         val str = refStr.zip(qryStr).map((r, q) => s"\n$r :=\n$q").mkString(",\n")
@@ -198,7 +200,7 @@ object TreePrettyPrinter {
         val childrenPrint = naryRelationOp.children.map(_.prettyPrintIR(depth + 1, printAST))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", naryRelationOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}N-aryRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
-      case MultiRecursiveRelationOp(alias, query, finalQ, carriedSymbols, ast) =>
+      case MultiRecursiveRelationOp(alias, query, finalQ, carriedSymbols, ast, _) =>
         val qryStr = query.map(q => q.prettyPrintIR(depth + 1, false))
         val finalQStr = finalQ.prettyPrintIR(depth + 1, false)
         val str = alias.zip(qryStr).map((r, q) => s"\n$r => \n$q").mkString(",\n")

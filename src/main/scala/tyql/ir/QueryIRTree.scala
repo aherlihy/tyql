@@ -237,7 +237,7 @@ object QueryIRTree:
             SelectAllQuery(Seq(v), Seq(), Some(v.alias), multiRecursive.$resultQuery)
           case q => ??? //generateQuery(q, allSymbols, multiRecursive.$resultQuery)
 
-        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive)
+        MultiRecursiveRelationOp(aliases, separatedSQ, finalQ.appendFlag(SelectFlags.Final), vars, multiRecursive, multiRecursive.$materialized)
 
       case Query.NewGroupBy(source, grouping, sourceRefs, tags, having) =>
         val sourceIR = generateQuery(source, symbols)
@@ -248,7 +248,7 @@ object QueryIRTree:
           case SelectAllQuery(from, _, _, _) =>
             if from.length != tags.length then throw new Exception("Unimplemented: groupBy on complex query")
             from
-          case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _) =>
+          case MultiRecursiveRelationOp(_, _, _, carriedSymbols, _, _) =>
             carriedSymbols.map(_._2)
           case _ => throw new Exception("Unimplemented: groupBy on complex query")
 
@@ -271,9 +271,9 @@ object QueryIRTree:
           case SelectAllQuery(from, where, overrideAlias, ast) =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, from, where, None, groupBy)
-          case MultiRecursiveRelationOp(aliases, query, finalQ, carriedSymbols, ast) =>
+          case MultiRecursiveRelationOp(aliases, query, finalQ, carriedSymbols, ast, mat) =>
             val newSource = getSource(finalQ).appendFlags(finalQ.flags)
-            MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, ast)
+            MultiRecursiveRelationOp(aliases, query, newSource, carriedSymbols, ast, mat)
           case _ =>
             val select = generateFun(groupBy.$selectFn, fromIR, symbols)
             SelectQuery(select, Seq(fromIR), Seq(), None, groupBy) // force subquery
@@ -331,7 +331,12 @@ object QueryIRTree:
       case _ => Seq()
     val children = tupleOfProject.toList.zipWithIndex
       .map((expr, idx) =>
-        val e = expr.asInstanceOf[Expr[?, ?, ?]]
+        val e = expr match
+          case e: Expr[?, ?, ?] => e
+          case i: Int => Expr.IntLit(i)
+          case s: String => Expr.StringLit(s)
+          case d: Double => Expr.DoubleLit(d)
+          case other => throw new Exception(s"Unsupported literal type in projection: ${other.getClass}")
         AttrExpr(generateExpr(e, symbols), namedTupleNames(idx), e)
       )
     ProjectClause(children, p)

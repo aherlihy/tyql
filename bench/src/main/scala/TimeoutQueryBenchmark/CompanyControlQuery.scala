@@ -11,7 +11,8 @@ import scala.jdk.CollectionConverters.*
 import scala.language.experimental.namedTuples
 import scala.NamedTuple.*
 import tyql.{Ord, Query, Table}
-import tyql.Query.{fix, unrestrictedFix}
+import tyql.*
+import tyql.Query.{unrestrictedFix, unrestrictedBagFix, fix}
 import tyql.Expr.{IntLit, StringLit, min, sum}
 import Helpers.*
 
@@ -84,8 +85,30 @@ class TOCompanyControlQuery extends QueryBenchmark {
       " WITH RECURSIVE recursive1 AS ((SELECT * FROM cc_shares as cc_shares2) UNION ((SELECT ref0.com1 as byC, ref1.of as of, SUM(ref1.percent) as percent FROM recursive2 as ref0, recursive1 as ref1 WHERE ref1.byC = ref0.com2 GROUP BY ref0.com1, ref1.of))),\nrecursive2 AS ((SELECT * FROM cc_control as cc_control8) UNION ((SELECT ref5.byC as com1, ref5.of as com2 FROM recursive1 as ref5 WHERE ref5.percent > 50)))\n SELECT * FROM recursive2 as recref1 ORDER BY com2 ASC, com1 ASC"
     resultJDBC_RSQL = ddb.runQuery(queryStr)
 
-  def executeTyQL(ddb: DuckDBBackend): Unit =
+  def executeUnrestrictedTyQL(ddb: DuckDBBackend): Unit =
     val (cshares, control) = unrestrictedFix(tyqlDB.shares, tyqlDB.control)((cshares, control) =>
+      val csharesRecur = control.aggregate(con =>
+        cshares
+          .filter(cs => cs.byC == con.com2)
+          .aggregate(cs => (byC = con.com1, of = cs.of, percent = sum(cs.percent)).toGroupingRow)
+      ).groupBySource(
+        (con, csh) => (byC = con.com1, of = csh.of).toRow
+      ).distinct
+      val controlRecur = cshares
+        .filter(s => s.percent > 50)
+        .map(s => (com1 = s.byC, com2 = s.of).toRow)
+        .distinct
+      (csharesRecur, controlRecur)
+    )
+    val query = control.sort(_.com1, Ord.ASC).sort(_.com2, Ord.ASC)
+
+    val queryStr = query.toQueryIR.toSQLString()
+    resultTyql = ddb.runQuery(queryStr)
+
+  def executeCustomTyQL(ddb: DuckDBBackend): Unit =
+    import RestrictedQuery.*
+    val ccOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (cshares, control) = fix(ccOptions)(tyqlDB.shares, tyqlDB.control)((cshares, control) =>
       val csharesRecur = control.aggregate(con =>
         cshares
           .filter(cs => cs.byC == con.com2)
@@ -139,7 +162,7 @@ class TOCompanyControlQuery extends QueryBenchmark {
       (csharesRecur, controlRecur)
     )
     resultCollections = control.sortBy(_.com1).sortBy(_.com2)
-    println(s"\nIT,$name,collections,$it")
+    // println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -185,7 +208,7 @@ class TOCompanyControlQuery extends QueryBenchmark {
 
     val result = cc_derived2.select.sortBy(_.com1).sortBy(_.com2)
     resultScalaSQL = db.run(result)
-    println(s"\nIT,$name,scalasql,$it")
+    // println(s"\nIT,$name,scalasql,$it")
 
 
   // Write results to csv for checking

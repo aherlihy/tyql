@@ -1,9 +1,9 @@
 package test.query.recursiveconstraints
 
 import test.{SQLStringQueryTest, TestDatabase}
-import tyql.{Query, RestrictedQuery, Table, SetResult}
+import tyql.{Query, RestrictedQuery, Table, SetResult, RestrictedConstructors, Monotone, Linear, AllowMutual}
+import Query.{fix, restrictedFix}
 import tyql.Expr.sum
-import tyql.Query.fix
 
 import scala.compiletime.summonInline
 import scala.reflect.Typeable
@@ -34,7 +34,7 @@ class RecursionConstraintRangeRestrictionTest extends SQLStringQueryTest[TCDB, E
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.restrictedFix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -73,7 +73,7 @@ class RecursionConstraintRangeRestrictionFailTest extends munit.FunSuite {
 
           // TEST
           val path = tables.edges
-          path.fix(path =>
+          path.restrictedFix(path =>
             path.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -89,7 +89,7 @@ class RecursionConstraintCategoryResultTest extends SQLStringQueryTest[TCDB, Edg
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.restrictedFix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -131,7 +131,7 @@ class RecursionConstraintCategoryUnionAllFailTest extends munit.FunSuite {
 
           // TEST
           val path = tables.edges
-          path.fix(path =>
+          path.restrictedFix(path =>
             path.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -165,7 +165,7 @@ class RecursionConstraintCategoryFlatmapFailTest extends munit.FunSuite {
 
           // TEST
           val path = tables.edges
-          path.fix(path =>
+          path.restrictedFix(path =>
             path.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -177,112 +177,74 @@ class RecursionConstraintCategoryFlatmapFailTest extends munit.FunSuite {
   }
 }
 class RecursionConstraintMonotonic1FailTest extends munit.FunSuite {
-  def testDescription: String = "Aggregation within recursive definition"
-  def expectedError: String = "value aggregate is not a member of tyql.RestrictedQueryRef"
+  def testDescription: String = "Aggregation within recursive definition rejected by monotone constraint"
+  def expectedError: String = "Cannot prove that tyql.Monotone =:= tyql.NonMonotone"
 
   test(testDescription) {
     val error: String =
       compileErrors(
         """
-           // BOILERPLATE
            import language.experimental.namedTuples
-           import tyql.{Table, Expr, Query}
+           import tyql.*
+           import Expr.sum
+           import Query.fix
 
            type Edge = (x: Int, y: Int)
-           type Edge2 = (z: Int, q: Int)
-           type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
+           val base = Table[Edge]("edges")
 
-           val tables = (
-             edges = Table[Edge]("edges"),
-             otherEdges = Table[Edge2]("otherEdges"),
-             emptyEdges = Table[Edge]("empty")
+           base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+             pathRec.aggregate(p => (x = sum(p.x), y = sum(p.y)).toGroupingRow).groupBySource(p => (x = p._1.x).toRow).distinct
            )
-
-          // TEST
-          val pathBase = tables.edges
-          val pathToABase = tables.emptyEdges
-          val (pathResult, pathToAResult) = Query.fix(pathBase, pathToABase)((path, pathToA) =>
-            val P = path.flatMap(p =>
-              tables.edges
-                .filter(e => p.y == e.x)
-                .map(e => (x = p.x, y = e.y).toRow)
-            )
-            val PtoA = path.aggregate(e => Expr.Avg(e.x) == "A")
-            (P, PtoA)
-          )
           """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
 class RecursionConstraintMonotonic2FailTest extends munit.FunSuite {
-  def testDescription: String = "Aggregation within recursive definition using query-level agg"
-  def expectedError: String = "value size is not a member of tyql.RestrictedQueryRef"
+  def testDescription: String = "Aggregation (single expr) within recursive definition rejected by monotone constraint"
+  def expectedError: String = "Cannot prove that tyql.Monotone =:= tyql.NonMonotone"
 
   test(testDescription) {
     val error: String =
       compileErrors(
         """
-           // BOILERPLATE
            import language.experimental.namedTuples
-           import tyql.{Table, Expr, Query}
+           import tyql.*
+           import Expr.sum
+           import Query.fix
 
            type Edge = (x: Int, y: Int)
-           type Edge2 = (z: Int, q: Int)
-           type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
+           val base = Table[Edge]("edges")
 
-           val tables = (
-             edges = Table[Edge]("edges"),
-             otherEdges = Table[Edge2]("otherEdges"),
-             emptyEdges = Table[Edge]("empty")
+           base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
+             pathRec.aggregate(p => sum(p.x)).groupBySource(p => (x = p._1.x).toRow).distinct
            )
-
-          // TEST
-          val pathBase = tables.edges
-          val pathToABase = tables.emptyEdges
-          val (pathResult, pathToAResult) = Query.fix(pathBase, pathToABase)((path, pathToA) =>
-            val P = path.flatMap(p =>
-              tables.edges
-                .filter(e => p.y == e.x)
-                .map(e => (x = p.x, y = e.y).toRow)
-            ).distinct
-            val PtoA = path.size()
-            (P, PtoA)
-          )
           """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
 }
 class RecursionConstraintMonotonicInlineFailTest extends munit.FunSuite {
-  def testDescription: String = "Aggregation within inline fix"
-  def expectedError: String = "value aggregate is not a member of tyql.RestrictedQueryRef"
+  def testDescription: String = "Aggregation within fix with Monotone constraint"
+  def expectedError: String = "Cannot prove that tyql.Monotone =:= tyql.NonMonotone"
 
   test(testDescription) {
     val error: String =
       compileErrors(
         """
-           // BOILERPLATE
            import language.experimental.namedTuples
-           import tyql.{Table, Expr}
+           import tyql.*
+           import Expr.{avg, sum}
+           import Query.fix
 
            type Edge = (x: Int, y: Int)
-           type Edge2 = (z: Int, q: Int)
-           type TCDB = (edges: Edge, otherEdges: Edge2, emptyEdges: Edge)
+           val base = Table[Edge]("edges")
 
-           val tables = (
-             edges = Table[Edge]("edges"),
-             otherEdges = Table[Edge2]("otherEdges"),
-             emptyEdges = Table[Edge]("empty")
+           base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
+             pathRec.aggregate(p =>
+               base
+                 .filter(e => p.y == e.x)
+                 .aggregate(e => (x = avg(p.x), y = sum(e.y)).toGroupingRow)
+             ).groupBySource((p, e) => (x = p.x).toRow).distinct
            )
-
-          // TEST
-          val path = tables.edges
-          path.fix(path =>
-            path.aggregate(p =>
-              tables.edges
-                .filter(e => p.y == e.x)
-                .aggregate(e => (x = Expr.avg(p.x), y = Expr.sum(e.y)).toRow)
-            )
-          )
           """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
   }
@@ -293,7 +255,7 @@ class RecursiveConstraintLinearTest extends SQLStringQueryTest[TCDB, Int] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix(path =>
+    path.restrictedFix(path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -313,9 +275,9 @@ class RecursiveConstraintLinearTest extends SQLStringQueryTest[TCDB, Int] {
 }
 
 class RecursiveConstraintLinearFailInline0Test extends munit.FunSuite {
-  def testDescription: String = "Non-linear recursion: 0 usages of path, inline fix"
+  def testDescription: String = "Non-linear recursion: 0 usages of path, inline restrictedFix"
 
-  // Special because inline fix
+  // Special because inline restrictedFix
   def expectedError: String = "Found:    tyql.Query[(x : Int, y : Int), tyql.SetResult]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)"
 
   test(testDescription) {
@@ -336,7 +298,7 @@ class RecursiveConstraintLinearFailInline0Test extends munit.FunSuite {
 
             // TEST
             val path = tables.edges
-            path.fix(path =>
+            path.restrictedFix(path =>
               tables.edges.flatMap(p =>
                 tables.edges2
                   .filter(e => p.y == e.x)
@@ -348,9 +310,9 @@ class RecursiveConstraintLinearFailInline0Test extends munit.FunSuite {
   }
 }
 
-// TODO: improve error messages for inline fix
+// TODO: improve error messages for inline restrictedFix
 class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
-  def testDescription: String = "Non-linear recursion: 2 usages of path, inline fix"
+  def testDescription: String = "Non-linear recursion: 2 usages of path, inline restrictedFix"
 
 //  def expectedError: String = "Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice"
   def expectedError: String = "Found:    tyql.RestrictedQuery[(x : Int, y : Int), tyql.SetResult,\n  ((0 : Int), (0 : Int)), tyql.RestrictedConstructors, tyql.MonotoneRestriction]\nRequired: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple1[(0 : Int)"
@@ -372,7 +334,7 @@ class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
 
               // TEST
               val path = tables.edges
-               path.fix(path =>
+               path.restrictedFix(path =>
                  path.flatMap(p =>
                   path
                     .filter(e => p.y == e.x)
@@ -408,7 +370,7 @@ class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
 //            // TEST
 //              val pathBase = tables.edges
 //              val path2Base = tables.emptyEdges
-//              val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+//              val (pathResult, path2Result) = restrictedFix(pathBase, path2Base)((path, path2) =>
 //                val P = path.flatMap(p =>
 //                 path
 //                    .filter(e => p.y == e.x)
@@ -427,9 +389,9 @@ class RecursiveConstraintLinearInline2xFailTest extends munit.FunSuite {
 //}
 
 class RecursiveConstraintLinearMultifix0FailTest extends munit.FunSuite {
-  def testDescription: String = "Non-linear recursion: zero usage of path in multifix"
+  def testDescription: String = "Non-linear recursion: zero usage of path in multifix, rejected by restrictedFix because mutual recursion not allowed"
 
-  def expectedError: String = "Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions"
+  def expectedError: String = "restrictedFix does not support mutual recursion, use fix to allow it"
 
   test(testDescription) {
     val error: String =
@@ -450,7 +412,7 @@ class RecursiveConstraintLinearMultifix0FailTest extends munit.FunSuite {
               // TEST
                 val pathBase = tables.edges
                 val pathToABase = tables.emptyEdges
-                val (pathResult, pathToAResult) = fix(pathBase, pathToABase)((path, pathToA) =>
+                val (pathResult, pathToAResult) = restrictedFix(pathBase, pathToABase)((path, pathToA) =>
                   val P = path.flatMap(p =>
                     tables.edges
                       .filter(e => p.y == e.x)
@@ -476,8 +438,9 @@ class RecursiveConstraintLinear5Test extends SQLStringQueryTest[TCDB, Edge] {
 //    type QT = (Query[Edge, ?], Query[Edge, ?])
 //    type DT = (Tuple1[0], (0, 1))
 //    type RQT = (RestrictedQuery[Edge, SetResult, Tuple1[0]], RestrictedQuery[Edge, SetResult, (0, 1)])
-//    val (pathResult, path2Result) = fix[QT, DT, RQT](pathBase, path2Base)((path, path2) =>
-    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+//    val (pathResult, path2Result) = restrictedFix[QT, DT, RQT](pathBase, path2Base)((path, path2) =>
+    val mutualOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (pathResult, path2Result) = fix(mutualOptions)(pathBase, path2Base)((path, path2) =>
       val P = path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -514,7 +477,8 @@ class RecursiveConstraintLinear6Test extends SQLStringQueryTest[TCDB, Edge] {
   def query() =
     val pathBase = testDB.tables.edges
     val path2Base = testDB.tables.emptyEdges
-    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+    val mutualOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (pathResult, path2Result) = fix(mutualOptions)(pathBase, path2Base)((path, path2) =>
       val P = path.union(path2)
       val P2 = path2.union(path)
       (P, P2)
@@ -547,7 +511,8 @@ class RecursiveConstraintLinear7Test extends SQLStringQueryTest[TCDB, Edge] {
   def query() =
     val pathBase = testDB.tables.edges
     val path2Base = testDB.tables.otherEdges
-    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+    val mutualOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (pathResult, path2Result) = fix(mutualOptions)(pathBase, path2Base)((path, path2) =>
       val P = path2.flatMap(p =>
         path
           .filter(e => p.q == e.x)
@@ -575,7 +540,7 @@ class RecursiveConstraintLinear7Test extends SQLStringQueryTest[TCDB, Edge] {
 }
 
 class RecursiveConstraintInvalidFailTest extends munit.FunSuite {
-  def testDescription: String = "Use multifix instead of fix for single definition"
+  def testDescription: String = "Use multifix instead of restrictedFix for single definition"
 
   def expectedError: String = "Found:    (pathBase : tyql.Table[Edge])\nRequired: Tuple"
 
@@ -598,7 +563,7 @@ class RecursiveConstraintInvalidFailTest extends munit.FunSuite {
                 // TEST
                   val pathBase = tables.edges
                   val pathToABase = tables.emptyEdges
-                  val (pathResult, path2Result) = fix(pathBase)((path, path2) =>
+                  val (pathResult, path2Result) = restrictedFix(pathBase)((path, path2) =>
                     val P = path2.flatMap(p =>
                       path
                         .filter(e => p.q == e.x)
@@ -614,7 +579,7 @@ class RecursiveConstraintInvalidFailTest extends munit.FunSuite {
 }
 
 class RecursiveConstraintInvalid2FailTest extends munit.FunSuite {
-  def testDescription: String = "Extra param in fix fns"
+  def testDescription: String = "Extra param in restrictedFix fns"
 
   def expectedError: String = "Wrong number of parameters"
 
@@ -637,7 +602,7 @@ class RecursiveConstraintInvalid2FailTest extends munit.FunSuite {
                   // TEST
                 val pathBase = tables.edges
                 val path2Base = tables.emptyEdges
-                val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2, path3) =>
+                val (pathResult, path2Result) = restrictedFix(pathBase, path2Base)((path, path2, path3) =>
                   val P = path2.flatMap(p =>
                     path
                       .filter(e => p.q == e.x)
@@ -654,7 +619,7 @@ class RecursiveConstraintInvalid2FailTest extends munit.FunSuite {
 }
 
 class RecursiveConstraintInvalid3FailTest extends munit.FunSuite {
-  def testDescription: String = "Too few param in fix fns"
+  def testDescription: String = "Too few param in restrictedFix fns"
 
   def expectedError: String = "Wrong number of parameters"
 
@@ -677,7 +642,7 @@ class RecursiveConstraintInvalid3FailTest extends munit.FunSuite {
                     // TEST
                 val pathBase = tables.edges
                 val path2Base = tables.emptyEdges
-                  val (pathResult, path2Result) = fix(pathBase, path2Base, path2Base)((path, path2) =>
+                  val (pathResult, path2Result) = restrictedFix(pathBase, path2Base, path2Base)((path, path2) =>
                     val P = path2.flatMap(p =>
                       path
                         .filter(e => p.q == e.x)
@@ -717,7 +682,7 @@ class RecursiveConstraintInvalid4FailTest extends munit.FunSuite {
     // TEST
       val pathBase = tables.edges
       val path2Base = tables.emptyEdges
-    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+    val (pathResult, path2Result) = restrictedFix(pathBase, path2Base)((path, path2) =>
       val P = path2.flatMap(p =>
         path
           .filter(e => p.q == e.x)
@@ -757,7 +722,7 @@ class RecursiveConstraintInvalid5FailTest extends munit.FunSuite {
     // TEST
       val pathBase = tables.edges
       val path2Base = tables.emptyEdges
-    val (pathResult, path2Result) = fix(pathBase, path2Base)((path, path2) =>
+    val (pathResult, path2Result) = restrictedFix(pathBase, path2Base)((path, path2) =>
       val P = path2.flatMap(p =>
         path
           .filter(e => p.q == e.x)
@@ -798,7 +763,7 @@ class RecursiveConstraintGroupbyInlineFailTest extends munit.FunSuite {
     // TEST
     val edges = tables.edges.groupBy(e => (x = e.x).toRow, e => (x = e.x, y = min(e.y)).toRow)
 
-    edges.fix(minReach =>
+    edges.restrictedFix(minReach =>
       minReach.flatMap(mr =>
         edges
           .filter(e => mr.y == e.x)
@@ -841,7 +806,7 @@ class RecursiveConstraintGroupbyMultifixFailTest extends munit.FunSuite {
     val ancestorBase = parentChild
     val descendantBase = parentChild
 
-    val (ancestorResult, descendantResult) = fix(ancestorBase, descendantBase) { (ancestor, descendant) =>
+    val (ancestorResult, descendantResult) = restrictedFix(ancestorBase, descendantBase) { (ancestor, descendant) =>
       val newAncestor = ancestor.flatMap(a =>
         parentChild
           .filter(p => a.y == p.x)
@@ -890,7 +855,7 @@ class RecursiveConstraintGroupbyMultifixFailTest extends munit.FunSuite {
 //    val ancestorBase = parentChild
 //    val descendantBase = parentChild
 //
-//    val (ancestorResult, descendantResult) = fix(ancestorBase, descendantBase) { (ancestor, descendant) =>
+//    val (ancestorResult, descendantResult) = restrictedFix(ancestorBase, descendantBase) { (ancestor, descendant) =>
 //      val newAncestor = parentChild.groupBy(
 //        row => (x = row.x).toRow,
 //        row => (x = row.x, mutual_friend_count = count(row.y)).toRow
@@ -932,7 +897,7 @@ class RecursiveConstraintGroupbyMultifixFailTest extends munit.FunSuite {
 //    )
 //
 //    // TEST
-//    val (cshares, control) = fix(tables.shares, tables.control)((cshares, control) =>
+//    val (cshares, control) = restrictedFix(tables.shares, tables.control)((cshares, control) =>
 //      val csharesRecur = control.flatMap(con =>
 //        cshares
 //          .filter(cs => cs.by == con.com2)
@@ -975,7 +940,7 @@ class RecursionConstraintCategoryUnionAll2FailTest extends munit.FunSuite {
 
           // TEST
           val base = tables.edges
-          base.fix(path =>
+          base.restrictedFix(path =>
             path.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -1000,12 +965,12 @@ class RecursionFibFailTest extends munit.FunSuite {
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
-           import Query.fix
+           import Query.restrictedFix
 
            type FibNum = (recursionDepth: Int, fibonacciNumber: Int, nextNumber: Int)
            val base = Table[FibNum]("base")
 
-           base.fix(fib =>
+           base.restrictedFix(fib =>
              fib
                .filter(f => (f.recursionDepth + 1) < 10)
                .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
@@ -1029,7 +994,7 @@ class RecursionShortestPathFailTest extends munit.FunSuite {
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
-           import Query.fix
+           import Query.restrictedFix
 
            type Edge = (x: Int, y: Int)
            type Path = (startNode: Int, endNode: Int, path: List[Int])
@@ -1039,7 +1004,7 @@ class RecursionShortestPathFailTest extends munit.FunSuite {
              .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
              .filter(p => p.startNode == 1)
 
-           pathBase.fix(path =>
+           pathBase.restrictedFix(path =>
              path.flatMap(p =>
                edge
                  .filter(e => e.x == p.endNode)
@@ -1064,7 +1029,7 @@ class RecursionTreeFailTest extends munit.FunSuite {
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
-           import Query.fix
+           import Query.restrictedFix
 
            type Tag = (id: Int, name: String, subclassof: Int)
            type TagHierarchy = (id: Int, source: String, path: List[String])
@@ -1074,7 +1039,7 @@ class RecursionTreeFailTest extends munit.FunSuite {
              .filter(t => t.subclassof == -1)
              .map(t => (id = t.id, source = t.name, path = List(t.name).toExpr).toRow)
 
-           tagHierarchy0.fix(tagHierarchy1 =>
+           tagHierarchy0.restrictedFix(tagHierarchy1 =>
              tagHierarchy1.flatMap(hier =>
                tag
                  .filter(t => t.subclassof == hier.id)
@@ -1099,14 +1064,14 @@ class AncestryFailTest extends munit.FunSuite {
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
-           import Query.fix
+           import Query.restrictedFix
 
            type Parent = (parent: String, child: String)
            val parent = Table[Parent]("parents")
 
            val base = parent.filter(p => p.parent == "Alice").map(e => (name = e.child, gen = Expr.IntLit(1)).toRow)
 
-           base.fix(gen =>
+           base.restrictedFix(gen =>
              parent.flatMap(parent =>
                gen
                  .filter(g => parent.parent == g.name)
@@ -1131,7 +1096,7 @@ class EvenOddFailTest extends munit.FunSuite {
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
-           import Query.fix
+           import Query.restrictedFix
 
            type Number = (id: Int, value: Int)
            val numbers = Table[Number]("numbers")
@@ -1139,7 +1104,7 @@ class EvenOddFailTest extends munit.FunSuite {
            val evenBase = numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = Expr.StringLit("even")).toRow)
            val oddBase = numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = Expr.StringLit("odd")).toRow)
 
-           val (even, odd) = fix((evenBase, oddBase))((even, odd) =>
+           val (even, odd) = restrictedFix((evenBase, oddBase))((even, odd) =>
              val evenResult = numbers.flatMap(num =>
                odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = Expr.StringLit("even")))
              ).distinct
@@ -1166,14 +1131,14 @@ class RecursionSSSPFailTest extends munit.FunSuite {
            // BOILERPLATE
            import language.experimental.namedTuples
            import tyql.{Table, Expr, Query}
-           import Query.fix
+           import Query.restrictedFix
 
            type WeightedEdge = (src: Int, dst: Int, cost: Int)
            val edge = Table[WeightedEdge]("edge")
 
            val base = Table[(dst: Int, cost: Int)]("base")
 
-           base.fix(sp =>
+           base.restrictedFix(sp =>
              edge.flatMap(edge =>
                sp
                  .filter(s => s.dst == edge.src)
@@ -1192,7 +1157,7 @@ class RecursionSSSPFailTest extends munit.FunSuite {
 //
 //  def query() =
 //    val path = testDB.tables.edges
-//    path.fix(path =>
+//    path.restrictedFix(path =>
 //      path.flatMap(p =>
 //        path
 //          .filter(e => p.y == e.x)

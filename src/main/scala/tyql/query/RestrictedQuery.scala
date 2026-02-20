@@ -3,7 +3,7 @@ package tyql
 import tyql.Utils.{GenerateIndices, HasDuplicate, ZipWithIndex}
 import tyql.{DatabaseAST, Expr, NonScalarExpr, Query, ResultTag}
 
-import scala.NamedTuple.AnyNamedTuple
+import scala.NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.annotation.{implicitNotFound, targetName}
 
 trait MonotoneRestriction
@@ -13,6 +13,10 @@ class NonMonotone extends MonotoneRestriction
 trait LinearRestriction
 class Linear extends LinearRestriction
 class NonLinear extends LinearRestriction
+
+trait MutualRestriction
+class NoMutual extends MutualRestriction
+class AllowMutual extends MutualRestriction
 
 case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int, RestrictionCF <: ConstructorFreedom, RestrictionM <: MonotoneRestriction](w: Option[Query.QueryRef[A, C]] = None) extends RestrictedQuery[A, C, Tuple1[ID], RestrictionCF, RestrictionM] (w.getOrElse(Query.QueryRef[A, C]())):
   type Self = this.type
@@ -33,6 +37,52 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple, RestrictionCF <: Const
   val tag: ResultTag[A] = qTag
   type deps
   def toQuery: Query[A, C] = wrapped
+
+  /** Aggregate returning AggregationExpr (single-level: sum, min, toGroupingRow).
+   *  Only available when monotonicity is disabled (NonMonotone). */
+  def aggregate[B: ResultTag]
+    (f: Expr.Ref[A, NonScalarExpr, RestrictionCF] => AggregationExpr[B])
+    (using RestrictionM =:= NonMonotone)
+  : RestrictedQuery.RestrictedAggregation[A *: EmptyTuple, B, D, RestrictionCF] =
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictionCF]()
+    val agg = Aggregation.AggFlatMap[A *: EmptyTuple, B](wrapped, Expr.Fun(ref, f(ref)))
+    RestrictedQuery.RestrictedAggregation[A *: EmptyTuple, B, D, RestrictionCF](agg)
+
+  /** Aggregate returning a named-tuple of mixed Expr/AggregationExpr (no .toGroupingRow needed).
+   *  Only available when monotonicity is disabled (NonMonotone). */
+  @targetName("restrictedAggregateNamedTuple")
+  def aggregate[B <: AnyNamedTuple: Expr.IsTupleOfMixedExpr]
+    (using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])
+    (f: Expr.Ref[A, NonScalarExpr, RestrictionCF] => B)
+    (using RestrictionM =:= NonMonotone)
+  : RestrictedQuery.RestrictedAggregation[A *: EmptyTuple, NamedTuple.Map[B, Expr.StripExpr], D, RestrictionCF] =
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictionCF]()
+    val row = AggregationExpr.AggProject(f(ref))
+    val agg = Aggregation.AggFlatMap[A *: EmptyTuple, NamedTuple.Map[B, Expr.StripExpr]](wrapped, Expr.Fun(ref, row))
+    RestrictedQuery.RestrictedAggregation[A *: EmptyTuple, NamedTuple.Map[B, Expr.StripExpr], D, RestrictionCF](agg)
+
+  /** Nested aggregate: f returns a RestrictedAggregation (from inner restricted .aggregate).
+   *  Source types accumulate. Dependencies concatenated. */
+  @targetName("restrictedAggregateNestedRestricted")
+  def aggregate[B: ResultTag, T <: Tuple, D2 <: Tuple]
+    (f: Expr.Ref[A, NonScalarExpr, RestrictionCF] => RestrictedQuery.RestrictedAggregation[T, B, D2, RestrictionCF])
+    (using RestrictionM =:= NonMonotone)
+  : RestrictedQuery.RestrictedAggregation[A *: T, B, Tuple.Concat[D, D2], RestrictionCF] =
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictionCF]()
+    val unwrapped: Expr.Ref[A, NonScalarExpr, RestrictionCF] => Aggregation[T, B] = r => f(r).wrapped
+    val agg = Aggregation.AggFlatMap[A *: T, B](wrapped, Expr.Fun(ref, unwrapped(ref)))
+    RestrictedQuery.RestrictedAggregation[A *: T, B, Tuple.Concat[D, D2], RestrictionCF](agg)
+
+  /** Nested aggregate: f returns a plain Aggregation (from non-recursive Query.aggregate).
+   *  No new dependencies added. Source types accumulate. */
+  @targetName("restrictedAggregateNestedPlain")
+  def aggregate[B: ResultTag, T <: Tuple]
+    (f: Expr.Ref[A, NonScalarExpr, RestrictionCF] => Aggregation[T, B])
+    (using RestrictionM =:= NonMonotone)
+  : RestrictedQuery.RestrictedAggregation[A *: T, B, D, RestrictionCF] =
+    val ref = Expr.Ref[A, NonScalarExpr, RestrictionCF]()
+    val agg = Aggregation.AggFlatMap[A *: T, B](wrapped, Expr.Fun(ref, f(ref)))
+    RestrictedQuery.RestrictedAggregation[A *: T, B, D, RestrictionCF](agg)
 
   // flatMap given a function that returns regular Query does not add any dependencies
   @targetName("restrictedQueryFlatMap")
@@ -170,7 +220,25 @@ object RestrictedQuery {
   type ExpectedResult[QT <: Tuple] = Tuple.Union[GenerateIndices[0, Tuple.Size[QT]]]
   type ActualResult[RT <: Tuple] = Tuple.Union[Tuple.FlatMap[RT, ExtractDependencies]]
 
-  // Proof of concept that you can selectively disable the monotone constraint
-  extension [A, C <: ResultCategory, D <: Tuple, RCF <: ConstructorFreedom](q: RestrictedQuery[A, C, D, RCF, NonMonotone])
-    def aggregate[B: ResultTag, T <: Tuple](f: Expr.Ref[A, NonScalarExpr, NonRestrictedConstructors] => Expr[B, ScalarExpr, ?]): RestrictedQuery[B, BagResult, D, RCF, NonMonotone] = ???
+  /**
+   * Restricted aggregation: wraps an Aggregation while preserving dependency tracking (D) and
+   * constructor freedom (RCF). Only producible from RestrictedQuery[..., NonMonotone].aggregate(...).
+   * Provides groupBySource which returns a RestrictedQuery, keeping all constraints enforceable.
+   */
+  class RestrictedAggregation[AllSourceTypes <: Tuple, Result, D <: Tuple, RCF <: ConstructorFreedom]
+    (using ResultTag[Result])(val wrapped: Aggregation[AllSourceTypes, Result]):
+
+    def groupBySource[GroupResult, GroupShape <: ExprShape]
+      (groupingFn: ToNonScalarRef[AllSourceTypes] => Expr[GroupResult, GroupShape, ?])
+    : RestrictedQuery[Result, BagResult, D, RCF, NonMonotone] =
+      RestrictedQuery(wrapped.groupBySource(groupingFn))
+
+    @targetName("groupBySourceNamedTuple")
+    def groupBySource[B <: AnyNamedTuple: Expr.IsTupleOfExpr]
+      (using rt: ResultTag[NamedTuple.Map[B, Expr.StripExpr]])
+      (groupingFn: ToNonScalarRef[AllSourceTypes] => B)
+    : RestrictedQuery[Result, BagResult, D, RCF, NonMonotone] =
+      import Expr.toRow
+      groupBySource[NamedTuple.Map[B, Expr.StripExpr], NonScalarExpr](r => groupingFn(r).toRow)
+
 }

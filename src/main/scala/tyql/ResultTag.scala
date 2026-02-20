@@ -17,7 +17,6 @@ enum ResultTag[T]:
   case ProductTag[T](productName: String, fields: ResultTag[NamedTuple.From[T]]) extends ResultTag[T]
   case ListTag[T](elementType: ResultTag[T]) extends ResultTag[List[T]]
   case AnyTag extends ResultTag[Any]
-// TODO: Add more types, specialize for DB backend
 object ResultTag:
   given ResultTag[Int] = ResultTag.IntTag
   given ResultTag[String] = ResultTag.StringTag

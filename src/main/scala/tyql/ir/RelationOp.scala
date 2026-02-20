@@ -374,21 +374,22 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
                                     query: Seq[RelationOp],
                                     finalQ: RelationOp,
                                     override val carriedSymbols: List[(String, RecursiveIRVar)],
-                                    ast: DatabaseAST[?]) extends RelationOp:
+                                    ast: DatabaseAST[?],
+                                    materialized: Boolean = false) extends RelationOp:
   val alias = finalQ.alias
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendWhere(w, astOther), carriedSymbols, ast
+      aliases, query, finalQ.appendWhere(w, astOther), carriedSymbols, ast, materialized
     ).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendProject(p, astOther), carriedSymbols, ast
+      aliases, query, finalQ.appendProject(p, astOther), carriedSymbols, ast, materialized
     ).appendFlags(flags)
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.mergeWith(r, astOther).appendFlag(Final), carriedSymbols, ast
+      aliases, query, finalQ.mergeWith(r, astOther).appendFlag(Final), carriedSymbols, ast, materialized
     ).appendFlags(flags)
 
   override def appendFlag(f: SelectFlags): RelationOp =
@@ -400,7 +401,8 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
     this
 
   override def toSQLString(): String =
-    val ctes = aliases.zip(query).map((a, q) => s"$a AS (${q.toSQLString()})").mkString(",\n")
+    val matHint = if materialized then " MATERIALIZED" else ""
+    val ctes = aliases.zip(query).map((a, q) => s"$a AS$matHint (${q.toSQLString()})").mkString(",\n")
     val inner = s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
     if (flags.contains(SelectFlags.Top))
       inner

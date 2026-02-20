@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS party_organizer;
+DROP TABLE IF EXISTS party_organizers;
 DROP TABLE IF EXISTS party_friends;
 DROP TABLE IF EXISTS party_counts;
 DROP TABLE IF EXISTS party_delta1;

@@ -1,12 +1,67 @@
 package test.query.recursivebenchmarks
 
 import test.{SQLStringAggregationTest, SQLStringQueryTest, TestDatabase}
-import tyql.Query.{MultiRecursive, fix, unrestrictedBagFix, unrestrictedFix}
+import tyql.Query.{MultiRecursive, restrictedFix, fix, unrestrictedBagFix, unrestrictedFix}
 import tyql.Expr.{IntLit, StringLit, count, max, min, sum}
-import tyql.{Ord, Table}
+import tyql.*
 
 import language.experimental.namedTuples
 import NamedTuple.*
+
+import scala.language.implicitConversions
+
+// Even-Odd types
+type Number = (id: Int, value: Int)
+type NumberType = (value: Int, typ: String)
+type EvenOddDB = (numbers: Number)
+
+given EvenOddBenchDBs: TestDatabase[EvenOddDB] with
+  override def tables = (
+    numbers = Table[Number]("numbers")
+  )
+
+// EO: Mono ✓, MR ✗, Lin ✓, Set ✓, CF ✗
+class EvenOddBenchTest extends SQLStringQueryTest[EvenOddDB, NumberType] {
+  def testDescription: String = "Even-Odd benchmark"
+
+  def query() =
+    val evenBase = testDB.tables.numbers.filter(n => n.value == 0).map(n => (value = n.value, typ = StringLit("even")).toRow)
+    val oddBase = testDB.tables.numbers.filter(n => n.value == 1).map(n => (value = n.value, typ = StringLit("odd")).toRow)
+
+    val options = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (even, odd) = fix(options)((evenBase, oddBase))((even, odd) =>
+      val evenResult = testDB.tables.numbers.flatMap(num =>
+        odd.filter(o => num.value == o.value + 1).map(o => (value = num.value, typ = StringLit("even")))
+      ).distinct
+      val oddResult = testDB.tables.numbers.flatMap(num =>
+        even.filter(e => num.value == e.value + 1).map(e => (value = num.value, typ = StringLit("odd")))
+      ).distinct
+      (evenResult, oddResult)
+    )
+    odd
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+        recursive$1 AS
+          ((SELECT numbers$2.value as value, "even" as typ
+            FROM numbers as numbers$2
+            WHERE numbers$2.value = 0)
+          UNION
+            ((SELECT numbers$4.value as value, "even" as typ
+              FROM numbers as numbers$4, recursive$2 as ref$5
+              WHERE numbers$4.value = ref$5.value + 1))),
+         recursive$2 AS
+          ((SELECT numbers$8.value as value, "odd" as typ
+            FROM numbers as numbers$8
+            WHERE numbers$8.value = 1)
+              UNION
+          ((SELECT numbers$10.value as value, "odd" as typ
+            FROM numbers as numbers$10, recursive$1 as ref$8
+            WHERE numbers$10.value = ref$8.value + 1)))
+        SELECT * FROM recursive$2 as recref$1
+    """
+}
 
 type WeightedEdge = (src: Int, dst: Int, cost: Int)
 type WeightedGraphDB = (edge: WeightedEdge, base: (dst: Int, cost: Int))
@@ -27,7 +82,10 @@ def query() =
     .groupBySource(e =>
       (src = e._1.src, dst = e._1.dst).toRow)
 
-  val asps = base.unrestrictedFix(path =>
+  // APSP: Mono ✗, MR ✓, Lin ✗, Set ✓, CF ✗
+  import RestrictedQuery.*
+  val apspOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
+  val asps = base.fix(apspOptions)(path =>
     path.aggregate(p =>
       path
         .filter(e =>
@@ -123,7 +181,9 @@ class OrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
 
   def query() =
     val base = testDB.tables.base
-    val orbits = base.unrestrictedBagFix(orbits =>
+    // Orbits: Mono •(stratified), MR ✓, Lin ✗, Set ✗, CF ✓
+    val orbitsOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual())
+    val orbits = base.fix(orbitsOptions)(orbits =>
       orbits.flatMap(p =>
         orbits
           .filter(e => p.y == e.x)
@@ -132,7 +192,7 @@ class OrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
     )
 
     orbits match
-      case MultiRecursive(_, _, orbitsRef) =>
+      case MultiRecursive(_, _, orbitsRef, _) =>
         orbits.filter(o =>
           orbitsRef
             .flatMap(o1 =>
@@ -179,7 +239,9 @@ class AndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge] {
 
   def query() =
     val base = testDB.tables.addressOf.map(a => (x = a.x, y = a.y).toRow)
-    base.unrestrictedFix(pointsTo =>
+    // APT: Mono ✓, MR ✓, Lin ✗, Set ✓, CF ✓
+    val aptOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
+    base.fix(aptOptions)(pointsTo =>
       testDB.tables.assign.flatMap(a =>
         pointsTo.filter(p => a.y == p.x).map(p =>
           (x = a.x, y = p.y).toRow))
@@ -195,6 +257,7 @@ class AndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge] {
             .filter(pt2 => s.x == pt1.x && s.y == pt2.x)
             .map(pt2 =>
               (x = pt1.y, y = pt2.y).toRow)))))
+
 
   def expectedQueryPattern: String =
     """
@@ -232,13 +295,15 @@ given PointsToDBs: TestDatabase[PointsToDB] with
     baseHPT= Table[ProgramHeapOp]("baseHPT")
   )
 
-class JavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] {
+class JavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramOp] {
   def testDescription: String = "Field-sensitive subset-based oop points-to"
 
   def query() =
     val baseVPT = testDB.tables.newPT.map(a => (x = a.x, y = a.y).toRow)
     val baseHPT = testDB.tables.baseHPT
-    val pt = unrestrictedBagFix((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
+    // JPT: Mono ✓, MR ✗, Lin ✗, Set ✗, CF ✓
+    val jptOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = AllowMutual())
+    val pt = fix(jptOptions)((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
       val vpt = testDB.tables.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           (x = a.x, y = p.y).toRow
@@ -266,7 +331,7 @@ class JavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] {
 
       (vpt, hpt)
     )
-    pt._2
+    pt._1
 
   def expectedQueryPattern: String =
     """
@@ -289,7 +354,7 @@ class JavaPTTest extends SQLStringQueryTest[PointsToDB, ProgramHeapOp] {
             ((SELECT ref$9.y as x, store$15.y as y, ref$10.y as h
               FROM store as store$15, recursive$1 as ref$9, recursive$1 as ref$10
               WHERE store$15.x = ref$9.x AND store$15.h = ref$10.x)))
-        SELECT * FROM recursive$2 as recref$0
+        SELECT * FROM recursive$1 as recref$0
     """
 }
 
@@ -327,7 +392,9 @@ class CSPAComprehensionTest extends SQLStringQueryTest[CSPADB, Location] {
           assign.map(a => (p1 = a.p2, p2 = a.p2).toRow)
         )
 
-    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = unrestrictedFix(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
+    // CSPA: Mono ✓, MR ✗, Lin ✗, Set ✓, CF ✓
+    val cspaOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual())
+    val (valueFlowFinal, valueAliasFinal, memoryAliasFinal) = fix(cspaOptions)(valueFlowBase, testDB.tables.empty, memoryAliasBase)(
       (valueFlow, valueAlias, memoryAlias) =>
         // ValueFlow(x, y) :- (Assign(x, z), MemoryAlias(z, y))
         val vfDef1 =
@@ -429,7 +496,9 @@ class BOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int)] {
 
   def query() =
     val waitFor = testDB.tables.basic
-    waitFor.unrestrictedBagFix(waitFor =>
+    // BOM: Mono •(stratified), MR ✓, Lin ✓, Set ✗, CF ✓
+    val bomOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual())
+    waitFor.fix(bomOptions)(waitFor =>
       testDB.tables.assbl.flatMap(assbl =>
         waitFor
           .filter(wf => assbl.spart == wf.part)
@@ -500,7 +569,10 @@ class PartyAttendanceTest extends SQLStringQueryTest[PartyDB, (person: String)] 
     val baseAttend = testDB.tables.organizers.map(o => (person = o.orgName).toRow)
     val baseCntFriends = testDB.tables.counts
 
-    val (finalAttend, finalCntFriends) = unrestrictedBagFix(baseAttend, baseCntFriends)((attend, cntfriends) =>
+    // Party: Mono ✗, MR ✗, Lin ✓, Set ✗, CF ✗
+    import RestrictedQuery.*
+    val partyOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = BagResult(), linearity = Linear(), mutual = AllowMutual())
+    val (finalAttend, finalCntFriends) = fix(partyOptions)(baseAttend, baseCntFriends)((attend, cntfriends) =>
       val recurAttend = cntfriends
         .filter(cf => cf.nCount > 2)
         .map(cf => (person = cf.fName).toRow)
@@ -549,7 +621,10 @@ class RecursionCompanyControlTest extends SQLStringQueryTest[CompanyControlDB, C
   def testDescription: String = "Company control"
 
   def query() =
-    val (cshares, control) = unrestrictedFix(testDB.tables.shares, testDB.tables.control)((cshares, control) =>
+    // CC: Mono ✗, MR ✗, Lin ✓, Set ✓, CF ✗
+    import RestrictedQuery.*
+    val ccOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = AllowMutual())
+    val (cshares, control) = fix(ccOptions)(testDB.tables.shares, testDB.tables.control)((cshares, control) =>
       val csharesRecur = control.aggregate(con =>
           cshares
             .filter(cs => cs.byC == con.com2)
@@ -595,7 +670,9 @@ class GraphalyticsDAGTest extends SQLStringQueryTest[GraphDB, Path] {
       .filter(p => p.x == 1)
       .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
 
-    pathBase.unrestrictedBagFix(path =>
+    // TC: Mono ✓, MR ✓, Lin ✓, Set ✗, CF ✗
+    val tcOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual())
+    pathBase.fix(tcOptions)(path =>
       path.flatMap(p =>
         testDB.tables.edge
           .filter(e => e.x == p.endNode && !p.path.contains(e.y))
@@ -655,7 +732,9 @@ class CBATest extends SQLStringAggregationTest[CBADB, Int] {
 
     val ctrlVarBase = testDB.tables.baseCtrl
 
-    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = unrestrictedBagFix((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))(
+    // CBA: Mono •(stratified), MR ✗, Lin ✗, Set ✗, CF ✓
+    val cbaOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = AllowMutual())
+    val (dataTerm, dataVar, ctrlTerm, ctrlVar) = fix(cbaOptions)((dataTermBase, dataVarBase, ctrlTermBase, ctrlVarBase))(
       (dataTerm, dataVar, ctrlTerm, ctrlVar) => {
         val dt1 =
           for
@@ -770,7 +849,9 @@ class TrustChainTest extends SQLStringQueryTest[TrustDB, (person: String, count:
   def query() = {
     val baseFriends = testDB.tables.friends
 
-    val (trust, friends) = unrestrictedBagFix((baseFriends, baseFriends))((trust, friends) => {
+    // COT: Mono ✓, MR ✗, Lin ✓, Set ✗, CF ✓
+    val cotOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = AllowMutual())
+    val (trust, friends) = fix(cotOptions)((baseFriends, baseFriends))((trust, friends) => {
       val mutualTrustResult = friends.flatMap(f =>
         trust
           .filter(mt => mt.person2 == f.person1)
@@ -878,8 +959,10 @@ class FlowTest extends SQLStringQueryTest[FlowDB, (r: String, w: String)] {
   def testDescription: String = "Data flow query"
 
   def query() = {
+    // DF: Mono ✓, MR ✓, Lin ✗, Set ✗, CF ✓
+    val dfOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual())
     testDB.tables.jumpOp
-      .unrestrictedBagFix(flow =>
+      .fix(dfOptions)(flow =>
         flow.flatMap(f1 =>
           flow.filter(f2 => f1.b == f2.a).map(f2 =>
             (a = f1.a, b = f2.b).toRow)))
@@ -910,7 +993,9 @@ class PointsToCountTest extends SQLStringAggregationTest[PointsToDB, Int] {
   def query() =
     val baseVPT = testDB.tables.newPT.map(a => (x = a.x, y = a.y).toRow)
     val baseHPT = testDB.tables.baseHPT
-    val pt = unrestrictedFix((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
+    // PTC: Mono •(stratified), MR ✗, Lin ✗, Set ✓, CF ✓
+    val ptcOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = AllowMutual())
+    val pt = fix(ptcOptions)((baseVPT, baseHPT))((varPointsTo, heapPointsTo) =>
       val vpt = testDB.tables.assign.flatMap(a =>
         varPointsTo.filter(p => a.y == p.x).map(p =>
           (x = a.x, y = p.y).toRow
@@ -934,7 +1019,7 @@ class PointsToCountTest extends SQLStringAggregationTest[PointsToDB, Int] {
               (x = vpt1.y, y = s.y, h = vpt2.y).toRow
             )
         )
-      )
+      ).distinct
 
       (vpt, hpt)
     )
@@ -962,6 +1047,74 @@ class PointsToCountTest extends SQLStringAggregationTest[PointsToDB, Int] {
               FROM store as store$15, recursive$1 as ref$9, recursive$1 as ref$10
               WHERE store$15.x = ref$9.x AND store$15.h = ref$10.x)))
         SELECT COUNT(1) FROM recursive$1 as recref$0 WHERE recref$0.x = "r"
+    """
+}
+
+// SSSP: Mono •(stratified), MR ✓, Lin ✓, Set ✓, CF ✗
+class SSSPBenchTest extends SQLStringQueryTest[WeightedGraphDB, (dst: Int, cost: Int)] {
+  def testDescription: String = "SSSP benchmark"
+
+  def query() =
+    val base = testDB.tables.base
+    val ssspOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
+    base.fix(ssspOptions)(sp =>
+      testDB.tables.edge.flatMap(edge =>
+        sp
+          .filter(s => s.dst == edge.src)
+          .map(s => (dst = edge.dst, cost = s.cost + edge.cost).toRow)
+      ).distinct
+    ).aggregate(s => (dst = s.dst, cost = min(s.cost)).toGroupingRow).groupBySource(s => (dst = s._1.dst).toRow)
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+        recursive$1 AS
+          ((SELECT * FROM base as base$1)
+              UNION
+            ((SELECT
+                edge$3.dst as dst, ref$1.cost + edge$3.cost as cost
+              FROM edge as edge$3, recursive$1 as ref$1
+              WHERE ref$1.dst = edge$3.src)))
+      SELECT recref$0.dst as dst, MIN(recref$0.cost) as cost FROM recursive$1 as recref$0 GROUP BY recref$0.dst
+    """
+}
+
+// Same-Generation (SG)
+type SGParent = (parent: String, child: String)
+type SGDB = (parents: SGParent)
+
+given SGDBs: TestDatabase[SGDB] with
+  override def tables = (
+    parents = Table[SGParent]("parents")
+  )
+
+// SG: Mono ✓, MR ✓, Lin ✓, Set ✓, CF ✗
+class SameGenerationBenchTest extends SQLStringQueryTest[SGDB, (name: String)] {
+  def testDescription: String = "Same-Generation benchmark"
+
+  def query() =
+    val base = testDB.tables.parents.filter(p => p.parent == "Alice").map(e => (name = e.child, gen = IntLit(1)).toRow)
+    val sgOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
+    base.fix(sgOptions)(gen =>
+      testDB.tables.parents.flatMap(parent =>
+        gen
+          .filter(g => parent.parent == g.name)
+          .map(g => (name = parent.child, gen = g.gen + 1).toRow)
+      ).distinct
+    ).filter(g => g.gen == 2).map(g => (name = g.name).toRow)
+
+  def expectedQueryPattern: String =
+    """
+      WITH RECURSIVE
+        recursive$1 AS
+          ((SELECT parents$1.child as name, 1 as gen
+            FROM parents as parents$1
+            WHERE parents$1.parent = "Alice")
+            UNION
+          ((SELECT parents$3.child as name, ref$1.gen + 1 as gen
+            FROM parents as parents$3, recursive$1 as ref$1
+            WHERE parents$3.parent = ref$1.name)))
+      SELECT recref$0.name as name FROM recursive$1 as recref$0 WHERE recref$0.gen = 2
     """
 }
 
