@@ -2,7 +2,7 @@ package test.query.tpch
 
 import test.{SQLStringQueryTest, SQLStringAggregationTest, TestDatabase}
 import tyql.*
-import tyql.Expr.{sum, avg, min, max, count, toRow}
+import tyql.Expr.{sum, avg, min, max, count, countAll, toRow, DoubleLit}
 
 import language.experimental.namedTuples
 import NamedTuple.*
@@ -86,7 +86,7 @@ class TPCHQ6Test extends SQLStringAggregationTest[TPCHDB, Double] {
       .aggregate(l => sum(l.extendedprice * l.discount))
 
   def expectedQueryPattern = """
-    SELECT SUM(lineitem$A.extendedprice * lineitem$A.discount)
+    SELECT SUM((lineitem$A.extendedprice * lineitem$A.discount))
     FROM lineitem as lineitem$A
     WHERE lineitem$A.shipdate > 19940000
       AND lineitem$A.shipdate < 19950101
@@ -98,40 +98,67 @@ class TPCHQ6Test extends SQLStringAggregationTest[TPCHDB, Double] {
 
 
 /**
- * TPC-H Q1 (Pricing Summary Report) - simplified
- * Features: filter, groupBy with multiple aggregations, sort
+ * TPC-H Q1 (Pricing Summary Report)
+ * Features: filter, groupBy with multiple aggregations (sum, avg, countAll),
+ *           arithmetic (subtraction, addition, multiplication), multi-key sort
  *
- * SELECT l_returnflag,
+ * SELECT l_returnflag, l_linestatus,
  *        SUM(l_quantity) as sum_qty,
  *        SUM(l_extendedprice) as sum_base_price,
+ *        SUM(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+ *        SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
  *        AVG(l_quantity) as avg_qty,
  *        AVG(l_extendedprice) as avg_price,
- *        AVG(l_discount) as avg_disc
+ *        AVG(l_discount) as avg_disc,
+ *        COUNT(*) as count_order
  * FROM lineitem
  * WHERE l_shipdate <= 19980902
- * GROUP BY l_returnflag
- * ORDER BY l_returnflag ASC
+ * GROUP BY l_returnflag, l_linestatus
+ * ORDER BY l_returnflag, l_linestatus
  */
-class TPCHQ1Test extends SQLStringQueryTest[TPCHDB, (sumQty: Double, sumBasePrice: Double, avgQty: Double, avgPrice: Double, avgDisc: Double)] {
+class TPCHQ1Test extends SQLStringQueryTest[TPCHDB,
+  (returnflag: String, linestatus: String,
+   sumQty: Double, sumBasePrice: Double, sumDiscPrice: Double, sumCharge: Double,
+   avgQty: Double, avgPrice: Double, avgDisc: Double, countOrder: Int)] {
   def testDescription = "TPCH Q1: pricing summary report"
   def query() =
-    import AggregationExpr.toRow
     testDB.tables.lineitem
       .filter(l => l.shipdate <= 19980902)
       .groupBy(
-        l => (returnflag = l.returnflag).toRow,
-        l => (sumQty = sum(l.quantity), sumBasePrice = sum(l.extendedprice), avgQty = avg(l.quantity), avgPrice = avg(l.extendedprice), avgDisc = avg(l.discount)).toRow
+        l => (returnflag = l.returnflag, linestatus = l.linestatus).toRow,
+        l => {
+          val res = (
+            returnflag = l.returnflag,
+            linestatus = l.linestatus,
+            sumQty = sum(l.quantity),
+            sumBasePrice = sum(l.extendedprice),
+            sumDiscPrice = sum(l.extendedprice * (DoubleLit(1.0) - l.discount)),
+            sumCharge = sum(l.extendedprice * (DoubleLit(1.0) - l.discount) * (DoubleLit(1.0) + l.tax)),
+            avgQty = avg(l.quantity),
+            avgPrice = avg(l.extendedprice),
+            avgDisc = avg(l.discount),
+            countOrder = countAll
+          )
+          res.toRow
+        }
       )
-      .sort(_.sumQty, Ord.ASC)
+      .sort(_.linestatus, Ord.ASC).sort(_.returnflag, Ord.ASC)
 
   def expectedQueryPattern = """
-    SELECT SUM(lineitem$A.quantity) as sumQty, SUM(lineitem$A.extendedprice) as sumBasePrice,
-      AVG(lineitem$A.quantity) as avgQty, AVG(lineitem$A.extendedprice) as avgPrice,
-      AVG(lineitem$A.discount) as avgDisc
+    SELECT lineitem$A.returnflag as returnflag,
+      lineitem$A.linestatus as linestatus,
+      SUM(lineitem$A.quantity) as sumQty,
+      SUM(lineitem$A.extendedprice) as sumBasePrice,
+      SUM((lineitem$A.extendedprice * (1.0 - lineitem$A.discount))) as sumDiscPrice,
+      SUM(((lineitem$A.extendedprice * (1.0 - lineitem$A.discount)) * (1.0 + lineitem$A.tax))) as sumCharge,
+      AVG(lineitem$A.quantity) as avgQty,
+      AVG(lineitem$A.extendedprice) as avgPrice,
+      AVG(lineitem$A.discount) as avgDisc,
+      COUNT(*) as countOrder
     FROM lineitem as lineitem$A
     WHERE lineitem$A.shipdate <= 19980902
-    GROUP BY lineitem$A.returnflag
-    ORDER BY sumQty ASC
+    GROUP BY lineitem$A.returnflag, lineitem$A.linestatus
+    ORDER BY returnflag ASC, linestatus ASC
   """
 }
 
@@ -247,11 +274,11 @@ class TPCHQ11Test extends SQLStringQueryTest[TPCHDB, (value: Double)] {
       .sort(_.value, Ord.DESC)
 
   def expectedQueryPattern = """
-    SELECT SUM(partsupp$A.supplycost * partsupp$A.availqty) as value
+    SELECT SUM((partsupp$A.supplycost * partsupp$A.availqty)) as value
     FROM partsupp as partsupp$A, supplier as supplier$B
     WHERE partsupp$A.suppkey = supplier$B.suppkey
     GROUP BY partsupp$A.partkey
-    HAVING SUM(partsupp$A.supplycost * partsupp$A.availqty) > 1000.0
+    HAVING SUM((partsupp$A.supplycost * partsupp$A.availqty)) > 1000.0
     ORDER BY value DESC
   """
 }

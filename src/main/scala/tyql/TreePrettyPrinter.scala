@@ -66,6 +66,7 @@ object TreePrettyPrinter {
       case Or(x, y) => s"${indent(depth)}Or(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Not(x) => s"${indent(depth)}Not(${x.prettyPrint(depth + 1)})"
       case Plus(x, y) => s"${indent(depth)}Plus(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
+      case Minus(x, y) => s"${indent(depth)}Minus(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Times(x, y) => s"${indent(depth)}Times(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Upper(x) => s"${indent(depth)}Upper(${x.prettyPrint(depth + 1)})"
       case Lower(x) => s"${indent(depth)}Lower(${x.prettyPrint(depth + 1)})"
@@ -107,6 +108,7 @@ object TreePrettyPrinter {
       case Sum(x) => s"${indent(depth)}Sum(${x.prettyPrint(depth + 1).stripLeading()})"
       case Avg(x) => s"${indent(depth)}Avg(${x.prettyPrint(depth + 1).stripLeading()})"
       case Count(x) => s"${indent(depth)}Count(${x.prettyPrint(depth + 1).stripLeading()})"
+      case CountAll() => s"${indent(depth)}CountAll()"
       case AggProject(inner) =>
         val a = NamedTuple.toTuple(inner.asInstanceOf[NamedTuple[Tuple, Tuple]]) // TODO: bug? See https://github.com/scala/scala3/issues/21157
         val namedTupleNames = agg.tag match

@@ -21,6 +21,7 @@ object AggregationExpr {
   case class Min[A: ResultTag]($a: Expr[A]) extends AggregationExpr[A]
 
   case class Count[A]($a: Expr[A]) extends AggregationExpr[Int]
+  case class CountAll() extends AggregationExpr[Int]
 
   // Needed because project can be a top-level result for aggregation but not query
   case class AggProject[A <: AnyNamedTuple]($a: A)(using ResultTag[NamedTuple.Map[A, StripExpr]]) extends AggregationExpr[NamedTuple.Map[A, StripExpr]]

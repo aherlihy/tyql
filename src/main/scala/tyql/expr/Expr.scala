@@ -43,7 +43,17 @@ object Expr:
     @targetName("gtDoubleLit")
     def >(y: Double): Expr[Boolean] = GtDouble(x, DoubleLit(y))
     def <(y: Double): Expr[Boolean] = LtDouble(x, DoubleLit(y))
+    @targetName("lteDoubleLit")
+    def <=(y: Double): Expr[Boolean] = LteDouble(x, DoubleLit(y))
+    @targetName("lteDoubleExpr")
+    def <=(y: Expr[Double]): Expr[Boolean] = LteDouble(x, y)
+    @targetName("gteDoubleLit")
+    def >=(y: Double): Expr[Boolean] = GteDouble(x, DoubleLit(y))
+    @targetName("gteDoubleExpr")
+    def >=(y: Expr[Double]): Expr[Boolean] = GteDouble(x, y)
 
+    def +(y: Double): Expr[Double] = Plus[Double](x, DoubleLit(y))
+    def -(y: Double): Expr[Double] = Minus[Double](x, DoubleLit(y))
     def *(y: Double): Expr[Double] = Times[Double](x, DoubleLit(y))
 
 
@@ -59,11 +69,15 @@ object Expr:
   extension(x: Expr[Double])
     @targetName("addDoubleToNonRestricted")
     def +(y: Expr[Double]): Expr[Double] = Plus(x, y)
+    @targetName("subtractDoubleToNonRestricted")
+    def -(y: Expr[Double]): Expr[Double] = Minus(x, y)
     @targetName("multipleDoubleToNonRestricted")
     def *(y: Expr[Double]): Expr[Double] = Times(x, y)
   extension(x: Expr[Int])
     @targetName("addDoubleToNonRestrictedInt")
     def +(y: Expr[Int]): Expr[Int] = Plus(x, y)
+    @targetName("subtractDoubleToNonRestrictedInt")
+    def -(y: Expr[Int]): Expr[Int] = Minus(x, y)
     @targetName("multipleDoubleToNonRestrictedInt")
     def *(y: Expr[Int]): Expr[Int] = Times(x, y)
 
@@ -93,6 +107,7 @@ object Expr:
   def count(x: Expr[Int]): AggregationExpr[Int] = AggregationExpr.Count(x)
   @targetName("stringCnt")
   def count(x: Expr[String]): AggregationExpr[Int] = AggregationExpr.Count(x)
+  def countAll: AggregationExpr[Int] = AggregationExpr.CountAll()
 
   // Note: All field names of constructors in the query language are prefixed with `$`
   // so that we don't accidentally pick a field name of a constructor class where we want
@@ -104,8 +119,11 @@ object Expr:
   case class Gt($x: Expr[Int], $y: Expr[Int]) extends Expr[Boolean]
   case class GtDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
   case class LtDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
+  case class LteDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
+  case class GteDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
 
   case class Plus[T: Numeric]($x: Expr[T], $y: Expr[T])(using ResultTag[T]) extends Expr[T]
+  case class Minus[T: Numeric]($x: Expr[T], $y: Expr[T])(using ResultTag[T]) extends Expr[T]
   case class Times[T: Numeric]($x: Expr[T], $y: Expr[T])(using ResultTag[T]) extends Expr[T]
   case class And($x: Expr[Boolean], $y: Expr[Boolean]) extends Expr[Boolean]
   case class Or($x: Expr[Boolean], $y: Expr[Boolean]) extends Expr[Boolean]
