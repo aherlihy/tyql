@@ -1307,7 +1307,7 @@ class NestedJoinSubqueryFilterMap1Test extends SQLStringQueryTest[AllCommerceDBs
 
     lhs.flatMap(p3 =>
       testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.map(r => (newId = r.id))
+        testDB.tables.buyers.map(r => (newId = r.id).toRow)
       )
     )
 
@@ -1338,7 +1338,7 @@ class NestedJoinSubqueryFilterMap2Test extends SQLStringQueryTest[AllCommerceDBs
 
     lhs.flatMap(p3 =>
       testDB.tables.shipInfos.flatMap(p4 =>
-        testDB.tables.buyers.map(r => (newId = r.id))
+        testDB.tables.buyers.map(r => (newId = r.id).toRow)
       )
     )
 

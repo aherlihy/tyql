@@ -1,6 +1,5 @@
 package test.query.groupby
-import test.SQLStringQueryTest
-import test.query.recursivebenchmarks.{WeightedGraphDB, WeightedEdge, WeightedGraphDBs}
+import test.{SQLStringQueryTest, TestDatabase}
 import test.query.{AllCommerceDBs, Purchase, commerceDBs}
 import tyql.*
 
@@ -8,6 +7,17 @@ import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 import tyql.Expr.{avg, min, sum}
+
+type WeightedEdge = (src: Int, dst: Int, cost: Int)
+type ResultEdge = (dst: Int, cost: Int)
+type WeightedGraphDB = (edge: WeightedEdge, base: ResultEdge)
+
+
+given WeightedGraphDBs: TestDatabase[WeightedGraphDB] with
+  override def tables = (
+    edge = Table[WeightedEdge]("edge"),
+    base = Table[(dst: Int, cost: Int)]("base")
+  )
 
 class GroupByTest extends SQLStringQueryTest[AllCommerceDBs, (total: Double)] {
   def testDescription = "GroupBy: simple"

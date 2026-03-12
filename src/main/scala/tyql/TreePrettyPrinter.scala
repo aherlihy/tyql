@@ -22,9 +22,9 @@ object TreePrettyPrinter {
       s"${indent(level)}$key=${values.mkString("[\n", ",\n", s"\n${indent(level)}]")}"
 
 
-  extension (fun: Fun[?, ?, ?, ?]) {
+  extension (fun: Fun[?, ?]) {
     def prettyPrint(depth: Int): String = fun match
-      case Fun(param, body: Expr[?, ?, ?]) =>
+      case Fun(param, body: Expr[?]) =>
         s"${indent(depth)}FunE(${param.stringRef()} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Fun(param, body: DatabaseAST[?]) =>
         s"${indent(depth)}FunQ(${param.stringRef()} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
@@ -37,10 +37,10 @@ object TreePrettyPrinter {
         s"${indent(depth)}FunR(${param.prettyPrint(0)} =>\n${body.prettyPrint(depth + 1)}\n${indent(depth)})"
   }
 
-  extension (expr: Expr[?, ?, ?]) {
+  extension (expr: Expr[?]) {
     def prettyPrint(depth: Int): String = expr match {
       case Select(x, name) => s"${indent(depth)}Select(${x.prettyPrint(0)}.$name)"
-      case Ref(_) => s"${indent(depth)}${expr.asInstanceOf[Ref[?, ?, ?]].stringRef()}"
+      case Ref(_) => s"${indent(depth)}${expr.asInstanceOf[Ref[?]].stringRef()}"
       case Eq(x, y) => s"${indent(depth)}Eq(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Ne(x, y) => s"${indent(depth)}Ne(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
       case Gt(x, y) => s"${indent(depth)}Gt(\n${x.prettyPrint(depth + 1)},\n${y.prettyPrint(depth + 1)}\n${indent(depth)})"
@@ -82,7 +82,7 @@ object TreePrettyPrinter {
           case _ => Seq()
         val children = a.toList.zipWithIndex
           .map((expr, idx) =>
-            val e = expr.asInstanceOf[Expr[?, ?, ?]]
+            val e = expr.asInstanceOf[Expr[?]]
             val namedStr = namedTupleNames(idx).fold("")(n => s"$n")
             indentWithKey(depth + 1, namedStr, e.prettyPrint(depth + 1))
           )
@@ -114,7 +114,7 @@ object TreePrettyPrinter {
           case _ => Seq()
         val children = a.toList.zipWithIndex
           .map((expr, idx) =>
-            val e = expr.asInstanceOf[Expr[?, ?, ?]]
+            val e = expr.asInstanceOf[Expr[?]]
             val namedStr = namedTupleNames(idx).fold("")(n => s"$n=")
             s"${indent(depth+1)}$namedStr${e.prettyPrint(0)}"
           )
@@ -155,13 +155,7 @@ object TreePrettyPrinter {
         s"${indent(depth)}IntersectAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
       case ExceptAll(thisQuery, other) =>
         s"${indent(depth)}ExceptAll(\n${thisQuery.prettyPrint(depth + 1)},\n${other.prettyPrint(depth + 1)}\n${indent(depth)})"
-      case MultiRecursive(refs, querys, finalQ) =>
-        val refStr = refs.toList.map(r => r.toQuery.prettyPrint(depth+1))
-        val qryStr = querys.toList.map(q => q.asInstanceOf[Query[?, ?]].prettyPrint(depth + 2))
-        val str = refStr.zip(qryStr).map((r, q) => s"\n$r :=\n$q").mkString(",\n")
-        val finalQStr = finalQ.prettyPrint(depth + 1)
-        s"${indent(depth)}MultiRecursive($str\n${indent(depth)}\n${indentWithKey(depth+1, "FINAL->", finalQStr)}\n${indent(depth)})"
-      case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?, ?]].stringRef()})"
+      case QueryRef() => s"${indent(depth)}QueryRef(${ast.asInstanceOf[QueryRef[?]].stringRef()})"
       case a: Aggregation[?, ?] => a.prettyPrint(depth)
       case GroupBy(source, grouping, select, having) =>
         s"${indent(depth)}GroupBy(\n${source.prettyPrint(depth + 1)},\n${grouping.prettyPrint(depth + 1)},\n${select.prettyPrint(depth + 1)},\n${having.map(_.prettyPrint(depth + 1)).getOrElse(s"${indent(depth+1)}-")}\n${indent(depth)})"
@@ -198,13 +192,6 @@ object TreePrettyPrinter {
         val childrenPrint = naryRelationOp.children.map(_.prettyPrintIR(depth + 1, printAST))
         val astPrint = if (printAST) s"\n${indentWithKey(depth + 1, "AST", naryRelationOp.ast.prettyPrint(depth + 1))}" else ""
         s"${indent(depth)}N-aryRelationOp{${relationOp.alias}}{${relationOp.flags.mkString(",")}}(\n${indent(depth + 1)}op = '${naryRelationOp.op}'\n${childrenPrint.mkString(",\n")}$astPrint\n${indent(depth)})"
-      case MultiRecursiveRelationOp(alias, query, finalQ, carriedSymbols, ast) =>
-        val qryStr = query.map(q => q.prettyPrintIR(depth + 1, false))
-        val finalQStr = finalQ.prettyPrintIR(depth + 1, false)
-        val str = alias.zip(qryStr).map((r, q) => s"\n$r => \n$q").mkString(",\n")
-        s"${indent(depth)}MultiRecursive{$alias}{${relationOp.flags.mkString(",")}}($str\n${indent(depth)})${indent(depth)}(finalQ =>\n$finalQStr\n${indent(depth)})"
-      case recursiveIRVar: RecursiveIRVar =>
-        s"${indent(depth)}RecursiveVar{${recursiveIRVar.alias}}{${relationOp.flags.mkString(",")}}->${recursiveIRVar.pointsToAlias}"
       case GroupByQuery(source, groupBy, having, overrideAlias, ast) =>
         val srcStr = source.prettyPrintIR(depth + 1, false)
         val groupByStr = groupBy.prettyPrintIR(depth + 1, false)
