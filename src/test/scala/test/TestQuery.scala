@@ -109,7 +109,7 @@ trait TestSQLString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]] extend
     val strippedExpected = expectedQueryPattern.trim().replace("\n", " ").replaceAll("\\s+", " ")
     // Only print debugging trees if test fails
     val (success, debug) = TestComparitor.matchStrings(strippedExpected, actual)
-//    println(actual) // print actual query even if passed, for manual testing
+    println(actual) // print actual query even if passed, for manual testing
     if (!success)
       println(s"String match failed with: $debug")
       println(s"AST:\n${q.prettyPrint(0)}")

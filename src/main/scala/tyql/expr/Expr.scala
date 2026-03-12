@@ -1,6 +1,7 @@
 package tyql
 
 import scala.annotation.targetName
+import java.time.LocalDate
 import language.experimental.namedTuples
 import NamedTuple.{AnyNamedTuple, NamedTuple}
 import scala.deriving.*
@@ -35,6 +36,9 @@ object Expr:
     def <(y: Expr[Int]): Expr[Boolean] = Lt(x, y)
     def <(y: Int): Expr[Boolean] = Lt(x, IntLit(y))
     def <=(y: Expr[Int]): Expr[Boolean] = Lte(x, y)
+    def <=(y: Int): Expr[Boolean] = Lte(x, IntLit(y))
+    def >=(y: Expr[Int]): Expr[Boolean] = Gte(x, y)
+    def >=(y: Int): Expr[Boolean] = Gte(x, IntLit(y))
 
   // TODO: write for numerical
   extension(x: Expr[Double])
@@ -56,6 +60,24 @@ object Expr:
     def -(y: Double): Expr[Double] = Minus[Double](x, DoubleLit(y))
     def *(y: Double): Expr[Double] = Times[Double](x, DoubleLit(y))
 
+
+  extension(x: Expr[LocalDate])
+    @targetName("gtDateExpr")
+    def >(y: Expr[LocalDate]): Expr[Boolean] = GtDate(x, y)
+    @targetName("gtDateLit")
+    def >(y: LocalDate): Expr[Boolean] = GtDate(x, DateLit(y))
+    @targetName("ltDateExpr")
+    def <(y: Expr[LocalDate]): Expr[Boolean] = LtDate(x, y)
+    @targetName("ltDateLit")
+    def <(y: LocalDate): Expr[Boolean] = LtDate(x, DateLit(y))
+    @targetName("lteDateExpr")
+    def <=(y: Expr[LocalDate]): Expr[Boolean] = LteDate(x, y)
+    @targetName("lteDateLit")
+    def <=(y: LocalDate): Expr[Boolean] = LteDate(x, DateLit(y))
+    @targetName("gteDateExpr")
+    def >=(y: Expr[LocalDate]): Expr[Boolean] = GteDate(x, y)
+    @targetName("gteDateLit")
+    def >=(y: LocalDate): Expr[Boolean] = GteDate(x, DateLit(y))
 
   extension(x: Expr[Boolean])
     def &&(y: Expr[Boolean]): Expr[Boolean] = And(x, y)
@@ -117,10 +139,15 @@ object Expr:
   case class Lt($x: Expr[Int], $y: Expr[Int]) extends Expr[Boolean]
   case class Lte($x: Expr[Int], $y: Expr[Int]) extends Expr[Boolean]
   case class Gt($x: Expr[Int], $y: Expr[Int]) extends Expr[Boolean]
+  case class Gte($x: Expr[Int], $y: Expr[Int]) extends Expr[Boolean]
   case class GtDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
   case class LtDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
   case class LteDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
   case class GteDouble($x: Expr[Double], $y: Expr[Double]) extends Expr[Boolean]
+  case class GtDate($x: Expr[LocalDate], $y: Expr[LocalDate]) extends Expr[Boolean]
+  case class LtDate($x: Expr[LocalDate], $y: Expr[LocalDate]) extends Expr[Boolean]
+  case class LteDate($x: Expr[LocalDate], $y: Expr[LocalDate]) extends Expr[Boolean]
+  case class GteDate($x: Expr[LocalDate], $y: Expr[LocalDate]) extends Expr[Boolean]
 
   case class Plus[T: Numeric]($x: Expr[T], $y: Expr[T])(using ResultTag[T]) extends Expr[T]
   case class Minus[T: Numeric]($x: Expr[T], $y: Expr[T])(using ResultTag[T]) extends Expr[T]
@@ -193,6 +220,9 @@ object Expr:
 
   case class DoubleLit($value: Double) extends Expr[Double]
   given Conversion[Double, DoubleLit] = DoubleLit(_)
+
+  case class DateLit($value: LocalDate) extends Expr[LocalDate]
+  given Conversion[LocalDate, DateLit] = DateLit(_)
 
   case class BooleanLit($value: Boolean) extends Expr[Boolean]
   //  given Conversion[Boolean, BooleanLit] = BooleanLit(_)
