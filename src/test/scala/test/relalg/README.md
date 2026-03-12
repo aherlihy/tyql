@@ -30,13 +30,13 @@ The changes are on the [`relalg-tyql`](https://github.com/aherlihy/scair/tree/re
 git clone https://github.com/aherlihy/scair.git
 cd scair
 git checkout relalg-tyql
-mill __.publishLocal
+./mill __.publishLocal
 ```
 
 TyQL's `build.sbt` depends on the locally published snapshot:
 
 ```scala
-"io.github.edin-dal" %% "scair-dialects" % "0.0.0-339-f04bd1-DIRTY12dc25b-SNAPSHOT"
+"io.github.edin-dal" %% "scair-dialects" % "0.0.0-342-f3cb1b-SNAPSHOT"
 ```
 
 ### `db` dialect (`dialects/src/db/DB.scala`)
@@ -98,7 +98,7 @@ All three dialects are registered in `dialects/src/AllDialects.scala`.
 git clone https://github.com/aherlihy/scair.git
 cd scair
 git checkout relalg-tyql
-mill __.publishLocal
+./mill __.publishLocal
 ```
 
 ### Step 2: Clone TyQL and run the tests
