@@ -15,7 +15,6 @@ import scair.dialects.tuples.*
 import scair.dialects.subop.{SubopLocalTableType, LocalTableColumn, SetResult}
 
 import java.io.{PrintWriter, StringWriter}
-import java.time.LocalDate
 
 /** Schema information for a table's columns. */
 case class TableSchema(
@@ -35,6 +34,13 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
 
   private val ts = TupleStreamType()
   private val tupleT = TupleType()
+
+  // Synthetic scope names for computed columns
+  private val MapScope = "map"
+  private val AggrScope = "aggr"
+
+  // Track computed column types for synthetic scopes
+  private val syntheticColumnTypes = scala.collection.mutable.Map[String, scala.collection.mutable.Map[String, Attribute]]()
 
   // ── Helpers for column references ──
 
@@ -294,13 +300,13 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
               if predVals.size == 1 then predVals.head
               else
                 val andOp = DBAnd(
-                  vals = predVals.map(_._1),
+                  vals = predVals,
                   result = Result(I1),
                 )
                 regionOps += andOp
-                (andOp.result.asInstanceOf[Value[Attribute]], "i1")
+                andOp.result.asInstanceOf[Value[Attribute]]
 
-            val ret = TuplesReturn(results_ = Seq(finalPred._1))
+            val ret = TuplesReturn(results_ = Seq(finalPred))
             regionOps += ret
             regionOps.toSeq,
         )
@@ -310,14 +316,12 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
     ops += selOp
     selOp.result
 
-  /** Emit an expression inside a predicate region. Returns (value,
-    * typeString).
-    */
+  /** Emit an expression node, returning the SSA value. */
   private def emitPredicate(
       node: QueryIRNode,
       tupleArg: Value[Attribute],
       ops: scala.collection.mutable.ArrayBuffer[Operation],
-  ): (Value[Attribute], String) =
+  ): Value[Attribute] =
     node match
       case bin: BinExprOp =>
         bin.ast match
@@ -330,11 +334,11 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
             if allPreds.size == 1 then allPreds.head
             else
               val andOp = DBAnd(
-                vals = allPreds.map(_._1),
+                vals = allPreds,
                 result = Result(I1),
               )
               ops += andOp
-              (andOp.result.asInstanceOf[Value[Attribute]], "i1")
+              andOp.result.asInstanceOf[Value[Attribute]]
 
           // Comparisons
           case _: (Expr.Gt | Expr.GtDouble | Expr.GtDate) =>
@@ -352,11 +356,11 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
 
           // Arithmetic
           case _: Expr.Plus[?] =>
-            emitArith("db.add", bin.lhs, bin.rhs, tupleArg, ops)
+            emitArith(ArithKind.Add, bin.lhs, bin.rhs, tupleArg, ops)
           case _: Expr.Minus[?] =>
-            emitArith("db.sub", bin.lhs, bin.rhs, tupleArg, ops)
+            emitArith(ArithKind.Sub, bin.lhs, bin.rhs, tupleArg, ops)
           case _: Expr.Times[?] =>
-            emitArith("db.mul", bin.lhs, bin.rhs, tupleArg, ops)
+            emitArith(ArithKind.Mul, bin.lhs, bin.rhs, tupleArg, ops)
 
           case _ =>
             throw Exception(
@@ -366,14 +370,13 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
       case unary: UnaryExprOp =>
         unary.ast match
           case _: Expr.Not =>
-            val (childVal, childTy) =
-              emitPredicate(unary.child, tupleArg, ops)
+            val childVal = emitPredicate(unary.child, tupleArg, ops)
             val notOp = DBNot(
               val_ = childVal,
               result = Result(I1),
             )
             ops += notOp
-            (notOp.result.asInstanceOf[Value[Attribute]], "i1")
+            notOp.result.asInstanceOf[Value[Attribute]]
           case _ =>
             throw Exception(
               s"Unsupported UnaryExprOp in predicate: ${unary.ast.getClass.getSimpleName}"
@@ -393,22 +396,15 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
           s"Unsupported predicate node: ${node.getClass.getSimpleName}"
         )
 
-  private def emitExpr(
-      node: QueryIRNode,
-      tupleArg: Value[Attribute],
-      ops: scala.collection.mutable.ArrayBuffer[Operation],
-  ): (Value[Attribute], String) =
-    emitPredicate(node, tupleArg, ops)
-
   private def emitCompare(
       pred: CmpPredicate,
       lhs: QueryIRNode,
       rhs: QueryIRNode,
       tupleArg: Value[Attribute],
       ops: scala.collection.mutable.ArrayBuffer[Operation],
-  ): (Value[Attribute], String) =
-    val (lVal0, lTy) = emitPredicate(lhs, tupleArg, ops)
-    val (rVal0, rTy) = emitPredicate(rhs, tupleArg, ops)
+  ): Value[Attribute] =
+    val lVal0 = emitPredicate(lhs, tupleArg, ops)
+    val rVal0 = emitPredicate(rhs, tupleArg, ops)
     // Auto-cast char<N> to string when comparing with string
     val (lVal, rVal) = (lVal0.typ, rVal0.typ) match
       case (_: CharType, _: DBStringType) =>
@@ -427,32 +423,34 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
       result = Result(I1),
     )
     ops += cmp
-    (cmp.result.asInstanceOf[Value[Attribute]], "i1")
+    cmp.result.asInstanceOf[Value[Attribute]]
+
+  private enum ArithKind:
+    case Add, Sub, Mul, Div
 
   private def emitArith(
-      opName: String,
+      kind: ArithKind,
       lhs: QueryIRNode,
       rhs: QueryIRNode,
       tupleArg: Value[Attribute],
       ops: scala.collection.mutable.ArrayBuffer[Operation],
-  ): (Value[Attribute], String) =
-    val (lVal, lTy) = emitPredicate(lhs, tupleArg, ops)
-    val (rVal, rTy) = emitPredicate(rhs, tupleArg, ops)
-    val resultType = computeArithResultType(opName, lVal.typ, rVal.typ)
-    val arithOp = opName match
-      case "db.add" => DBAdd(lhs = lVal, rhs = rVal, result = Result(resultType))
-      case "db.sub" => DBSub(lhs = lVal, rhs = rVal, result = Result(resultType))
-      case "db.mul" => DBMul(lhs = lVal, rhs = rVal, result = Result(resultType))
-      case "db.div" => DBDiv(lhs = lVal, rhs = rVal, result = Result(resultType))
-      case _ => throw Exception(s"Unknown arithmetic op: $opName")
+  ): Value[Attribute] =
+    val lVal = emitPredicate(lhs, tupleArg, ops)
+    val rVal = emitPredicate(rhs, tupleArg, ops)
+    val resultType = computeArithResultType(kind, lVal.typ, rVal.typ)
+    val arithOp = kind match
+      case ArithKind.Add => DBAdd(lhs = lVal, rhs = rVal, result = Result(resultType))
+      case ArithKind.Sub => DBSub(lhs = lVal, rhs = rVal, result = Result(resultType))
+      case ArithKind.Mul => DBMul(lhs = lVal, rhs = rVal, result = Result(resultType))
+      case ArithKind.Div => DBDiv(lhs = lVal, rhs = rVal, result = Result(resultType))
     ops += arithOp
-    (arithOp.results.head.asInstanceOf[Value[Attribute]], lTy)
+    arithOp.results.head.asInstanceOf[Value[Attribute]]
 
   private def emitGetCol(
       sel: SelectExpr,
       tupleArg: Value[Attribute],
       ops: scala.collection.mutable.ArrayBuffer[Operation],
-  ): (Value[Attribute], String) =
+  ): Value[Attribute] =
     val (tableName, colName) = extractColumnRefFromSelect(sel)
     val colType = lookupColumnType(tableName, colName)
     val colRef = mkColRef(tableName, colName)
@@ -462,35 +460,31 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
       result = Result(colType),
     )
     ops += getCol
-    (getCol.result.asInstanceOf[Value[Attribute]], colType.toString)
+    getCol.result.asInstanceOf[Value[Attribute]]
 
   private def emitConstant(
       lit: Literal,
       ops: scala.collection.mutable.ArrayBuffer[Operation],
-  ): (Value[Attribute], String) =
-    val (value, typ) = lit.ast match
+  ): Value[Attribute] =
+    val (value, typ): (String, Attribute) = lit.ast match
       case d: Expr.DateLit =>
-        (d.$value.toString, DateType(StringData("day")).asInstanceOf[Attribute])
+        (d.$value.toString, DateType(StringData("day")))
       case d: Expr.DoubleLit =>
-        (
-          d.$value.toString,
-          DecimalType(IntData(12), IntData(2))
-            .asInstanceOf[Attribute],
-        )
+        (d.$value.toString, DecimalType(IntData(12), IntData(2)))
       case i: Expr.IntLit =>
-        (i.$value.toString, I32.asInstanceOf[Attribute])
+        (i.$value.toString, I32)
       case s: Expr.StringLit =>
-        (s.$value, DBStringType().asInstanceOf[Attribute])
+        (s.$value, DBStringType())
       case b: Expr.BooleanLit =>
-        (b.$value.toString, I1.asInstanceOf[Attribute])
+        (b.$value.toString, I1)
       case _ =>
-        (lit.stringRep, DBStringType().asInstanceOf[Attribute])
+        (lit.stringRep, DBStringType())
     val constOp = DBConstant(
       value = StringData(value),
       result = Result(typ),
     )
     ops += constOp
-    (constOp.result.asInstanceOf[Value[Attribute]], typ.toString)
+    constOp.result.asInstanceOf[Value[Attribute]]
 
   // ── Aggregation handling ──
 
@@ -533,7 +527,8 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
 
     val mappedRel = if computedExprs.nonEmpty then
       val mapColDefs = computedExprs.map { (name, _, typ) =>
-        mkColDef("map", name, typ)
+        registerSyntheticColumn(MapScope, name, typ)
+        mkColDef(MapScope, name, typ)
       }
       val mapOp = MapOp(
         rel = rel.asInstanceOf[Value[TupleStreamType]],
@@ -545,7 +540,7 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
               val tupleArg = args.head
               val regionOps = scala.collection.mutable.ArrayBuffer[Operation]()
               val resultVals = computedExprs.map { (_, exprNode, _) =>
-                emitPredicate(exprNode, tupleArg, regionOps)._1
+                emitPredicate(exprNode, tupleArg, regionOps)
               }
               val ret = TuplesReturn(results_ = resultVals)
               regionOps += ret
@@ -563,14 +558,15 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
       case (name, Some((func, Left(ref))), resultType) =>
         (name, Some((func, ref)), resultType)
       case (name, Some((func, Right(_))), resultType) =>
-        (name, Some((func, mkColRef("map", name))), resultType)
+        (name, Some((func, mkColRef(MapScope, name))), resultType)
       case (name, None, resultType) =>
         (name, None, resultType)
     }
 
     val computedCols = resolvedInfos.map {
       case (name, _, resultType) =>
-        mkColDef("aggr", name, resultType)
+        registerSyntheticColumn(AggrScope, name, resultType)
+        mkColDef(AggrScope, name, resultType)
     }
 
     val aggrOp = RelAlgAggregation(
@@ -688,20 +684,33 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
   /** Compute the result type of an arithmetic op on two types,
     * following SQL/LingoDB decimal arithmetic rules.
     */
+  /** Compute the result type of an arithmetic op on two decimal types,
+    * following SQL/LingoDB decimal arithmetic rules.
+    */
   private def computeArithResultType(
-      opName: String,
+      kind: ArithKind,
       lhsType: Attribute,
       rhsType: Attribute,
   ): Attribute =
-    (opName, lhsType, rhsType) match
-      case ("db.mul", DecimalType(IntData(p1), IntData(s1)), DecimalType(IntData(p2), IntData(s2))) =>
+    (kind, lhsType, rhsType) match
+      case (ArithKind.Mul, DecimalType(IntData(p1), IntData(s1)), DecimalType(IntData(p2), IntData(s2))) =>
         val rawP = p1 + p2
         val rawS = s1 + s2
-        if rawP > 38 then
-          val adjS = (rawS - (rawP - 38)) max 6
-          DecimalType(IntData(38), IntData(adjS))
-        else DecimalType(IntData(rawP), IntData(rawS))
-      case _ => lhsType // db.add/db.sub keep operand type in LingoDB
+        clampDecimal(rawP, rawS)
+      case (ArithKind.Div, DecimalType(IntData(p1), IntData(s1)), DecimalType(IntData(p2), IntData(s2))) =>
+        val rawP = p1 - s1 + s2 + (BigInt(6) max (s1 + p2 + 1))
+        val rawS = BigInt(6) max (s1 + p2 + 1)
+        clampDecimal(rawP, rawS)
+      case (ArithKind.Add | ArithKind.Sub, _: DecimalType, _: DecimalType) =>
+        // LingoDB preserves the LHS type for add/sub
+        lhsType
+      case _ => lhsType
+
+  private def clampDecimal(rawP: BigInt, rawS: BigInt): Attribute =
+    if rawP > 38 then
+      val adjS = (rawS - (rawP - 38)) max 6
+      DecimalType(IntData(38), IntData(adjS))
+    else DecimalType(IntData(rawP), IntData(rawS))
 
   /** Infer the result type of an expression by looking at column refs and arithmetic. */
   private def inferExprType(node: QueryIRNode): Attribute =
@@ -712,12 +721,12 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
       case bin: BinExprOp =>
         val lType = inferExprType(bin.lhs)
         val rType = inferExprType(bin.rhs)
-        val opName = bin.ast match
-          case _: Expr.Plus[?]  => "db.add"
-          case _: Expr.Minus[?] => "db.sub"
-          case _: Expr.Times[?] => "db.mul"
-          case _                => "db.add"
-        computeArithResultType(opName, lType, rType)
+        val kind = bin.ast match
+          case _: Expr.Plus[?]  => ArithKind.Add
+          case _: Expr.Minus[?] => ArithKind.Sub
+          case _: Expr.Times[?] => ArithKind.Mul
+          case _                => ArithKind.Add
+        computeArithResultType(kind, lType, rType)
       case unary: UnaryExprOp => inferExprType(unary.child)
       case lit: Literal =>
         lit.ast match
@@ -807,7 +816,7 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
                 (tableName, origColName)
               case None =>
                 // It's likely an aggregation computed column
-                ("aggr", colName)
+                (AggrScope, colName)
           case _ =>
             ("aggr", colName)
 
@@ -864,9 +873,13 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
     schemas
       .get(tableName)
       .flatMap(_.columns.get(colName))
+      .orElse(syntheticColumnTypes.get(tableName).flatMap(_.get(colName)))
       .getOrElse(
         throw Exception(s"Unknown column: $tableName.$colName")
       )
+
+  private def registerSyntheticColumn(scope: String, colName: String, typ: Attribute): Unit =
+    syntheticColumnTypes.getOrElseUpdate(scope, scala.collection.mutable.Map()) += (colName -> typ)
 
   private def flattenAnd(node: QueryIRNode): Seq[QueryIRNode] =
     node match
