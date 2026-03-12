@@ -7,7 +7,8 @@ inThisBuild(Seq(
   libraryDependencies ++= Seq(
     "org.scalameta" %% "munit" % "1.0.0+24-ee555b1d-SNAPSHOT" % Test,
     "org.duckdb" % "duckdb_jdbc" % "1.1.1",
-    "com.lihaoyi" %% "scalasql" % "0.1.11"
+    "com.lihaoyi" %% "scalasql" % "0.1.11",
+    "io.github.edin-dal" %% "scair-dialects" % "0.0.0-339-f04bd1-DIRTY12dc25b-SNAPSHOT"
   )
 ))
 
