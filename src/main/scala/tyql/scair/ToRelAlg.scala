@@ -3,13 +3,16 @@ package tyql
 import scair.Printer
 import scair.ir.*
 import scair.dialects.builtin.*
+import scair.dialects.func.{Func, Return}
 import scair.dialects.relalg.{
   BaseTable, Selection, MapOp, InnerJoin, CrossProduct,
   Aggregation as RelAlgAggregation, AggrFn, CountRows, Sort, Limit,
-  Projection, Materialize, AggrFunc, SetSemantic, SortSpec, SortSpecificationAttr,
+  Projection, Materialize, RelAlgQuery, QueryReturn,
+  AggrFunc, SetSemantic, SortSpec, SortSpecificationAttr,
 }
 import scair.dialects.db.*
 import scair.dialects.tuples.*
+import scair.dialects.subop.{SubopLocalTableType, LocalTableColumn, SetResult}
 
 import java.io.{PrintWriter, StringWriter}
 import java.time.LocalDate
@@ -51,6 +54,67 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
     val resultVal = emitRelation(ir.asInstanceOf[RelationOp], ops)
     val module =
       ModuleOp(body = Region(Seq(Block(operations = ops.toSeq))))
+    val out = StringWriter()
+    Printer(p = PrintWriter(out)).print(module)(using 0)
+    out.toString().trim()
+
+  /** Convert a tyql IR tree to executable MLIR wrapped in func.func @main().
+    * The wrapper adds: relalg.query, relalg.materialize, relalg.query_return,
+    * subop.set_result, and func.return — making the output runnable by LingoDB's run-mlir.
+    */
+  def convertExecutable(ir: QueryIRNode, outputColumns: Seq[RelAlgGenerator.OutputColumn]): String =
+    val queryBodyOps = scala.collection.mutable.ArrayBuffer[Operation]()
+    val lastRelVal = emitRelation(ir.asInstanceOf[RelationOp], queryBodyOps)
+
+    // Build the SubopLocalTableType from output columns
+    val localTableCols = outputColumns.map { oc =>
+      LocalTableColumn(StringData(oc.colName), oc.colType)
+    }
+    val localTableNames = outputColumns.map(oc => StringData(oc.outputName))
+    val localTableType = SubopLocalTableType(localTableCols, localTableNames)
+
+    // Materialize
+    val matCols = outputColumns.map(oc =>
+      mkColRef(oc.scope, oc.colName)
+    )
+    val matNames = outputColumns.map(oc => StringData(oc.outputName))
+    val matOp = Materialize(
+      rel = lastRelVal.asInstanceOf[Value[TupleStreamType]],
+      cols = ArrayAttribute(matCols),
+      colNames = ArrayAttribute(matNames),
+      result = Result(localTableType),
+    )
+    queryBodyOps += matOp
+
+    // QueryReturn (terminator)
+    val qret = QueryReturn(rel = matOp.result.asInstanceOf[Value[Attribute]])
+    queryBodyOps += qret
+
+    // RelAlgQuery wrapping the body
+    val queryOp = RelAlgQuery(
+      body = Region(Seq(Block(operations = queryBodyOps.toSeq))),
+      result = Result(localTableType),
+    )
+
+    // subop.set_result 0 %query_result : type
+    val setResult = SetResult(
+      index = IntData(0),
+      rel = queryOp.result.asInstanceOf[Value[Attribute]],
+    )
+
+    // func.return
+    val funcReturn = Return(Seq())
+
+    // func.func @main() { ... }
+    val funcOp = Func(
+      sym_name = StringData("main"),
+      function_type = FunctionType(inputs = Seq(), outputs = Seq()),
+      sym_visibility = None,
+      body = Region(Seq(Block(operations = Seq(queryOp, setResult, funcReturn)))),
+    )
+
+    // module { func.func @main() { ... } }
+    val module = ModuleOp(body = Region(Seq(Block(operations = Seq(funcOp)))))
     val out = StringWriter()
     Printer(p = PrintWriter(out)).print(module)(using 0)
     out.toString().trim()
@@ -821,86 +885,11 @@ class RelAlgGenerator(schemas: Map[String, TableSchema]):
       case other => Seq(other)
 
 object RelAlgGenerator:
-  /** Helper to create a generator with TPC-H schemas.
-    * Types match LingoDB's actual database schema:
-    * - decimal(p,s) columns use decimal<12,2>
-    * - char(N) columns use !db.char<N>
-    * - varchar columns use !db.string
-    * - integer columns use i32
+  /** Column mapping for the executable wrapper's materialize + subop.local_table type.
+    * @param scope     Column ref scope (e.g. "lineitem", "aggr")
+    * @param colName   Column ref name (e.g. "l_returnflag", "sum_0")
+    * @param outputName Display name in the result table (e.g. "l_returnflag", "sum_qty")
+    * @param colType   MLIR type of the column
     */
-  def tpchSchemas: Map[String, TableSchema] =
-    val decimal: Attribute = DecimalType(IntData(12), IntData(2))
-    val dateDay: Attribute = DateType(StringData("day"))
-    val dbString: Attribute = DBStringType()
-    val int32: Attribute = I32
-    def char(n: Int): Attribute = CharType(IntData(n))
+  case class OutputColumn(scope: String, colName: String, outputName: String, colType: Attribute)
 
-    Map(
-      "lineitem" -> TableSchema(
-        "lineitem",
-        Map(
-          "l_orderkey" -> int32,
-          "l_partkey" -> int32,
-          "l_suppkey" -> int32,
-          "l_quantity" -> decimal,
-          "l_extendedprice" -> decimal,
-          "l_discount" -> decimal,
-          "l_tax" -> decimal,
-          "l_returnflag" -> char(1),
-          "l_linestatus" -> char(1),
-          "l_shipdate" -> dateDay,
-          "l_commitdate" -> dateDay,
-          "l_receiptdate" -> dateDay,
-        ),
-      ),
-      "orders" -> TableSchema(
-        "orders",
-        Map(
-          "o_orderkey" -> int32,
-          "o_custkey" -> int32,
-          "o_totalprice" -> decimal,
-          "o_orderdate" -> dateDay,
-          "o_orderpriority" -> char(15),
-          "o_shippriority" -> int32,
-        ),
-      ),
-      "customer" -> TableSchema(
-        "customer",
-        Map(
-          "c_custkey" -> int32,
-          "c_name" -> dbString,
-          "c_nationkey" -> int32,
-          "c_acctbal" -> decimal,
-          "c_mktsegment" -> char(10),
-          "c_phone" -> char(15),
-          "c_address" -> dbString,
-          "c_comment" -> dbString,
-        ),
-      ),
-      "nation" -> TableSchema(
-        "nation",
-        Map(
-          "n_nationkey" -> int32,
-          "n_name" -> char(25),
-          "n_regionkey" -> int32,
-        ),
-      ),
-      "supplier" -> TableSchema(
-        "supplier",
-        Map(
-          "s_suppkey" -> int32,
-          "s_name" -> char(25),
-          "s_nationkey" -> int32,
-          "s_acctbal" -> decimal,
-        ),
-      ),
-      "partsupp" -> TableSchema(
-        "partsupp",
-        Map(
-          "ps_partkey" -> int32,
-          "ps_suppkey" -> int32,
-          "ps_availqty" -> decimal,
-          "ps_supplycost" -> decimal,
-        ),
-      ),
-    )

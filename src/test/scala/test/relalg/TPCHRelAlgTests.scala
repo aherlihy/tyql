@@ -5,19 +5,80 @@ import test.query.tpch.{TPCHDB, given}
 import tyql.*
 import tyql.Expr.{sum, avg, min, max, count, countAll, toRow, DoubleLit, DateLit}
 import tyql.{RelAlgGenerator, TableSchema}
+import tyql.RelAlgGenerator.OutputColumn
+import scair.dialects.db.{DecimalType, DateType, CharType, DBStringType}
+import scair.dialects.builtin.{IntData, StringData, I32, I64}
+import scair.ir.Attribute
 
 import language.experimental.namedTuples
 import NamedTuple.*
 import scala.language.implicitConversions
 import java.time.LocalDate
 
+/** TPC-H table schemas for LingoDB relalg MLIR generation.
+  * Types match LingoDB's actual database schema:
+  * - decimal(p,s) columns use decimal<12,2>
+  * - char(N) columns use !db.char<N>
+  * - varchar columns use !db.string
+  * - integer columns use i32
+  */
+object TPCHSchemas:
+  val decimal: Attribute = DecimalType(IntData(12), IntData(2))
+  val dateDay: Attribute = DateType(StringData("day"))
+  val dbString: Attribute = DBStringType()
+  val int32: Attribute = I32
+  def char(n: Int): Attribute = CharType(IntData(n))
+
+  val schemas = Map(
+    "lineitem" -> TableSchema(
+      "lineitem",
+      Map(
+        "l_orderkey" -> int32, "l_partkey" -> int32, "l_suppkey" -> int32,
+        "l_quantity" -> decimal, "l_extendedprice" -> decimal,
+        "l_discount" -> decimal, "l_tax" -> decimal,
+        "l_returnflag" -> char(1), "l_linestatus" -> char(1),
+        "l_shipdate" -> dateDay, "l_commitdate" -> dateDay, "l_receiptdate" -> dateDay,
+      ),
+    ),
+    "orders" -> TableSchema(
+      "orders",
+      Map(
+        "o_orderkey" -> int32, "o_custkey" -> int32, "o_totalprice" -> decimal,
+        "o_orderdate" -> dateDay, "o_orderpriority" -> char(15), "o_shippriority" -> int32,
+      ),
+    ),
+    "customer" -> TableSchema(
+      "customer",
+      Map(
+        "c_custkey" -> int32, "c_name" -> dbString, "c_nationkey" -> int32,
+        "c_acctbal" -> decimal, "c_mktsegment" -> char(10),
+        "c_phone" -> char(15), "c_address" -> dbString, "c_comment" -> dbString,
+      ),
+    ),
+    "nation" -> TableSchema(
+      "nation",
+      Map("n_nationkey" -> int32, "n_name" -> char(25), "n_regionkey" -> int32),
+    ),
+    "supplier" -> TableSchema(
+      "supplier",
+      Map("s_suppkey" -> int32, "s_name" -> char(25), "s_nationkey" -> int32, "s_acctbal" -> decimal),
+    ),
+    "partsupp" -> TableSchema(
+      "partsupp",
+      Map("ps_partkey" -> int32, "ps_suppkey" -> int32, "ps_availqty" -> decimal, "ps_supplycost" -> decimal),
+    ),
+  )
+
 /** TPC-H Q6 in RelAlg MLIR.
   * Simple: filter + aggregate (SUM) with computed expression.
   */
 class TPCHQ6RelAlgTest extends RelAlgAggregationTest[TPCHDB, Double] {
   def testDescription = "TPCH Q6 RelAlg: forecasting revenue change"
-  def tableSchemas = RelAlgGenerator.tpchSchemas
+  def tableSchemas = TPCHSchemas.schemas
   override def outputFileName = Some("q6.mlir")
+  override def outputColumns = Seq(
+    OutputColumn("aggr", "result", "revenue", DecimalType(IntData(24), IntData(4))),
+  )
 
   def query() =
     testDB.tables.lineitem
@@ -72,8 +133,26 @@ class TPCHQ1RelAlgTest extends RelAlgQueryTest[TPCHDB,
    sum_qty: Double, sum_base_price: Double, sum_disc_price: Double, sum_charge: Double,
    avg_qty: Double, avg_price: Double, avg_disc: Double, count_order: Int)] {
   def testDescription = "TPCH Q1 RelAlg: pricing summary report"
-  def tableSchemas = RelAlgGenerator.tpchSchemas
+  def tableSchemas = TPCHSchemas.schemas
   override def outputFileName = Some("q1.mlir")
+  override def outputColumns = {
+    val decimal12 = DecimalType(IntData(12), IntData(2))
+    val decimal24 = DecimalType(IntData(24), IntData(4))
+    val decimal36 = DecimalType(IntData(36), IntData(6))
+    val decimal31 = DecimalType(IntData(31), IntData(21))
+    Seq(
+      OutputColumn("lineitem", "l_returnflag", "l_returnflag", CharType(IntData(1))),
+      OutputColumn("lineitem", "l_linestatus", "l_linestatus", CharType(IntData(1))),
+      OutputColumn("aggr", "sum_qty", "sum_qty", decimal12),
+      OutputColumn("aggr", "sum_base_price", "sum_base_price", decimal12),
+      OutputColumn("aggr", "sum_disc_price", "sum_disc_price", decimal24),
+      OutputColumn("aggr", "sum_charge", "sum_charge", decimal36),
+      OutputColumn("aggr", "avg_qty", "avg_qty", decimal31),
+      OutputColumn("aggr", "avg_price", "avg_price", decimal31),
+      OutputColumn("aggr", "avg_disc", "avg_disc", decimal31),
+      OutputColumn("aggr", "count_order", "count_order", I64),
+    )
+  }
 
   def query() =
     testDB.tables.lineitem
@@ -146,8 +225,14 @@ class TPCHQ1RelAlgTest extends RelAlgQueryTest[TPCHDB,
 class TPCHQ3RelAlgTest extends RelAlgQueryTest[TPCHDB,
   (l_orderkey: Int, revenue: Double, o_orderdate: LocalDate, o_shippriority: Int)] {
   def testDescription = "TPCH Q3 RelAlg: shipping priority"
-  def tableSchemas = RelAlgGenerator.tpchSchemas
+  def tableSchemas = TPCHSchemas.schemas
   override def outputFileName = Some("q3.mlir")
+  override def outputColumns = Seq(
+    OutputColumn("lineitem", "l_orderkey", "l_orderkey", I32),
+    OutputColumn("aggr", "revenue", "revenue", DecimalType(IntData(24), IntData(4))),
+    OutputColumn("orders", "o_orderdate", "o_orderdate", DateType(scair.dialects.builtin.StringData("day"))),
+    OutputColumn("orders", "o_shippriority", "o_shippriority", I32),
+  )
 
   def query() =
     testDB.tables.customer
@@ -221,8 +306,18 @@ class TPCHQ10RelAlgTest extends RelAlgQueryTest[TPCHDB,
   (c_custkey: Int, c_name: String, revenue: Double, c_acctbal: Double,
    n_name: String, c_address: String, c_phone: String, c_comment: String)] {
   def testDescription = "TPCH Q10 RelAlg: returned item reporting"
-  def tableSchemas = RelAlgGenerator.tpchSchemas
+  def tableSchemas = TPCHSchemas.schemas
   override def outputFileName = Some("q10.mlir")
+  override def outputColumns = Seq(
+    OutputColumn("customer", "c_custkey", "c_custkey", I32),
+    OutputColumn("customer", "c_name", "c_name", DBStringType()),
+    OutputColumn("aggr", "revenue", "revenue", DecimalType(IntData(24), IntData(4))),
+    OutputColumn("customer", "c_acctbal", "c_acctbal", DecimalType(IntData(12), IntData(2))),
+    OutputColumn("nation", "n_name", "n_name", CharType(IntData(25))),
+    OutputColumn("customer", "c_address", "c_address", DBStringType()),
+    OutputColumn("customer", "c_phone", "c_phone", CharType(IntData(15))),
+    OutputColumn("customer", "c_comment", "c_comment", DBStringType()),
+  )
 
   def query() =
     testDB.tables.customer

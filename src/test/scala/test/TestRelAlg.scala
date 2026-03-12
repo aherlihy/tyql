@@ -2,6 +2,7 @@ package test
 
 import tyql.{DatabaseAST, Query, Aggregation}
 import tyql.{RelAlgGenerator, TableSchema}
+import tyql.RelAlgGenerator.OutputColumn
 
 import language.experimental.namedTuples
 import NamedTuple.AnyNamedTuple
@@ -22,6 +23,11 @@ trait TestRelAlgString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]]
   /** Optional: file name for writing MLIR output (e.g. "q1.mlir"). */
   def outputFileName: Option[String] = None
 
+  /** Output columns for the executable wrapper (materialize + subop.local_table).
+    * Override this to enable executable MLIR generation.
+    */
+  def outputColumns: Seq[OutputColumn] = Seq()
+
   test(testDescription + " [RelAlg]") {
     val q = query()
     val actualIR = q.toQueryIR
@@ -40,6 +46,13 @@ trait TestRelAlgString[Rows <: AnyNamedTuple, ReturnShape <: DatabaseAST[?]]
       val outPath = outDir.resolve(name)
       java.nio.file.Files.writeString(outPath, actual + "\n")
       println(s"Wrote MLIR to $outPath")
+
+      // Also write executable MLIR if outputColumns are provided
+      if outputColumns.nonEmpty then
+        val executable = gen.convertExecutable(actualIR, outputColumns)
+        val execPath = outDir.resolve("exec-" + name)
+        java.nio.file.Files.writeString(execPath, executable + "\n")
+        println(s"Wrote executable MLIR to $execPath")
     }
 
     val (success, debug) = TestComparitor.matchStrings(normalizedExpected, normalizedActual)
