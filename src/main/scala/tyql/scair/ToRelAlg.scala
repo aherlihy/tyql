@@ -4,15 +4,7 @@ import scair.Printer
 import scair.ir.*
 import scair.dialects.builtin.*
 import scair.dialects.func.{Func, Return}
-import scair.dialects.lingodb.relalg.{
-  BaseTable, Selection, MapOp, InnerJoin, CrossProduct,
-  Aggregation as RelAlgAggregation, AggrFn, CountRows, Sort, Limit,
-  Projection, Materialize, RelAlgQuery, QueryReturn,
-  AggrFunc, SetSemantic, SortSpec, SortSpecificationAttr,
-}
-import scair.dialects.lingodb.db.*
-import scair.dialects.lingodb.tuples.*
-import scair.dialects.lingodb.subop.{SubopLocalTableType, LocalTableColumn, SetResult}
+import scair.dialects.lingodb.{Aggregation as RelAlgAggregation, *}
 
 import java.io.{PrintWriter, StringWriter}
 

@@ -6,7 +6,7 @@ import tyql.*
 import tyql.Expr.{sum, avg, min, max, count, countAll, toRow, DoubleLit, DateLit}
 import tyql.{RelAlgGenerator, TableSchema}
 import tyql.RelAlgGenerator.OutputColumn
-import scair.dialects.lingodb.db.{DecimalType, DateType, CharType, DBStringType}
+import scair.dialects.lingodb.{DecimalType, DateType, CharType, DBStringType}
 import scair.dialects.builtin.{IntData, StringData, I32, I64}
 import scair.ir.Attribute
 

@@ -8,7 +8,7 @@ inThisBuild(Seq(
     "org.scalameta" %% "munit" % "1.0.0+24-ee555b1d-SNAPSHOT" % Test,
     "org.duckdb" % "duckdb_jdbc" % "1.1.1",
     "com.lihaoyi" %% "scalasql" % "0.1.11",
-    "io.github.edin-dal" %% "scair-dialects" % "0.0.0-342-f3cb1b-DIRTY2716b62b-SNAPSHOT"
+    "io.github.edin-dal" %% "scair-dialects" % "0.0.0-340-720470-DIRTY49bda1c0-SNAPSHOT"
   )
 ))
 
