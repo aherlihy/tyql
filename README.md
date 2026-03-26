@@ -1,21 +1,48 @@
-# Tyql
+# TyQL
 
-A Scala3 SQL query generator
+A Scala 3 SQL query generator
 - based on [named tuples](https://scala-lang.org/api/3.x/docs/docs/reference/experimental/named-tuples.html) and not macros nor higher-kinded types,
 - checks query correctness at compile-time against selected backend,
 - generates SQL at runtime,
 - guides the user with nice error messages,
 - is usable (feature coverage, speed).
 
-| TOC  |
-|---------|
-|  [Tyql - A Scala3 SQL query generator](#tyql) |
-|  [How do i use it?](#how-do-i-use-it) |
-|  [How do I configure it?](#how-do-i-configure-it) |
-|  [How fast is it in practice?](#how-fast-is-it-in-practice) |
-|  [What about caching queries with changing inputs?](#what-about-caching-queries-with-changing-inputs) |
-|  [What about transactions and other driver-specific functionality?](#what-about-transactions-and-other-driver-specific-functionality) |
-|  [Limits of compile-time correctness checking](#limits-of-compile-time-correctness-checking) |
+## Running Tests
+
+### Unit tests only (no databases required)
+```bash
+sbt 'testOnly -- --exclude-tags=Expensive'
+```
+
+### Full test suite (requires Docker)
+Integration tests run against PostgreSQL, MySQL, and MariaDB via Docker. SQLite, DuckDB, and H2 run in-memory.
+
+```bash
+# Start the database containers
+docker compose --profile dbs up -d
+
+# Wait for databases to be healthy, then run all tests
+sbt test
+
+# Stop the databases when done
+docker compose --profile dbs stop
+```
+
+Alternatively, use the helper script:
+```bash
+./dev.sh db-start   # start databases
+sbt test            # run tests locally
+./dev.sh db-stop    # stop databases
+```
+
+Database ports (non-standard to avoid conflicts):
+- PostgreSQL: `localhost:5433`
+- MySQL: `localhost:3307`
+- MariaDB: `localhost:3308`
+
+Credentials: `testuser` / `testpass` / database `testdb`
+
+## Usage
 
 ### How do i use it?
 First, import a dialect (`postgres`, `mysql`, `mariadb`, `duckdb`, `sqlite`, `h2`) like this
