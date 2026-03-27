@@ -84,6 +84,30 @@ class LinearRelevanceAloneTest extends munit.FunSuite {
   }
 }
 
+// T4: Linearity (affinity/no duplicates) enforced independently.
+// Using the same recursive ref twice within one definition with Linear should fail.
+class LinearAffinityAloneTest extends munit.FunSuite {
+  def expectedError: String = "Failed to generate recursive queries"
+
+  test("Linearity (affinity) enforced when all other constraints disabled") {
+    val error = compileErrors("""
+      import language.experimental.namedTuples
+      import tyql.*
+      import Query.fix
+
+      type Edge = (x: Int, y: Int)
+      val base = Table[Edge]("edges")
+
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+        pathRec.flatMap(p =>
+          pathRec.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
+        )
+      )
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
 // T5: Mutual recursion enforced independently via fix.
 // fix always disallows mutual recursion regardless of other settings.
 class MutualRecursionViaFixTest extends munit.FunSuite {
@@ -151,6 +175,30 @@ class MonotonicityAloneTest extends munit.FunSuite {
 
       base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
         pathRec.aggregate(p => (x = p.x, y = sum(p.y)).toGroupingRow).groupBySource(p => (x = p._1.x).toRow)
+      )
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
+// T8: Two constraints simultaneously: Linear + SetResult.
+// NonLinear self-join without .distinct fails the generate check.
+class LinearAndSetSimultaneousTest extends munit.FunSuite {
+  def expectedError: String = "Failed to generate recursive queries"
+
+  test("Linear + Set enforced simultaneously") {
+    val error = compileErrors("""
+      import language.experimental.namedTuples
+      import tyql.*
+      import Query.fix
+
+      type Edge = (x: Int, y: Int)
+      val base = Table[Edge]("edges")
+
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+        pathRec.flatMap(p =>
+          pathRec.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
+        ).distinct
       )
     """)
     assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")

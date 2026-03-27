@@ -149,6 +149,33 @@ class NonMonotoneConstructorStillEnforcedTest extends munit.FunSuite {
   }
 }
 
+// N3: NonMonotone allows aggregate but linearity is still enforced.
+// Using the recursive ref twice (once in aggregate, once in flatMap) with Linear should fail.
+class NonMonotoneLinearStillEnforcedTest extends munit.FunSuite {
+  def testDescription: String = "NonMonotone + Linear: using recursive ref twice still fails"
+  def expectedError: String = "Failed to generate recursive queries"
+
+  test(testDescription) {
+    val error: String = compileErrors("""
+      import language.experimental.namedTuples
+      import tyql.{Table, Expr, Query, RestrictedQuery}
+      import Expr.sum
+      import RestrictedQuery.*
+      import Query.fix
+
+      type Edge = (x: Int, y: Int)
+      val base = Table[Edge]("edges")
+
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+        pathRec.flatMap(p =>
+          pathRec.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
+        ).distinct
+      )
+    """)
+    assert(error.contains(expectedError), s"Expected substring '$expectedError' in '$error'")
+  }
+}
+
 // N4: NonMonotone allows aggregate but set semantics is still enforced.
 // Returning a BagResult (no .distinct) when SetResult is required should fail.
 class NonMonotoneSetStillEnforcedTest extends munit.FunSuite {

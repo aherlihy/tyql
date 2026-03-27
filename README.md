@@ -2,7 +2,7 @@
 
 # Experimental Section 
 Experiments in this section are run on Intel(R) Xeon(R) Gold 5118 CPU @ 2.30GHz (2 x 12-core) with 376GB RAM, 
-on Ubuntu 22.04 LTS with Linux kernel Linux 5.15.0-27-generic (diascld48) and Scala 3.5.1-RC1 The JVM used is
+on Ubuntu 22.04 LTS with Linux kernel Linux 5.15.0-27-generic (s48) and Scala 3.8.2 The JVM used is
 GraalVM Community Java 17.0.9 with sbt 1.9.9 with heap size 8GB
 
 Each experiment is run with the Java Benchmarking Harness (JMH) with 5 iterations, 5 warm-up iterations.
@@ -15,7 +15,8 @@ randomized data are stored in `bench/data/<benchmark>/csv_columns.txt`.
 The smallest, s, is stored on github in the `bench/data/<benchmark>/data` folders. The output of each benchmark will write 
 to the `bench/data/<benchmark>/out` folder.
 The medium and large datasets are too large to store on github so we provide zipped folders containing `<benchmark>/m_data` 
-and `l_data` directories. Unzip these folders so the structure is `bench/data/<benchmark>/m_data` and `bench/data/<benchmark>/l_data`. 
+and `l_data` directories in https://zenodo.org/records/19237643. Unzip these folders so the structure is `bench/data/<benchmark>/m_data` and `bench/data/<benchmark>/l_data`.
+The sizes.sh script will run through and list the size of each folder.
 
 # Build TyQL
 ```shell
@@ -55,8 +56,15 @@ file produced by the section above > "Get Data"
 6) Repeat steps 3-5 for the medium and large datasets in their respective sheets.
 
 Due to the JIT there is some variability in the calculated speedups 
-but the numbers should be within the same order of magnitude and consistent, relative to each other, with the ones in the paper.
+but the numbers should be within the same order of magnitude and consistent, relative to each other, with the ones in the paper. The Orbits query is unique among the benchmarks in that it references the recursive relation multiple times in the final query via a correlated subquery, which limits the speedup over non-recursive SQL on
+  larger inputs as DuckDB re-evaluates the recursive CTE for each reference. On some machines WITH RECURSIVE is slightly faster, on some machines non-recursive SQL is slightly faster, and on some machines they are equivalent.
 If you want to additionally count iterations, then you can uncomment the printlines in `bench/src/main/scala/TimeoutQueryBenchmark/<query>.scala` 
 and rerun the benchmarks, then post-processes the output to count the number of iterations.
 
 If there are any questions or problems running the benchmark you can always contact me at herlihyap at gmail and I will do my best to clarify.
+
+To keep the recursive query source code focused and readable, backend specialization (Dialect support, multi-database SQL generation) is located on the "backend-specialization" branch.
+
+# Additional Notes
+- The code shown in Fig. 14 is located in `restrictedFix`: `scala/tyql/query/Query.scala:357`.
+- The example queries in Fig. 11 are located in `scala/test/query/PaperExampleTests.scala`.
