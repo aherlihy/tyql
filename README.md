@@ -18,42 +18,111 @@ The medium and large datasets are too large to store on github so we provide zip
 and `l_data` directories in https://zenodo.org/records/19237643. Unzip these folders so the structure is `bench/data/<benchmark>/m_data` and `bench/data/<benchmark>/l_data`.
 The sizes.sh script will run through and list the size of each folder.
 
-# Build TyQL
+# Push-button run (Docker)
+A `Dockerfile` is provided that matches the paper environment exactly
+(Ubuntu 22.04 + GraalVM Community 17.0.9 + sbt 1.9.9). All dependencies are
+pre-resolved at build time, so running the benchmarks needs no internet.
+
+```shell
+# 1. Build the image (native host arch; ~5 min first time)
+$ docker build -t tyql-artifact .
+
+# 2. Push-button run: the small suite only (~3 min), cleaned CSVs in ./out
+$ mkdir -p out
+$ docker run --rm -v "$(pwd)/out:/out" tyql-artifact
+```
+The default `docker run` is equivalent to `-S` (small, the "kick-the-tires"
+option). To run additional sizes, bind-mount the Zenodo-hosted medium/large
+data and pass the corresponding flags:
+```shell
+$ docker run --rm \
+      -v "$(pwd)/out:/out" \
+      -v "$(pwd)/bench/data:/tyql/bench/data" \
+      tyql-artifact -S -M -L
+```
+For the final artifact submission, build the image for `linux/amd64` (the
+architecture the paper's numbers were measured on — may run under emulation on
+Apple Silicon hosts):
+```shell
+$ docker buildx build --platform linux/amd64 -t tyql-artifact --load .
+```
+
+# Build TyQL (without Docker)
 ```shell
 # Always clean + recompile both source and benchmarking code between runs, otherwise JMH can cause SBT to exit if something is out of sync 
 $ sbt -java-home <path to jdk> "clean;compile;bench/Jmh/clean;bench/Jmh/compile"
 ```
 # Run Benchmarks
-Run benchmarks, on a dedicated server without other processes running at the same time. 
-There is a script "run_all_bench.sh" that should help run all three sizes consecutively. Note that you will need to update
-the `java-home` argument for your machine. The log of the benchmarks will write to `bench_<size>.out` and the results will
-be written to a csv file `bench/benchmark_out_<size>.csv`. You can follow the progress with `tail -f bench_<size>.out`.
+Run benchmarks on a dedicated server without other processes running at the same time.
+The script `run_all_bench.sh` launches one or more of the three sizes consecutively.
+
+```
+Usage: bash run_all_bench.sh -java-home <path-to-jdk> [-S] [-M] [-L]
+
+  -java-home <path>   Path to the JDK to use (required).
+  -S                  Run the small  (data)   benchmark suite.
+  -M                  Run the medium (m_data) benchmark suite.
+  -L                  Run the large  (l_data) benchmark suite.
+```
+If none of `-S`, `-M`, `-L` are supplied, all three sizes are run consecutively.
+
+The log of each size is written to `bench_<size>.out` and the results to
+`bench/benchmark_out_<size>.csv`. You can follow the progress with
+`tail -f bench_<size>.out`.
+
+Examples:
 ```shell
-$ bash run_all_bench.sh
+# Run all three sizes
+$ bash run_all_bench.sh -java-home /opt/graalvm-community-openjdk-17.0.9+9.1
+
+# Run just the small suite (the short-run option for "kick-the-tires")
+$ bash run_all_bench.sh -java-home /opt/graalvm-community-openjdk-17.0.9+9.1 -S
 ```
 
 # Post-processing result data
 This section describes how to generate the tables/charts used in the paper.
-Search `bench_<size>.out` for `"Exception"`, there should not be any that are not timeouts, but if there were 
-problems running the benchmarks then it will show up there.
+`postprocess.sh` automatically scans each `bench_<size>.out` for `Exception`
+lines that are not `TimeoutException` and prints a warning if any are found —
+benchmarks that hit the 10-minute cutoff surface as `TimeoutException`s and are
+expected, but any other exception indicates a problem (missing data dir, JVM
+crash, query failure, ...).
 
-## Cleaning the benchmark file
-NOTE: I do the cleaning on my laptop which runs MacOS and zsh. If you are running this step on a different machine,
-you may need to update the `sed` command below with the appropriate arguments for your operating system or shell. 
+## Cleaning the benchmark files
+Run `postprocess.sh` on the directory containing the raw outputs of
+`run_all_bench.sh`. The script strips the JMH class prefix from each row and
+splits the method name into a separate column so the CSV can be imported into
+Excel as-is. It uses only POSIX-compatible `sed` features and works on both
+macOS (BSD sed) and Ubuntu (GNU sed).
+
+```
+Usage: bash postprocess.sh <benchsrc> [output_dir]
+
+  <benchsrc>     Directory with benchmark_out_{s,m,l}.csv and bench_{s,m,l}.out
+                 (both the repo root after a local run, or a collected dir,
+                 are accepted).
+  [output_dir]   Output directory (default: ./results).
+```
+
+For each size present it writes:
+- `<output_dir>/<size>_clean.csv` — cleaned CSV suitable for Excel import
+- `<output_dir>/<size>_iterations.csv` — per-query iteration counts extracted
+  from the sbt log (empty unless the optional `IT` printlns in
+  `bench/src/main/scala/TimeoutQueryBenchmark/<query>.scala` are enabled)
+
+Example (assuming you ran the benchmarks from the repo root):
 ```shell
-cat benchmark_out_<size>.csv | sed -e 's/tyql.bench.TO//' -e 's/Benchmark\./\",\"/' -e 's/_graph//' -e 's/_misc//' -e 's/_programanalysis//' > benchmark_<size>_clean.csv
+$ bash postprocess.sh . results
 ```
 
 ## Generating aggregate data 
-The excel file used to generate results is "repro-tyql.xlsx", import the data and the charts should auto-generate.
-Steps:
-1) Open `tyql-repro.xlsx` with Excel Version 16.76 (23081101)
+The excel file used to generate results is `tyql-repro.xlsx`; import the cleaned
+data and the charts auto-generate. Steps:
+1) Open `tyql-repro.xlsx` with Excel (tested with Version 16.76 / 23081101).
 2) Add an empty sheet to import the data into.
-3) In that new sheet, navigate to "Data > Get Data (Power Query) > From Text (Legacy) > select the small datasize <benchmark_out>_clean.csv 
-file produced by the section above > "Get Data"
-4) In the text import wizard click "Delimited" > next > select "Comma". 
-5) Do not treat consecutive delimiters as one. > Finish and put the data, ignoring the header, in the "small" sheet starting at row 3 column A. It should go to line 50.
-6) Repeat steps 3-5 for the medium and large datasets in their respective sheets.
+3) In that new sheet, navigate to `Data > Get Data (Power Query) > From Text (Legacy)` and select `results/small_clean.csv` > "Get Data".
+4) In the text import wizard click "Delimited" > next > select "Comma".
+5) Do **not** treat consecutive delimiters as one. > Finish and put the data, ignoring the header, in the "small" sheet starting at row 3 column A. It should go to line 50.
+6) Repeat steps 3-5 for `results/medium_clean.csv` and `results/large_clean.csv` in their respective sheets.
 
 Due to the JIT there is some variability in the calculated speedups 
 but the numbers should be within the same order of magnitude and consistent, relative to each other, with the ones in the paper. The Orbits query is unique among the benchmarks in that it references the recursive relation multiple times in the final query via a correlated subquery, which limits the speedup over non-recursive SQL on

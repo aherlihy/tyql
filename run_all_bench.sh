@@ -1,24 +1,117 @@
+#!/usr/bin/env bash
+# Run the JMH benchmarks for one or more input dataset sizes.
+#
+# Usage: bash run_all_bench.sh -java-home <path-to-jdk> [-S] [-M] [-L]
+#
+#   -java-home <path>   Path to the JDK to use (required). Example:
+#                       -java-home /opt/graalvm-community-openjdk-17.0.9+9.1
+#   -S                  Run the small  (xs/data) benchmark suite.
+#   -M                  Run the medium (m_data)  benchmark suite.
+#   -L                  Run the large  (l_data)  benchmark suite.
+#
+# If none of -S, -M, -L are supplied, all three sizes are run consecutively.
+#
+# For size <X> (one of s, m, l) the results are written to:
+#     bench/benchmark_out_<X>.csv     # JMH CSV output
+#     bench_<X>.out                   # full sbt/JMH log (follow with `tail -f`)
+#
+# The script clears any previous output files for the sizes it is about to run.
+
+set -u
+
+usage() {
+    cat <<'EOF'
+Run the JMH benchmarks for one or more input dataset sizes.
+
+Usage: bash run_all_bench.sh -java-home <path-to-jdk> [-S] [-M] [-L]
+
+  -java-home <path>   Path to the JDK to use (required). Example:
+                      -java-home /opt/graalvm-community-openjdk-17.0.9+9.1
+  -S                  Run the small  (data)   benchmark suite.
+  -M                  Run the medium (m_data) benchmark suite.
+  -L                  Run the large  (l_data) benchmark suite.
+
+If none of -S, -M, -L are supplied, all three sizes are run consecutively.
+
+For size <X> (one of s, m, l) the results are written to:
+    bench/benchmark_out_<X>.csv   # JMH CSV output
+    bench_<X>.out                 # full sbt/JMH log (follow with `tail -f`)
+
+The script removes any previous output files for the sizes it is about to run.
+EOF
+    exit "${1:-1}"
+}
+
+JAVA_HOME_PATH=""
+RUN_S=0
+RUN_M=0
+RUN_L=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -java-home|--java-home)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: -java-home requires a path argument." >&2
+                usage 1
+            fi
+            JAVA_HOME_PATH="$2"
+            shift 2
+            ;;
+        -S) RUN_S=1; shift ;;
+        -M) RUN_M=1; shift ;;
+        -L) RUN_L=1; shift ;;
+        -h|--help) usage 0 ;;
+        *)
+            echo "Error: unknown argument: $1" >&2
+            usage 1
+            ;;
+    esac
+done
+
+if [[ -z "$JAVA_HOME_PATH" ]]; then
+    echo "Error: -java-home <path> is required." >&2
+    usage 1
+fi
+
+if [[ ! -d "$JAVA_HOME_PATH" ]]; then
+    echo "Error: java-home path does not exist: $JAVA_HOME_PATH" >&2
+    exit 1
+fi
+
+# Default to all sizes if none were specified.
+if [[ $RUN_S -eq 0 && $RUN_M -eq 0 && $RUN_L -eq 0 ]]; then
+    RUN_S=1
+    RUN_M=1
+    RUN_L=1
+fi
+
 s_data_dir="data"
 m_data_dir="m_data"
 l_data_dir="l_data"
 
 only=".*"
-exceptM="-e TOCollectionsBenchmark\.((cba)|(cspa)|(evenodd)|(pointsto)|(javapointsto)|(orbits)|(party)|(trust)) -e Unrestricted -e TOScalaSQLBenchmark\.((evenodd))"
-exceptL="-e TOCollectionsBenchmark\.((ancestry)|(asps)|(bom)|(cba)|(cspa)|(evenodd)|(pointsto)|(orbits)|(party)|(trust)) -e Unrestricted -e TOScalaSQLBenchmark\.((ancestry)|(evenodd)|(pointsto)|(javapointsto))"
+exceptM='-e TOCollectionsBenchmark\.((cba)|(cspa)|(evenodd)|(pointsto)|(javapointsto)|(orbits)|(party)|(trust)) -e Unrestricted -e TOScalaSQLBenchmark\.((evenodd))'
+exceptL='-e TOCollectionsBenchmark\.((ancestry)|(asps)|(bom)|(cba)|(cspa)|(evenodd)|(pointsto)|(orbits)|(party)|(trust)) -e Unrestricted -e TOScalaSQLBenchmark\.((ancestry)|(evenodd)|(pointsto)|(javapointsto))'
 jtest="-wi 5 -i 5"
-#only=".*TyQL.*"
-#jtest="-wi 3 -i 3"
 
-rm -f bench_s.out bench_m.out bench_l.out bench/benchmark_out_s.csv bench/benchmark_out_m.csv bench/benchmark_out_l.csv
+run_size() {
+    local size="$1"
+    local data_dir="$2"
+    local except="$3"
 
-export TYQL_DATA_DIR=$s_data_dir
-sbt -java-home /scratch2/herlihy/graalvm-community-openjdk-17.0.9+9.1 "clean; bench/Jmh/clean"
-sbt -java-home /scratch2/herlihy/graalvm-community-openjdk-17.0.9+9.1 "bench/Jmh/run $only $jtest -rff benchmark_out_s.csv -jvmArgs \"-Xmx8G\"" &> bench_s.out
+    echo ">>> Running size=${size} (TYQL_DATA_DIR=${data_dir})"
+    rm -f "bench_${size}.out" "bench/benchmark_out_${size}.csv"
 
-export TYQL_DATA_DIR=$m_data_dir
-sbt -java-home /scratch2/herlihy/graalvm-community-openjdk-17.0.9+9.1 "clean; bench/Jmh/clean"
-sbt -java-home /scratch2/herlihy/graalvm-community-openjdk-17.0.9+9.1 "bench/Jmh/run $only $exceptM $jtest -rff benchmark_out_m.csv -jvmArgs \"-Xmx8G\"" &> bench_m.out
+    export TYQL_DATA_DIR="$data_dir"
+    sbt -java-home "$JAVA_HOME_PATH" "clean; bench/Jmh/clean"
+    sbt -java-home "$JAVA_HOME_PATH" \
+        "bench/Jmh/run $only $except $jtest -rff benchmark_out_${size}.csv -jvmArgs \"-Xmx8G\"" \
+        &> "bench_${size}.out"
+    echo ">>> Finished size=${size}. Log: bench_${size}.out  CSV: bench/benchmark_out_${size}.csv"
+}
 
-export TYQL_DATA_DIR=$l_data_dir
-sbt -java-home /scratch2/herlihy/graalvm-community-openjdk-17.0.9+9.1 "clean; bench/Jmh/clean"
-sbt -java-home /scratch2/herlihy/graalvm-community-openjdk-17.0.9+9.1 "bench/Jmh/run $only $exceptL $jtest -rff benchmark_out_l.csv -jvmArgs \"-Xmx8G\"" &> bench_l.out
+if [[ $RUN_S -eq 1 ]]; then run_size s "$s_data_dir" ""; fi
+if [[ $RUN_M -eq 1 ]]; then run_size m "$m_data_dir" "$exceptM"; fi
+if [[ $RUN_L -eq 1 ]]; then run_size l "$l_data_dir" "$exceptL"; fi
+
+exit 0
