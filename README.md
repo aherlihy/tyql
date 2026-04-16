@@ -66,7 +66,7 @@ with `docker logs -f`:
 $ CID=$(docker run -d \
          -v "$(pwd)/out:/out" \
          -v "$(pwd)/bench/data:/tyql/bench/data" \
-         tyql-artifact -S -M)
+         tyql-artifact -M)
 
 # (safe to log out here — the container keeps running under the Docker daemon)
 
@@ -90,9 +90,9 @@ above), the three sizes took approximately:
 
 | Size | Flag | Wall-clock on tested machine |
 |------|------|------------------------------|
-| small  | `-S` | a few minutes |
-| medium | `-M` | ~4 hours  |
-| large  | `-L` | ~10 hours |
+| small  | `-S` | a few minutes                |
+| medium | `-M` | ~4 hours, 2hr -skipTimeout   |
+| large  | `-L` | ~10 hours                    |
 
 The paper's performance table reports all three sizes. The ECOOP artifact
 guidelines recommend supplying a scaled-down version of any experiment whose
