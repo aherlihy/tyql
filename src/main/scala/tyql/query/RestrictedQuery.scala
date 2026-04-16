@@ -18,7 +18,7 @@ trait MutualRestriction
 class NoMutual extends MutualRestriction
 class AllowMutual extends MutualRestriction
 
-case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID <: Int, RestrictionCF <: ConstructorFreedom, RestrictionM <: MonotoneRestriction](w: Option[Query.QueryRef[A, C]] = None) extends RestrictedQuery[A, C, Tuple1[ID], RestrictionCF, RestrictionM] (w.getOrElse(Query.QueryRef[A, C]())):
+case class RestrictedQueryRef[A: ResultTag, C <: ResultCategory, ID, RestrictionCF <: ConstructorFreedom, RestrictionM <: MonotoneRestriction](w: Option[Query.QueryRef[A, C]] = None) extends RestrictedQuery[A, C, Tuple1[ID], RestrictionCF, RestrictionM] (w.getOrElse(Query.QueryRef[A, C]())):
   type Self = this.type
   def toQueryRef: Query.QueryRef[A, C] = wrapped.asInstanceOf[Query.QueryRef[A, C]]
 
