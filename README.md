@@ -10,11 +10,17 @@ The library versions are specified in the root `build.sbt` file.
 
 # Input datasets
 The experiments are run on 3 differently sized datasets that are stored as CSV files in the `bench/data` directory.
-The smallest, s, is stored on github in the `bench/data/<benchmark>/data` folders. The output of each benchmark will write 
-to the `bench/data/<benchmark>/out` folder.
-The medium and large datasets are too large to store on github so we provide zipped folders containing `<benchmark>/m_data` 
-and `l_data` directories in https://zenodo.org/records/19237643. Unzip these folders so the structure is `bench/data/<benchmark>/m_data` and `bench/data/<benchmark>/l_data`.
-The sizes.sh script will run through and list the size of each folder.
+The smallest (small, `-S`) is checked into the repository at `bench/data/<benchmark>/data/` and is used by default.
+The medium (`-M`) and large (`-L`) datasets are hosted on Zenodo
+(https://zenodo.org/records/19237643) as a single archive `rr-data.zip` (~147 MB).
+
+`get_data.sh` downloads and unpacks them into the correct locations
+(`bench/data/<benchmark>/m_data/` and `.../l_data/`). It is idempotent — re-running it is a no-op once the data is in place:
+```shell
+$ bash get_data.sh
+```
+After it finishes, the message at the end of the script gives the exact
+`docker run` command to use for the medium / large suites (it bind-mounts `bench/data` into the container).
 
 # Push-button run (Docker)
 A `Dockerfile` is provided that matches the paper environment exactly
@@ -22,22 +28,60 @@ A `Dockerfile` is provided that matches the paper environment exactly
 All dependencies are pre-resolved at build time, so running the benchmarks
 needs no internet.
 
+The full reviewer workflow:
+
 ```shell
-# 1. Build the image
+# 1. Build the image (one-time)
 $ docker build -t tyql-artifact .
 
-# 2. Push-button run: the small suite, cleaned CSVs in ./out
+# 2. Kick-the-tires: small suite only, cleaned CSVs in ./out
 $ mkdir -p out
 $ docker run --rm -v "$(pwd)/out:/out" tyql-artifact
-```
-The default `docker run` is equivalent to `-S` (small). To run additional sizes, bind-mount the Zenodo-hosted medium/large
-data and pass the corresponding flags:
-```shell
+
+# 3. (Only for -M / -L) fetch the Zenodo-hosted medium/large datasets
+$ bash get_data.sh
+
+# 4. Medium run (or -L, or -S -M -L) with bench/data bind-mounted
 $ docker run --rm \
       -v "$(pwd)/out:/out" \
       -v "$(pwd)/bench/data:/tyql/bench/data" \
-      tyql-artifact -S -M
+      tyql-artifact -M
 ```
+
+Flags accepted by the image are the same as `run_all_bench.sh`:
+`-S` / `-M` / `-L` select sizes, and `-skipTimeout` skips the configurations
+that are known to hit the 10-minute per-iteration timeout at `-M` / `-L`
+(faster run, fewer rows in the output CSV; without it every configuration is
+run — the complete paper-matching run but slower because each timed-out
+configuration still costs ~10 min).
+
+## Running detached (remote machines, long `-M` / `-L` runs)
+
+`-M` and `-L` take hours, so it's useful to start the container and log out.
+Use `docker run -d` (detached), save the container ID, and follow the live log
+with `docker logs -f`:
+
+```shell
+# Start detached; the command prints and returns a container ID
+$ CID=$(docker run -d \
+         -v "$(pwd)/out:/out" \
+         -v "$(pwd)/bench/data:/tyql/bench/data" \
+         tyql-artifact -S -M)
+
+# (safe to log out here — the container keeps running under the Docker daemon)
+
+# Later: see whether it's still running
+$ docker ps --filter "id=$CID"
+
+# Follow the live JMH output (equivalent to `tail -f bench_<size>.out`)
+$ docker logs -f $CID
+
+# Block until it finishes (exit code mirrors the entrypoint)
+$ docker wait $CID
+```
+
+After the container exits, `./out/` contains the cleaned CSVs and `./out/raw/`
+contains the full sbt/JMH logs.
 
 ## Run sizes and expected wall-clock time
 
@@ -71,12 +115,17 @@ Run benchmarks on a dedicated server without other processes running at the same
 The script `run_all_bench.sh` launches one or more of the three sizes consecutively.
 
 ```
-Usage: bash run_all_bench.sh -java-home <path-to-jdk> [-S] [-M] [-L]
+Usage: bash run_all_bench.sh -java-home <path-to-jdk> [-S] [-M] [-L] [-skipTimeout]
 
   -java-home <path>   Path to the JDK to use (required).
   -S                  Run the small  (data)   benchmark suite.
   -M                  Run the medium (m_data) benchmark suite.
   -L                  Run the large  (l_data) benchmark suite.
+  -skipTimeout        Skip configurations that are known to hit the 10-minute
+                      per-iteration timeout at -M/-L. Faster run, fewer rows
+                      in the output CSV. Without it every configuration is
+                      run — complete paper-matching run but slower because
+                      each timed-out configuration still costs ~10 min.
 ```
 If none of `-S`, `-M`, `-L` are supplied, all three sizes are run consecutively.
 
