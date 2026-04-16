@@ -85,7 +85,7 @@ def query() =
   // APSP: Mono ✗, MR ✓, Lin ✗, Set ✓, CF ✗
   import RestrictedQuery.*
   val apspOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
-  val asps = base.fix(apspOptions)(path =>
+  val asps = base.fix(apspOptions)([K] => path =>
     path.aggregate(p =>
       path
         .filter(e =>
@@ -183,7 +183,7 @@ class OrbitsTest extends SQLStringQueryTest[PlanetaryDB, Orbits] {
     val base = testDB.tables.base
     // Orbits: Mono •(stratified), MR ✓, Lin ✗, Set ✗, CF ✓
     val orbitsOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual())
-    val orbits = base.fix(orbitsOptions)(orbits =>
+    val orbits = base.fix(orbitsOptions)([K] => orbits =>
       orbits.flatMap(p =>
         orbits
           .filter(e => p.y == e.x)
@@ -241,7 +241,7 @@ class AndersensTest extends SQLStringQueryTest[AndersenPointsToDB, Edge] {
     val base = testDB.tables.addressOf.map(a => (x = a.x, y = a.y).toRow)
     // APT: Mono ✓, MR ✓, Lin ✗, Set ✓, CF ✓
     val aptOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
-    base.fix(aptOptions)(pointsTo =>
+    base.fix(aptOptions)([K] => pointsTo =>
       testDB.tables.assign.flatMap(a =>
         pointsTo.filter(p => a.y == p.x).map(p =>
           (x = a.x, y = p.y).toRow))
@@ -498,7 +498,7 @@ class BOMTest extends SQLStringQueryTest[BOMDB, (part: String, max: Int)] {
     val waitFor = testDB.tables.basic
     // BOM: Mono •(stratified), MR ✓, Lin ✓, Set ✗, CF ✓
     val bomOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual())
-    waitFor.fix(bomOptions)(waitFor =>
+    waitFor.fix(bomOptions)([K] => waitFor =>
       testDB.tables.assbl.flatMap(assbl =>
         waitFor
           .filter(wf => assbl.spart == wf.part)
@@ -672,7 +672,7 @@ class GraphalyticsDAGTest extends SQLStringQueryTest[GraphDB, Path] {
 
     // TC: Mono ✓, MR ✓, Lin ✓, Set ✗, CF ✗
     val tcOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual())
-    pathBase.fix(tcOptions)(path =>
+    pathBase.fix(tcOptions)([K] => path =>
       path.flatMap(p =>
         testDB.tables.edge
           .filter(e => e.x == p.endNode && !p.path.contains(e.y))
@@ -962,7 +962,7 @@ class FlowTest extends SQLStringQueryTest[FlowDB, (r: String, w: String)] {
     // DF: Mono ✓, MR ✓, Lin ✗, Set ✗, CF ✓
     val dfOptions = (constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual())
     testDB.tables.jumpOp
-      .fix(dfOptions)(flow =>
+      .fix(dfOptions)([K] => flow =>
         flow.flatMap(f1 =>
           flow.filter(f2 => f1.b == f2.a).map(f2 =>
             (a = f1.a, b = f2.b).toRow)))
@@ -1057,7 +1057,7 @@ class SSSPBenchTest extends SQLStringQueryTest[WeightedGraphDB, (dst: Int, cost:
   def query() =
     val base = testDB.tables.base
     val ssspOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
-    base.fix(ssspOptions)(sp =>
+    base.fix(ssspOptions)([K] => sp =>
       testDB.tables.edge.flatMap(edge =>
         sp
           .filter(s => s.dst == edge.src)
@@ -1095,7 +1095,7 @@ class SameGenerationBenchTest extends SQLStringQueryTest[SGDB, (name: String)] {
   def query() =
     val base = testDB.tables.parents.filter(p => p.parent == "Alice").map(e => (name = e.child, gen = IntLit(1)).toRow)
     val sgOptions = (constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
-    base.fix(sgOptions)(gen =>
+    base.fix(sgOptions)([K] => gen =>
       testDB.tables.parents.flatMap(parent =>
         gen
           .filter(g => parent.parent == g.name)

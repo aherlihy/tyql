@@ -225,34 +225,56 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     given linearOk: LinearConstraint[Linear, Tuple1[0]] with {}
     given nonLinearOk[DT1 <: Tuple]: LinearConstraint[NonLinear, DT1] with {}
 
+  /** Conditionally tag the ref ID with K based on linearity option.
+   *  Linear: ref has `0 & K` → κ enforced.
+   *  NonLinear: ref has bare `0` → K is a no-op. */
+  type FixRefID[RL <: LinearRestriction, K] = RL match
+    case Linear    => 0 & K
+    case NonLinear => 0
+
+  /** Conditionally constrain the return D based on linearity option.
+   *  Linear: D must be `Tuple1[0 & K]` → linearity + κ enforced.
+   *  NonLinear: D is free (DT1 inferred from body) → no linearity check. */
+  type FixReturnD[RL <: LinearRestriction, K, DT1 <: Tuple] = RL match
+    case Linear    => Tuple1[0 & K]
+    case NonLinear => DT1
+
+  /** Instance `fix` with κ.  Uses `[K] =>` polymorphic body.
+   *  When `linearity = Linear`, κ is enforced via `0 & K` in the dep tuple.
+   *  When `linearity = NonLinear`, K is a no-op (ref has bare `0`, D is unconstrained).
+   *  All other constraints (monotonicity, category, constructor-freedom) are
+   *  always enforced via RestrictedQuery's type parameters. */
   def fix[RCF <: ConstructorFreedom, RM <: MonotoneRestriction, RC <: ResultCategory, RL <: LinearRestriction, MR <: MutualRestriction, DT1 <: Tuple]
     (options: (constructorFreedom: RCF, monotonicity: RM, category: RC, linearity: RL, mutual: MR), materialized: Boolean = false)
     (using A <:< AnyNamedTuple)
-    (p: RestrictedQueryRef[A, ?, 0, RCF, RM] => RestrictedQuery[A, RC, DT1, RCF, RM])
+    (p: [K] => RestrictedQueryRef[A, ?, FixRefID[RL, K], RCF, RM] => RestrictedQuery[A, RC, FixReturnD[RL, K, DT1], RCF, RM])
     (using @implicitNotFound("Failed to generate recursive queries")
-      ev3: Tuple1[RestrictedQuery[A, RC, DT1, RCF, RM]] <:< RestrictedQuery.ToRestrictedQuery[Tuple1[Query[A, ?]], RestrictedQuery.ToDependencyTuple[RL, Tuple1[RestrictedQuery[A, RC, DT1, RCF, RM]]], RCF, RM, RC])
+      ev3: Tuple1[RestrictedQuery[A, RC, FixReturnD[RL, Any, DT1], RCF, RM]] <:< RestrictedQuery.ToRestrictedQuery[Tuple1[Query[A, ?]], RestrictedQuery.ToDependencyTuple[RL, Tuple1[RestrictedQuery[A, RC, FixReturnD[RL, Any, DT1], RCF, RM]]], RCF, RM, RC])
     (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions")
-      ev4: Query.CheckLinearRelevance[RL, Tuple1[Query[A, ?]], Tuple1[RestrictedQuery[A, RC, DT1, RCF, RM]]])
+      ev4: Query.CheckLinearRelevance[RL, Tuple1[Query[A, ?]], Tuple1[RestrictedQuery[A, RC, FixReturnD[RL, Any, DT1], RCF, RM]]])
     (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition")
-      ev5: Query.CheckLinearDuplicates[RL, Tuple1[RestrictedQuery[A, RC, DT1, RCF, RM]]])
+      ev5: Query.CheckLinearDuplicates[RL, Tuple1[RestrictedQuery[A, RC, FixReturnD[RL, Any, DT1], RCF, RM]]])
   : Query[A, BagResult] =
-    type QT = Tuple1[Query[A, ?]]
-    type RQT = Tuple1[RestrictedQuery[A, RC, DT1, RCF, RM]]
-    val fn: RestrictedQuery.ToRestrictedQueryRef[QT, RCF, RM] => RQT = r => Tuple1(p(r._1))
-    Query.fixImpl[QT, RestrictedQuery.ToRestrictedQueryRef[QT, RCF, RM], RQT, RCF, RM](options.category.isInstanceOf[SetResult], materialized)(Tuple1(this))(fn)._1
+    val fn: Any => Any = { refs =>
+      val ref = refs.asInstanceOf[Product].productElement(0)
+      Tuple1(p[Singleton](ref.asInstanceOf))
+    }
+    Query.fixImpl(options.category.isInstanceOf[SetResult], materialized)(
+      Tuple1(this))(fn.asInstanceOf[Nothing => Tuple])
+      .asInstanceOf[Tuple1[Query.MultiRecursive[A]]]._1
 
+  /** Instance `restrictedFix` with κ.  Always Linear, always κ-enforced. */
   def restrictedFix
     (using A <:< AnyNamedTuple)
-    (p: RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction] => RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction])
-    (using @implicitNotFound("Failed to generate recursive queries")
-      ev3: Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]] <:< RestrictedQuery.ToRestrictedQuery[Tuple1[Query[A, ?]], RestrictedQuery.ToDependencyTuple[Linear, Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]]], RestrictedConstructors, MonotoneRestriction, SetResult])
-    (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions")
-      ev4: Query.CheckLinearRelevance[Linear, Tuple1[Query[A, ?]], Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]]])
+    (p: [K] => RestrictedQueryRef[A, ?, 0 & K, RestrictedConstructors, MonotoneRestriction] => RestrictedQuery[A, SetResult, Tuple1[0 & K], RestrictedConstructors, MonotoneRestriction])
   : Query[A, BagResult] =
-    type QT = Tuple1[Query[A, ?]]
-    type RQT = Tuple1[RestrictedQuery[A, SetResult, Tuple1[0], RestrictedConstructors, MonotoneRestriction]]
-    val fn: Tuple1[RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction]] => RQT = r => Tuple1(p(r._1))
-    Query.fixImpl[QT, Tuple1[RestrictedQueryRef[A, ?, 0, RestrictedConstructors, MonotoneRestriction]], RQT, RestrictedConstructors, MonotoneRestriction](true)(Tuple1(this))(fn)._1
+    val fn: Any => Any = { refs =>
+      val ref = refs.asInstanceOf[Product].productElement(0)
+      Tuple1(p[Singleton](ref.asInstanceOf))
+    }
+    Query.fixImpl(true)(Tuple1(this))(fn.asInstanceOf[Nothing => Tuple])
+      .asInstanceOf[Tuple1[Query.MultiRecursive[A]]]._1
+
 
 
   def unrestrictedFix(p: Query.QueryRef[A, ?] => Query[A, ?]): Query[A, BagResult] =
@@ -346,6 +368,16 @@ object Query:
   type IndexSequence[QT <: Tuple] = Tuple.Union[GenerateIndices[0, Tuple.Size[QT]]]
   type UnionDT[RQT <: Tuple] = Tuple.Union[Tuple.FlatMap[RQT, ExtractDependencies]]
 
+  // κ-tagged variants: dep indices are `i & K` instead of bare `i`.
+  type ToKRef[QT <: Tuple, K, RCF <: ConstructorFreedom, RM <: MonotoneRestriction] =
+    Tuple.Map[Utils.ZipWithIndex[RestrictedQuery.Elems[QT]], [T] =>> T match
+      case (elem, idx) => RestrictedQueryRef[elem, SetResult, idx & K, RCF, RM]]
+  type IndexSequenceK[QT <: Tuple, K] =
+    Tuple.Union[Tuple.Map[Utils.GenerateIndices[0, Tuple.Size[QT]], [I] =>> I & K]]
+  type CheckLinearRelevanceK[RL <: LinearRestriction, QT <: Tuple, K, RQT <: Tuple] = RL match
+    case Linear => IndexSequenceK[QT, K] =:= UnionDT[RQT]
+    case NonLinear => DummyImplicit
+
   // Formal rule: ∀ DT_i |DT_i| ≡ |∪ DT_i| (checks no duplicates across all DT_i)
   // This is checked by ensuring the flattened tuple of all dependencies has no duplicates
   type AllDependencies[RQT <: Tuple] = Tuple.FlatMap[RQT, ExtractDependencies]
@@ -374,9 +406,11 @@ object Query:
 
   type ToRQuery[Qbase <: Tuple, D <: Tuple] = ToRestrictedQuery[Qbase, D, RestrictedConstructors, MonotoneRestriction, SetResult]
 
-  def restrictedFix[Qbase <: Tuple, Qret <: Tuple]
+  /** Companion `restrictedFix` with κ.  K is a method-level type param.
+   *  Mirrors `FixWithK.restrictedFix`. */
+  def restrictedFix[K, Qbase <: Tuple, Qret <: Tuple]
   (q: Qbase)
-  (f: Qref[Qbase] => Qret)
+  (f: ToKRef[Qbase, K, RestrictedConstructors, MonotoneRestriction] => Qret)
   (using @implicitNotFound("Base cases must be of type Query: ${Qbase}") ev1:
   IsTupleOfQueries[Qbase])
   (using @implicitNotFound("Row types must be Tuples: ${Qbase}") evRowTypes:
@@ -387,20 +421,23 @@ object Query:
   Tuple.Size[Qbase] =:= 1)
   (using @implicitNotFound("Failed to generate recursive queries: ${Qret}") ev3:
   Qret <:< ToRQuery[Qbase, ExtractD[Qret]])
-  (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions") ev4:
-  NoReferencesMissing[Qbase, Qret])
+  (using @implicitNotFound("Recursive definitions must be linear with matching κ: ${Qret}") evK:
+  IndexSequenceK[Qbase, K] =:= UnionDT[Qret])
   (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition") ev5:
   NoDuplicateReferences[Qret])
   : ToQuery[Qbase] =
     fixImpl(true)(q)(f)
 
+  /** Companion `fix` with κ.  K is a method-level type param.
+   *  Mirrors `FixWithK.fix`. */
   def fix[
+    K,
     Qbase <: Tuple, Qret <: Tuple,
     RCF <: ConstructorFreedom, RM <: MonotoneRestriction, RC <: ResultCategory, RL <: LinearRestriction, MR <: MutualRestriction
   ]
     (options: (constructorFreedom: RCF, monotonicity: RM, category: RC, linearity: RL, mutual: MR))
     (q: Qbase)
-    (f: ToRestrictedQueryRef[Qbase, RCF, RM] => Qret)
+    (f: ToKRef[Qbase, K, RCF, RM] => Qret)
     (using @implicitNotFound("Base cases must be of type Query: ${Qbase}") ev1:
     IsTupleOfQueries[Qbase])
     (using @implicitNotFound("Row types must be Tuples: ${Qbase}") evRowTypes:
@@ -411,8 +448,8 @@ object Query:
     CheckMutual[MR, Qbase])
     (using @implicitNotFound("Failed to generate recursive queries: ${Qret}") ev3:
     Qret <:< ToRestrictedQuery[Qbase, ToDependencyTuple[RL, Qret], RCF, RM, RC])
-    (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references must appear at least once in all the recursive definitions") ev4:
-    CheckLinearRelevance[RL, Qbase, Qret])
+    (using @implicitNotFound("Recursive definitions must be linear with matching κ: ${Qret}") evK:
+    CheckLinearRelevanceK[RL, Qbase, K, Qret])
     (using @implicitNotFound("Recursive definitions must be linear, e.g. recursive references cannot appear twice within the same recursive definition") ev5:
     CheckLinearDuplicates[RL, Qret])
   : ToQuery[Qbase] =

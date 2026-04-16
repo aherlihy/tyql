@@ -14,7 +14,7 @@ class fixBag extends SQLStringQueryTest[TCDB, Edge] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+    path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual()))([K] => pathRec =>
       pathRec.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)
@@ -29,11 +29,7 @@ WITH RECURSIVE recursive$553 AS ((SELECT * FROM edges as edges$553) UNION ALL ((
 
 class fixBagNeg extends munit.FunSuite {
   def testDescription: String = "recursive query defined over bag, using unionAll"
-  def expectedError: String = """tyql.RestrictedQuery[(x : Int, y : Int), tyql.BagResult, Tuple1[(0 : Int)],
-                                |  tyql.RestrictedConstructors, tyql.Monotone]
-                                |Required: tyql.RestrictedQuery[Edge, tyql.SetResult, Tuple, tyql.RestrictedConstructors,
-                                |  tyql.Monotone]
-                                |            ).unionAll(tables.edges2)""".stripMargin
+  def expectedError: String = "tyql.BagResult, Tuple1[(0 : Int) & K]"
 
   test(testDescription) {
     val error: String =
@@ -52,7 +48,7 @@ class fixBagNeg extends munit.FunSuite {
              emptyEdges = Table[Edge]("empty")
            )
           val path = tables.edges
-          path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+          path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))([K] => pathRec =>
             pathRec.flatMap(p =>
               tables.edges
                 .filter(e => p.y == e.x)
@@ -84,7 +80,7 @@ class fixConstructorNeg extends munit.FunSuite {
            val edge = Table[WeightedEdge]("edge")
            val base = Table[(dst: Int, cost: Int)]("base")
 
-           base.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(sp =>
+           base.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))([K] => sp =>
              edge.flatMap(edge =>
                sp
                  .filter(s => s.dst == edge.src)
@@ -116,7 +112,7 @@ class fixMonotonicNeg extends munit.FunSuite {
 
           // TEST
           val path = table
-          path.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+          path.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))([K] => pathRec =>
             pathRec.aggregate(p => (x = sum(p.x), y = sum(p.y)).toGroupingRow).distinct
           )
           """)
@@ -130,7 +126,7 @@ class fixMonotonicTestPos extends munit.FunSuite {
     val path = Table[Edge]("edges")
     import RestrictedQuery.*
 
-    path.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+    path.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))([K] => pathRec =>
       pathRec.aggregate(p => (x = sum(p.x), y = sum(p.y)).toGroupingRow).groupBySource(p => (x = p._1.x).toRow).distinct
     )
   }
@@ -141,7 +137,7 @@ class fixLinearTest extends SQLStringQueryTest[TCDB, Int] {
 
   def query() =
     val path = testDB.tables.edges
-    path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(path =>
+    path.fix((constructorFreedom = RestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))([K] => path =>
       path.flatMap(p =>
         testDB.tables.edges
           .filter(e => p.y == e.x)

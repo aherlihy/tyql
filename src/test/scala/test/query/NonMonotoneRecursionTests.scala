@@ -30,7 +30,7 @@ class NonMonotoneSimpleAggregateTest extends SQLStringQueryTest[EdgeDB, Edge] {
   def query() =
     val base = testDB.tables.edges
     val options = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual())
-    base.fix(options)(pathRec =>
+    base.fix(options)([K] => pathRec =>
       pathRec.aggregate(p => (x = p.x, y = sum(p.y)).toGroupingRow)
         .groupBySource(p => (x = p._1.x).toRow)
         .distinct
@@ -54,7 +54,7 @@ class NonMonotoneLinearTest extends SQLStringQueryTest[EdgeDB, Edge] {
   def query() =
     val base = testDB.tables.edges
     val options = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual())
-    base.fix(options)(pathRec =>
+    base.fix(options)([K] => pathRec =>
       pathRec.aggregate(p => (x = p.x, y = sum(p.y)).toGroupingRow)
         .groupBySource(p => (x = p._1.x).toRow)
         .distinct
@@ -78,7 +78,7 @@ class NonMonotoneBagTest extends SQLStringQueryTest[EdgeDB, Edge] {
   def query() =
     val base = testDB.tables.edges
     val options = (constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual())
-    base.fix(options)(pathRec =>
+    base.fix(options)([K] => pathRec =>
       pathRec.aggregate(p => (x = p.x, y = sum(p.y)).toGroupingRow)
         .groupBySource(p => (x = p._1.x).toRow)
     )
@@ -116,7 +116,7 @@ class MonotoneRejectsAggregateTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.aggregate(p => (x = sum(p.x), y = sum(p.y)).toGroupingRow).groupBySource(p => (x = p._1.x).toRow).distinct
       )
     """)
@@ -141,7 +141,7 @@ class NonMonotoneConstructorStillEnforcedTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = RestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = RestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.filter(p => p.x == p.y + 1).aggregate(p => sum(p.x)).groupBySource(p => (x = p._1.x).toRow).distinct
       )
     """)
@@ -153,7 +153,7 @@ class NonMonotoneConstructorStillEnforcedTest extends munit.FunSuite {
 // Using the recursive ref twice (once in aggregate, once in flatMap) with Linear should fail.
 class NonMonotoneLinearStillEnforcedTest extends munit.FunSuite {
   def testDescription: String = "NonMonotone + Linear: using recursive ref twice still fails"
-  def expectedError: String = "Failed to generate recursive queries"
+  def expectedError: String = "Required: tyql.RestrictedQuery"
 
   test(testDescription) {
     val error: String = compileErrors("""
@@ -166,7 +166,7 @@ class NonMonotoneLinearStillEnforcedTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.flatMap(p =>
           pathRec.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
         ).distinct
@@ -193,7 +193,7 @@ class NonMonotoneSetStillEnforcedTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.aggregate(p => (x = p.x, y = sum(p.y)).toGroupingRow)
           .groupBySource(p => (x = p._1.x).toRow)
       )

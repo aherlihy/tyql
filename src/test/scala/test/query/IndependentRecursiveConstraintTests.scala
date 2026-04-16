@@ -23,7 +23,7 @@ class ConstructorFreedomAloneTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = RestrictedConstructors(), monotonicity = NonMonotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = RestrictedConstructors(), monotonicity = NonMonotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.flatMap(p =>
           pathRec.filter(e => p.y == e.x + 1).map(e => (x = p.x, y = e.y).toRow)
         )
@@ -48,7 +48,7 @@ class SetSemanticsAloneTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.flatMap(p =>
           pathRec.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
         )
@@ -87,7 +87,7 @@ class LinearRelevanceAloneTest extends munit.FunSuite {
 // T4: Linearity (affinity/no duplicates) enforced independently.
 // Using the same recursive ref twice within one definition with Linear should fail.
 class LinearAffinityAloneTest extends munit.FunSuite {
-  def expectedError: String = "Failed to generate recursive queries"
+  def expectedError: String = "Tuple1[(0 : Int) & K]"
 
   test("Linearity (affinity) enforced when all other constraints disabled") {
     val error = compileErrors("""
@@ -98,7 +98,7 @@ class LinearAffinityAloneTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = BagResult(), linearity = Linear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.flatMap(p =>
           pathRec.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
         )
@@ -173,7 +173,7 @@ class MonotonicityAloneTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = Monotone(), category = BagResult(), linearity = NonLinear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.aggregate(p => (x = p.x, y = sum(p.y)).toGroupingRow).groupBySource(p => (x = p._1.x).toRow)
       )
     """)
@@ -184,7 +184,7 @@ class MonotonicityAloneTest extends munit.FunSuite {
 // T8: Two constraints simultaneously: Linear + SetResult.
 // NonLinear self-join without .distinct fails the generate check.
 class LinearAndSetSimultaneousTest extends munit.FunSuite {
-  def expectedError: String = "Failed to generate recursive queries"
+  def expectedError: String = "Required: tyql.RestrictedQuery"
 
   test("Linear + Set enforced simultaneously") {
     val error = compileErrors("""
@@ -195,7 +195,7 @@ class LinearAndSetSimultaneousTest extends munit.FunSuite {
       type Edge = (x: Int, y: Int)
       val base = Table[Edge]("edges")
 
-      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))(pathRec =>
+      base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = Linear(), mutual = NoMutual()))([K] => pathRec =>
         pathRec.flatMap(p =>
           pathRec.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
         ).distinct
@@ -216,7 +216,7 @@ class DisablingLinearAllowsSelfJoinTest extends munit.FunSuite {
     val base = Table[Edge]("edges")
 
     // This should compile — NonLinear allows the self-join
-    base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))(pathRec =>
+    base.fix((constructorFreedom = NonRestrictedConstructors(), monotonicity = NonMonotone(), category = SetResult(), linearity = NonLinear(), mutual = NoMutual()))([K] => pathRec =>
       pathRec.flatMap(p =>
         pathRec.filter(e => p.y == e.x).map(e => (x = p.x, y = e.y).toRow)
       ).distinct

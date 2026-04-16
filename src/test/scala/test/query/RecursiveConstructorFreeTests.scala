@@ -34,7 +34,7 @@ class RecursionFibTest extends SQLStringQueryTest[FibNumDB, (FibonacciNumberInde
 
   def query() =
     val fib = testDB.tables.base
-    fib.fix(constructorsAllowedOptions)(fib =>
+    fib.fix(constructorsAllowedOptions)([K] => fib =>
       fib
         .filter(f => (f.recursionDepth + 1) < 10)
         .map(f => (recursionDepth = f.recursionDepth + 1, fibonacciNumber = f.nextNumber, nextNumber = f.fibonacciNumber + f.nextNumber).toRow)
@@ -77,7 +77,7 @@ class RecursionShortestPathTest extends SQLStringQueryTest[ReachabilityDB, Path]
       .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
       .filter(p => p.startNode == 1) // Filter after map means subquery
 
-    pathBase.fix(constructorsAllowedOptions)(path =>
+    pathBase.fix(constructorsAllowedOptions)([K] => path =>
       path.flatMap(p =>
         testDB.tables.edge
           .filter(e =>
@@ -144,7 +144,7 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
         val initListPath: Expr.ListExpr[String] = List(t.name).toExpr
         (id = t.id, source = t.name, path = initListPath).toRow
       )
-    tagHierarchy0.fix(constructorsAllowedOptions)(tagHierarchy1 =>
+    tagHierarchy0.fix(constructorsAllowedOptions)([K] => tagHierarchy1 =>
       tagHierarchy1.flatMap(hier =>
         testDB.tables.tag
           .filter(t => t.subclassof == hier.id)
@@ -184,7 +184,7 @@ class AncestryTest extends SQLStringQueryTest[AncestryDB, (name: String)] {
 
   def query() =
     val base = testDB.tables.parent.filter(p => p.parent == "Alice").map(e => (name = e.child, gen = IntLit(1)).toRow)
-    base.fix(constructorsAllowedOptions)(gen =>
+    base.fix(constructorsAllowedOptions)([K] => gen =>
       testDB.tables.parent.flatMap(parent =>
         gen
           .filter(g => parent.parent == g.name)
@@ -264,7 +264,7 @@ class RecursionSSSPTest extends SQLStringQueryTest[WeightedGraphDB, (dst: Int, c
 
   def query() =
     val base = testDB.tables.base
-    base.fix(constructorsAllowedOptions)(sp =>
+    base.fix(constructorsAllowedOptions)([K] => sp =>
       testDB.tables.edge.flatMap(edge =>
         sp
           .filter(s => s.dst == edge.src)

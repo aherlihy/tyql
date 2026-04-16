@@ -692,7 +692,7 @@ class SSSPAppendixTest extends SQLStringQueryTest[EmptyDB, (dst: String, cost: I
     )
     val base = Table[(dst: String, cost: Int)]("Base")
     val edge = Table[(src: String, dst: String, cost: Int)]("Edge")
-    base.fix(options)(pathR =>
+    base.fix(options)([K] => pathR =>
         edge.flatMap(edge =>
           pathR
             .filter(s => s.dst == edge.src)
@@ -741,7 +741,7 @@ class AncestryAppendixTest extends SQLStringQueryTest[EmptyDB, (name: String)] {
       .filter(p => p.parent == "A")
       .map(e => (name = e.child, gen = IntLit(1)).toRow)
 
-    base.fix(options)(genR =>
+    base.fix(options)([K] => genR =>
         parents.flatMap(parent =>
           genR
             .filter(g => parent.parent == g.name)
@@ -790,7 +790,7 @@ class APTAppendixTest extends SQLStringQueryTest[EmptyDB, (x: String, y: String)
     val store = Table[(x: String, y: String)]("Store")
     val base = addressOf.map(a => (x = a.x, y = a.y).toRow)
 
-    base.fix(options)(pointsToR =>
+    base.fix(options)([K] => pointsToR =>
       assign.flatMap(a =>
           pointsToR.filter(p => a.y == p.x).map(p =>
             (x = a.x, y = p.y).toRow))
@@ -858,7 +858,7 @@ class APSPAppendixTest extends SQLStringQueryTest[EmptyDB, (src: Int, dst: Int, 
         (src = e._1.src, dst = e._1.dst).toRow)
 
     val asps =
-//      base.fix(options)(pathR =>
+//      base.fix(options)([K] => pathR =>
       baseEdges.unrestrictedFix(pathR =>
         pathR.aggregate(p =>
             pathR
@@ -916,7 +916,7 @@ class TCAppendixTest extends SQLStringQueryTest[EmptyDB, (startNode: Int, endNod
       .map(e => (startNode = e.x, endNode = e.y, path = List(e.x, e.y).toExpr).toRow)
 
     pathBase
-      .fix(options)(pathR =>
+      .fix(options)([K] => pathR =>
         pathR.flatMap(p =>
           edge
             .filter(e => e.x == p.endNode && !p.path.contains(e.y))
@@ -959,7 +959,7 @@ class BOMAppendixTest extends SQLStringQueryTest[EmptyDB, (part: String, max: In
     val assbl = Table[(part: String, spart: String)]("Assbl")
     val basic = Table[(part: String, days: Int)]("Basic")
     val result = basic
-      .fix(options)(waitForR =>
+      .fix(options)([K] => waitForR =>
         assbl.flatMap(assbl =>
           waitForR
             .filter(wf => assbl.spart == wf.part)
@@ -1005,7 +1005,7 @@ class OrbitsAppendixTest extends SQLStringQueryTest[EmptyDB, (x: String, y: Stri
     )
     val base = Table[(x: String, y: String)]("Base")
     val orbits =
-      base.fix(options)(orbitsR =>
+      base.fix(options)([K] => orbitsR =>
         orbitsR.flatMap(p =>
           orbitsR
             .filter(e => p.y == e.x)
@@ -1068,7 +1068,7 @@ class DataflowAppendixTest extends SQLStringQueryTest[EmptyDB, (r: String, w: St
     val writeOp = Table[(opN: String, varN: String)]("WriteOp")
     val jumpOp = Table[(a: String, b: String)]("JumpOp")
     jumpOp
-      .fix(options)(flowR =>
+      .fix(options)([K] => flowR =>
         flowR.flatMap(f1 =>
           flowR.filter(f2 => f1.b == f2.a).map(f2 =>
             (a = f1.a, b = f2.b).toRow)))

@@ -35,7 +35,7 @@ class PaperExampleNonMonotonicTest extends SQLStringQueryTest[BOMDB, BasicPart] 
       mutual = NoMutual())
     val BasicParts = testDB.tables.basicparts
     val SubParts = testDB.tables.subparts
-    BasicParts.fix(P2)(waitFor =>
+    BasicParts.fix(P2)([K] => waitFor =>
       SubParts.aggregate(sp =>
         waitFor
           .filter(wf => sp.sub == wf.part)
@@ -77,7 +77,7 @@ class PaperExampleNonLinearTest extends SQLStringQueryTest[EdgeDB, Edge] {
       mutual = NoMutual()
     )
     val Edges = testDB.tables.edges
-    Edges.fix(P4)(pathR =>
+    Edges.fix(P4)([K] => pathR =>
       pathR.flatMap(p =>
         pathR
           .filter(e => p.y == e.x)
@@ -124,7 +124,7 @@ class PaperExampleBagSemanticTest extends SQLStringQueryTest[ParentDB, Generatio
     Parents
       .filter(p => p.par == "A")
       .map(e => (nm = e.ch, g = 1))
-      .fix(P5P6)(gensR =>
+      .fix(P5P6)([K] => gensR =>
         Parents.flatMap(p =>
           gensR
             .filter(g => p.par == g.nm)
