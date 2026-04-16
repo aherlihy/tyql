@@ -39,7 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV GRAALVM_HOME=/opt/graalvm-community-openjdk-17.0.9+9.1
 ENV PATH=${GRAALVM_HOME}/bin:${PATH}
 RUN set -eux; \
-    curl -fsSL -o /tmp/graalvm.tgz \
+    curl -fL --retry 3 --retry-delay 10 --connect-timeout 30 --max-time 900 \
+        -o /tmp/graalvm.tgz \
         "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-17.0.9/graalvm-community-jdk-17.0.9_linux-x64_bin.tar.gz"; \
     tar -xzf /tmp/graalvm.tgz -C /opt; \
     rm /tmp/graalvm.tgz; \
@@ -49,7 +50,8 @@ RUN set -eux; \
 ENV SBT_HOME=/opt/sbt
 ENV PATH=${SBT_HOME}/bin:${PATH}
 RUN set -eux; \
-    curl -fsSL -o /tmp/sbt.tgz \
+    curl -fL --retry 3 --retry-delay 10 --connect-timeout 30 --max-time 600 \
+        -o /tmp/sbt.tgz \
         https://github.com/sbt/sbt/releases/download/v1.9.9/sbt-1.9.9.tgz; \
     tar -xzf /tmp/sbt.tgz -C /opt; \
     rm /tmp/sbt.tgz

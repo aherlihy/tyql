@@ -56,6 +56,11 @@ full run is prohibitively long; running `-S` and `-M` alone reproduces the
 small and medium rows of the paper's table and avoids the ~10-hour `-L` run,
 while `-S` on its own is the short-run / kick-the-tires option.
 
+Reviewers running under Docker Desktop (macOS/Windows) for the `-M` or `-L`
+suites may need to increase the Docker Desktop VM memory in
+Settings → Resources to accommodate the `-Xmx8G` heap plus JVM overhead.
+`-S` runs in the default Docker Desktop configuration.
+
 # Build TyQL (without Docker)
 ```shell
 # Always clean + recompile both source and benchmarking code between runs, otherwise JMH can cause SBT to exit if something is out of sync 
