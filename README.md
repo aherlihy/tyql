@@ -10,8 +10,6 @@ The library versions are specified in the root `build.sbt` file.
 
 # Input datasets
 The experiments are run on 3 differently sized datasets that are stored as CSV files in the `bench/data` directory.
-The DDL for each dataset is stored in `bench/data/<benchmark>/schema.ddl` and the column formats used as helpers to generate 
-randomized data are stored in `bench/data/<benchmark>/csv_columns.txt`.
 The smallest, s, is stored on github in the `bench/data/<benchmark>/data` folders. The output of each benchmark will write 
 to the `bench/data/<benchmark>/out` folder.
 The medium and large datasets are too large to store on github so we provide zipped folders containing `<benchmark>/m_data` 
@@ -20,32 +18,43 @@ The sizes.sh script will run through and list the size of each folder.
 
 # Push-button run (Docker)
 A `Dockerfile` is provided that matches the paper environment exactly
-(Ubuntu 22.04 + GraalVM Community 17.0.9 + sbt 1.9.9). All dependencies are
-pre-resolved at build time, so running the benchmarks needs no internet.
+(Ubuntu 22.04 + GraalVM Community 17.0.9 + sbt 1.9.9, pinned to `linux/amd64`).
+All dependencies are pre-resolved at build time, so running the benchmarks
+needs no internet.
 
 ```shell
-# 1. Build the image (native host arch; ~5 min first time)
+# 1. Build the image
 $ docker build -t tyql-artifact .
 
-# 2. Push-button run: the small suite only (~3 min), cleaned CSVs in ./out
+# 2. Push-button run: the small suite, cleaned CSVs in ./out
 $ mkdir -p out
 $ docker run --rm -v "$(pwd)/out:/out" tyql-artifact
 ```
-The default `docker run` is equivalent to `-S` (small, the "kick-the-tires"
-option). To run additional sizes, bind-mount the Zenodo-hosted medium/large
+The default `docker run` is equivalent to `-S` (small). To run additional sizes, bind-mount the Zenodo-hosted medium/large
 data and pass the corresponding flags:
 ```shell
 $ docker run --rm \
       -v "$(pwd)/out:/out" \
       -v "$(pwd)/bench/data:/tyql/bench/data" \
-      tyql-artifact -S -M -L
+      tyql-artifact -S -M
 ```
-For the final artifact submission, build the image for `linux/amd64` (the
-architecture the paper's numbers were measured on — may run under emulation on
-Apple Silicon hosts):
-```shell
-$ docker buildx build --platform linux/amd64 -t tyql-artifact --load .
-```
+
+## Run sizes and expected wall-clock time
+
+On the machine used for the paper's experiments (see the Experimental Section
+above), the three sizes took approximately:
+
+| Size | Flag | Wall-clock on tested machine |
+|------|------|------------------------------|
+| small  | `-S` | a few minutes |
+| medium | `-M` | ~4 hours  |
+| large  | `-L` | ~10 hours |
+
+The paper's performance table reports all three sizes. The ECOOP artifact
+guidelines recommend supplying a scaled-down version of any experiment whose
+full run is prohibitively long; running `-S` and `-M` alone reproduces the
+small and medium rows of the paper's table and avoids the ~10-hour `-L` run,
+while `-S` on its own is the short-run / kick-the-tires option.
 
 # Build TyQL (without Docker)
 ```shell

@@ -2,28 +2,24 @@
 #
 # TyQL reproducibility artifact for ECOOP 2026.
 # Matches the paper environment: Ubuntu 22.04, GraalVM Community 17.0.9, sbt 1.9.9.
+# Pinned to linux/amd64 (the architecture the paper's numbers were measured on).
 #
-# Build (native to host arch — fast on Apple Silicon, fine on x86_64 Linux):
+# Build:
 #   docker build -t tyql-artifact .
 #
-# Build the *submission* image (x86_64, matches the paper exactly — may be slow
-# via emulation on Apple Silicon hosts):
-#   docker buildx build --platform linux/amd64 -t tyql-artifact --load .
-#
-# Push-button run (small size only, ~3 min on the authors' machine):
+# Push-button run (small size only):
 #   mkdir -p out
 #   docker run --rm -v "$(pwd)/out:/out" tyql-artifact
 #
-# Run all three sizes (requires the Zenodo-hosted medium/large data bind-mounted
-# under /tyql/bench/data — see README):
+# Run additional sizes (requires the Zenodo-hosted medium/large data
+# bind-mounted under /tyql/bench/data — see README):
 #   docker run --rm \
 #       -v "$(pwd)/out:/out" \
 #       -v "$(pwd)/bench/data:/tyql/bench/data" \
 #       tyql-artifact -S -M -L
 
-FROM ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:22.04
 
-ARG TARGETARCH
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Base tools required by run_all_bench.sh / postprocess.sh plus what we need
@@ -43,13 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV GRAALVM_HOME=/opt/graalvm-community-openjdk-17.0.9+9.1
 ENV PATH=${GRAALVM_HOME}/bin:${PATH}
 RUN set -eux; \
-    case "${TARGETARCH}" in \
-        amd64) GARCH=x64 ;; \
-        arm64) GARCH=aarch64 ;; \
-        *) echo "Unsupported TARGETARCH=${TARGETARCH}" >&2; exit 1 ;; \
-    esac; \
     curl -fsSL -o /tmp/graalvm.tgz \
-        "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-17.0.9/graalvm-community-jdk-17.0.9_linux-${GARCH}_bin.tar.gz"; \
+        "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-17.0.9/graalvm-community-jdk-17.0.9_linux-x64_bin.tar.gz"; \
     tar -xzf /tmp/graalvm.tgz -C /opt; \
     rm /tmp/graalvm.tgz; \
     java -version
@@ -85,5 +76,5 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-# Default to the small size (the "short-run / kick-the-tires" option).
+# Default to the small size.
 CMD ["-S"]
