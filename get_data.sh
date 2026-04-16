@@ -39,9 +39,28 @@ case "${1:-}" in
         ;;
 esac
 
+print_next_step() {
+    cat <<EOF
+
+Next step: run the benchmarks in Docker, with bench/data bind-mounted so
+the container sees the medium / large input datasets:
+
+    mkdir -p out
+    docker run --rm \\
+        -v "\$(pwd)/out:/out" \\
+        -v "\$(pwd)/bench/data:/tyql/bench/data" \\
+        tyql-artifact -M
+
+Replace -M with -L for the large suite, or pass both (-S -M -L) to run
+everything. Add -skipTimeout to skip the configurations that are known to
+hit the 10-minute per-iteration timeout.
+EOF
+}
+
 if [[ $FORCE -eq 0 && -d "$PROBE_DIR" ]]; then
     echo "Dataset already present at $PROBE_DIR — nothing to do."
     echo "Pass --force to re-download and re-unpack."
+    print_next_step
     exit 0
 fi
 
@@ -63,5 +82,4 @@ echo ">>> Done. Representative layout under bench/data/:"
 ls -d bench/data/*/ | head -5
 echo "    ..."
 
-echo ">>> You can now run: bash run_all_bench.sh -java-home <path-to-jdk> -M"
-echo "    (or -L for the large suite)"
+print_next_step

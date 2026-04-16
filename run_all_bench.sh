@@ -23,13 +23,19 @@ usage() {
     cat <<'EOF'
 Run the JMH benchmarks for one or more input dataset sizes.
 
-Usage: bash run_all_bench.sh -java-home <path-to-jdk> [-S] [-M] [-L]
+Usage: bash run_all_bench.sh -java-home <path-to-jdk> [-S] [-M] [-L] [-skipTimeout]
 
   -java-home <path>   Path to the JDK to use (required). Example:
                       -java-home /opt/graalvm-community-openjdk-17.0.9+9.1
   -S                  Run the small  (data)   benchmark suite.
   -M                  Run the medium (m_data) benchmark suite.
   -L                  Run the large  (l_data) benchmark suite.
+  -skipTimeout        Skip the benchmark configurations that are known to hit
+                      the 10-minute per-iteration timeout at -M and -L (faster
+                      run, fewer rows in the output CSV). Without this flag,
+                      every configuration is run — the complete paper-matching
+                      run but slower because each timed-out configuration
+                      still costs ~10 min.
 
 If none of -S, -M, -L are supplied, all three sizes are run consecutively.
 
@@ -46,6 +52,7 @@ JAVA_HOME_PATH=""
 RUN_S=0
 RUN_M=0
 RUN_L=0
+SKIP_TIMEOUT=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -60,6 +67,7 @@ while [[ $# -gt 0 ]]; do
         -S) RUN_S=1; shift ;;
         -M) RUN_M=1; shift ;;
         -L) RUN_L=1; shift ;;
+        -skipTimeout|--skipTimeout) SKIP_TIMEOUT=1; shift ;;
         -h|--help) usage 0 ;;
         *)
             echo "Error: unknown argument: $1" >&2
@@ -90,8 +98,28 @@ m_data_dir="m_data"
 l_data_dir="l_data"
 
 only=".*"
-exceptM='-e TOCollectionsBenchmark\.((cba)|(cspa)|(evenodd)|(pointsto)|(javapointsto)|(orbits)|(party)|(trust)) -e Unrestricted -e TOScalaSQLBenchmark\.((evenodd))'
-exceptL='-e TOCollectionsBenchmark\.((ancestry)|(asps)|(bom)|(cba)|(cspa)|(evenodd)|(pointsto)|(orbits)|(party)|(trust)) -e Unrestricted -e TOScalaSQLBenchmark\.((ancestry)|(evenodd)|(pointsto)|(javapointsto))'
+# Exclusions that apply to every size. UnrestrictedTyQL is a debug/exploration
+# variant that is not part of the paper's results and should never be run.
+exceptBase='-e Unrestricted'
+
+# Additional exclusions applied only when -skipTimeout is passed. These skip
+# configurations that are known to hit the 10-minute per-iteration timeout at
+# the given size, so the overall run is faster at the cost of producing fewer
+# rows in the output CSV. Without -skipTimeout every configuration is run
+# (complete paper-matching run).
+exceptM_skipTimeout="${exceptBase} "'-e TOCollectionsBenchmark\.((cba)|(cspa)|(evenodd)|(pointsto)|(javapointsto)|(orbits)|(party)|(trust)) -e TOScalaSQLBenchmark\.((evenodd))'
+exceptL_skipTimeout="${exceptBase} "'-e TOCollectionsBenchmark\.((ancestry)|(asps)|(bom)|(cba)|(cspa)|(evenodd)|(pointsto)|(orbits)|(party)|(trust)) -e TOScalaSQLBenchmark\.((ancestry)|(evenodd)|(pointsto)|(javapointsto))'
+
+if [[ $SKIP_TIMEOUT -eq 1 ]]; then
+    exceptS="$exceptBase"
+    exceptM="$exceptM_skipTimeout"
+    exceptL="$exceptL_skipTimeout"
+else
+    exceptS="$exceptBase"
+    exceptM="$exceptBase"
+    exceptL="$exceptBase"
+fi
+
 jtest="-wi 5 -i 5"
 
 run_size() {
@@ -104,13 +132,15 @@ run_size() {
 
     export TYQL_DATA_DIR="$data_dir"
     sbt -java-home "$JAVA_HOME_PATH" "clean; bench/Jmh/clean"
+    # tee so JMH progress is visible on stdout while still being captured in
+    # bench_<size>.out for postprocess.sh.
     sbt -java-home "$JAVA_HOME_PATH" \
         "bench/Jmh/run $only $except $jtest -rff benchmark_out_${size}.csv -jvmArgs \"-Xmx8G\"" \
-        &> "bench_${size}.out"
+        2>&1 | tee "bench_${size}.out"
     echo ">>> Finished size=${size}. Log: bench_${size}.out  CSV: bench/benchmark_out_${size}.csv"
 }
 
-if [[ $RUN_S -eq 1 ]]; then run_size s "$s_data_dir" ""; fi
+if [[ $RUN_S -eq 1 ]]; then run_size s "$s_data_dir" "$exceptS"; fi
 if [[ $RUN_M -eq 1 ]]; then run_size m "$m_data_dir" "$exceptM"; fi
 if [[ $RUN_L -eq 1 ]]; then run_size l "$l_data_dir" "$exceptL"; fi
 
