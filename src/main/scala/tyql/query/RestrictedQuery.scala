@@ -157,8 +157,8 @@ object RestrictedQuery {
 
   type ToRestrictedQuery[QT <: Tuple, DT <: Tuple, RCF <: ConstructorFreedom, RM <: MonotoneRestriction, RC <: ResultCategory] =
     Tuple.Map[Tuple.Zip[Elems[QT], DT], [T] =>> ConstructRestrictedQuery[T, RCF, RM, RC]]
-  type ToRestrictedQueryRef[QT <: Tuple, RCF <: ConstructorFreedom, RM <: MonotoneRestriction] = Tuple.Map[ZipWithIndex[Elems[QT]], [T] =>> T match
-    case (elem, index) => RestrictedQueryRef[elem, SetResult, index, RCF, RM]]
+  type ToRestrictedQueryRef[QT <: Tuple, K, RCF <: ConstructorFreedom, RM <: MonotoneRestriction] = Tuple.Map[ZipWithIndex[Elems[QT]], [T] =>> T match
+    case (elem, index) => RestrictedQueryRef[elem, SetResult, index & K, RCF, RM]]
 
   // Adjustable restrictions:
   // only include the monotone restriction, ignore category or linearity
