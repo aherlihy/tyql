@@ -278,6 +278,26 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
   def isEmpty: Expr[Boolean, NonScalarExpr, NonRestrictedConstructors] =
     Expr.IsEmpty(this)
 
+  // POC; the full CRUD API (Insert, Update, Delete) and each backend's SQL
+  // syntax live on the `backend-specialization` branch.
+  inline def insertInto[R]
+    (table: InsertableTable[R, ?])
+    (using @scala.annotation.implicitNotFound(
+        "This dialect does not support INSERT ... SELECT. " +
+        "Import a dialect that does, e.g. `import tyql.dialects.postgresql.given`.")
+      insertable: dialects.DialectFeature.Insertable)
+    (using @scala.annotation.implicitNotFound(
+        "Types being inserted ${A} do not fit inside target types ${R}.")
+      ev: TypeOperations.IsAcceptableInsertion[
+        Tuple.Map[NamedTuple.DropNames[NamedTuple.From[A]], Expr.StripExpr],
+        NamedTuple.DropNames[NamedTuple.From[R]]
+      ])
+  : InsertFromSelect[R, A] =
+    val targetColumns =
+      scala.compiletime.constValueTuple[NamedTuple.Names[NamedTuple.From[R]]]
+        .toList.asInstanceOf[List[String]]
+    InsertFromSelect(table.underlyingTable, this, targetColumns)
+
 object Query:
   import Expr.{Fun, Ref}
   import RestrictedQuery.*
