@@ -105,6 +105,25 @@ suites may need to increase the Docker Desktop VM memory in
 Settings → Resources to accommodate the `-Xmx8G` heap plus JVM overhead.
 `-S` runs in the default Docker Desktop configuration.
 
+# Generating tables with Excel
+For convenience, an Excel file (`artifact-tables.xlsx`) that reproduces the exact tables and then provides a summary table of the % difference between the latest run, the bare-metal run reported in the paper, and the results the author got from following exactly these steps on the dockerized version. 
+
+1) Open `artifact-tables.xlsx` with Excel (tested with Version 16.76 / 23081101).
+2) Add an empty sheet to import the data into.
+3) In that new sheet, navigate to `Data > Get Data (Power Query) > From Text (Legacy)` and select `results/small_clean.csv` > "Get Data".
+4) In the text import wizard click "Delimited" > next > select "Comma".
+5) Do **not** treat consecutive delimiters as one. > Finish and put the data, ignoring the header, in the "small" sheet where it is indicated in yellow. 
+6) Repeat steps 3-5 for `results/medium_clean.csv` and `results/large_clean.csv` in their respective sheets.
+
+The "EXACT TABLE" sheet generates Tables 4 and 5, with the exception of the number of iterations.
+We did not include instructions for this in the artifact because it requires running all the benchmarks a second time with printlines uncommented, and the number of iterations is not a property of our implementation, it is a property of the query, data, and backend database implementation.
+
+The "compare-with-submitted" sheet is a convenience to shows the difference in speedup between the bare-metal, submitted version of the benchmarks and the data that was imported into the sheet; it also shows the difference in speedup between the authors' run of the dockerized artifact and then data that was imported into the sheet. The cells will be highlighted in red if the difference exceeds 30%, which is expected in some cases, but it should not exceed more then ~2x.
+
+Due to the JIT there is some variability in the calculated speedups
+but the numbers should be within the same order of magnitude and consistent, relative to each other, with the ones in the paper. The Orbits query is unique among the benchmarks in that it references the recursive relation multiple times in the final query via a correlated subquery, which limits the speedup over non-recursive SQL on
+larger inputs as DuckDB re-evaluates the recursive CTE for each reference. On some machines WITH RECURSIVE is slightly faster, on some machines non-recursive SQL is slightly faster, and on some machines they are equivalent.
+
 # Build TyQL (without Docker)
 ```shell
 # Always clean + recompile both source and benchmarking code between runs, otherwise JMH can cause SBT to exit if something is out of sync 
@@ -176,22 +195,6 @@ Example (assuming you ran the benchmarks from the repo root):
 ```shell
 $ bash postprocess.sh . results
 ```
-
-## Generating aggregate data 
-The excel file used to generate results is `tyql-repro.xlsx`; import the cleaned
-data and the charts auto-generate. Steps:
-1) Open `tyql-repro.xlsx` with Excel (tested with Version 16.76 / 23081101).
-2) Add an empty sheet to import the data into.
-3) In that new sheet, navigate to `Data > Get Data (Power Query) > From Text (Legacy)` and select `results/small_clean.csv` > "Get Data".
-4) In the text import wizard click "Delimited" > next > select "Comma".
-5) Do **not** treat consecutive delimiters as one. > Finish and put the data, ignoring the header, in the "small" sheet starting at row 3 column A. It should go to line 50.
-6) Repeat steps 3-5 for `results/medium_clean.csv` and `results/large_clean.csv` in their respective sheets.
-
-Due to the JIT there is some variability in the calculated speedups 
-but the numbers should be within the same order of magnitude and consistent, relative to each other, with the ones in the paper. The Orbits query is unique among the benchmarks in that it references the recursive relation multiple times in the final query via a correlated subquery, which limits the speedup over non-recursive SQL on
-  larger inputs as DuckDB re-evaluates the recursive CTE for each reference. On some machines WITH RECURSIVE is slightly faster, on some machines non-recursive SQL is slightly faster, and on some machines they are equivalent.
-If you want to additionally count iterations, then you can uncomment the printlines in `bench/src/main/scala/TimeoutQueryBenchmark/<query>.scala` 
-and rerun the benchmarks, then post-processes the output to count the number of iterations.
 
 If there are any questions or problems running the benchmark you can always contact me at herlihyap at gmail and I will do my best to clarify.
 
