@@ -23,13 +23,9 @@ results/
 # Crash reports from local JVM runs.
 hs_err_pid*.log
 
-# Large dataset archives — reviewers fetch medium/large data from Zenodo and
-# bind-mount into the container. Small data lives under bench/data/<q>/data/
-# and IS included.
+# Large dataset archives (the unpacked data IS included).
 rr-data.zip
 bench/data/data-repro.zip
-bench/data/*/m_data/
-bench/data/*/l_data/
 bench/data/orbits/og-data/
 
 # Author workspace (response docs, old xlsx variants, stray files).
