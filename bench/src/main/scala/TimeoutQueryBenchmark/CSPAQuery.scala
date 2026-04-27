@@ -316,7 +316,7 @@ class TOCSPAQuery extends QueryBenchmark {
               .map(a => (a.p1, a.p1)))
           .union(
             cspa_assign.select.map(a => (a.p2, a.p2)))
-      (memoryAliasBase, cspa_empty.select.map(s => (s.p1, s.p2)), valueFlowBase)
+      (valueFlowBase, cspa_empty.select.map(s => (s.p1, s.p2)), memoryAliasBase)
     }
 
     val fixFn: ((ScalaSQLTable[PairSS], ScalaSQLTable[PairSS], ScalaSQLTable[PairSS])) => (query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)]) =
