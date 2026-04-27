@@ -134,7 +134,7 @@ class TOTCQuery extends QueryBenchmark {
     ).sortBy(r => r.path.length)
       .sortBy(_.startNode)
       .sortBy(_.endNode)
-    // println(s"\nIT,$name,collections,$it")
+    println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -172,7 +172,7 @@ class TOTCQuery extends QueryBenchmark {
 
     val result = tc_derived.select.sortBy(_.path).sortBy(_.startNode).sortBy(_.endNode)
     resultScalaSQL = db.run(result)
-    // println(s"\nIT,$name,scalasql,$it")
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

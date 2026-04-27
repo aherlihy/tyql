@@ -156,7 +156,7 @@ class TOOrbitsQuery extends QueryBenchmark {
         )
       )
     ).sortBy(_.x).sortBy(_.y)
-    // println(s"\nIT,$name,collections,$it")
+    println(s"\nIT,$name,collections,$it")
 
 
   def executeScalaSQL(ddb: DuckDBBackend): Unit =
@@ -189,7 +189,7 @@ class TOOrbitsQuery extends QueryBenchmark {
       "     WHERE recref0.x = subquery9.x AND recref0.y = subquery9.y)" +
       " ORDER BY recref0.y, recref0.x"
     )
-    // println(s"\nIT,$name,scalasql,$it")
+    println(s"\nIT,$name,scalasql,$it")
 
   // Write results to csv for checking
   def writeJDBC_RSQLResult(): Unit =

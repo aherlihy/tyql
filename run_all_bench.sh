@@ -97,7 +97,7 @@ s_data_dir="data"
 m_data_dir="m_data"
 l_data_dir="l_data"
 
-only=".*"
+only=".*(TOScalaSQLBenchmark|TOCollectionsBenchmark).*"
 # Exclusions that apply to every size. UnrestrictedTyQL is a debug/exploration
 # variant that is not part of the paper's results and should never be run.
 exceptBase='-e Unrestricted'
@@ -120,7 +120,7 @@ else
     exceptL="$exceptBase"
 fi
 
-jtest="-wi 5 -i 5"
+jtest="-wi 0 -i 1"
 
 run_size() {
     local size="$1"
