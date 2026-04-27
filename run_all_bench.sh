@@ -131,12 +131,15 @@ run_size() {
     rm -f "bench_${size}.out" "bench/benchmark_out_${size}.csv"
 
     export TYQL_DATA_DIR="$data_dir"
-    sbt -java-home "$JAVA_HOME_PATH" "clean; bench/Jmh/clean"
+    # Redirect stdin from /dev/null so sbt never tries to read from the
+    # controlling TTY. Without this, running the script with `&` gets
+    # suspended by SIGTTIN as soon as sbt's interactive console probes stdin.
+    sbt -java-home "$JAVA_HOME_PATH" "clean; bench/Jmh/clean" < /dev/null
     # tee so JMH progress is visible on stdout while still being captured in
     # bench_<size>.out for postprocess.sh.
     sbt -java-home "$JAVA_HOME_PATH" \
         "bench/Jmh/run $only $except $jtest -rff benchmark_out_${size}.csv -jvmArgs \"-Xmx8G\"" \
-        2>&1 | tee "bench_${size}.out"
+        < /dev/null 2>&1 | tee "bench_${size}.out"
     echo ">>> Finished size=${size}. Log: bench_${size}.out  CSV: bench/benchmark_out_${size}.csv"
 }
 
