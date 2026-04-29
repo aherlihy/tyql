@@ -121,6 +121,9 @@ $ bash get_data.sh
 
 # Build the image (includes all data)
 $ docker build -t tyql-artifact .
+
+# Save the image
+$ docker save tyql-artifact | gzip > tyql-artifact-image.tar.gz
 ```
 
 ## Building TyQL natively (without Docker)
