@@ -2,8 +2,10 @@
 # Post-process raw JMH benchmark outputs into cleaned CSVs suitable for the
 # import step described in the README (Excel "Get Data" pipeline).
 #
-# Usage: bash postprocess.sh <benchsrc> [output_dir]
+# Usage: bash postprocess.sh [-perf|-iterations] <benchsrc> [output_dir]
 #
+#   -perf          Skip writing <size>_iterations.csv (perf-only run).
+#   -iterations    Skip writing <size>_clean.csv (iterations-only run).
 #   <benchsrc>     Directory containing the raw benchmark outputs produced by
 #                  run_all_bench.sh, namely:
 #                       <benchsrc>/benchmark_out_s.csv   <benchsrc>/bench_s.out
@@ -28,24 +30,30 @@ set -u
 
 usage() {
     cat <<'EOF'
-Usage: bash postprocess.sh <benchsrc> [output_dir]
+Usage: bash postprocess.sh [-perf|-iterations] <benchsrc> [output_dir]
 
+  -perf          Skip writing <size>_iterations.csv.
+  -iterations    Skip writing <size>_clean.csv.
   <benchsrc>     Directory containing benchmark_out_{s,m,l}.csv
                  and bench_{s,m,l}.out produced by run_all_bench.sh.
   [output_dir]   Output directory (default: ./results).
 
-Writes <output_dir>/<size>_clean.csv and <output_dir>/<size>_iterations.csv
-for each size present (small, medium, large).
+By default, writes both <output_dir>/<size>_clean.csv and
+<output_dir>/<size>_iterations.csv for each size present.
 EOF
     exit "${1:-1}"
 }
 
+MODE="all"
+case "${1:-}" in
+    -h|--help) usage 0 ;;
+    -perf) MODE="perf"; shift ;;
+    -iterations) MODE="iterations"; shift ;;
+esac
+
 if [[ $# -lt 1 || $# -gt 2 ]]; then
     usage 1
 fi
-case "$1" in
-    -h|--help) usage 0 ;;
-esac
 
 BENCHSRC="$1"
 OUTDIR="${2:-results}"
@@ -82,27 +90,31 @@ clean_one() {
     local out_clean="$OUTDIR/${long}_clean.csv"
     local out_iters="$OUTDIR/${long}_iterations.csv"
 
-    if [[ -n "$csv" ]]; then
-        # Strip the "tyql.bench.TO" prefix and split the "<Class>Benchmark.<query>"
-        # cell into two CSV columns, then strip the benchmark-group suffixes used
-        # in the JMH method names.
-        sed -e 's/tyql\.bench\.TO//' \
-            -e 's/Benchmark\./","/' \
-            -e 's/_graph//' \
-            -e 's/_misc//' \
-            -e 's/_programanalysis//' \
-            "$csv" > "$out_clean"
-        echo "wrote $out_clean (from $csv)"
-    else
-        echo "(skipped ${long}: no benchmark_out_${size}.csv under $BENCHSRC or $BENCHSRC/bench)"
+    if [[ "$MODE" != "iterations" ]]; then
+        if [[ -n "$csv" ]]; then
+            # Strip the "tyql.bench.TO" prefix and split the "<Class>Benchmark.<query>"
+            # cell into two CSV columns, then strip the benchmark-group suffixes used
+            # in the JMH method names.
+            sed -e 's/tyql\.bench\.TO//' \
+                -e 's/Benchmark\./","/' \
+                -e 's/_graph//' \
+                -e 's/_misc//' \
+                -e 's/_programanalysis//' \
+                "$csv" > "$out_clean"
+            echo "wrote $out_clean (from $csv)"
+        else
+            echo "(skipped ${long}: no benchmark_out_${size}.csv under $BENCHSRC or $BENCHSRC/bench)"
+        fi
     fi
 
     if [[ -n "$log" ]]; then
         # Extract per-iteration counts printed by the optional IT printlns in
         # bench/src/main/scala/TimeoutQueryBenchmark/<query>.scala. If the
         # printlns are disabled the output is simply empty.
-        sed -n 's/^\[info\] IT, *//p' "$log" > "$out_iters"
-        echo "wrote $out_iters (from $log)"
+        if [[ "$MODE" != "perf" ]]; then
+            sed -n 's/^\[info\] IT, *//p' "$log" > "$out_iters"
+            echo "wrote $out_iters (from $log)"
+        fi
 
         # Warn about any Exception in the log that is NOT a TimeoutException.
         # Timeouts are expected on the queries that blow past the per-iteration

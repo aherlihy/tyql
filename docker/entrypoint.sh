@@ -22,7 +22,6 @@ on the authors' machine) is used.
 
 Output layout (inside the mounted /out):
   <size>_clean.csv          cleaned CSV suitable for Excel import
-  <size>_iterations.csv     per-query iteration counts (if IT printlns enabled)
   raw/bench_<size>.out      full sbt/JMH log
   raw/benchmark_out_<size>.csv  raw JMH CSV
 
@@ -43,7 +42,7 @@ echo ">>> Running benchmarks (args: $*)"
 bash run_all_bench.sh -java-home "$GRAALVM_HOME" "$@"
 
 echo ">>> Post-processing into $OUTDIR"
-bash postprocess.sh /tyql "$OUTDIR"
+bash postprocess.sh -perf /tyql "$OUTDIR"
 
 # Ship the raw outputs too, for diagnostics.
 mkdir -p "$OUTDIR/raw"
