@@ -29,14 +29,14 @@ dependencies pre-installed. No internet access is needed to run benchmarks.
 # 1. Load the pre-built image
 $ docker load < tyql-artifact-iterations-all-image.tar.gz
 
-# 2. Kick-the-tires: small suite only (~3 min), cleaned CSVs in ./out
+# 2. Kick-the-tires: small suite only (~1 min), iterations CSVs in ./out
 $ mkdir -p out
 $ docker run --rm -v "$(pwd)/out:/out" tyql-artifact-iterations-all
 
-# 3. Medium suite (~4 hours, ~2 hours with -skipTimeout)
+# 3. Medium suite (~1hr30)
 $ docker run --rm -v "$(pwd)/out:/out" tyql-artifact-iterations-all -M
 
-# 4. Large suite (~10 hours, ~5 hours with -skipTimeout)
+# 4. Large suite (~3hr)
 $ docker run --rm -v "$(pwd)/out:/out" tyql-artifact-iterations-all -L
 ```
 
