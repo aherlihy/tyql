@@ -375,21 +375,22 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
                                     finalQ: RelationOp,
                                     override val carriedSymbols: List[(String, RecursiveIRVar)],
                                     ast: DatabaseAST[?],
-                                    materialized: Boolean = false) extends RelationOp:
+                                    materialized: Boolean = false,
+                                    dialect: dialects.Dialect = dialects.Dialect.ansi) extends RelationOp:
   val alias = finalQ.alias
   override def appendWhere(w: WhereClause, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendWhere(w, astOther), carriedSymbols, ast, materialized
+      aliases, query, finalQ.appendWhere(w, astOther), carriedSymbols, ast, materialized, dialect
     ).appendFlags(flags)
 
   override def appendProject(p: QueryIRNode, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.appendProject(p, astOther), carriedSymbols, ast, materialized
+      aliases, query, finalQ.appendProject(p, astOther), carriedSymbols, ast, materialized, dialect
     ).appendFlags(flags)
 
   override def mergeWith(r: RelationOp, astOther: DatabaseAST[?]): RelationOp =
     MultiRecursiveRelationOp(
-      aliases, query, finalQ.mergeWith(r, astOther).appendFlag(Final), carriedSymbols, ast, materialized
+      aliases, query, finalQ.mergeWith(r, astOther).appendFlag(Final), carriedSymbols, ast, materialized, dialect
     ).appendFlags(flags)
 
   override def appendFlag(f: SelectFlags): RelationOp =
@@ -400,10 +401,61 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
         flags = flags + f
     this
 
+  /** Output column names of the recursive relation, read off its row type. */
+  private def relationColumns: Seq[String] =
+    ast.qTag match
+      case ResultTag.NamedTupleTag(names, _) => names
+      case _ => Seq()
+
+  /** Route the 2nd and later references to the recursive CTE through DuckDB's
+   *  `recurring.` pseudo-table (the full accumulated relation); the first
+   *  reference stays the semi-naive working table.  This is what makes a
+   *  NON-LINEAR recursive self-join evaluate correctly under USING KEY. */
+  private def routeRecurring(body: String, recAlias: String): String =
+    val marker = s"$recAlias as "
+    val parts = body.split(java.util.regex.Pattern.quote(marker), -1)
+    if parts.length <= 2 then body
+    else parts.head + marker + parts.tail.mkString(s"recurring.$marker")
+
+  /** Columns of the recursive relation that are a plain column reference in the
+   *  recursive step (the node identity), excluding columns built by a
+   *  constructor (arithmetic, etc.) which grow unboundedly.  These are the
+   *  columns a CYCLE clause must track to bound an otherwise non-terminating
+   *  bag-semantic recursion (e.g. same-generation's `nm`, not `g = g + 1`). */
+  private def nodeIdentityColumns(body: String): Seq[String] =
+    val recPart = body.split("(?i)union(\\s+all)?").last
+    val proj = recPart.replaceAll("(?is).*?\\bselect\\b", "").split("(?i)\\bfrom\\b").headOption.getOrElse("")
+    proj.split(",").flatMap { item =>
+      item.split("(?i)\\bas\\b") match
+        case Array(expr, name) if expr.trim.matches("""\w+(\.\w+)?""") => Some(name.trim)
+        case _ => None
+    }.toSeq
+
   override def toSQLString(): String =
     val matHint = if materialized then " MATERIALIZED" else ""
-    val ctes = aliases.zip(query).map((a, q) => s"$a AS$matHint (${q.toSQLString()})").mkString(",\n")
-    val inner = s"WITH RECURSIVE $ctes\n ${finalQ.toSQLString()}"
+    val cols = relationColumns
+    val parts = aliases.zip(query).map { (a, q) =>
+      val body = q.toSQLString()
+      // Number of references to the recursive relation in the body; >= 2 ==> non-linear.
+      val refCount = body.split(java.util.regex.Pattern.quote(s"$a as "), -1).length - 1
+      val isNonLinear = refCount >= 2
+      val isBag = q match { case n: NaryRelationOp => n.op.toUpperCase.contains("UNION ALL"); case _ => false }
+      if isNonLinear && dialect.supportsKeyedRecursion && cols.nonEmpty then
+        // DuckDB: route the non-linear self-join through `recurring.` under USING KEY.
+        val colList = cols.mkString(", ")
+        (s"$a($colList) USING KEY ($colList) AS$matHint (${routeRecurring(body, a)})", None)
+      else if isBag && dialect.supportsCycleClause then
+        // PostgreSQL: bound the bag-semantic recursion with a CYCLE clause over
+        // the node-identity (non-constructor) columns.
+        val nodeCols = nodeIdentityColumns(body)
+        val cyc = if nodeCols.nonEmpty then Some(s"CYCLE ${nodeCols.mkString(", ")} SET is_cycle USING path") else None
+        (s"$a AS$matHint ($body)", cyc)
+      else
+        (s"$a AS$matHint ($body)", None)
+    }
+    val ctes = parts.map(_._1).mkString(",\n")
+    val cycleClause = parts.flatMap(_._2).headOption.map(c => s"\n$c").getOrElse("")
+    val inner = s"WITH RECURSIVE $ctes$cycleClause\n ${finalQ.toSQLString()}"
     if (flags.contains(SelectFlags.Top))
       inner
     else

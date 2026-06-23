@@ -292,6 +292,33 @@ trait Query[A, Category <: ResultCategory](using ResultTag[A]) extends DatabaseA
     val fn: Tuple1[Query.QueryRef[A, ?]] => Tuple1[Query[A, ?]] = r => Tuple1(p(r._1))
     Query.unrestrictedBagFix[QT](Tuple1(this))(fn)._1
 
+  /** Backend-specialized single-relation recursion (mutual recursion out of
+   *  scope).  The developer picks a backend by importing a dialect's givens
+   *  (e.g. `import tyql.dialects.duckdb.given`) and writes the recursive body
+   *  with no profile.  The body's ACTUAL shape, read off its type, is matched
+   *  against the backend's capabilities:
+   *   - non-affine (a recursive reference used more than once) requires keyed
+   *     recursion (`USING KEY`);
+   *   - bag-semantic recursion requires a `CYCLE` clause;
+   *   - an aggregate in the recursive step requires recursive aggregation,
+   *     gated upstream by the recursive ref's monotonicity (`AggregationMode`).
+   *  A query the chosen backend cannot run is a compile-time error; relevance
+   *  (the body must reference the relation it defines) is always enforced. */
+  def composableFix[RC <: ResultCategory, DT1 <: Tuple, RM <: MonotoneRestriction]
+    (using A <:< AnyNamedTuple)
+    (using aggMode: Query.AggregationMode[RM])
+    (p: RestrictedQueryRef[A, ?, 0, NonRestrictedConstructors, RM] => RestrictedQuery[A, RC, DT1, NonRestrictedConstructors, RM])
+    (using @implicitNotFound("A recursive query must reference the relation it defines at least once")
+      relevant: Query.CheckLinearRelevance[Linear, Tuple1[Query[A, ?]], Tuple1[RestrictedQuery[A, RC, DT1, NonRestrictedConstructors, RM]]])
+    (using setBased: Query.IsSetBased[RC])
+    (using keyed: Query.RequireKeyed[Query.IsNonLinear[Tuple1[RestrictedQuery[A, RC, DT1, NonRestrictedConstructors, RM]]]])
+    (using cycle: Query.RequireCycle[RC])
+  : Query[A, BagResult] =
+    type QT = Tuple1[Query[A, ?]]
+    type RQT = Tuple1[RestrictedQuery[A, RC, DT1, NonRestrictedConstructors, RM]]
+    val fn: RestrictedQuery.ToRestrictedQueryRef[QT, NonRestrictedConstructors, RM] => RQT = r => Tuple1(p(r._1))
+    Query.fixImpl[QT, RestrictedQuery.ToRestrictedQueryRef[QT, NonRestrictedConstructors, RM], RQT, NonRestrictedConstructors, RM](setBased.value, false)(Tuple1(this))(fn)._1
+
   def withFilter(p: Ref[A, NonScalarExpr, NonRestrictedConstructors] => Expr[Boolean, NonScalarExpr, ?]): Query[A, Category] =
     val ref = Ref[A, NonScalarExpr, NonRestrictedConstructors]()
     Query.Filter[A, Category](this, Fun(ref, p(ref)))
@@ -393,11 +420,71 @@ object Query:
   // Formal rule: ∀ DT_i |DT_i| ≡ |∪ DT_i| (checks no duplicates across all DT_i)
   // This is checked by ensuring the flattened tuple of all dependencies has no duplicates
   type AllDependencies[RQT <: Tuple] = Tuple.FlatMap[RQT, ExtractDependencies]
+
+  /** Does the tuple contain a duplicate element?  Unlike `HasDuplicate`, this
+   *  reduces to a clean `Boolean` (`HasDuplicate` reduces to `Nothing` on a
+   *  duplicate, and `Nothing match {...}` stays `Nothing`). */
+  type HasDupB[T <: Tuple] <: Boolean = T match
+    case EmptyTuple => false
+    case h *: t => Tuple.Contains[t, h] match
+      case true  => true
+      case false => HasDupB[t]
+
+  /** A recursive definition is non-linear (non-affine) when a recursive
+   *  reference is used more than once, i.e. its dependency tuple repeats. */
+  type IsNonLinear[RQT <: Tuple] = HasDupB[AllDependencies[RQT]]
   type NoDuplicates[RQT <: Tuple] <: Boolean = HasDuplicate[AllDependencies[RQT]] match {
     case Nothing => false
     case _ => true
   }
   type NoDuplicateReferences[RQT <: Tuple] = NoDuplicates[RQT] =:= true
+
+  // ---- Backend specialization ------------------------------------------------
+  // Map a recursive query's ACTUAL shape (read off its type) to the dialect
+  // capability it requires.  The user picks a backend (imports a dialect's
+  // givens); these gates either resolve (the backend supports what the query
+  // needs) or raise an @implicitNotFound at compile time.
+
+  /** Keyed recursion (`USING KEY`) is required only when the recursion is
+   *  NON-affine -- a recursive reference is used more than once, i.e.
+   *  `NoDuplicates = false` (the transitive-closure self-join).  An affine
+   *  (linear) recursion needs nothing special and runs on any backend.  The
+   *  `false` instance demands `DialectFeature.KeyedRecursion`, so a non-linear
+   *  query on a backend that lacks it is rejected with this message. */
+  @implicitNotFound(
+    "This backend cannot run a non-linear recursive query: it has no keyed recursion (USING KEY). " +
+      "Make the recursion linear, or target a backend that supports it, e.g. `import tyql.dialects.duckdb.given`."
+  )
+  sealed trait RequireKeyed[IsNonLin <: Boolean]
+  object RequireKeyed:
+    given linear: RequireKeyed[false] = new RequireKeyed[false] {}
+    given nonLinear(using dialects.DialectFeature.KeyedRecursion): RequireKeyed[true] = new RequireKeyed[true] {}
+
+  /** A `CYCLE` clause is required only when the recursion is bag-semantic
+   *  (`UNION ALL`); set-semantic recursion terminates on any backend. */
+  @implicitNotFound(
+    "This backend cannot run a bag-semantic recursive query safely: it has no CYCLE clause. " +
+      "Use set semantics (.distinct), or target a backend that supports it, e.g. `import tyql.dialects.postgresql.given`."
+  )
+  sealed trait RequireCycle[RC <: ResultCategory]
+  object RequireCycle:
+    given setOk: RequireCycle[SetResult] = new RequireCycle[SetResult] {}
+    given bagNeedsCycle(using dialects.DialectFeature.CycleClause): RequireCycle[BagResult] = new RequireCycle[BagResult] {}
+
+  /** The monotonicity the recursive reference is handed: `NonMonotone`
+   *  (aggregation in the recursive step is permitted) iff the dialect in scope
+   *  provides `RecursiveAggregation`, otherwise `Monotone` -- so a recursive
+   *  `.aggregate` simply fails to type-check on a backend that forbids it. */
+  sealed trait AggregationMode[RM <: MonotoneRestriction]
+  given aggAllowed(using dialects.DialectFeature.RecursiveAggregation): AggregationMode[NonMonotone] =
+    new AggregationMode[NonMonotone] {}
+  given aggForbidden(using scala.util.NotGiven[dialects.DialectFeature.RecursiveAggregation]): AggregationMode[Monotone] =
+    new AggregationMode[Monotone] {}
+
+  /** Reify the set/bag category type to the `setBased` flag `fixImpl` needs. */
+  sealed trait IsSetBased[RC <: ResultCategory] { def value: Boolean }
+  given IsSetBased[SetResult] with { def value = true }
+  given IsSetBased[BagResult] with { def value = false }
 
   // Extract the row type from Query union type
   type ExtractRowType[Q] = Q match {

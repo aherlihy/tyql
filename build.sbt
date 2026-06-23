@@ -6,7 +6,7 @@ inThisBuild(Seq(
   version := "0.0.1",
   libraryDependencies ++= Seq(
     "org.scalameta" %% "munit" % "1.2.4" % Test,
-    "org.duckdb" % "duckdb_jdbc" % "1.1.1",
+    "org.duckdb" % "duckdb_jdbc" % "1.5.3.0",
     "com.lihaoyi" %% "scalasql" % "0.1.11"
   ),
   scalacOptions ++= Seq(
