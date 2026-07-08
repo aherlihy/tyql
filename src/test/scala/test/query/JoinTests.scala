@@ -11,19 +11,17 @@ import NamedTuple.*
 
 import java.time.LocalDate
 
-class JoinSimple1Test extends SQLStringQueryTest[AllCommerceDBs, (name: String, shippingDate: LocalDate)] {
+class JoinSimple1Test extends SQLStringQueryTest[AllCommerceDBs, (name: String)] {
   def testDescription = "Join: two-table simple join on int equality + project"
   def query() =
     // val q =
-    for
-      b <- testDB.tables.buyers
-      si <- testDB.tables.shipInfos
-      if si.buyerId == b.id
-    yield (name = b.name, shippingDate = si.shippingDate).toRow
+      testDB.tables.buyers
+        .filter(b => b.id > 90)
+        .map(b => (name = b.name).toRow)
 //  q
 
   def expectedQueryPattern: String = """
-        SELECT buyers$A.name as name, shippingInfo$B.shippingDate as shippingDate
+        xSELECT buyers$A.name as name, shippingInfo$B.shippingDate as shippingDate
         FROM buyers as buyers$A, shippingInfo as shippingInfo$B
         WHERE shippingInfo$B.buyerId = buyers$A.id
       """

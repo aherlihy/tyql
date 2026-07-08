@@ -75,9 +75,11 @@ class FlowForTest4Test extends SQLStringQueryTest[AllCommerceDBs, (name: String,
       if purch.id == prod.id && prod.id == si.id
     yield (name = prod.name, id = purch.id, sd = si.shippingDate).toRow
 
+
+
   def expectedQueryPattern =
     """
-        SELECT product$A.name as name, purchase$B.id as id, shippingInfo$C.shippingDate as sd
+        xSELECT product$A.name as name, purchase$B.id as id, shippingInfo$C.shippingDate as sd
         FROM
           purchase as purchase$B,
           product as product$A,
