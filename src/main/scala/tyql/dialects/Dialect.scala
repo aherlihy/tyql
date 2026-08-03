@@ -38,6 +38,13 @@ trait Dialect:
    *  recursive query. Compile-time gate: `DialectFeature.CycleClause`. */
   def supportsCycleClause: Boolean = false
 
+  /** Whether this backend declares an aggregate in the *head* of a recursive
+   *  definition (RaSQL's endo-aggregate form, e.g. `waitfor(part, max() as days)`)
+   *  rather than as an ordinary `GROUP BY` inside the recursive step. RaSQL
+   *  guarantees this form converges to the stratified result for pre-mappable
+   *  aggregates. Compile-time gate: `DialectFeature.RecursiveAggregation`. */
+  def supportsRecursiveAggregateHead: Boolean = false
+
 object Dialect:
   /** Default ANSI dialect — in scope automatically whenever any Dialect is
    *  summoned and no more specific given is in scope.  Deliberately does NOT
@@ -92,4 +99,18 @@ object duckdb:
     override def supportsKeyedRecursion: Boolean = true
 
   given DialectFeature.KeyedRecursion = new DialectFeature.KeyedRecursion {}
+  given DialectFeature.RecursiveAggregation = new DialectFeature.RecursiveAggregation {}
+
+/** RaSQL dialect (Recursive-aggregate-SQL, Gu et al. 2019).  Users activate it
+ *  with `import tyql.dialects.rasql.given`.  Unlike DuckDB, which merely permits
+ *  an aggregate as an ordinary `GROUP BY` in the recursive step with no
+ *  convergence guarantee, RaSQL declares the aggregate in the *head* of the
+ *  recursive definition (e.g. `waitfor(part, max() as days)`) and guarantees,
+ *  via the pre-mappability (PreM) property, that this endo-aggregate program
+ *  converges to the same result as its stratified counterpart. */
+object rasql:
+  given rasql: Dialect = new Dialect:
+    def name() = "RaSQL Dialect"
+    override def supportsRecursiveAggregateHead: Boolean = true
+
   given DialectFeature.RecursiveAggregation = new DialectFeature.RecursiveAggregation {}

@@ -431,6 +431,40 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
         case _ => None
     }.toSeq
 
+  /** The recursive part of a CTE body, i.e. everything after the (last) UNION. */
+  private def recursivePart(body: String): String =
+    body.split("(?i)union(\\s+all)?").last
+
+  /** Whether the recursive step applies an aggregate function (RaSQL lifts this
+   *  into the CTE head rather than leaving it as a `GROUP BY`). */
+  private def hasRecursiveAggregate(body: String): Boolean =
+    "(?i)\\b(MAX|MIN|SUM|COUNT|AVG)\\s*\\(".r.findFirstIn(recursivePart(body)).isDefined
+
+  /** RaSQL endo-aggregate form: lift the aggregate declared in the recursive
+   *  step into the CTE head (e.g. `waitfor(part, max() as days)`), project the
+   *  raw aggregated expression in the body, and drop the `GROUP BY`. This is the
+   *  form RaSQL (Gu et al. 2019) evaluates under the PreM property. Returns the
+   *  head (aliased column list) and the rewritten body. */
+  private def liftAggregateToHead(body: String, recAlias: String, cols: Seq[String]): (String, String) =
+    // Map each aggregated output column to its aggregate function.
+    val proj = recursivePart(body).replaceAll("(?is).*?\\bselect\\b", "").split("(?i)\\bfrom\\b").headOption.getOrElse("")
+    val itemRe = "(?is)^\\s*(MAX|MIN|SUM|COUNT|AVG)\\s*\\(.*\\)\\s+as\\s+(\\w+)\\s*$".r
+    val aggCols: Map[String, String] = proj.split(",").flatMap { item =>
+      item.trim match
+        case itemRe(fn, name) => Some(name.trim -> fn.trim.toLowerCase)
+        case _ => None
+    }.toMap
+    val headCols = cols.map(c => aggCols.get(c) match
+      case Some(fn) => s"$fn() as $c"
+      case None      => c
+    ).mkString(", ")
+    val rewritten = body
+      // unwrap `MAX(expr) as name` -> `expr as name`
+      .replaceAll("(?is)(?:MAX|MIN|SUM|COUNT|AVG)\\s*\\(\\s*([^()]*?)\\s*\\)(\\s+as\\b)", "$1$2")
+      // drop the now-unnecessary GROUP BY
+      .replaceAll("(?is)\\s+GROUP\\s+BY\\b[^)]*", "")
+    (s"$recAlias($headCols)", rewritten)
+
   override def toSQLString(): String =
     val matHint = if materialized then " MATERIALIZED" else ""
     val cols = relationColumns
@@ -450,6 +484,10 @@ case class MultiRecursiveRelationOp(aliases: Seq[String],
         val nodeCols = nodeIdentityColumns(body)
         val cyc = if nodeCols.nonEmpty then Some(s"CYCLE ${nodeCols.mkString(", ")} SET is_cycle USING path") else None
         (s"$a AS$matHint ($body)", cyc)
+      else if dialect.supportsRecursiveAggregateHead && cols.nonEmpty && hasRecursiveAggregate(body) then
+        // RaSQL: declare the aggregate in the recursive CTE head (endo-aggregate form).
+        val (head, rewritten) = liftAggregateToHead(body, a, cols)
+        (s"$head AS$matHint ($rewritten)", None)
       else
         (s"$a AS$matHint ($body)", None)
     }
