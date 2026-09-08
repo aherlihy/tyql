@@ -90,16 +90,24 @@ object mysql:
 
 /** DuckDB dialect.  Users activate it with `import tyql.dialects.duckdb.given`.
  *  DuckDB uses ANSI double-quoted identifiers (inherited default).  It provides
- *  two recursive capabilities the standard does not: keyed recursion
- *  (`USING KEY`), which lets a non-linear recursive query run correctly, and
- *  aggregation inside the recursive step.  It does NOT provide a `CYCLE` clause. */
+ *  keyed recursion (`USING KEY`), the capability the standard lacks that lets a
+ *  non-linear recursive query run correctly.  It does NOT provide a `CYCLE`
+ *  clause, and it does NOT provide `RecursiveAggregation`: although DuckDB will
+ *  *execute* a `GROUP BY` inside the recursive step, it does not *guarantee*
+ *  that such a program converges to the stratified result. Only RaSQL does, via
+ *  the pre-mappability (PreM) property. CirQL therefore rejects a recursive
+ *  aggregate on DuckDB at compile time, exactly as it does on PostgreSQL. */
 object duckdb:
   given duck: Dialect = new Dialect:
     def name() = "DuckDB Dialect"
     override def supportsKeyedRecursion: Boolean = true
 
   given DialectFeature.KeyedRecursion = new DialectFeature.KeyedRecursion {}
-  given DialectFeature.RecursiveAggregation = new DialectFeature.RecursiveAggregation {}
+  // NOTE: DuckDB deliberately does NOT provide `RecursiveAggregation`. It has no
+  // convergence guarantee for aggregation inside recursion, so a recursive
+  // aggregate must fail to type-check here just as it does under PostgreSQL;
+  // only RaSQL (below), which guarantees convergence via PreM, provides it.
+  // given DialectFeature.RecursiveAggregation = new DialectFeature.RecursiveAggregation {}
 
 /** RaSQL dialect (Recursive-aggregate-SQL, Gu et al. 2019).  Users activate it
  *  with `import tyql.dialects.rasql.given`.  Unlike DuckDB, which merely permits

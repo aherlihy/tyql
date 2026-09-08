@@ -41,18 +41,34 @@ class ComposableFixTest extends munit.FunSuite:
     assert(sql.contains("USING KEY"), sql)
     assert(sql.contains("recurring."), sql)
 
-  // aggregation in the recursive step: needs recursive aggregation (DuckDB permits)
-  test("DuckDB: recursive aggregation (bill-of-materials) compiles"):
-    import tyql.dialects.duckdb.given
-    import Expr.max
-    val q = BasicParts.composableFix(waitFor =>
-      SubParts.aggregate(sp =>
-        waitFor
-          .filter(wf => sp.sub == wf.part)
-          .aggregate(wf => (part = sp.part, days = max(wf.days))))
-        .groupBySource((wf, _) => (part = wf.part))
-        .distinct)
-    assert(q.toSQLString.contains("RECURSIVE"), q.toSQLString)
+  // aggregation in the recursive step needs recursive aggregation. DuckDB will
+  // *execute* a recursive GROUP BY but does not *guarantee* convergence to the
+  // stratified result, so CirQL does NOT expose RecursiveAggregation for it: the
+  // bill-of-materials query is rejected at compile time, exactly as under
+  // PostgreSQL. Only RaSQL (which guarantees convergence via PreM) admits it.
+  test("DuckDB rejects recursive aggregation (bill-of-materials) at compile time"):
+    val err = compileErrors("""
+      import tyql.*
+      import tyql.dialects.duckdb.given
+      import tyql.Expr.max
+      import language.experimental.namedTuples
+      import NamedTuple.*
+      import scala.language.implicitConversions
+      type BasicPart = (part: String, days: Int)
+      type SubPart = (part: String, sub: String)
+      val BasicParts: Table[BasicPart] = Table[BasicPart]("basicparts")
+      val SubParts: Table[SubPart] = Table[SubPart]("subparts")
+      BasicParts.composableFix(waitFor =>
+        SubParts.aggregate(sp =>
+          waitFor.filter(wf => sp.sub == wf.part)
+            .aggregate(wf => (part = sp.part, days = max(wf.days))))
+          .groupBySource((wf, _) => (part = wf.part))
+          .distinct)
+    """)
+    assert(err.nonEmpty, "expected a compile error under DuckDB")
+    // rejected specifically for the recursive aggregate (the monotonicity gate),
+    // not for a missing CYCLE clause or keyed recursion.
+    assert(!err.contains("CYCLE") && !err.toLowerCase.contains("keyed recursion"), err)
 
   // RaSQL: the SAME query source, but under the RaSQL dialect the aggregate is
   // declared in the recursive CTE head (endo-aggregate form), the GROUP BY is
@@ -208,31 +224,31 @@ class ComposableFixTest extends munit.FunSuite:
     val expected = Set((1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(2,5),(3,4))
     assertEquals(result, expected, s"generated SQL:\n$sql")
 
-  test("DuckDB EXECUTES the generated recursive aggregation (BOM) with correct max-days"):
-    import tyql.dialects.duckdb.given
-    import Expr.max
-    val q = BasicParts.composableFix(waitFor =>
-      SubParts.aggregate(sp =>
-        waitFor
-          .filter(wf => sp.sub == wf.part)
-          .aggregate(wf => (part = sp.part, days = max(wf.days))))
-        .groupBySource((wf, _) => (part = wf.part))
-        .distinct)
-    val sql = q.toSQLString
-    val result = withDuckDB(Seq(
-      "CREATE TABLE basicparts(part VARCHAR, days INTEGER)",
-      "INSERT INTO basicparts VALUES ('A',1),('B',2)",
-      "CREATE TABLE subparts(part VARCHAR, sub VARCHAR)",
-      "INSERT INTO subparts VALUES ('C','A'),('C','B'),('D','C')"
-    )) { conn =>
-      val rs = conn.createStatement().executeQuery(sql)
-      val buf = scala.collection.mutable.Map[String, Int]()
-      while rs.next() do
-        val p = rs.getString("part"); val d = rs.getInt("days")
-        buf(p) = math.max(buf.getOrElse(p, Int.MinValue), d)
-      buf.toMap
-    }
-    assertEquals(result, Map("A" -> 1, "B" -> 2, "C" -> 2, "D" -> 2), s"generated SQL:\n$sql")
+  test("DuckDB never executes the recursive aggregation (BOM): rejected before it can run"):
+    // The former execution test is gone by design: because the BOM recursive
+    // aggregate no longer type-checks under DuckDB (no convergence guarantee ->
+    // no RecursiveAggregation feature), no SQL is ever generated to execute.
+    // This mirrors the thesis, which reports a compile-time error on DuckDB just
+    // as on PostgreSQL; only RaSQL admits the query (see the RaSQL test above).
+    val err = compileErrors("""
+      import tyql.*
+      import tyql.dialects.duckdb.given
+      import tyql.Expr.max
+      import language.experimental.namedTuples
+      import NamedTuple.*
+      import scala.language.implicitConversions
+      type BasicPart = (part: String, days: Int)
+      type SubPart = (part: String, sub: String)
+      val BasicParts: Table[BasicPart] = Table[BasicPart]("basicparts")
+      val SubParts: Table[SubPart] = Table[SubPart]("subparts")
+      BasicParts.composableFix(waitFor =>
+        SubParts.aggregate(sp =>
+          waitFor.filter(wf => sp.sub == wf.part)
+            .aggregate(wf => (part = sp.part, days = max(wf.days))))
+          .groupBySource((wf, _) => (part = wf.part))
+          .distinct)
+    """)
+    assert(err.nonEmpty, "expected a compile error under DuckDB (query must not compile or execute)")
 
   test("DuckDB EXECUTES a generated string-literal filter (single-quoted) correctly"):
     import tyql.dialects.duckdb.given

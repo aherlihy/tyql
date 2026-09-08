@@ -42,11 +42,14 @@ object DialectFeature:
   )
   trait CycleClause extends DialectFeature
 
-  /** Aggregation inside the recursive step (DuckDB, research engines). The SQL
-   *  standard prohibits it and most engines reject it. Required only when a
-   *  recursive query actually aggregates in its recursive case. */
+  /** Aggregation inside the recursive step, provided only by a backend that
+   *  *guarantees* such a program converges to the stratified result (RaSQL, via
+   *  the PreM property). The SQL standard prohibits it; engines that merely
+   *  *execute* it without a convergence guarantee (e.g. DuckDB) do NOT provide
+   *  this feature. Required only when a recursive query actually aggregates in
+   *  its recursive case. */
   @implicitNotFound(
     "This backend rejects aggregation inside a recursive query. " +
-      "Target a backend that permits it, e.g. `import tyql.dialects.duckdb.given`."
+      "Target a backend that guarantees convergence, e.g. `import tyql.dialects.rasql.given`."
   )
   trait RecursiveAggregation extends DialectFeature
