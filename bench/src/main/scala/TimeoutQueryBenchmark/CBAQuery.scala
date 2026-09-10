@@ -210,7 +210,7 @@ class TOCBAQuery extends QueryBenchmark {
       })
 
     val query = dataTerm.distinct.size
-    val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
+    val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =

@@ -95,7 +95,7 @@ class TOEvenOddQuery extends QueryBenchmark {
       (evenResult, oddResult)
     )
 
-    val queryStr = odd.sort(_.value, Ord.ASC).sort(_.typ, Ord.ASC).toQueryIR.toSQLString().replace("\"", "'")
+    val queryStr = odd.sort(_.value, Ord.ASC).sort(_.typ, Ord.ASC).toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =

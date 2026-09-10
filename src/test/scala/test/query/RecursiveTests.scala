@@ -421,46 +421,50 @@ class RecursiveCSPADistinctTest extends SQLStringQueryTest[CSPADB, Location] {
               )
             )
           ).distinct
-        (VF, MA, VA)
+        (VF, VA, MA)
     )
     valueFlowFinal
 
   def expectedQueryPattern: String =
     """
-    WITH RECURSIVE
-      recursive$A AS
-        (((SELECT * FROM assign as assign$D)
+    WITH RECURSIVE recursive$1 AS
+          (((SELECT *
+          FROM assign as assign$1)
+        UNION ALL
+          (SELECT assign$2.p1 as p1, assign$2.p1 as p2
+          FROM assign as assign$2)
+        UNION ALL
+          (SELECT assign$3.p2 as p1, assign$3.p2 as p2
+          FROM assign as assign$3))
+      UNION
+            (((SELECT assign$4.p1 as p1, ref$1.p2 as p2
+            FROM assign as assign$4, recursive$2 as ref$1
+            WHERE assign$4.p2 = ref$1.p1)
           UNION ALL
-        (SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
+            (SELECT ref$2.p1 as p1, ref$3.p2 as p2
+            FROM recursive$1 as ref$2, recursive$1 as ref$3
+            WHERE ref$2.p2 = ref$3.p1)))), recursive$3 AS
+        ((SELECT *
+        FROM empty as empty$1)
+      UNION
+            (((SELECT ref$4.p2 as p1, ref$5.p2 as p2
+            FROM recursive$1 as ref$4, recursive$1 as ref$5
+            WHERE ref$4.p1 = ref$5.p1)
           UNION ALL
-        (SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F))
-          UNION
-        (((SELECT assign$G.p1 as p1, ref$J.p2 as p2
-        FROM assign as assign$G, recursive$C as ref$J
-        WHERE assign$G.p2 = ref$J.p1)
-          UNION ALL
-        (SELECT ref$K.p1 as p1, ref$L.p2 as p2
-        FROM recursive$A as ref$K, recursive$A as ref$L
-        WHERE ref$K.p2 = ref$L.p1)))),
-      recursive$B AS
-        ((SELECT * FROM empty as empty$M)
-          UNION
-        ((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
-        FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-        WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
-      recursive$C AS
-        (((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
-          UNION ALL
-        (SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I))
-          UNION
-        (((SELECT ref$Q.p2 as p1, ref$R.p2 as p2
-        FROM recursive$A as ref$Q, recursive$A as ref$R
-        WHERE ref$Q.p1 = ref$R.p1)
-          UNION ALL
-        (SELECT ref$S.p2 as p1, ref$T.p2 as p2
-        FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-        WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2))))
-    SELECT * FROM recursive$A as recref$V
+            (SELECT ref$6.p2 as p1, ref$7.p2 as p2
+            FROM recursive$1 as ref$6, recursive$2 as ref$8, recursive$1 as ref$7
+            WHERE ref$6.p1 = ref$8.p1 AND ref$7.p1 = ref$8.p2)))), recursive$2 AS
+          (((SELECT assign$5.p2 as p1, assign$5.p2 as p2
+          FROM assign as assign$5)
+        UNION ALL
+          (SELECT assign$6.p1 as p1, assign$6.p1 as p2
+          FROM assign as assign$6))
+      UNION
+          ((SELECT dereference$1.p2 as p1, dereference$2.p2 as p2
+          FROM dereference as dereference$1, recursive$3 as ref$9, dereference as dereference$2
+          WHERE dereference$1.p1 = ref$9.p1 AND ref$9.p2 = dereference$2.p1)))
+    SELECT *
+    FROM recursive$1 as recref$1
     """
 }
 
@@ -532,46 +536,50 @@ class RecursiveCSPATest extends SQLStringQueryTest[CSPADB, Location] {
               )
             )
           )
-        (VF, MA, VA)
+        (VF, VA, MA)
     )
     valueFlowFinal
 
   def expectedQueryPattern: String =
     """
-    WITH RECURSIVE
-      recursive$A AS
-        ((SELECT * FROM assign as assign$D)
-          UNION
-        ((SELECT assign$E.p1 as p1, assign$E.p1 as p2 FROM assign as assign$E)
-          UNION
-        (SELECT assign$F.p2 as p1, assign$F.p2 as p2 FROM assign as assign$F)
-          UNION
-        (SELECT assign$G.p1 as p1, ref$J.p2 as p2
-        FROM assign as assign$G, recursive$C as ref$J
-        WHERE assign$G.p2 = ref$J.p1)
-          UNION
-        (SELECT ref$K.p1 as p1, ref$L.p2 as p2
-        FROM recursive$A as ref$K, recursive$A as ref$L
-        WHERE ref$K.p2 = ref$L.p1))),
-      recursive$B AS
-        ((SELECT * FROM empty as empty$M)
-          UNION
-        ((SELECT dereference$N.p2 as p1, dereference$O.p2 as p2
-        FROM dereference as dereference$N, recursive$B as ref$P, dereference as dereference$O
-        WHERE dereference$N.p1 = ref$P.p1 AND ref$P.p2 = dereference$O.p1))),
-      recursive$C AS
-        ((SELECT assign$H.p2 as p1, assign$H.p2 as p2 FROM assign as assign$H)
-          UNION
-        ((SELECT assign$I.p1 as p1, assign$I.p1 as p2 FROM assign as assign$I)
-          UNION
-        (SELECT ref$Q.p2 as p1, ref$R.p2 as p2
-        FROM recursive$A as ref$Q, recursive$A as ref$R
-        WHERE ref$Q.p1 = ref$R.p1)
-          UNION
-        (SELECT ref$S.p2 as p1, ref$T.p2 as p2
-        FROM recursive$A as ref$S, recursive$C as ref$U, recursive$A as ref$T
-        WHERE ref$S.p1 = ref$U.p1 AND ref$T.p1 = ref$U.p2)))
-    SELECT * FROM recursive$A as recref$V
+    WITH RECURSIVE recursive$1 AS
+        ((SELECT *
+        FROM assign as assign$1)
+      UNION
+          ((SELECT assign$2.p1 as p1, assign$2.p1 as p2
+          FROM assign as assign$2)
+        UNION
+          (SELECT assign$3.p2 as p1, assign$3.p2 as p2
+          FROM assign as assign$3)
+        UNION
+          (SELECT assign$4.p1 as p1, ref$1.p2 as p2
+          FROM assign as assign$4, recursive$2 as ref$1
+          WHERE assign$4.p2 = ref$1.p1)
+        UNION
+          (SELECT ref$2.p1 as p1, ref$3.p2 as p2
+          FROM recursive$1 as ref$2, recursive$1 as ref$3
+          WHERE ref$2.p2 = ref$3.p1))), recursive$3 AS
+        ((SELECT *
+        FROM empty as empty$1)
+      UNION
+          ((SELECT ref$4.p2 as p1, ref$5.p2 as p2
+          FROM recursive$1 as ref$4, recursive$1 as ref$5
+          WHERE ref$4.p1 = ref$5.p1)
+        UNION
+          (SELECT ref$6.p2 as p1, ref$7.p2 as p2
+          FROM recursive$1 as ref$6, recursive$2 as ref$8, recursive$1 as ref$7
+          WHERE ref$6.p1 = ref$8.p1 AND ref$7.p1 = ref$8.p2))), recursive$2 AS
+        ((SELECT assign$5.p2 as p1, assign$5.p2 as p2
+        FROM assign as assign$5)
+      UNION
+          ((SELECT assign$6.p1 as p1, assign$6.p1 as p2
+          FROM assign as assign$6)
+        UNION
+          (SELECT dereference$1.p2 as p1, dereference$2.p2 as p2
+          FROM dereference as dereference$1, recursive$3 as ref$9, dereference as dereference$2
+          WHERE dereference$1.p1 = ref$9.p1 AND ref$9.p2 = dereference$2.p1)))
+    SELECT *
+    FROM recursive$1 as recref$1
     """
 }
 
@@ -677,7 +685,7 @@ class RecursionTreeTest extends SQLStringQueryTest[TagDB, List[String]] {
               tag$64.id as id, tag$64.name as source, list_prepend(tag$64.name, ref$30.path) as path
             FROM recursive$62 as ref$30, tag as tag$64
             WHERE tag$64.subclassof = ref$30.id)))
-      SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = "Oasis"
+      SELECT recref$5.path FROM recursive$62 as recref$5 WHERE recref$5.source = 'Oasis'
       """
 }
 

@@ -541,7 +541,7 @@ class NestedJoinSubquery7Test extends SQLStringQueryTest[AllCommerceDBs, Product
       FROM
         purchase as purchase$A,
         product as product$B
-      WHERE product$B.name = "test"
+      WHERE product$B.name = 'test'
       """
 }
 
@@ -560,7 +560,7 @@ class NestedJoinSubquery8Test extends SQLStringQueryTest[AllCommerceDBs, Product
       FROM
         purchase as purchase$A,
         product as product$B
-      WHERE (purchase$A.id = 1 AND product$B.name = "test")
+      WHERE (purchase$A.id = 1 AND product$B.name = 'test')
       """
 }
 
@@ -580,7 +580,7 @@ class NestedJoinSubquery9Test extends SQLStringQueryTest[AllCommerceDBs, (newId:
       FROM
         purchase as purchase$A,
         product as product$B
-      WHERE product$B.name = "test"
+      WHERE product$B.name = 'test'
       """
 }
 
@@ -717,7 +717,7 @@ class NestedJoinSubquery15Test extends SQLStringQueryTest[AllCommerceDBs, Produc
           FROM
             (SELECT purchase$B.id as newId FROM purchase as purchase$B) as subquery$C,
             product as product$A
-          WHERE product$A.name = "test"
+          WHERE product$A.name = 'test'
         """
 }
 
@@ -1557,7 +1557,7 @@ class NestedJoinExtraTest extends SQLStringQueryTest[AllCommerceDBs, (name: Stri
           purchase as purchase$B,
           product as product$A)
         as subquery$C
-      WHERE subquery$C.name = "test"
+      WHERE subquery$C.name = 'test'
     """
 }
 
@@ -1580,7 +1580,7 @@ class NestedJoinExtra2Test extends SQLStringQueryTest[AllCommerceDBs, (name: Str
         FROM
           purchase as purchase$B,
           product as product$A
-      WHERE (purchase$B.id = 1 AND product$A.name = "test")
+      WHERE (purchase$B.id = 1 AND product$A.name = 'test')
     """
 }
 

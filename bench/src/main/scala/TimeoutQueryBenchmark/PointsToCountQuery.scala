@@ -146,7 +146,7 @@ class TOPointsToCountQuery extends QueryBenchmark {
     )
     val query = pt._1.filter(vpt => vpt.x == "r").size
 
-    val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
+    val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =

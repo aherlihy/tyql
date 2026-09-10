@@ -84,7 +84,7 @@ class TOAncestryQuery extends QueryBenchmark {
       .map(g => (name = g.name).toRow)
       .sort(_.name, Ord.ASC)
 
-    val queryStr = query.toQueryIR.toSQLString().replace("\"", "'")
+    val queryStr = query.toQueryIR.toSQLString()
     resultTyql = ddb.runQuery(queryStr)
 
   def executeCollections(): Unit =

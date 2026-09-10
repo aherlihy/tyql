@@ -71,8 +71,13 @@ case class QueryIRVar(toSub: RelationOp, name: String, ast: Expr.Ref[?, ?]) exte
 case class Literal(stringRep: String, ast: Expr[?, ?]) extends QueryIRLeaf:
   override def toSQLString(): String = stringRep
 
-case class ListTypeExpr(elements: List[QueryIRNode], ast: Expr[?, ?]) extends QueryIRNode:
-  override def toSQLString(): String = elements.map(_.toSQLString()).mkString("[", ", ", "]")
+/**
+ * A list value. How a list is spelled is backend-specific -- DuckDB has a native
+ * list type, the other backends encode one as a delimited string -- so the
+ * rendering is supplied by the dialect at IR-construction time.
+ */
+case class ListTypeExpr(elements: List[QueryIRNode], render: Seq[String] => String, ast: Expr[?, ?]) extends QueryIRNode:
+  override def toSQLString(): String = render(elements.map(_.toSQLString()))
 
 /**
  * Empty leaf node, to avoid Options everywhere.

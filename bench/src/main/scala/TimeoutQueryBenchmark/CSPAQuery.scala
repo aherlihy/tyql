@@ -144,7 +144,8 @@ class TOCSPAQuery extends QueryBenchmark {
           yield (p1 = vf1.p2, p2 = vf2.p2).toRow
         val VA = vaDef1.union(vaDef2)
 
-        (VF, MA.distinct, VA)
+        // Order must match the bases: (ValueFlow, ValueAlias, MemoryAlias).
+        (VF, VA, MA.distinct)
     )
 
     val queryStr = valueFlowFinal.sort(_.p2, Ord.ASC).sort(_.p1, Ord.ASC).toQueryIR.toSQLString()
@@ -225,7 +226,8 @@ class TOCSPAQuery extends QueryBenchmark {
           yield PairCC(p1 = vf1.p2, p2 = vf2.p2)
         val VA = valueAliasDef1.union(valueAliasDef2)
 
-        (VF, MA, VA)
+        // Order must match the bases: (ValueFlow, ValueAlias, MemoryAlias).
+        (VF, VA, MA)
       }
     )
     resultCollections = valueFlowFinal.sortBy(_.p2).sortBy(_.p1)
@@ -251,7 +253,8 @@ class TOCSPAQuery extends QueryBenchmark {
               .map(a => (a.p1, a.p1)))
           .union(
             cspa_assign.select.map(a => (a.p2, a.p2)))
-      (memoryAliasBase, cspa_empty.select.map(s => (s.p1, s.p2)), valueFlowBase)
+      // Order must match fixFn's (valueFlow, valueAlias, memoryAlias) destructuring.
+      (valueFlowBase, cspa_empty.select.map(s => (s.p1, s.p2)), memoryAliasBase)
     }
 
     val fixFn: ((ScalaSQLTable[PairSS], ScalaSQLTable[PairSS], ScalaSQLTable[PairSS])) => (query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)], query.Select[(Expr[Int], Expr[Int]), (Int, Int)]) =
@@ -302,7 +305,8 @@ class TOCSPAQuery extends QueryBenchmark {
         val VA = valueAliasDef1.union(valueAliasDef2)
 
         //        println(s"output:\n\teven: ${db.run(evenResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}\n\toddResult: ${db.run(oddResult).map(f => f._1 + "-" + f._2).mkString("(", ",", ")")}")
-        (VF, MA, VA)
+        // Order must match the bases: (ValueFlow, ValueAlias, MemoryAlias).
+        (VF, VA, MA)
       }
 
     FixedPointQuery.scalaSQLSemiNaiveTHREE(set)(
