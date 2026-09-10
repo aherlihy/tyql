@@ -130,9 +130,11 @@ object Expr:
   def avg(x: Expr[Double, ?, NonRestrictedConstructors]): AggregationExpr[Double] = AggregationExpr.Avg(x)
 
   // max, min only select existing values from the domain, so they accept any ConstructorFreedom
-  def max[T: ResultTag](x: Expr[T, ?, ?]): AggregationExpr[T] = AggregationExpr.Max(x)
+  // Narrow return type to the concrete node so the selecting/accumulating
+  // distinction survives to the type level (AggregationExpr.IsTupleOfSelectingAgg).
+  def max[T: ResultTag](x: Expr[T, ?, ?]): AggregationExpr.Max[T] = AggregationExpr.Max(x)
 
-  def min[T: ResultTag](x: Expr[T, ?, ?]): AggregationExpr[T] = AggregationExpr.Min(x)
+  def min[T: ResultTag](x: Expr[T, ?, ?]): AggregationExpr.Min[T] = AggregationExpr.Min(x)
 
   def count(x: Expr[Int, ?, NonRestrictedConstructors]): AggregationExpr[Int] = AggregationExpr.Count(x)
   @targetName("stringCnt")

@@ -55,6 +55,11 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple, RestrictionCF <: Const
     (using ResultTag[NamedTuple.Map[B, Expr.StripExpr]])
     (f: Expr.Ref[A, NonScalarExpr, RestrictionCF] => B)
     (using RestrictionM =:= NonMonotone)
+    (using @implicitNotFound(
+      "Only the selecting aggregates min and max are admitted inside a recursive definition. " +
+      "sum, count and avg accumulate once per derivation, so they diverge on cyclic input. " +
+      "This is an over-conservative approximation of the PreM property.")
+      selecting: AggregationExpr.IsTupleOfSelectingAgg[B])
   : RestrictedQuery.RestrictedAggregation[A *: EmptyTuple, NamedTuple.Map[B, Expr.StripExpr], D, RestrictionCF] =
     val ref = Expr.Ref[A, NonScalarExpr, RestrictionCF]()
     val row = AggregationExpr.AggProject(f(ref))

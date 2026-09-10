@@ -28,6 +28,21 @@ object AggregationExpr {
 // For now restrict all elements to be agg instead of allowing a mix.
   type IsTupleOfAgg[A <: AnyNamedTuple] = Tuple.Union[NamedTuple.DropNames[A]] <:< Expr[?, ScalarExpr, ?]
 
+  /** CirQL's over-conservative approximation of the PreM property.
+   *
+   *  `Max`/`Min` SELECT among the values the recursion produces, so a repeated
+   *  derivation contributes nothing and the fixpoint is reached even on cyclic
+   *  input. `Sum`/`Count`/`Avg` ACCUMULATE once per derivation, so cyclic input
+   *  yields infinitely many derivations and the query diverges. Only the
+   *  selecting aggregates are admitted inside a recursive definition.
+   *
+   *  An element is admissible when it is an ordinary (non-aggregate) column
+   *  expression, which is `Expr[?, NonScalarExpr, ?]`, or a selecting aggregate.
+   *  `Sum[A]` is `Expr[A, ScalarExpr, ?]` and matches neither, so it is
+   *  rejected at compile time. */
+  type IsTupleOfSelectingAgg[A <: AnyNamedTuple] =
+    Tuple.Union[NamedTuple.DropNames[A]] <:< (Expr[?, NonScalarExpr, ?] | Max[?] | Min[?])
+
   // Allow only aggregates in toRow. TODO: allow constants e.g. SELECT AVG(x), 1 FROM db
   extension [A <: AnyNamedTuple: IsTupleOfAgg](x: A)
     def toRow(using ResultTag[NamedTuple.Map[A, StripExpr]]): AggProject[A] = AggProject(x)
