@@ -1,6 +1,6 @@
 package tyql
 
-import tyql.Utils.{GenerateIndices, HasDuplicate, ZipWithIndex}
+import tyql.Utils.{GenerateIndices, HasDuplicate, UnionCollect, ZipWithIndex}
 import tyql.{DatabaseAST, Expr, NonScalarExpr, Query, ResultTag}
 
 import scala.NamedTuple.AnyNamedTuple
@@ -46,12 +46,12 @@ class RestrictedQuery[A, C <: ResultCategory, D <: Tuple](using ResultTag[A])(pr
 
   def union[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])
 //                        (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true)
-    : RestrictedQuery[A, SetResult, Tuple.Concat[D, D2]] =
+    : RestrictedQuery[A, SetResult, UnionCollect[D, D2]] =
     RestrictedQuery(Query.Union(wrapped, that.toQuery))
 
   def unionAll[D2 <: Tuple](that: RestrictedQuery[A, ?, D2])
 //                           (using @implicitNotFound("Recursive definition must be linearly recursive, e.g. each recursive reference cannot be used twice") ev: Tuple.Disjoint[D, D2] =:= true)
-    : RestrictedQuery[A, BagResult, Tuple.Concat[D, D2]] =
+    : RestrictedQuery[A, BagResult, UnionCollect[D, D2]] =
     RestrictedQuery(Query.UnionAll(wrapped, that.toQuery))
 
   @targetName("unionQuery")
